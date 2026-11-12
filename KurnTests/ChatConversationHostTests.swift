@@ -241,6 +241,28 @@ struct MeetingChatBackgroundTests {
         #expect(requests == 2)
     }
 
+    @Test func aStoppedRunThatChangedADocumentIsLeftForTheUser() async throws {
+        let window = FakeBackgroundWindow()
+        let create = try chatAgentCall("create_document", arguments: .object([
+            "title": .string("Draft"), "markdown": .string("Body")
+        ]))
+        let model = ChatAgentModel([AgentTurnResponse(text: "", toolCalls: [create]),
+                                    AgentTurnResponse(text: "Writing"), AgentTurnResponse(text: "Again")], pauseAt: 1)
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model }, makeBackgroundWindow: { window })
+        vm.configure(meeting: meeting, modelContext: context)
+        vm.send(question: "Minutes", provider: .openAI, model: "gpt-4o")
+        for _ in 0..<2_000 where await model.requests.count < 2 { try? await Task.sleep(for: .milliseconds(5)) }
+        window.expire()
+        await vm.resumeAfterForeground()
+        // The document was committed before the stop: re-running would create it a second time.
+        #expect(vm.retryableQuestion == "Minutes")
+        #expect(vm.artifacts.count == 1)
+        let requests = await model.requests.count
+        #expect(requests == 2)
+    }
+
     @Test func aUserStopIsNeverResumed() async {
         let window = FakeBackgroundWindow()
         let model = ChatAgentModel([AgentTurnResponse(text: "Partial"), AgentTurnResponse(text: "Monday.")], pauseAt: 0)

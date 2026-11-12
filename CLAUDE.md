@@ -2950,7 +2950,11 @@ never frozen mid-request or mid-tool. That interruption is kept as `pendingForeg
 question, provider and model); on the next `.active` scene phase `KurnApp` calls
 `ChatConversationHost.resumeAfterForeground()`, which sends each such question again once
 (`background_resumed`) after its run has settled — only if it is still the unanswered retryable
-question with no error. A user stop, a new question, `reset` or `load` clear it, and the host does
+question with no error, and only if the stopped run committed no document change (a resumed run
+would call the tool again under a new invocation identity no receipt matches; such a question stays
+for the user's Retry, `background_resume_declined`). A user stop, a new question, `reset` or `load`
+(opening another saved conversation in the same scope) clear it; each scope keeps its own, so moving
+between meetings does not. The host does
 not evict a conversation that holds one. The resumed run starts over from the saved question; nothing
 of the stopped run is replayed, and committed document effects keep their receipts. The transcription coordinator's background cancellation
 gets the same earlier, checkpointable moment.

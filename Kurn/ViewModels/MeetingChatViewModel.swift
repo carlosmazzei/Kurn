@@ -74,6 +74,10 @@ final class MeetingChatViewModel {
     /// foreground (`resumeAfterForeground`). A user stop, a new question, `reset` or `load`
     /// clear it: only an interruption the user did not ask for is resumed.
     @ObservationIgnored private(set) var pendingForegroundResume: ForegroundResume?
+    /// Whether the last stopped run committed a document change before it stopped. A resumed
+    /// run would call the tool again under a new invocation identity, which no receipt matches,
+    /// so such a question is left for the user to retry instead of being resumed.
+    @ObservationIgnored private var stoppedRunCommittedEffects = false
     struct ForegroundResume {
         let question: String
         let provider: AIProvider
@@ -101,6 +105,7 @@ final class MeetingChatViewModel {
         guard !trimmed.isEmpty, !isResponding, task == nil else { return }
         error = nil
         pendingForegroundResume = nil
+        stoppedRunCommittedEffects = false
 
         generation = UUID()
         let generation = self.generation
@@ -253,6 +258,13 @@ final class MeetingChatViewModel {
         guard let pending = pendingForegroundResume else { return }
         pendingForegroundResume = nil
         guard retryableQuestion == pending.question, error == nil else { return }
+        guard !stoppedRunCommittedEffects else {
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: OperationID(), operation: "meeting_chat", stage: "background",
+                outcome: .cancelled, code: "background_resume_declined"
+            ))
+            return
+        }
         ReliabilityLog.record(ReliabilityEvent(
             operationID: OperationID(), operation: "meeting_chat", stage: "background",
             outcome: .started, code: "background_resumed"
@@ -511,6 +523,8 @@ final class MeetingChatViewModel {
             await Self.terminate(run)
             try? transcript?.end(error is CancellationError ? .cancelled : .failed, stopReason: nil)
             let snapshot = await workspace.snapshot()
+            // Any document change this run committed rules out an automatic resume.
+            if snapshot != initialArtifacts { stoppedRunCommittedEffects = true }
             if self.generation == generation, snapshot != artifacts {
                 turns[index - 1].recordArtifacts(from: artifacts, to: snapshot,
                                                 origin: origin, priorOrigins: priorOrigins)

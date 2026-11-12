@@ -662,7 +662,8 @@ any request, and each run writes a durable `ChatRunRecord` (`.running` → `.end
 marks records a dead process left running as interrupted, so the question reopens as retryable,
 with a note above Retry saying the app closed before the reply finished. A reply the background
 wind-down stopped is sent again once when the app returns to the foreground, unless the user
-stopped, replaced or left it. Each run also commits
+stopped, replaced or left it, or the stopped run had already committed a document change (stable
+effect identity across a resumed run is open). Each run also commits
 its native messages and per-request usage through the harness's awaited sinks, before dependent
 work, between start (frozen scope authorization and model) and end entries, on a branch of the saved session anchored at the accepted question; the selected leaf never
 moves, so the presentation path is unchanged, and a failed commit fails the run with the question

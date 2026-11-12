@@ -394,8 +394,10 @@ The question is persisted before any request (a failed save sends nothing), and 
 `.run` recovery record, `running` then `ended`. A launch sweep marks records still `running` as
 `interrupted`; it never re-sends, resumes or replays a run. A run the background wind-down stopped
 in a live process is sent again once when the app returns to the foreground, from the saved
-question with the same provider and model, only while that question is still the unanswered one;
-a user stop, a new question or switching conversations cancels that.
+question with the same provider and model, only while that question is still the unanswered one
+and only if the stopped run committed no document change (its tool would run again under a new
+invocation identity); a user stop, a new question, a new chat or opening another saved conversation
+in that scope cancels it.
 
 ## NH05 host activation, increment 2: canonical run history
 
