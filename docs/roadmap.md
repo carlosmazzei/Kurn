@@ -670,7 +670,9 @@ moves, so the presentation path is unchanged, and a failed commit fails the run 
 retryable.
 
 **Still open in NH05:** make `AgentSession` the app's run owner (the host now writes native
-message/usage entries in its shape, on per-run branches, including scope authorization); canonical UI/history
+message/usage entries in its shape, on per-run branches, including scope authorization; the owner now
+supports that branch mode and retries an append another writer raced, so the remaining step is
+exposing its run handle/events to the chat and replacing the host writer); canonical UI/history
 restoration from those branches; full phase/identity projection (run/turn/
 call IDs, compacting/retry/waiting phases); durable command idempotency; resuming a run a
 dead process left interrupted (the in-process background case is done); persistence-failure recovery beyond retry (a failed

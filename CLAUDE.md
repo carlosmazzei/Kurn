@@ -2924,7 +2924,12 @@ terminal-save retry never reruns inference/effects and recognizes an identical c
 entry after a lost acknowledgement. Persistence failure is explicit and blocks new prompts;
 message/usage failures require host recovery. Store adapters must implement atomic checked
 append groups. One retained owner per session and authorized history projection are host
-responsibilities; constructing an owner never resumes a saved run.
+responsibilities; constructing an owner never resumes a saved run. `AgentSessionAppendMode.branch`
+chains a run's entries from the leaf at run start without moving the selected leaf — the shape the
+host's `ChatRunTranscriptWriter` writes, so the owner can take that over. Each append is built
+against the snapshot it commits on; a conflict (another writer committed first) rebuilds it on the
+new snapshot, up to `conflictAttempts` (4) tries, and the terminal entry keeps one append identity
+across retries so a lost acknowledgement is recognized by ID and payload.
 
 **Chat conversations are host-owned (NH05 host activation).** `ChatConversationHost`
 (`ViewModels/`, built by `AppComposition`, injected app-wide) retains one
@@ -2956,7 +2961,7 @@ for the user's Retry, `background_resume_declined`). A user stop, a new question
 (opening another saved conversation in the same scope) clear it; each scope keeps its own, so moving
 between meetings does not. The host does
 not evict a conversation that holds one. The resumed run starts over from the saved question; nothing
-of the stopped run is replayed, and committed document effects keep their receipts. The transcription coordinator's background cancellation
+of the stopped run is replayed. The transcription coordinator's background cancellation
 gets the same earlier, checkpointable moment.
 
 **The question is a barrier, and every run leaves a record.** `send` saves the conversation

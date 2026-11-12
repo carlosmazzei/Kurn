@@ -13,6 +13,17 @@ public struct AgentSessionState: Sendable, Equatable {
     public internal(set) var outcome: AgentRunOutcome?
 }
 
+/// Where a session's appended entries go relative to the selected leaf.
+public enum AgentSessionAppendMode: Sendable, Equatable {
+    /// Each appended entry becomes the selected leaf: a linear session.
+    case selectLeaf
+    /// A run's entries form their own branch from the leaf at run start, and the selected leaf
+    /// never moves. A host that keeps its own presentation path on the selected leaf can give a
+    /// run's canonical history to the owner without either path disturbing the other. In an
+    /// empty session the first entry becomes the leaf, since a non-empty log needs one.
+    case branch
+}
+
 /// Initial NH05 ownership boundary. One actor is retained per session by the host. Observation
 /// lifetime does not own execution. This does not activate host UI, queues or canonical replay.
 /// The caller supplies an authorized history projection until NH06 defines that projection.
@@ -24,14 +35,25 @@ public actor AgentSession {
     private var handle: AgentRunHandle?
     private var cancellationRequested = false
     private var persistenceFailed = false
-    private var pendingTerminal: AgentSessionEntry?
+    /// The terminal entry's append identity, fixed once chosen so a retried save recognizes a
+    /// commit whose acknowledgement was lost.
+    private var pendingTerminalID: String?
     private var terminalPayload: AgentSessionEntry.Payload?
     private var terminalEnd: AgentSessionState.End?
+    public let appendMode: AgentSessionAppendMode
+    /// The current run's newest entry in `.branch` mode, the parent of its next one.
+    private var branchTip: String?
+    /// The leaf the current run's branch hangs from, read on its first append and kept across
+    /// conflict retries, so a host write racing that append cannot move the run's anchor.
+    private var branchAnchor: String??
+    /// How many times one append is rebuilt after another writer committed first.
+    static let conflictAttempts = 4
 
-    public init(sessionID: String, store: any AgentSessionStore) throws {
+    public init(sessionID: String, store: any AgentSessionStore, appendMode: AgentSessionAppendMode = .selectLeaf) throws {
         guard AgentContentMessage.validID(sessionID) else { throw AgentSessionStoreError.invalidEntry }
         self.sessionID = sessionID
         self.store = store
+        self.appendMode = appendMode
     }
 
     public func snapshot() -> AgentSessionState { state }
@@ -47,6 +69,8 @@ public actor AgentSession {
         let runID = UUID()
         state = AgentSessionState(phase: .preparing, runID: runID)
         cancellationRequested = false
+        branchTip = nil
+        branchAnchor = nil
         task = Task {
             await perform(harness: harness, systemPrompt: systemPrompt, history: history, prompt: prompt,
                           tools: tools, maxOutputTokens: maxOutputTokens, contextResolution: contextResolution, runID: runID)
@@ -73,7 +97,7 @@ public actor AgentSession {
     /// Returns after acceptance; `waitUntilSettled` also waits for this persistence attempt.
     public func retrySettlement() throws {
         guard task == nil else { throw AgentSessionOwnerError.busy }
-        guard pendingTerminal != nil || terminalPayload != nil else { throw AgentSessionOwnerError.persistenceBlocked }
+        guard terminalPayload != nil else { throw AgentSessionOwnerError.persistenceBlocked }
         state.phase = .preparing
         task = Task { await retryTerminal() }
     }
@@ -133,14 +157,12 @@ public actor AgentSession {
     }
 
     private func commitTerminal() async throws {
-        if pendingTerminal == nil {
-            guard let terminalPayload else { throw AgentSessionOwnerError.persistenceBlocked }
-            pendingTerminal = try await entry(payload: terminalPayload)
-        }
-        guard let pendingTerminal else { throw AgentSessionOwnerError.persistenceBlocked }
-        try await append(pendingTerminal)
-        self.pendingTerminal = nil
-        terminalPayload = nil
+        guard let terminalPayload else { throw AgentSessionOwnerError.persistenceBlocked }
+        let id = pendingTerminalID ?? UUID().uuidString
+        pendingTerminalID = id
+        try await append(payload: terminalPayload, id: id)
+        pendingTerminalID = nil
+        self.terminalPayload = nil
     }
 
     private func appendMessage(_ message: AgentMessage, runID: UUID) async throws {
@@ -160,24 +182,34 @@ public actor AgentSession {
         } catch { persistenceFailed = true; throw error }
     }
 
-    private func entry(payload: AgentSessionEntry.Payload) async throws -> AgentSessionEntry {
-        let snapshot = try await store.load(sessionID: sessionID)
-        return try AgentSessionEntry(sessionID: sessionID, id: UUID().uuidString, parentID: snapshot.leafID,
-            ordinal: snapshot.entries.count + 1, createdAt: AgentSessionEntry.time(), payload: payload,
-            metadata: .object(["runID": state.runID.map { .string($0.uuidString) } ?? .null]))
-    }
-
-    private func append(payload: AgentSessionEntry.Payload) async throws {
-        try await append(entry(payload: payload))
-    }
-
-    private func append(_ entry: AgentSessionEntry) async throws {
-        let snapshot = try await store.load(sessionID: sessionID)
-        if let existing = snapshot.entries.first(where: { $0.id == entry.id }) {
-            guard existing == entry else { throw AgentSessionStoreError.conflict }
+    /// Builds the entry against the snapshot it commits on, so its parent and ordinal are never
+    /// stale. Another writer committing in between is a conflict: the entry is rebuilt on the new
+    /// snapshot and tried again, a bounded number of times. A failed commit writes nothing, so a
+    /// retry cannot duplicate an entry; an `id` already present with the same payload is a commit
+    /// whose acknowledgement was lost.
+    private func append(payload: AgentSessionEntry.Payload, id: String = UUID().uuidString) async throws {
+        var attempt = 0
+        while true {
+            attempt += 1
+            let snapshot = try await store.load(sessionID: sessionID)
+            if let existing = snapshot.entries.first(where: { $0.id == id }) {
+                guard existing.payload == payload else { throw AgentSessionStoreError.conflict }
+                if appendMode == .branch { branchTip = id }
+                return
+            }
+            if branchAnchor == nil { branchAnchor = .some(snapshot.leafID) }
+            let parent = appendMode == .branch ? (branchTip ?? branchAnchor ?? snapshot.leafID) : snapshot.leafID
+            let entry = try AgentSessionEntry(sessionID: sessionID, id: id, parentID: parent,
+                ordinal: snapshot.entries.count + 1, createdAt: AgentSessionEntry.time(), payload: payload,
+                metadata: .object(["runID": state.runID.map { .string($0.uuidString) } ?? .null]))
+            do {
+                try await store.commit(AgentSessionCommit(sessionID: sessionID, expectedRevision: snapshot.revision,
+                    entries: [entry], leafID: appendMode == .branch ? (snapshot.leafID ?? entry.id) : entry.id))
+            } catch AgentSessionStoreError.conflict where attempt < Self.conflictAttempts {
+                continue
+            }
+            if appendMode == .branch { branchTip = id }
             return
         }
-        try await store.commit(AgentSessionCommit(sessionID: sessionID, expectedRevision: snapshot.revision,
-            entries: [entry], leafID: entry.id))
     }
 }
