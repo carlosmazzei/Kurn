@@ -250,9 +250,10 @@ final class MeetingChatViewModel {
 
     /// Sends again, once, the question a background wind-down stopped (NH05 foreground
     /// resumption). Waits for that run to settle first; does nothing if the user has since
-    /// answered, stopped, replaced or left the question. The run starts over from the saved
-    /// question with the same provider and model: committed document effects keep their
-    /// receipts, and nothing of the stopped run is replayed.
+    /// answered, stopped, replaced or left the question, or if the stopped run had committed a
+    /// document change (its tool would run again under a new invocation identity). The run
+    /// starts over from the saved question with the same provider and model; nothing of the
+    /// stopped run is replayed.
     func resumeAfterForeground() async {
         await waitUntilSettled()
         guard let pending = pendingForegroundResume else { return }
