@@ -43,6 +43,9 @@ public actor AgentSession {
     public let appendMode: AgentSessionAppendMode
     /// The current run's newest entry in `.branch` mode, the parent of its next one.
     private var branchTip: String?
+    /// The leaf the current run's branch hangs from, read on its first append and kept across
+    /// conflict retries, so a host write racing that append cannot move the run's anchor.
+    private var branchAnchor: String??
     /// How many times one append is rebuilt after another writer committed first.
     static let conflictAttempts = 4
 
@@ -67,6 +70,7 @@ public actor AgentSession {
         state = AgentSessionState(phase: .preparing, runID: runID)
         cancellationRequested = false
         branchTip = nil
+        branchAnchor = nil
         task = Task {
             await perform(harness: harness, systemPrompt: systemPrompt, history: history, prompt: prompt,
                           tools: tools, maxOutputTokens: maxOutputTokens, contextResolution: contextResolution, runID: runID)
@@ -193,7 +197,8 @@ public actor AgentSession {
                 if appendMode == .branch { branchTip = id }
                 return
             }
-            let parent = appendMode == .branch ? (branchTip ?? snapshot.leafID) : snapshot.leafID
+            if branchAnchor == nil { branchAnchor = .some(snapshot.leafID) }
+            let parent = appendMode == .branch ? (branchTip ?? branchAnchor ?? snapshot.leafID) : snapshot.leafID
             let entry = try AgentSessionEntry(sessionID: sessionID, id: id, parentID: parent,
                 ordinal: snapshot.entries.count + 1, createdAt: AgentSessionEntry.time(), payload: payload,
                 metadata: .object(["runID": state.runID.map { .string($0.uuidString) } ?? .null]))

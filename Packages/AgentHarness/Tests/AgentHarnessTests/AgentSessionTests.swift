@@ -247,6 +247,8 @@ actor SessionTestStore: AgentSessionStore {
         #expect(await store.leaf?.hasPrefix("host-") == true)
         let run = entries.filter { $0.metadata != nil }
         #expect(run.count == 4)
+        // The race did not move the run's anchor off the question it was accepted on.
+        #expect(run.first?.parentID == "question")
         for (parent, child) in zip(run, run.dropFirst()) { #expect(child.parentID == parent.id) }
     }
 
