@@ -108,7 +108,21 @@ public struct NativeHarness: Sendable {
 
     private enum ObservationMode { case legacy, owned, ownedComplete }
 
-    private func launch(systemPrompt: String, history: [AgentMessage], prompt: String, tools: [AgentTool],
+    /// Continues a run from `history` without a new prompt (NH08). When the history ends on a
+    /// request or a tool result, the next request answers it. When it ends on an assistant reply,
+    /// one selection of queued input — steering, else follow-ups — is taken in first, by each
+    /// queue's mode; with nothing queued, or an empty history, the run fails with
+    /// `AgentContinueError.nothingToContinue` before any request and leaves the queues untouched.
+    public func continueRun(systemPrompt: String, history: [AgentMessage], tools: [AgentTool],
+                            maxOutputTokens: Int? = nil, contextResolution: AgentContextResolution? = nil,
+                            context: AgentRunContext = AgentRunContext(),
+                            observation: AgentRunObservation = .bounded) -> AgentRunHandle {
+        launch(systemPrompt: systemPrompt, history: history, prompt: nil, tools: tools,
+               maxOutputTokens: maxOutputTokens, contextResolution: contextResolution, context: context,
+               observation: observation == .bounded ? .owned : .ownedComplete)
+    }
+
+    private func launch(systemPrompt: String, history: [AgentMessage], prompt: String?, tools: [AgentTool],
                         maxOutputTokens: Int?, contextResolution: AgentContextResolution?, context: AgentRunContext,
                         observation: ObservationMode) -> AgentRunHandle {
         let (events, continuation) = AsyncThrowingStream<AgentEvent, Error>.makeStream(
@@ -159,15 +173,19 @@ public struct NativeHarness: Sendable {
         }
     }
 
-    private func drive(systemPrompt: String, history: [AgentMessage], prompt: String, tools: [AgentTool],
+    private func drive(systemPrompt: String, history: [AgentMessage], prompt: String?, tools: [AgentTool],
                        maxOutputTokens: Int?, events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
                        trace: AgentTraceEmitter) async throws -> AgentRunOutcome {
         do { _ = try AgentToolRegistry(tools) }
         catch { trace.record(.toolRegistryRejected); throw error }
-        let user = try AgentMessageFactory.user(prompt)
-        let messages = history + [user]
-        try await publish(user, events: events)
+        var messages = history
+        if let prompt {
+            let user = try AgentMessageFactory.user(prompt)
+            try await publish(user, events: events)
+            messages.append(user)
+        }
         var state = AgentRunState(history: messages, context: messages)
+        if prompt == nil { try await prepareContinuation(&state, events: events, trace: trace) }
         state.allowedTurns = limits.maxTurns
         state.allowedToolCalls = limits.maxToolCalls
         let specs = tools.map(\.spec)
@@ -229,6 +247,24 @@ public struct NativeHarness: Sendable {
                                       estimatedCostUSD: costEstimator != nil && state.costKnown ? state.cost : nil)
         events.yield(.runFinished(outcome))
         return outcome
+    }
+
+    /// What `continueRun` answers: the history's open request or tool result, or else one queued
+    /// selection after a finished assistant reply. Nothing to answer fails before any request.
+    private func prepareContinuation(_ state: inout AgentRunState,
+                                     events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
+                                     trace: AgentTraceEmitter) async throws {
+        guard let last = state.context.last else { throw AgentContinueError.nothingToContinue }
+        let endsOnReply: Bool
+        switch last {
+        case .content(let message): endsOnReply = message.role == .assistant
+        case .assistant: endsOnReply = true
+        case .tool, .toolResult, .user: endsOnReply = false
+        }
+        guard endsOnReply else { return }
+        if try await injectQueued(.steering, state: &state, events: events, trace: trace) { return }
+        if try await injectQueued(.followUp, state: &state, events: events, trace: trace) { return }
+        throw AgentContinueError.nothingToContinue
     }
 
     /// Drains `kind` from the input queue and commits each item as a user message. Returns whether

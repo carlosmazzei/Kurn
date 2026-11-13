@@ -145,3 +145,9 @@ public actor AgentInputQueue {
         if waiters.isEmpty { locked = false } else { waiters.removeFirst().resume() }
     }
 }
+
+/// A continuation with nothing to answer (NH08): an empty history, or a finished reply with
+/// nothing queued. Raised before any request; no queued input is consumed.
+public enum AgentContinueError: Error, Equatable {
+    case nothingToContinue
+}

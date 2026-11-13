@@ -144,6 +144,52 @@ import Testing
         #expect(changed == AgentInputQueue.Snapshot(steering: [item]))
     }
 
+    private func continued(_ harness: NativeHarness, history: [AgentMessage]) async throws -> AgentRunOutcome {
+        try await harness.continueRun(systemPrompt: "", history: history, tools: []).result()
+    }
+
+    @Test func continuingWithNothingToAnswerFailsWithoutConsumingTheQueue() async throws {
+        let queue = AgentInputQueue()
+        try await queue.enqueue("Later", as: .followUp)
+        let model = ScriptedAgentModel([AgentTurnResponse(text: "Unused")])
+        await #expect(throws: AgentContinueError.nothingToContinue) {
+            _ = try await continued(NativeHarness(model: model).receivingInput(queue), history: [])
+        }
+        // A finished reply with an empty queue has nothing to continue either.
+        await #expect(throws: AgentContinueError.nothingToContinue) {
+            _ = try await continued(NativeHarness(model: model), history: [.user("Q"), .assistant(text: "A", toolCalls: [])])
+        }
+        #expect(await model.requests.isEmpty)
+        #expect(await queue.snapshot.followUp.map(\.text) == ["Later"])
+    }
+
+    @Test func continuingAnOpenRequestAnswersItWithoutTakingQueuedInput() async throws {
+        let queue = AgentInputQueue()
+        let model = ScriptedAgentModel([AgentTurnResponse(text: "Answer")])
+        let outcome = try await continued(NativeHarness(model: model).receivingInput(queue), history: [.user("Open question")])
+        #expect(outcome.finalText == "Answer")
+        #expect(await model.requests.first?.messages.last == .user("Open question"))
+    }
+
+    @Test func continuingAfterAReplyTakesOneSelectionWithoutDrainingTwice() async throws {
+        let queue = AgentInputQueue()
+        try await queue.enqueue("Steer", as: .steering)
+        try await queue.enqueue("Follow", as: .followUp)
+        let model = ScriptedAgentModel([AgentTurnResponse(text: "One"), AgentTurnResponse(text: "Two")])
+        _ = try await continued(NativeHarness(model: model).receivingInput(queue),
+                                history: [.user("Q"), .assistant(text: "A", toolCalls: [])])
+        let requests = await model.requests
+        #expect(requests.count == 2)
+        // The continuation took the steering selection only; the follow-up waited for the run's end.
+        #expect(lastUserTexts(requests[0]) == ["Steer"])
+        #expect(lastUserTexts(requests[1]) == ["Follow"])
+        let steering = requests[1].messages.filter {
+            if case .content(let value) = $0 { return value.text == "Steer" }
+            return false
+        }
+        #expect(steering.count == 1)
+    }
+
     private actor Saved {
         var last: AgentInputQueue.Snapshot?
         var failing = false
