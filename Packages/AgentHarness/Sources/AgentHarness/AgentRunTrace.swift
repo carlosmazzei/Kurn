@@ -118,7 +118,7 @@ extension AgentRunTrace {
             switch entry.payload {
             case .message(.content(let message)) where message.role == .assistant:
                 turn += 1
-                trace.apply(.turnStarted(turn))
+                trace.apply(.turnStarted(index: turn))
                 for call in message.toolCalls {
                     trace.apply(.toolStarted(callID: call.id, name: call.name, arguments: call.arguments))
                 }
