@@ -64,6 +64,32 @@ import Testing
         #expect(trace.usage == usage)
     }
 
+    /// Each usage entry names its request; the same request recorded twice counts once, while an
+    /// entry from before requests were named still counts.
+    @Test func aRequestsUsageCountsOnce() async throws {
+        let (runID, entries) = try await recordedRun()
+        let usages = entries.filter { $0.kind == "agent.usage.v1" }
+        #expect(usages.count == 2)
+        for entry in usages {
+            guard case .custom(_, .object(let fields)) = entry.payload, case .string(let id)? = fields["requestID"] else {
+                Issue.record("A usage entry names no request"); continue
+            }
+            #expect(!id.isEmpty)
+        }
+        let first = try #require(usages.first)
+        let repeated = try AgentSessionEntry(sessionID: first.sessionID, id: "repeat", parentID: entries.last?.id,
+            ordinal: (entries.last?.ordinal ?? 0) + 1, createdAt: first.createdAt, payload: first.payload, metadata: first.metadata)
+        guard case .custom(let type, .object(var legacy)) = first.payload else { return }
+        legacy["requestID"] = nil
+        let unnamed = try AgentSessionEntry(sessionID: first.sessionID, id: "legacy", parentID: "repeat",
+            ordinal: repeated.ordinal + 1, createdAt: first.createdAt, payload: .custom(type: type, data: .object(legacy)),
+            metadata: first.metadata)
+        let trace = try #require(AgentRunTrace.restoring(run: runID, from: entries + [repeated]))
+        #expect(trace.usage == AgentUsage(inputTokens: 30, outputTokens: 7))
+        let withLegacy = try #require(AgentRunTrace.restoring(run: runID, from: entries + [repeated, unnamed]))
+        #expect(withLegacy.usage == AgentUsage(inputTokens: 40, outputTokens: 9))
+    }
+
     @Test func onlyTheNamedRunIsRead() async throws {
         let (_, entries) = try await recordedRun()
         #expect(AgentRunTrace.restoring(run: "another-run", from: entries) == nil)

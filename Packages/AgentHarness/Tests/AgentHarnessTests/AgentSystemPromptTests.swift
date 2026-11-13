@@ -84,4 +84,45 @@ import Testing
         #expect(run.systemPrompt(after: previous) == expected)
         #expect(run.toolLoadout == nil)
     }
+
+    /// A tool that changes what the prompt describes is seen by the next request of the same run;
+    /// an unchanged or missing refresh keeps the prompt and records nothing.
+    @Test func theNextRequestSeesAPromptChangedByATool() async throws {
+        actor Index {
+            var version = 1
+            func bump() { version += 1 }
+            func prompt() -> String { "Be helpful\nDocuments v\(version)" }
+        }
+        let index = Index()
+        let tool = AgentTool(spec: AgentToolSpec(name: "lookup", description: "Changes the index",
+                                                 inputSchema: .object(["type": .string("object"), "properties": .object([:]),
+                                                                       "additionalProperties": .bool(true)]))) { _ in
+            await index.bump()
+            return AgentToolOutput(content: "done", summary: "Index changed")
+        }
+        let model = ScriptedAgentModel([
+            AgentTurnResponse(text: "", toolCalls: [agentCall("1")]),
+            AgentTurnResponse(text: "", toolCalls: [agentCall("2")]),
+            AgentTurnResponse(text: "Answer")
+        ])
+        let capture = DiagnosticCapture()
+        let harness = NativeHarness(model: model, diagnosticSink: { capture.record($0) }).refreshingSystemPrompt {
+            await index.prompt()
+        }
+        var events: [AgentEvent] = []
+        for try await event in harness.run(systemPrompt: "Be helpful\nDocuments v1", history: [], prompt: "Q",
+                                           tools: [tool], maxOutputTokens: 256) { events.append(event) }
+        let refreshes = capture.events.filter { $0.kind == .systemPromptRefreshed }.count
+
+        #expect(try agentOutcome(events).finalText == "Answer")
+        let prompts = await model.requests.map(\.systemPrompt)
+        #expect(prompts == ["Be helpful\nDocuments v1", "Be helpful\nDocuments v2", "Be helpful\nDocuments v3"])
+        #expect(refreshes == 2)
+
+        // Nothing to refresh: the prompt stays as the run started.
+        let plain = ScriptedAgentModel([AgentTurnResponse(text: "", toolCalls: [agentCall("1")]), AgentTurnResponse(text: "Answer")])
+        for try await _ in NativeHarness(model: plain).refreshingSystemPrompt({ nil }).run(
+            systemPrompt: "Fixed", history: [], prompt: "Q", tools: [agentTool()], maxOutputTokens: 256) {}
+        #expect(await plain.requests.map(\.systemPrompt) == ["Fixed", "Fixed"])
+    }
 }

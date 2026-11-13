@@ -16,6 +16,7 @@ public struct AgentDiagnostic: Codable, Sendable, Equatable {
         case outputRetryStarted, outputRetryDenied
         case requestRetryScheduled
         case queuedInputDrained
+        case systemPromptRefreshed
         case outputBudgetAdjusted, replayPrepared
         case toolValidationFailed, toolPolicyDenied, toolProgress, toolAborted, toolRegistryRejected
     }

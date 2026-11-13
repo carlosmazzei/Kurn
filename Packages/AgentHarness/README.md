@@ -82,7 +82,8 @@ Recovery inside a run:
   nothing was streamed and the context shrank.
 - **Empty, cut-off reply.** One retry after a forced compaction, under the same conditions.
 - **Transient failure.** `AgentRetryPolicy` sends the request again as a new request after a
-  cancellable backoff (Retry-After when known). It is never retried after visible text.
+  cancellable backoff, waiting the provider's Retry-After when the error carries one
+  (`AgentTransientError.retryAfterSeconds`, or an `AgentRetryAfter` wrapper the harness unwraps). It is never retried after visible text.
 - **Output limit.** Hitting the output limit ends with `.outputLimit` and discards that turn's calls.
 
 Modifiers install the host's barriers. Each awaited sink must succeed before dependent work
@@ -94,6 +95,8 @@ continues:
 | `persistingUsage(_:)` | Each request's usage is recorded |
 | `persistingCompaction(_:)` | Any request uses compacted context |
 | `receivingInput(_:)` | (Not a barrier.) Injects queued steering after each tool batch and follow-ups when it would finish |
+| `refreshingSystemPrompt(_:)` | (Not a barrier.) Asks for the system prompt again after each tool batch, before the next request |
+| `compactingFirst()` | (Not a barrier.) Manual compaction: summarizes the earlier context before the first request |
 
 `start(...)` returns an `AgentRunHandle` (events plus `result()`); `run(...)` is the legacy stream form;
 `continueRun(...)` answers an open request or one queued input without a new prompt.
@@ -154,10 +157,10 @@ Entry types written by the package:
 | --- | --- | --- |
 | `message` (payload) | `AgentSession` | A native user, assistant or tool-result message |
 | `agent.run-start.v1` | `AgentSession` | Run ID, host start fields, command ID, system prompt or patch, tool loadout |
-| `agent.usage.v1` | `AgentSession` | One request's reported usage, including reasoning and cache counters |
+| `agent.usage.v1` | `AgentSession` | One request's reported usage, including reasoning and cache counters, named by its `requestID` so it counts once |
 | `agent.compaction.v1` | `AgentSession` | A summary checkpoint: summary, first kept message, tokens before and after |
 | `agent.run-end.v1` | `AgentSession` | How the run ended and the harness stop reason |
-| `agent.context-edit.v1` | Host (via the store) | Messages later runs leave out of replay |
+| `agent.context-edit.v1` | Host (`AgentContextEdit.entry`) | Messages later runs leave out of replay, or include again |
 | `agent.label.v1` | `AgentSessionTree.labelEntry` | A label on an entry (detached metadata) |
 
 Host entry types (for example the app's `kurn.presentation-state.v1`) are opaque to the package.

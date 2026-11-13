@@ -1272,10 +1272,16 @@
 "chat.archive.export_failed" = "Die Unterhaltung konnte nicht exportiert werden.";
 "chat.archive.import_failed" = "Diese Datei ist kein Unterhaltungsarchiv, das Kurn öffnen kann. Es wurde nichts importiert.";
 "chat.archive.imported_title" = "Importierte Unterhaltung";
-"chat.archive.export_markdown" = "Als Markdown exportieren";
+"chat.archive.export_as" = "Exportieren als…";
 "chat.archive.export" = "Archiv exportieren (alle Zweige)";
 "chat.archive.import" = "Archiv importieren";
 "chat.conversation.more" = "Aktionen der Unterhaltung";
 "chat.export.you" = "Du";
 "chat.export.assistant" = "Assistent";
 "chat.export.documents" = "Dokumente";
+"chat.context.leave_out" = "Aus späteren Antworten ausschließen";
+"chat.context.include" = "In spätere Antworten einbeziehen";
+"chat.context.left_out" = "Aus späteren Antworten ausgeschlossen";
+"chat.branch.tree" = "Alle Zweige";
+"chat.context.compact_next" = "Zuerst frühere Nachrichten zusammenfassen";
+"chat.draft.save_failed" = "Der nicht gesendete Text konnte nicht gespeichert werden. Er steht noch im Nachrichtenfeld.";

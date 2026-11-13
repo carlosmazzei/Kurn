@@ -13,9 +13,11 @@ public struct NativeHarness: Sendable {
     let isContextOverflow: @Sendable (Error) -> Bool
     let retryPolicy: AgentRetryPolicy
     var messageCommit: @Sendable (AgentMessage) async throws -> Void = { _ in }
-    var usageCommit: @Sendable (AgentUsage) async throws -> Void = { _ in }
+    var usageCommit: @Sendable (AgentUsage, AgentRequestIdentity) async throws -> Void = { _, _ in }
     var compactionCommit: @Sendable (AgentCompactionCheckpoint) async throws -> Void = { _ in }
     var inputQueue: AgentInputQueue?
+    var systemPromptRefresh: (@Sendable () async -> String?)?
+    var compactsFirst = false
     private let diagnosticSink: @Sendable (AgentDiagnostic) -> Void
 
     /// Appended to the system prompt for the tool-less wrap-up turn after a turn or tool-call limit.
@@ -83,8 +85,35 @@ public struct NativeHarness: Sendable {
     }
 
     public func persistingUsage(_ commit: @escaping @Sendable (AgentUsage) async throws -> Void) -> Self {
+        persistingUsage { usage, _ in try await commit(usage) }
+    }
+
+    /// Like `persistingUsage(_:)`, with the request each usage belongs to, so a store can count one
+    /// request's usage once however often it is offered.
+    public func persistingUsage(_ commit: @escaping @Sendable (AgentUsage, AgentRequestIdentity) async throws -> Void) -> Self {
         var copy = self
         copy.usageCommit = commit
+        return copy
+    }
+
+    /// Asks `refresh` for the system prompt after each complete tool batch, before the next request:
+    /// a tool that changes what the prompt describes (a document index, say) is seen by the request
+    /// that follows it, not only by the next run. Nil keeps the current prompt. The run's start
+    /// entry keeps the prompt the run started with.
+    public func refreshingSystemPrompt(_ refresh: @escaping @Sendable () async -> String?) -> Self {
+        var copy = self
+        copy.systemPromptRefresh = refresh
+        return copy
+    }
+
+    /// Compacts the context before the run's first request whatever its size (manual compaction):
+    /// the older messages are summarized into a durable checkpoint, as a threshold compaction
+    /// would, and the newest are kept. A conversation too short to compact is sent as it is, and a
+    /// summary that fails leaves the context unchanged and the run goes on; nothing stands in for a
+    /// summary.
+    public func compactingFirst() -> Self {
+        var copy = self
+        copy.compactsFirst = true
         return copy
     }
 
@@ -153,7 +182,7 @@ public struct NativeHarness: Sendable {
     }
 
     struct TurnSettings {
-        let systemPrompt: String
+        var systemPrompt: String
         let tools: [AgentToolSpec]
         var outputBudget: AgentOutputBudget
         var maxOutputTokens: Int { outputBudget.tokens }
@@ -192,6 +221,9 @@ public struct NativeHarness: Sendable {
         var reason = AgentRunStopReason.turnLimit
         var settings = TurnSettings(systemPrompt: systemPrompt, tools: specs,
                                     outputBudget: AgentOutputBudget(requested: maxOutputTokens, policy: compactor.policy))
+        if compactsFirst {
+            try await compact(settings, state: &state, events: events, trace: trace, force: true)
+        }
         while true {
             try Task.checkCancellation()
             if costLimitReached(state) { reason = .costLimit; break }
@@ -228,6 +260,10 @@ public struct NativeHarness: Sendable {
             }
             let stop = try await execute(calls, requestID: response.message?.identity?.requestID, tools: tools, state: &state, events: events, trace: trace)
             if let stop { reason = stop; break }
+            if let refreshed = await systemPromptRefresh?(), refreshed != settings.systemPrompt {
+                settings.systemPrompt = refreshed
+                trace.record(.systemPromptRefreshed)
+            }
             // Steering enters after the whole tool batch, before the next request.
             _ = try await injectQueued(.steering, state: &state, events: events, trace: trace)
         }

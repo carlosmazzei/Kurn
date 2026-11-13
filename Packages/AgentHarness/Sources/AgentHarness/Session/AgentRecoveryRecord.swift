@@ -2,7 +2,9 @@ import Foundation
 
 /// Persisted metadata containers. They do not schedule queues, resume runs or prove an effect.
 public struct AgentRecoveryRecord: Codable, Sendable, Equatable {
-    public enum Kind: String, Codable, Sendable { case run, queue, draft, effect }
+    /// `archived` keeps what an imported archive carried that the host does not interpret (its
+    /// unknown records and header fields), so the next export hands them on.
+    public enum Kind: String, Codable, Sendable { case run, queue, draft, effect, archived }
     public let contractVersion: Int
     public let id: String
     public let kind: Kind

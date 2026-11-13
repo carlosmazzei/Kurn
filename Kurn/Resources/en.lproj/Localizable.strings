@@ -1272,10 +1272,16 @@
 "chat.archive.export_failed" = "The conversation could not be exported.";
 "chat.archive.import_failed" = "This file is not a conversation archive Kurn can open. Nothing was imported.";
 "chat.archive.imported_title" = "Imported conversation";
-"chat.archive.export_markdown" = "Export as Markdown";
+"chat.archive.export_as" = "Export as…";
 "chat.archive.export" = "Export archive (all branches)";
 "chat.archive.import" = "Import archive";
 "chat.conversation.more" = "Conversation actions";
 "chat.export.you" = "You";
 "chat.export.assistant" = "Assistant";
 "chat.export.documents" = "Documents";
+"chat.context.leave_out" = "Leave out of later answers";
+"chat.context.include" = "Include in later answers";
+"chat.context.left_out" = "Left out of later answers";
+"chat.branch.tree" = "All branches";
+"chat.context.compact_next" = "Summarize earlier messages first";
+"chat.draft.save_failed" = "Your unsent text could not be saved. It is still in the message field.";

@@ -54,6 +54,44 @@ import Testing
         #expect(replayed.count == 1 + 1 + run.contextMessages.count)
     }
 
+    /// Manual compaction: a run asked to compact first summarizes the earlier conversation before
+    /// its first request even when the window has room, and saves the checkpoint before the answer;
+    /// a conversation too short to summarize is sent as it is.
+    @Test func aRunAskedToCompactFirstSummarizesBeforeItsFirstRequest() async throws {
+        let roomy = AgentContextPolicy(contextWindow: 100_000, reserveTokens: 0, keepRecentTokens: 100)
+        func run(_ harness: NativeHarness, history: [AgentMessage]) async throws -> [AgentSessionEntry] {
+            let store = SessionTestStore()
+            try await store.appendHostEntry("question")
+            let session = try AgentSession(sessionID: "session", store: store, appendMode: .branch)
+            let started = try await session.start(harness: harness, systemPrompt: "", history: history, prompt: "Question", tools: [])
+            do { for try await _ in started.events {} } catch {}
+            #expect(await session.waitUntilSettled().end == .completed)
+            return await store.entries
+        }
+        let compacting = ScriptedAgentModel([AgentTurnResponse(text: "Turn summary"), AgentTurnResponse(text: "Answer")])
+        let entries = try await run(NativeHarness(model: compacting, contextPolicy: roomy).compactingFirst(), history: try history())
+        let branch = try #require(AgentRunBranch.all(in: entries).first)
+        #expect(await compacting.requests.count == 2)
+        #expect(branch.checkpoints.map(\.firstKeptMessageID) == ["h2"])
+        #expect(branch.answer?.text == "Answer")
+        let saved = try #require(entries.firstIndex { $0.kind == AgentCompactionCheckpoint.entryType })
+        let answer = try #require(entries.firstIndex {
+            if case .message(.content(let value)) = $0.payload { return value.role == .assistant && value.text == "Answer" }
+            return false
+        })
+        #expect(saved < answer)
+
+        // Without asking, the same roomy window sends the conversation as it is.
+        let plain = ScriptedAgentModel([AgentTurnResponse(text: "Answer")])
+        _ = try await run(NativeHarness(model: plain, contextPolicy: roomy), history: try history())
+        #expect(await plain.requests.count == 1)
+        // Nothing old enough to summarize: no summary request, no checkpoint.
+        let short = ScriptedAgentModel([AgentTurnResponse(text: "Answer")])
+        let shortEntries = try await run(NativeHarness(model: short, contextPolicy: roomy).compactingFirst(), history: [])
+        #expect(await short.requests.count == 1)
+        #expect(!shortEntries.contains { $0.kind == AgentCompactionCheckpoint.entryType })
+    }
+
     @Test func anOverflowRetryRunsOnlyAfterItsSummaryIsSaved() async throws {
         let store = SessionTestStore()
         try await store.appendHostEntry("question")

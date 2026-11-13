@@ -191,12 +191,15 @@ provider reported them, both part of `inputTokens` — the whole input sent — 
 just as reasoning is part of output. Anthropic reports cached input apart from `input_tokens`, so its
 accumulator adds it to the total; OpenAI (`cached_tokens`), Responses and Gemini (`cachedContentTokenCount`)
 already include it. Unreported counts stay nil when usages are added. `agent.usage.v1` entries record
-them and `AgentRunTrace.restoring` reads them back.
+them with the request they belong to (`requestID`), and `AgentRunTrace.restoring` and
+`AgentSessionTree.usage` count one request's usage once (entries from before requests were named each count).
 The cost estimator returns nil for a usage it cannot price (NH07). `AgentRunOutcome.estimatedCostUSD`
 is the run's estimated cost, summaries included, or nil — unknown, never zero — when there was no estimator
 or any usage went unpriced. `AgentLimits.maxCostUSD` is checked only against a known cost: without an
 estimator, or once a usage could not be priced, the ceiling cannot be verified and counts as reached, so
-no further request is sent. `HarnessChatService` passes `ModelPricing` as the estimator. The figure is an
+no further request is sent. `HarnessChatService` passes `ModelPricing` as the estimator; it prices cache
+reads and writes at the vendor's own rates (OpenAI and Gemini discount reads, Anthropic also surcharges
+writes) and the rest of the input at the full rate, and the chat's per-answer cost uses the same usage. The figure is an
 estimate from a price table, not a provider billing cap.
 The session is the one retry owner for model requests (NH07, `AgentRetryPolicy`); the agent transport keeps
 its own retries off. A request that failed with an `AgentTransientError` before any visible text is sent
@@ -207,7 +210,10 @@ joined. Each failed attempt stays in the log as audit data, and `requestRetrySch
 the attempt and delay. `AgentRunProgress` shows the wait as `retryWaiting`. The chat uses `.standard`
 (three attempts). `AppError` is transient for 408/429/5xx statuses and connection failures, but not for
 timeouts or lost connections the provider may already be generating for, nor for auth, configuration,
-quota or context errors. Its `Retry-After` is not carried into the error yet.
+quota or context errors. `AppError` cannot carry a `Retry-After`, so the agent stream
+(`LLMHTTP.streamAgent`) throws a transient rejection whose response had one as an `AgentRetryAfter`
+around the `AppError`: the policy waits that long and the harness unwraps it everywhere else, so the
+run's failure, its audit and the stream classification only ever see the `AppError`.
 Credentials are resolved per request (NH07): `ProviderFactory.agentModel` returns an `AgentPerRequestModel`,
 which builds the vendor client from the Keychain for every request, compaction summaries included. A key
 replaced during a run is used from the next request on, and a key removed fails that request explicitly.
@@ -302,6 +308,10 @@ compaction failed. After an overflow that ends the run with `AgentContextReducti
 says the conversation is too long for the model, `chat.context.reduction_failed`); an output-limit
 recovery is denied and the run keeps its `.outputLimit` outcome; a threshold compaction sends the
 request as it is. Compaction changes only model context; outcomes retain full history.
+Manual compaction (`NativeHarness.compactingFirst`) summarizes the earlier context before a run's first
+request whatever its size, through the same durable checkpoint; a conversation too short to summarize is sent
+as it is and a failed summary changes nothing. The chat's "Summarize earlier messages first" toggle
+(`MeetingChatViewModel.compactsNextAnswer`) applies it to the next answer of a saved conversation.
 A summary compaction is a durable checkpoint (NH06, `AgentCompactionCheckpoint`): the harness hands it
 to the awaited `persistingCompaction` sink before any request uses the compacted context, and
 `AgentSession` commits it on the run's branch as `agent.compaction.v1` (summary, first kept message ID,
@@ -319,6 +329,9 @@ form a stable prefix, its `documents` index is the section a document mutation c
 run's (`systemPatch`: changed or added sections, `null` removing one), plus its declared tools and their
 delta from the previous run (`tools`: `AgentToolLoadout`). `AgentRunBranch.systemPrompts(of:)` folds
 the patches back into each run's prompt.
+Within a run, `NativeHarness.refreshingSystemPrompt` asks for the prompt again after each complete tool
+batch: the chat rebuilds it from the workspace, so the request after a document mutation lists the new
+version (diagnostic `systemPromptRefreshed`); the run-start entry keeps the prompt the run began with.
 Queued input (NH08, `AgentInputQueue`): two FIFO queues, *steering* and *follow-up*, each draining one item
 or all of them per boundary. Every change saves the complete lists through `persist` before it is applied
 or acknowledged, and `updates()` streams the complete lists with stable item IDs. A harness given a queue
@@ -351,7 +364,9 @@ branch. Labels and renames are metadata. Artifact revisions are per branch: the 
 other content is a revision of its own (`branchRevisionID`, the version's ID plus a digest of its bytes),
 never a conflict, and the save action reads a saved document as current only when it holds that version
 with the same body (`ChatArtifactStore.action`). `ChatBranchPresentation.usageSummary` lists the branch
-shown and every branch when they differ. Branch summaries are not implemented yet.
+shown and every branch when they differ. "All branches" (`ChatBranchOutline`, `ChatBranchTreeView`) lists
+every question as a tree — a question asked again opens a level, the branch shown is marked — and opens the
+one chosen where it was left. Branch summaries are not implemented yet.
 Session interchange (NH10, `AgentSessionArchive`): a native, versioned JSON Lines archive
 (`kurn.agent-session` v1) — a header, one line per entry (encoded directly, so integers keep their exact
 form) and namespaced host records kept opaque; unknown entries, record types and header fields survive a
@@ -361,15 +376,23 @@ payloads past the line/total/entry/depth limits, entries of another session and 
 moves the graph to a new identity. The app (`SwiftDataAgentSessionStore+Archive`,
 `MeetingChatViewModel+Archive`, `ChatConversationMenu`) exports a conversation with its document revisions
 (`kurn.artifact-revision`, exact stored bytes) and title (`kurn.conversation`), never run records, queued
-input or receipts, through the share sheet as a protected temporary `.jsonl`. Import is a new conversation
+input or receipts, through the share sheet as a protected temporary `.jsonl`. Records and header fields of
+another host are kept as `.archived` recovery records on import and exported again unchanged (one past the
+1 MiB recovery-record limit is left out and counted in the log). Import is a new conversation
 in the current chat: revision IDs are rebased and checked against their bytes, every revision a branch
 shows must be present, and nothing is written unless the whole archive holds; a restore keeps the archived
-identity only when no conversation has it. "Export as Markdown" writes the branch shown for a reader
-(`ChatConversationMarkdown`). The pi JSONL v3 subset and an HTML export are not implemented.
+identity only when no conversation has it. "Export as…" writes the branch shown for a reader
+(`ChatConversationMarkdown`) as Markdown, or as Word or HTML through `DocumentExport` and the meeting
+export's renderers; the HTML is one self-contained page with every text escaped, no script, no external
+resource and no link. The pi JSONL v3 subset is not implemented.
 Context edits (`AgentContextEdit`, `agent.context-edit.v1`) change only what later runs replay: removing
 an assistant message removes the results of its calls, a removed tool result becomes a stub so its call
-keeps a result, and the log, the shown conversation and recorded usage are unchanged. `ChatReplayHistory`
-applies them before the newest checkpoint.
+keeps a result, and the log, the shown conversation and recorded usage are unchanged. A later edit can
+include a message again (`restoredMessageIDs`), so what is left out is the net of every edit in order.
+`ChatReplayHistory` applies them before the newest checkpoint. In the chat, a saved question's menu offers
+"Leave out of later answers" / "Include in later answers" (`MeetingChatViewModel.setLeftOut`,
+`SwiftDataAgentSessionStore.editContext`): the edit names the question and its answer turn, the whole
+exchange stops being replayed (run or plain text alike), and the question is marked as left out.
 `AgentLimits.wrapUpOnLimit` runs one extra turn after a turn/tool-call limit with
 `NativeHarness.wrapUpInstruction` appended and `AgentTurnRequest.allowsToolCalls` false
 (tools stay declared; the wire formats send `tool_choice: none` / Gemini mode `NONE`, and
@@ -3097,6 +3120,13 @@ between meetings does not. The host does
 not evict a conversation that holds one. The resumed run starts over from the saved question; nothing
 of the stopped run is replayed. The transcription coordinator's background cancellation
 gets the same earlier, checkpointable moment.
+The composer's unsent text (A68) is `MeetingChatViewModel.draft`, not view state, so it outlives the
+view; a saved conversation keeps it as its `.draft` recovery record (`ChatDraftRecord`), written when the
+scene goes to the background (`ChatConversationHost.saveDrafts()`), when another conversation opens and
+before the host evicts the view model — never per keystroke. A reopened conversation puts it back; a
+question sent from the composer clears it (a resumed question leaves it); a new, unsaved conversation's draft
+lives in memory only, goes along ahead of an opened conversation's own draft, and keeps its view model from
+being evicted. A draft that cannot be saved is never dropped: it stays in the composer and the chat says so.
 
 **The question is a barrier, and every run leaves a record.** `send` saves the conversation
 with the new question before any request; if that save fails nothing is sent and the question

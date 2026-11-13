@@ -8,6 +8,9 @@ struct ChatTurnBranchActions {
     var showVersion: (Int) -> Void
     var fork: () -> Void
     var editLabel: () -> Void
+    /// Whether later answers leave this exchange out, and the action that switches it.
+    var isLeftOut = false
+    var setLeftOut: (Bool) -> Void = { _ in }
 }
 
 /// "‹ 2 of 3 ›" under a question asked more than once in the same place: moves between its
@@ -57,5 +60,48 @@ struct ChatTurnLabel: View {
             .foregroundStyle(Theme.textSecondary)
             .lineLimit(1)
             .accessibilityLabel(String(format: NSLocalizedString("chat.branch.label_value", comment: "Turn label"), text))
+    }
+}
+
+/// Every question of the conversation as a tree (NH09): the branch shown is marked, and choosing
+/// another question opens its branch where it was left.
+struct ChatBranchTreeView: View {
+    let outline: ChatBranchOutline
+    let open: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List(outline.nodes) { node in
+                Button {
+                    if !node.isShown { open(node.id) }
+                    dismiss()
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Image(systemName: node.isShown ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(node.isShown ? Theme.accent : Theme.textTertiary)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            if let label = node.label {
+                                Text(label).font(Theme.caption2).foregroundStyle(Theme.textSecondary)
+                            }
+                            Text(node.text).lineLimit(2).foregroundStyle(Theme.textPrimary)
+                        }
+                    }
+                    .padding(.leading, CGFloat(min(node.depth, 6)) * 16)
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(node.isShown ? .isSelected : [])
+                .accessibilityIdentifier("chat.branch.tree.node")
+            }
+            .navigationTitle(NSLocalizedString("chat.branch.tree", comment: "Every branch of the conversation"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }

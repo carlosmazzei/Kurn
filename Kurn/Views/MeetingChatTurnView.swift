@@ -29,6 +29,16 @@ struct MeetingChatTurnView: View {
                         .background(Theme.accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .contextMenu { branchMenu }
                 }
+                if branch?.isLeftOut == true {
+                    HStack {
+                        Spacer(minLength: 40)
+                        Label(NSLocalizedString("chat.context.left_out", comment: "This exchange is left out of later answers"),
+                              systemImage: "eye.slash")
+                            .font(Theme.caption2)
+                            .foregroundStyle(Theme.textSecondary)
+                            .accessibilityIdentifier("chat.context.left_out")
+                    }
+                }
                 if let branch, let versions = branch.versions {
                     HStack {
                         Spacer(minLength: 40)
@@ -94,6 +104,17 @@ struct MeetingChatTurnView: View {
             }
             Button(action: branch.editLabel) {
                 Label(NSLocalizedString("chat.branch.label", comment: "Label this question"), systemImage: "bookmark")
+            }
+            if branch.isLeftOut {
+                Button { branch.setLeftOut(false) } label: {
+                    Label(NSLocalizedString("chat.context.include", comment: "Include this exchange in later answers again"),
+                          systemImage: "eye")
+                }
+            } else {
+                Button { branch.setLeftOut(true) } label: {
+                    Label(NSLocalizedString("chat.context.leave_out", comment: "Leave this exchange out of later answers"),
+                          systemImage: "eye.slash")
+                }
             }
         }
     }

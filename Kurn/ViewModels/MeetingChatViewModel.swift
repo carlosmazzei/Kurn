@@ -97,6 +97,11 @@ final class MeetingChatViewModel {
     var queued = AgentInputQueue.Snapshot()
     /// Text handed back to the composer: queued input a stop or a failed run did not answer.
     var restoredDraft: String?
+    /// The composer's unsent text, and what of it is saved (`MeetingChatViewModel+Draft`).
+    var draft = ""
+    @ObservationIgnored var savedDraft = ""
+    /// Whether the next answer starts by summarizing the earlier conversation (manual compaction).
+    var compactsNextAnswer = false
     /// Whether the person stopped the last reply; shown once the stop settled. A new question,
     /// `reset` and `load` clear it.
     var replyWasStopped = false
@@ -152,6 +157,12 @@ final class MeetingChatViewModel {
                 self.error = .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.invalid", comment: "Saved chat storage error"))
             }
             return
+        }
+        // A question sent from the composer was its draft, which is not one any more. A resumed
+        // question comes from the conversation, not the composer: the draft stays.
+        if draft.trimmingCharacters(in: .whitespacesAndNewlines) == trimmed {
+            draft = ""
+            if !savedDraft.isEmpty { saveDraft() }
         }
         isResponding = true
         phase = .preparing
@@ -391,6 +402,8 @@ final class MeetingChatViewModel {
     /// Nothing is written until the first exchange completes (`persist()`),
     /// so an abandoned new chat never leaves an empty row in history.
     func reset() {
+        // A draft that could not be saved stays in the composer of the new conversation.
+        let kept = saveDraft() ? "" : draft
         cancel()
         // Fences the cancelled run: it can no longer touch what is shown from here on.
         generation = UUID()
@@ -408,6 +421,10 @@ final class MeetingChatViewModel {
         workspace = ChatDocumentWorkspace()
         scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id)
         branches = ChatBranchPresentation()
+        draft = kept
+        savedDraft = ""
+        compactsNextAnswer = false
+        if !kept.isEmpty { error = Self.draftSaveError }
     }
 
     // MARK: - Session history
@@ -440,6 +457,10 @@ final class MeetingChatViewModel {
     /// Loads a previously saved conversation for display and continuation.
     func load(session: ChatSession) {
         guard session.meeting?.id == meeting?.id else { return }
+        // Text typed in a new, unsaved conversation goes along to one with no draft of its own.
+        // Text typed in a new conversation, or a draft that could not be saved, goes along.
+        let saved = saveDraft()
+        let carried = self.session == nil || !saved ? draft : ""
         cancel()
         generation = UUID()
         do {
@@ -465,6 +486,9 @@ final class MeetingChatViewModel {
             retryArtifacts = []
             retryOrigins = [:]
             error = nil
+            restoreDraft(of: session, carrying: carried)
+            if !saved { error = Self.draftSaveError }
+            compactsNextAnswer = false
             restoreLeftoverQueue(of: session)
             refreshBranches()
         } catch {
@@ -524,7 +548,8 @@ final class MeetingChatViewModel {
                                           replay: ChatReplayHistory.load(
                                               turns: priorTurns.map { .init(id: $0.id, role: $0.role, text: $0.text) },
                                               session: savedSession, store: SwiftDataAgentSessionStore(context: modelContext)),
-                                          inputQueue: queue)
+                                          inputQueue: queue, compactFirst: compactsNextAnswer && savedSession != nil)
+        compactsNextAnswer = false
         // Whatever ends this function, the run has settled first: a cancelled or failed run is
         // only reported once nothing can still call a tool or write its effect.
         do { try Task.checkCancellation() } catch {
@@ -547,7 +572,7 @@ final class MeetingChatViewModel {
                 turns[index].steps = timeline.steps
                 turns[index].usage = timeline.hasUsage
                     ? TokenUsage(promptTokens: timeline.usage.inputTokens, completionTokens: timeline.usage.outputTokens) : nil
-                turns[index].costUSD = turns[index].usage.flatMap { ModelPricing.estimatedCostUSD(model: model, usage: $0) }
+                turns[index].costUSD = timeline.hasUsage ? ModelPricing.estimatedCostUSD(model: model, usage: timeline.usage) : nil
                 // Queued input the run took in shows as its own question and reply (NH08).
                 exchanges = view.exchanges
                 turns = Self.presenting(exchanges, fallback: view.text, in: turns, from: index)

@@ -14,8 +14,45 @@ public struct AgentContextEdit: Codable, Sendable, Equatable {
 
     /// Messages later context leaves out, by canonical ID.
     public let removedMessageIDs: [String]
+    /// Messages an earlier edit left out that later context includes again. Edits are entries,
+    /// never rewritten, so undoing one is another edit.
+    public let restoredMessageIDs: [String]
 
-    public init(removedMessageIDs: [String]) { self.removedMessageIDs = removedMessageIDs }
+    public init(removedMessageIDs: [String], restoredMessageIDs: [String] = []) {
+        self.removedMessageIDs = removedMessageIDs
+        self.restoredMessageIDs = restoredMessageIDs
+    }
+
+    private enum CodingKeys: String, CodingKey { case removedMessageIDs, restoredMessageIDs }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        removedMessageIDs = try container.decodeIfPresent([String].self, forKey: .removedMessageIDs) ?? []
+        restoredMessageIDs = try container.decodeIfPresent([String].self, forKey: .restoredMessageIDs) ?? []
+    }
+
+    /// An edit that restores nothing encodes as it did before restoring existed.
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(removedMessageIDs, forKey: .removedMessageIDs)
+        if !restoredMessageIDs.isEmpty { try container.encode(restoredMessageIDs, forKey: .restoredMessageIDs) }
+    }
+
+    /// This edit as a detached session entry (no parent: it never moves the selected path).
+    public func entry(sessionID: String, ordinal: Int, id: String = UUID().uuidString,
+                      createdAt: String = AgentSessionEntry.time()) throws -> AgentSessionEntry {
+        let data = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(self))
+        return try AgentSessionEntry(sessionID: sessionID, id: id, parentID: nil, ordinal: ordinal, createdAt: createdAt,
+                                     payload: .custom(type: Self.entryType, data: data))
+    }
+
+    /// The messages left out once every edit in `edits` applied in order.
+    public static func excluded(by edits: [AgentContextEdit]) -> Set<String> {
+        edits.reduce(into: Set<String>()) { removed, edit in
+            removed.formUnion(edit.removedMessageIDs)
+            removed.subtract(edit.restoredMessageIDs)
+        }
+    }
 
     /// `messages` with this edit applied.
     public func applied(to messages: [AgentMessage]) -> [AgentMessage] {
@@ -51,8 +88,9 @@ public struct AgentContextEdit: Codable, Sendable, Equatable {
         }
     }
 
-    /// `messages` with every edit in `edits` applied in order.
+    /// `messages` with every edit in `edits` applied in order: what is left out at the end, so a
+    /// message an edit restored is back.
     public static func applying(_ edits: [AgentContextEdit], to messages: [AgentMessage]) -> [AgentMessage] {
-        edits.reduce(messages) { $1.applied(to: $0) }
+        AgentContextEdit(removedMessageIDs: excluded(by: edits).sorted()).applied(to: messages)
     }
 }

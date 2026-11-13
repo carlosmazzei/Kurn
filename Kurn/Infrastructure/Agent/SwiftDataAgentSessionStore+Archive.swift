@@ -5,7 +5,8 @@ import SwiftData
 
 /// Archival export and import of a saved conversation (NH10), as an `AgentSessionArchive`: the
 /// whole log with every branch, plus the document revisions it shows (`kurn.artifact-revision`,
-/// their exact stored bytes) and the conversation's title (`kurn.conversation`). Run records,
+/// their exact stored bytes) and the conversation's title (`kurn.conversation`). Records and
+/// header fields of other hosts are kept as `.archived` recovery records and exported again. Run records,
 /// queued input and document receipts stay behind: an archive carries no live or pending
 /// operation, and no credentials ever reach the log.
 @MainActor
@@ -28,8 +29,45 @@ extension SwiftDataAgentSessionStore {
             records.append(.init(type: Self.revisionRecord, data: .object([
                 "id": .string(row.id), "payload": .string(row.payloadData.base64EncodedString())])))
         }
+        // What an earlier import carried and this app does not interpret goes on unchanged.
+        var metadata: [String: JSONValue] = [:]
+        for kept in try self.records(target).filter({ $0.kind == .archived }).sorted(by: { $0.id < $1.id }) {
+            if kept.id == Self.archivedHeaderID, case .object(let fields) = kept.data {
+                metadata = fields
+            } else if case .object(let fields) = kept.data, case .string(let type)? = fields["type"], let data = fields["data"],
+                      AgentSessionArchive.isRecordType(type) {
+                records.append(.init(type: type, data: data))
+            }
+        }
         return try AgentSessionArchive(sessionID: snapshot.sessionID, leafID: snapshot.leafID, entries: snapshot.entries,
-                                       records: records).jsonl()
+                                       records: records, metadata: metadata).jsonl()
+    }
+
+    static let archivedHeaderID = "header"
+
+    /// An archive's unknown records and header fields as `.archived` recovery records, in order.
+    /// A record past the recovery record size limit cannot be kept and is left out (counted in the
+    /// log); everything the app interprets is checked separately and fails the import instead.
+    private static func archivedRecords(_ archive: AgentSessionArchive) -> [AgentRecoveryRecord] {
+        var kept: [AgentRecoveryRecord] = []
+        var dropped = 0
+        if !archive.metadata.isEmpty {
+            if let header = try? AgentRecoveryRecord(id: archivedHeaderID, kind: .archived, data: .object(archive.metadata)) {
+                kept.append(header)
+            } else { dropped += 1 }
+        }
+        let foreign = archive.records.filter { $0.type != conversationRecord && $0.type != revisionRecord }
+        for (index, record) in foreign.enumerated() {
+            let id = String(format: "record-%06d", index)
+            if let value = try? AgentRecoveryRecord(id: id, kind: .archived,
+                                                    data: .object(["type": .string(record.type), "data": record.data])) {
+                kept.append(value)
+            } else { dropped += 1 }
+        }
+        if dropped > 0 {
+            AppLog.generation.atNotice.notice("chat: archive import left out \(dropped, privacy: .public) oversized host records")
+        }
+        return kept
     }
 
     /// A new saved conversation in `meeting`'s chat (nil for the library) from an archive. Nothing
@@ -97,6 +135,12 @@ extension SwiftDataAgentSessionStore {
                 row.session = target
                 context.insert(row)
                 _ = try Self.checkedRevision(row, session: target)
+            }
+            for record in Self.archivedRecords(archive) {
+                let row = HarnessSessionRecord(session: target, recordID: record.id, kindRaw: record.kind.rawValue,
+                                               payloadData: try HarnessPresentationCodec.encode(record))
+                row.session = target
+                context.insert(row)
             }
             target.canonicalVersion = 1; target.canonicalLeafID = moved.leafID
             target.canonicalOrdinal = entries.count; target.canonicalRevision = 1

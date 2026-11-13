@@ -16,6 +16,29 @@ struct MeetingChatHarnessTests {
         #expect(condition())
     }
 
+    /// "Summarize earlier messages first" applies to the next answer of a saved conversation only,
+    /// and is cleared once that answer starts or another conversation opens.
+    @Test func manualCompactionAppliesToTheNextAnswerOnly() async throws {
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let model = ChatAgentModel([AgentTurnResponse(text: "Monday."), AgentTurnResponse(text: "Friday.")])
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model })
+        vm.configure(meeting: meeting, modelContext: context)
+        ask(vm, "When do we ship?")
+        await waitUntil { !vm.isResponding }
+        vm.compactsNextAnswer = true
+        ask(vm, "And the review?")
+        await waitUntil { !vm.isResponding }
+        #expect(vm.error == nil)
+        #expect(!vm.compactsNextAnswer)
+        // The conversation is far too short to summarize: both answers were requested as they are.
+        #expect(await model.requests.count == 2)
+        #expect(vm.turns.last?.text == "Friday.")
+        vm.compactsNextAnswer = true
+        vm.reset()
+        #expect(!vm.compactsNextAnswer)
+    }
+
     @Test func harnessProducesStepsArtifactsUsageAndRestoresForRevision() async throws {
         let context = ModelContext(TestModelContainer.make())
         let meeting = MeetingFixtures.transcribed("Planning", in: context)
@@ -57,6 +80,10 @@ struct MeetingChatHarnessTests {
         let requests = await model.requests
         #expect(!requests[0].tools.contains { $0.name == "read_wiki" })
         #expect(requests[0].systemPrompt.contains("SAME LANGUAGE as the question"))
+        // The document index in the prompt follows the run's own mutations (C12).
+        #expect(!requests[0].systemPrompt.contains(artifact.id.uuidString))
+        #expect(requests[1].systemPrompt.contains(artifact.id.uuidString))
+        #expect(requests[1].systemPrompt.hasPrefix(String(requests[0].systemPrompt.prefix(200))))
         #expect(requests[1].messages.contains { if case .toolResult(_, "create_document", _, false) = $0.legacyProjection { return true }; return false })
 
         let revision = ChatAgentModel([

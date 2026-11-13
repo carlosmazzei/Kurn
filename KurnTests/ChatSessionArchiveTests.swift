@@ -139,6 +139,59 @@ struct ChatSessionArchiveTests {
         try? FileManager.default.removeItem(at: bad)
     }
 
+    /// The reading export as HTML is one inert page: hostile text from a question, an answer or a
+    /// document is escaped, and links and images keep only their text (A52).
+    @Test func theHTMLReadingExportIsInert() throws {
+        let context = ModelContext(TestModelContainer.make())
+        let session = ChatSession(meeting: nil, title: "Planning")
+        context.insert(session)
+        let hostile = "<script>alert(1)</script>"
+        try SwiftDataAgentSessionStore(context: context).writePresentation(session, turns: [
+            turn(.user, "Is \(hostile) safe?"),
+            turn(.assistant, "See [the plan](https://evil.example/x) and ![chart](https://evil.example/c.png).")
+        ], scope: nil, artifacts: [ChatDocumentArtifact(title: "Minutes", markdown: "<iframe src=\"https://evil.example\"></iframe>")])
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in nil })
+        vm.configure(meeting: nil, modelContext: context)
+        vm.load(session: session)
+
+        let url = try #require(vm.exportReadable(as: .html))
+        #expect(url.pathExtension == "html")
+        let html = try String(contentsOf: url, encoding: .utf8)
+        #expect(html.hasPrefix("<!DOCTYPE html>"))
+        #expect(html.contains("&lt;script&gt;") && html.contains("the plan"))
+        // Markup in the text arrives as escaped text, never as an element; link and image targets
+        // are dropped.
+        for active in ["<script", "<iframe", "<img", "<a ", "href=", "https://evil.example/x", "c.png"] {
+            #expect(!html.contains(active), "\(active) reached the page")
+        }
+        #expect(html.contains("&lt;iframe"))
+        let word = try #require(vm.exportReadable(as: .docx))
+        #expect(word.pathExtension == "docx")
+    }
+
+    /// Records and header fields another host put in an archive survive an import into the app and
+    /// the next export, unchanged and in order; the app's own records are still interpreted.
+    @Test func anotherHostsRecordsAndHeaderFieldsGoOnToTheNextExport() throws {
+        let context = ModelContext(TestModelContainer.make())
+        let seeded = try seed(context)
+        let store = SwiftDataAgentSessionStore(context: context)
+        let original = try AgentSessionArchive.decode(try store.archive(seeded.session))
+        let foreign: [AgentSessionArchive.Record] = [
+            .init(type: "other.notes", data: .object(["text": .string("kept"), "n": .number(3)])),
+            .init(type: "other.flags", data: .array([.bool(true), .null]))
+        ]
+        let metadata: [String: JSONValue] = ["origin": .object(["cwd": .string("/Users/someone/project")])]
+        let data = try AgentSessionArchive(sessionID: original.sessionID, leafID: original.leafID, entries: original.entries,
+                                           records: original.records + foreign, metadata: metadata).jsonl()
+
+        let imported = try store.importArchive(data, meeting: nil, defaultTitle: "Imported")
+        #expect(try imported.harnessSnapshot().artifacts == [seeded.other])
+        let again = try AgentSessionArchive.decode(try store.archive(imported))
+        #expect(Array(again.records.suffix(2)) == foreign)
+        #expect(again.metadata == metadata)
+        #expect(again.records.filter { $0.type == SwiftDataAgentSessionStore.revisionRecord }.count == 3)
+    }
+
     @Test func aBranchThatCannotOpenRejectsTheWholeImport() throws {
         let context = ModelContext(TestModelContainer.make())
         let seeded = try seed(context)

@@ -1,6 +1,6 @@
 # Native harness contract v1
 
-Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04); session ownership implemented (NH05); projection and persistent compaction implemented (NH06, except manual compaction and branch summaries); usage, cost, retries and credentials implemented (NH07, except a capability snapshot and transport Retry-After); queued input implemented (NH08, except a session-retained owner, model changes at request boundaries and `waitingForUser`); session tree implemented (NH09, except branch summaries); native archive, export and import implemented (NH10, except the pi JSONL v3 subset, HTML export and device qualification)**. NH01 froze the NH00
+Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04); session ownership implemented (NH05); projection and persistent compaction implemented (NH06, except branch summaries); usage, cost, retries and credentials implemented (NH07, except a capability snapshot); queued input implemented (NH08, except a session-retained owner, model changes at request boundaries and `waitingForUser`); session tree implemented (NH09, except branch summaries); native archive, export and import implemented (NH10, except the pi JSONL v3 subset and device qualification)**. NH01 froze the NH00
 compatibility baseline. NH02 now produces native v1 assistant blocks at the provider
 boundary and consumes them in the harness. Indexed session storage and lazy legacy conversion are active; detailed runtime
 message persistence barriers (NH05) and canonical tool-history replay (NH06) are active; complete pi compatibility is not claimed.
@@ -63,8 +63,8 @@ Important current adaptations/gaps:
   same library document for the session/artifact identity. Legacy missing model provenance
   stays unknown; it is not reconstructed from today's selected model.
 - Runtime compaction changes only the request projection; a summary is a durable checkpoint
-  (NH06) that reopening or another question reuses. Manual compaction and branch summaries are
-  not implemented.
+  (NH06) that reopening or another question reuses. Manual compaction summarizes before the next answer;
+  branch summaries are not implemented.
 - Output-limited calls never execute. Their native call blocks and raw arguments are kept with
   synthetic error results in the run's audit history, and a successful output recovery excludes
   that interrupted exchange from retry context and from replay.
@@ -73,8 +73,9 @@ Important current adaptations/gaps:
   across processes; queued input is saved before it is acknowledged (NH08). The chat stays busy
   (`cancelling`) after a stop until the run has settled. Open: one owner retained per session
   across runs (today one per run), and model changes at request boundaries.
-- Interchange is native (NH10, `kurn.agent-session` v1). The pi JSONL v3 subset, an HTML export
-  and keeping unknown host records through an app import are not implemented; integers past
+- Interchange is native (NH10, `kurn.agent-session` v1). The pi JSONL v3 subset is not implemented; another host's records
+  and header fields survive an app import and the next export, and the reading export is Markdown, Word or
+  inert HTML; integers past
   2^53 inside opaque archive fields lose precision (documented limitation).
 - Legacy Codable Date fields use Foundation seconds since 2001. Preserve that codec while
   reading old data. Contract v1/pi timestamps below are different fields and units.
@@ -479,8 +480,9 @@ is unknown (`nil`), never zero. Budgets come from the effective model's own wind
 System prompts are ordered sections (`AgentSystemPrompt`): Kurn's meeting-assistant `instructions`
 form a stable prefix and the `documents` index is its own section. Each `agent.run-start.v1`
 records the first run's prompt (`system`), later runs' `systemPatch` (changed sections, `null`
-removing one) and the declared tools with their delta (`tools`). Open: manual compaction and
-optional branch summaries.
+removing one) and the declared tools with their delta (`tools`); within a run the prompt is refreshed
+after each tool batch. Manual compaction (`compactingFirst`) summarizes before a run's first request.
+Open: optional branch summaries.
 
 ## Usage, cost, retries and credentials — NH07
 

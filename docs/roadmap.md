@@ -583,7 +583,7 @@ fixture hashes and evidence links. The canonical v1 format is not activated and 
 store migration runs in that increment. NH02 implements the local message/stream profile described below; NH03 implements the store/migration boundary described below; NH04 implements the native tool pipeline and durable local artifact boundary described below; NH05 is complete (session ownership, canonical run branches, barriers, cancellation, recovery
 and resumption, see `CLAUDE.md`); NH06 is implemented except manual compaction and branch
 summaries (canonical replay, persistent compaction, context edits, system sections and tool loadouts,
-see `CLAUDE.md`); NH07 is implemented except a full capability snapshot and transport Retry-After
+see `CLAUDE.md`); NH07 is implemented except a full capability snapshot
 (usage/cache counters, cost estimation and an unverifiable-ceiling guard, session-owned retries,
 per-request credentials, see `CLAUDE.md`); NH08 is implemented except a session-retained owner,
 model changes at request boundaries and `waitingForUser` (steering/follow-up queues, continuation,
@@ -817,10 +817,7 @@ of the omission note, context edits applied to the projection only (`AgentContex
 context usage after a compaction, ordered system sections recorded as per-run patches and tool
 loadouts with their delta (`AgentSystemPrompt`, `AgentToolLoadout`). Still open:
 
-- Manual compaction (a user action that summarizes now) and optional branch summaries.
-- Refreshing the `documents` system section inside a run after a document mutation (today the next
-  run records the change as a patch).
-- A host writer for context edits: the projection applies them, but no app action records one yet.
+- Optional branch summaries.
 - Plain fallback history (`.user`/`.assistant` without identities) cannot anchor a checkpoint.
 
 **NH07 details.** Model identity is provider plus ID, with a cached capability
@@ -859,9 +856,7 @@ attempts kept as audit data); credentials resolved per request (`AgentPerRequest
 
 - A cached capability snapshot per provider and model (modalities, tools, thinking, usage/cache
   support); context and output limits already come from `AgentContextResolution`.
-- Carrying the provider's `Retry-After` from the agent streaming transport into its error.
-- Pricing cache reads and writes at their own rates, and provider-reported (rather than estimated) cost.
-- Deduplicating usage by request identity in persisted usage entries.
+- Provider-reported (rather than estimated) cost, where a vendor reports one.
 
 **NH08 details.** Keep FIFO steering and follow-up queues with one/all modes.
 Steering enters after the current response and its complete tool batch;
@@ -902,7 +897,6 @@ shown. Still open:
 
 - Branch summaries: an explicit model operation that summarizes a branch being left, keeping its
   source restrictions, and that later runs replay.
-- A tree view of every branch (the chat moves between versions of one question at a time).
 
 **NH10 details.** Export a native versioned session bundle containing entries,
 branch/leaf state, scopes, context boundaries, artifact revisions/provenance and
@@ -928,29 +922,25 @@ export through the share sheet. Still open:
 
 - The supported pi JSONL v3 subset (message/system/compaction/usage entries), only once fixtures
   demonstrate it.
-- A safe HTML export (no scripts, remote embeds or hosted links).
-- Keeping unknown host records and header fields when an archive is imported into the app's store.
 - Exact integers past 2^53 in opaque host records and unknown header fields: those pass through
   `JSONValue`, whose numbers are `Double` (entries are encoded directly and keep exact integers).
-- Background/foreground draft preservation (A68), and migration/stress/device qualification.
+- Migration/stress/device qualification, including the background/foreground chat check (A68) in
+  `docs/release-physical-checklist.md`.
 
 ### Remaining native-harness work (audit after NH10)
 
-NH00–NH10 are merged into `feature/native-harness`. Of the contract's 97 items, 54 are verified, 28 are
-excluded by the local profile, 12 are partial, 2 are conditional and 1 is pending
+NH00–NH10 are merged into `feature/native-harness`. Of the contract's 97 items, 56 are verified, 28 are
+excluded by the local profile, 11 are partial, 2 are conditional and none is pending
 (`docs/contracts/native-harness-v1.json`, checked by `Tools/check_native_harness_contracts.py`). Everything still open, grouped by where it lands, with the contract items it closes:
 
 | Area | Open item | Contract |
 | --- | --- | --- |
 | Capabilities | A versioned per-model capability snapshot (tools, reasoning, images, cache) recorded with the run, and alias/authenticated provider qualification | C03, C04 |
-| Retry | Carry the provider's `Retry-After` from the agent transport into `AgentTransientError` | C14 |
-| Usage and cost | Cache-aware pricing; usage deduplicated by request identity across retries | C17 follow-up |
-| Compaction | Manual compaction; branch summaries; checkpoint anchoring for plain (identity-less) history | C10, C13 |
-| Context | Refresh the `documents` system-prompt section inside a run after a mutation; a host writer that records context edits from the UI | C11, C12 follow-up |
+| Usage and cost | Provider-reported cost where a vendor reports one (cache-aware pricing and per-request usage are done) | C17 follow-up |
+| Compaction | Branch summaries; checkpoint anchoring for plain (identity-less) history | C10, C13 |
 | Run ownership | One owner retained per session across runs; model/provider changes at request boundaries; a `waitingForUser` phase once a tool asks for confirmation | C24 |
-| Tree | A tree view of every branch | C10 follow-up |
-| Interchange | The pi JSONL v3 subset (only with fixtures); a safe HTML export; keeping unknown host records on app import; exact integers past 2^53 in opaque fields (accepted limitation) | C25, C26, A52 |
-| Suspension | Persist the unsent draft (the `draft` recovery record kind is unused) and reconcile background/foreground on a device | A68 |
+| Interchange | The pi JSONL v3 subset (only with fixtures); exact integers past 2^53 in opaque fields (accepted limitation) | C25, C26 |
+| Suspension | Reconcile background/foreground on a device (the release checklist's chat item); the unsent draft is saved | A68 |
 | Qualification | Real-transport chunking, Dynamic Type/VoiceOver over a running conversation, migration/stress, Thread Sanitizer on the session/store boundaries, and the physical-device checklist | A06, A51 |
 
 A18 stays partial by adaptation: Kurn exposes no end/continue hooks, and the loop consults the

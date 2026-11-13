@@ -68,6 +68,25 @@ import Testing
         #expect(scheduled.map { $0.metrics[.retryDelayMs] } == [1_000, 3_000])
     }
 
+    @Test func aHostsRetryAfterHintShapesTheWaitAndNothingElse() async throws {
+        let policy = AgentRetryPolicy(maxAttempts: 3, baseDelaySeconds: 1, maxDelaySeconds: 10, maxWaitSeconds: 15)
+        #expect(policy.delay(after: AgentRetryAfter(Transient(), seconds: 6), failedAttempts: 1, waited: 0) == 6)
+        #expect(policy.delay(after: AgentRetryAfter(Transient(), seconds: 30), failedAttempts: 1, waited: 0) == nil)
+        // A hint never makes a permanent failure retryable.
+        #expect(policy.delay(after: AgentRetryAfter(Permanent(), seconds: 2), failedAttempts: 1, waited: 0) == nil)
+
+        let waits = Waits()
+        let model = ResultScriptedAgentModel([.failure(AgentRetryAfter(Transient(), seconds: 4)),
+                                             .failure(AgentRetryAfter(Permanent(), seconds: 1)),
+                                             .success(AgentTurnResponse(text: "Unused"))])
+        // The run fails with the host's own error, never the wrapper.
+        await #expect(throws: Permanent.self) {
+            try await agentEvents(NativeHarness(model: model, retryPolicy: self.policy(waits)))
+        }
+        #expect(await waits.values == [4])
+        #expect(await model.requests.count == 2)
+    }
+
     @Test func attemptsAreBounded() async throws {
         let waits = Waits()
         let model = ResultScriptedAgentModel([.failure(Transient()), .failure(Transient()), .failure(Transient()),

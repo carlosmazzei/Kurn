@@ -17,7 +17,7 @@ extension AppError: @retroactive AgentTransientError {
         }
     }
 
-    /// The streaming transport does not carry the response's `Retry-After` into its error yet,
-    /// so the session uses its own backoff.
+    /// Always nil: `AppError` has no field for it. The agent stream attaches the response's
+    /// `Retry-After` as an `AgentRetryAfter` around this error (`LLMHTTP.streamAgent`).
     public var retryAfterSeconds: Double? { nil }
 }

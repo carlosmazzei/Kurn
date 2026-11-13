@@ -1272,10 +1272,16 @@
 "chat.archive.export_failed" = "Impossibile esportare la conversazione.";
 "chat.archive.import_failed" = "Questo file non è un archivio di conversazione che Kurn può aprire. Non è stato importato nulla.";
 "chat.archive.imported_title" = "Conversazione importata";
-"chat.archive.export_markdown" = "Esporta come Markdown";
+"chat.archive.export_as" = "Esporta come…";
 "chat.archive.export" = "Esporta archivio (tutti i rami)";
 "chat.archive.import" = "Importa archivio";
 "chat.conversation.more" = "Azioni della conversazione";
 "chat.export.you" = "Tu";
 "chat.export.assistant" = "Assistente";
 "chat.export.documents" = "Documenti";
+"chat.context.leave_out" = "Escludi dalle prossime risposte";
+"chat.context.include" = "Includi nelle prossime risposte";
+"chat.context.left_out" = "Escluso dalle prossime risposte";
+"chat.branch.tree" = "Tutti i rami";
+"chat.context.compact_next" = "Riassumi prima i messaggi precedenti";
+"chat.draft.save_failed" = "Non è stato possibile salvare il testo non inviato. È ancora nel campo del messaggio.";

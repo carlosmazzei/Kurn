@@ -364,9 +364,13 @@
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTreeTests.swift",
           "symbol": "sessionUsageCoversEveryBranchAndContextUsageOnlyTheSelectedPath"
+        },
+        {
+          "path": "KurnTests/ChatSessionTreeTests.swift",
+          "symbol": "theTreeOfEveryBranchOpensTheOneChosen"
         }
       ],
-      "note": "NH09: alternatives, atomic navigation while settled, fork, clone, labels, rename, branch-aware artifact revisions and save actions, and usage over every branch versus the selected path. Open: branch summaries."
+      "note": "NH09: alternatives, atomic navigation while settled, fork, clone, labels, rename, branch-aware artifact revisions and save actions, and usage over every branch versus the selected path. A tree of every branch opens the one chosen. Open: branch summaries."
     },
     {
       "id": "C11",
@@ -397,9 +401,17 @@
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextEditTests.swift",
           "symbol": "removingACallRemovesItsResultsWithIt"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "anExchangeLeftOutIsNotReplayedUntilItIsIncludedAgain"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextEditTests.swift",
+          "symbol": "aLaterEditCanIncludeAMessageAgain"
         }
       ],
-      "note": "NH06: replay projects each answered question's run branch (request, calls, results, answer) from the log, excludes audit-only replies, applies context edits and the newest permitted checkpoint, and keeps reads outside the current source authorization out of context."
+      "note": "NH06: replay projects each answered question's run branch (request, calls, results, answer) from the log, excludes audit-only replies, applies context edits and the newest permitted checkpoint, and keeps reads outside the current source authorization out of context. The chat records context edits from a question's menu (leave an exchange out of later answers, or include it again)."
     },
     {
       "id": "C12",
@@ -426,9 +438,13 @@
         {
           "path": "KurnTests/ChatReplayHistoryTests.swift",
           "symbol": "aSecondQuestionReplaysTheFirstRunsCallsAndResults"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSystemPromptTests.swift",
+          "symbol": "theNextRequestSeesAPromptChangedByATool"
         }
       ],
-      "note": "NH06: ordered system sections with Kurn's meeting-assistant instructions as a stable prefix and the document index as its own section; each run records its prompt as a patch on the previous run's and its declared tools with their delta. A document mutation inside a run is reflected from the next run on."
+      "note": "NH06: ordered system sections with Kurn's meeting-assistant instructions as a stable prefix and the document index as its own section; each run records its prompt as a patch on the previous run's and its declared tools with their delta. Within a run the prompt is refreshed after each tool batch, so the request after a document mutation lists the new version."
     },
     {
       "id": "C13",
@@ -454,9 +470,13 @@
         {
           "path": "KurnTests/ChatReplayHistoryTests.swift",
           "symbol": "aSavedCompactionIsReusedOnlyWhereItsRunMayBeRead"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "aRunAskedToCompactFirstSummarizesBeforeItsFirstRequest"
         }
       ],
-      "note": "NH06: durable summary checkpoints committed before use and reused on replay; no omission note stands in for a summary. Manual compaction and optional branch summaries remain open."
+      "note": "NH06: durable summary checkpoints committed before use and reused on replay; no omission note stands in for a summary. Manual compaction summarizes before the next answer's first request. Optional branch summaries remain open."
     },
     {
       "id": "C14",
@@ -464,7 +484,7 @@
       "sourceDocument": "02-sessoes-contexto.md",
       "disposition": "required",
       "increment": "NH07",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputRecoveryTests.swift"
@@ -482,9 +502,17 @@
         {
           "path": "KurnTests/AppErrorTransientRetryTests.swift",
           "symbol": "otherFailuresAreNot"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRetryPolicyTests.swift",
+          "symbol": "aHostsRetryAfterHintShapesTheWaitAndNothingElse"
+        },
+        {
+          "path": "KurnTests/ProviderHTTPTests+Agent.swift",
+          "symbol": "aRejectedAgentRequestCarriesTheProvidersRetryAfter"
         }
       ],
-      "note": "NH07: the session is the one retry owner; transient failures before visible text are retried as new requests with bounded, cancellable backoff, failed attempts stay as audit data. Open: the agent transport does not carry Retry-After into its error yet."
+      "note": "NH07: the session is the one retry owner; transient failures before visible text are retried as new requests with bounded, cancellable backoff that honours the provider's Retry-After (carried by the agent stream as AgentRetryAfter), and failed attempts stay as audit data."
     },
     {
       "id": "C15",
@@ -567,9 +595,17 @@
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunTraceRestorationTests.swift",
           "symbol": "restoredUsageKeepsItsCacheCounts"
+        },
+        {
+          "path": "KurnTests/ModelPricingTests.swift",
+          "symbol": "cacheReadsAndWritesArePricedAtTheirOwnRates"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunTraceRestorationTests.swift",
+          "symbol": "aRequestsUsageCountsOnce"
         }
       ],
-      "note": "NH07: input/output/reasoning/cache-read/cache-write counters with reasoning and cache counted once; unknown cost stays unknown and an unverifiable cost ceiling stops the run; the app passes its price table as the estimator."
+      "note": "NH07: input/output/reasoning/cache-read/cache-write counters with reasoning and cache counted once; unknown cost stays unknown and an unverifiable cost ceiling stops the run; the app passes its price table as the estimator. Cache reads and writes are priced at their own rates, and usage entries name their request so one request counts once."
     },
     {
       "id": "C18",
@@ -749,9 +785,13 @@
         {
           "path": "KurnTests/ChatSessionArchiveTests.swift",
           "symbol": "theChatExportsAndImportsConversations"
+        },
+        {
+          "path": "KurnTests/ChatSessionArchiveTests.swift",
+          "symbol": "anotherHostsRecordsAndHeaderFieldsGoOnToTheNextExport"
         }
       ],
-      "note": "NH10: native versioned JSONL archive with every branch, the leaf, runs, usage and document revisions; new-copy import and identity-preserving restore only when free; rejection of untrusted archives; Markdown reading export through the share sheet. Open: the pi JSONL v3 subset, safe HTML export, and keeping unknown host records on import into the app."
+      "note": "NH10: native versioned JSONL archive with every branch, the leaf, runs, usage and document revisions; new-copy import and identity-preserving restore only when free; rejection of untrusted archives; reading export (Markdown, Word or inert HTML) through the share sheet. Another host's records and header fields survive an app import and the next export. Open: the pi JSONL v3 subset."
     },
     {
       "id": "C27",
@@ -1737,15 +1777,19 @@
       "requirement": "Viewer não executa conteúdo de ferramenta como código ativo",
       "disposition": "required",
       "increment": "NH10",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [],
       "targetEvidence": [
         {
           "path": "KurnTests/ChatSessionArchiveTests.swift",
           "symbol": "theReadingExportIsTheBranchShown"
+        },
+        {
+          "path": "KurnTests/ChatSessionArchiveTests.swift",
+          "symbol": "theHTMLReadingExportIsInert"
         }
       ],
-      "note": "NH10: the reading export is Markdown text with no HTML of its own, and the chat renders model Markdown with links disabled. No HTML export exists yet, so hostile-HTML handling is not exercised."
+      "note": "The reading export is Markdown, Word or one self-contained HTML page: every text is escaped, links and images keep only their text, and there is no script or external resource; the chat renders model Markdown with links disabled."
     },
     {
       "id": "A53",
@@ -1923,10 +1967,23 @@
       "requirement": "Draft preservado e estado reconciliado, sem conclusão inventada",
       "disposition": "required",
       "increment": "NH10",
-      "targetStatus": "pending",
+      "targetStatus": "partial",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Open: a draft typed but not sent is not yet persisted (the draft recovery record exists but is unused), and reconciliation across background/foreground is device-only (release physical checklist). Runs interrupted by the background window already settle as retryable and resume once."
+      "targetEvidence": [
+        {
+          "path": "KurnTests/MeetingChatDraftTests.swift",
+          "symbol": "aDraftSavedInTheBackgroundComesBackAndASentQuestionClearsIt"
+        },
+        {
+          "path": "KurnTests/MeetingChatDraftTests.swift",
+          "symbol": "theHostKeepsAConversationWhoseDraftHasNowhereToGo"
+        },
+        {
+          "path": "KurnTests/ChatConversationHostTests.swift",
+          "symbol": "aReplyStoppedInTheBackgroundResumesOnceInTheForeground"
+        }
+      ],
+      "note": "The unsent draft of a saved conversation is a .draft recovery record saved on going to the background, on switching conversations and before the host lets a conversation go; an unsaved conversation's draft keeps its view model retained. Runs stopped by the background window settle as interruptions and resume once. Open: the device check in docs/release-physical-checklist.md."
     },
     {
       "id": "A69",

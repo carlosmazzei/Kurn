@@ -70,13 +70,15 @@ struct HarnessChatService {
         context: ModelContext, scope: ChatSourceScope, workspace: ChatDocumentWorkspace,
         history: [ChatMessage], question: String, owner: AgentSession? = nil, runID: UUID = UUID(),
         commandID: String? = nil, questionID: UUID? = nil, replay: ChatReplayHistory? = nil,
-        inputQueue: AgentInputQueue? = nil
+        inputQueue: AgentInputQueue? = nil, compactFirst: Bool = false
     ) async throws -> Run {
         let run = try await prepare(model: model, provider: provider, modelIdentifier: modelIdentifier, context: context,
                                     scope: scope, workspace: workspace, history: history, question: question,
                                     replay: replay)
         // Queued input (NH08) enters the run at its boundaries.
-        let harness = inputQueue.map { run.harness.receivingInput($0) } ?? run.harness
+        let queued = inputQueue.map { run.harness.receivingInput($0) } ?? run.harness
+        // Manual compaction: the earlier conversation is summarized before this run's first request.
+        let harness = compactFirst ? queued.compactingFirst() : queued
         guard let owner else {
             let handle = harness.start(systemPrompt: run.systemPrompt, history: run.history, prompt: run.question,
                                            tools: run.tools, contextResolution: run.resolution, context: run.context,
@@ -131,15 +133,14 @@ struct HarnessChatService {
         else { plannedLimits = AgentBudgetPlanner.limits(for: reader.workload) }
         // The run's cost comes from the app's price table; a model it cannot price stays unknown.
         let harness = NativeHarness(model: model, limits: plannedLimits,
-                                    costEstimator: { usage in
-                                        ModelPricing.estimatedCostUSD(model: modelIdentifier, usage: TokenUsage(
-                                            promptTokens: usage.inputTokens, completionTokens: usage.outputTokens))
-                                    },
+                                    costEstimator: { ModelPricing.estimatedCostUSD(model: modelIdentifier, usage: $0) },
                                     contextPolicy: AgentContextPolicy(contextWindow: resolution.contextWindowTokens,
                                                                       summaryPrompts: ChatCompactionPrompts.profile,
                                                                       maxOutputTokens: resolution.maxOutputTokens),
                                     retryPolicy: .standard,
                                     diagnosticSink: { HarnessDiagnostics.record($0) })
+            // A document tool changes the index the prompt lists; the next request sees it (C12).
+            .refreshingSystemPrompt { try? await Self.system(artifacts: workspace.snapshot()).text }
         let authorization = ChatRunAuthorization(scope: effective, meetingIDs: ids, model: "\(provider.id):\(modelIdentifier)")
         // Canonical replay (NH06) when the conversation's runs are known; otherwise plain text.
         let replayed = replay?.messages(for: authorization) ?? history.map {

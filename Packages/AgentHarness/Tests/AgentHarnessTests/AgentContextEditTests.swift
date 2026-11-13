@@ -60,4 +60,21 @@ import Testing
         let edited = AgentContextEdit.applying(edits, to: try conversation())
         #expect(edited.map(\.canonicalID) == ["q1", "a1", "r1", nil, "q2"])
     }
+
+    /// A later edit can include again what an earlier one left out; an edit that restores nothing
+    /// keeps its old shape, and its entry is detached from the conversation.
+    @Test func aLaterEditCanIncludeAMessageAgain() throws {
+        let edits = [AgentContextEdit(removedMessageIDs: ["a1", "q2"]), AgentContextEdit(removedMessageIDs: [], restoredMessageIDs: ["a1"])]
+        #expect(AgentContextEdit.excluded(by: edits) == ["q2"])
+        #expect(AgentContextEdit.applying(edits, to: try conversation()).map(\.canonicalID) == ["q1", "a1", "r1", "a2", nil])
+
+        let plain = try JSONEncoder().encode(AgentContextEdit(removedMessageIDs: ["x"]))
+        #expect(String(decoding: plain, as: UTF8.self) == #"{"removedMessageIDs":["x"]}"#)
+        let restoring = try JSONDecoder().decode(AgentContextEdit.self, from: JSONEncoder().encode(edits[1]))
+        #expect(restoring == edits[1])
+
+        let entry = try edits[1].entry(sessionID: "s", ordinal: 4, id: "edit")
+        #expect(entry.parentID == nil && entry.kind == AgentContextEdit.entryType)
+        #expect(AgentContextEdit.all(in: [entry]) == [edits[1]])
+    }
 }

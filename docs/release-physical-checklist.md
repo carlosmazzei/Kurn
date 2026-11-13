@@ -60,6 +60,12 @@ the release the same as a failed CI job would.
 - [ ] Thermal pressure: let the device get genuinely warm (extended
       recording + charging + a bright display) and confirm the live
       thermal-state check in `ResourceScheduler` engages.
+- [ ] Chat in the background (A68): ask a long question in a saved
+      conversation, type a follow-up without sending it, lock the device
+      until the background window ends, then force quit and relaunch;
+      confirm the reply settled as interrupted (no invented answer), the
+      question is retryable or resumed once, and the unsent follow-up is
+      back in the composer.
 
 ## Watch and models
 

@@ -215,6 +215,27 @@ extension ProviderHTTPTests {
             #expect(received == [.content(.failed(.preparation))])
         }
     }
+    /// A rejected agent request carries the provider's `Retry-After` to the session, which owns the
+    /// retry; without one, or for a permanent failure, the plain `AppError` is thrown.
+    @Test func aRejectedAgentRequestCarriesTheProvidersRetryAfter() async throws {
+        let model = AgentTestVendor.compatible.model()
+        MockURLProtocol.enqueue([MockURLProtocol.json(["error": ["message": "slow down"]], status: 429, headers: ["Retry-After": "7"])])
+        do {
+            _ = try await model.streamTurn(agentRequest) { _ in }
+            Issue.record("Expected a failure")
+        } catch let hinted as AgentRetryAfter {
+            #expect(hinted.seconds == 7)
+            guard case AppError.apiError(statusCode: 429, _) = hinted.underlying else { Issue.record("Expected the 429"); return }
+            #expect(AgentRetryPolicy.standard.delay(after: hinted, failedAttempts: 1, waited: 0) == 7)
+        }
+        #expect(MockURLProtocol.capturedRequests.count == 1)
+
+        for (status, headers) in [(429, [String: String]()), (401, ["Retry-After": "7"])] {
+            MockURLProtocol.enqueue([MockURLProtocol.json(["error": ["message": "no"]], status: status, headers: headers)])
+            await #expect(throws: AppError.self) { try await model.streamTurn(agentRequest) { _ in } }
+        }
+    }
+
     @Test func hostClassifiesProtocolAndCancellationFailures() {
         #expect(LLMHTTP.agentStreamFailure(AppError.decodingError("private")) == .invalidStream)
         #expect(LLMHTTP.agentStreamFailure(AppError.networkError(URLError(.cancelled))) == .cancelled)

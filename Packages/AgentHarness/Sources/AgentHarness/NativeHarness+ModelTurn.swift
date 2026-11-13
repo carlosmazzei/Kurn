@@ -38,7 +38,9 @@ extension NativeHarness {
                 ) { stream.consume($0) }
                 response = try stream.complete(raw)
                 try Task.checkCancellation()
-            } catch {
+            } catch let caught {
+                // A host's `Retry-After` hint only shapes the wait; everything else sees the failure.
+                let error = AgentRetryAfter.unwrapped(caught)
                 stream.fail(error)
                 try await recordFailure(stream, state: &state, events: events, trace: trace)
                 trace.record(.requestFailed, metrics: [.durationMs: Self.milliseconds(since: started), .protocolFailure: stream.failureCode])
@@ -47,7 +49,7 @@ extension NativeHarness {
                 // A transient failure before any visible text is sent again as a new request, after a
                 // cancellable wait; a cancel during it starts no new attempt.
                 if !stream.hasVisibleText,
-                   let delay = retryPolicy.delay(after: error, failedAttempts: attempts, waited: waited) {
+                   let delay = retryPolicy.delay(after: caught, failedAttempts: attempts, waited: waited) {
                     trace.record(.requestRetryScheduled, metrics: [.requestAttempt: attempts,
                                                                    .retryDelayMs: Int((delay * 1_000).rounded())])
                     try await retryPolicy.sleep(delay)
@@ -72,7 +74,7 @@ extension NativeHarness {
             metrics[.streamedText] = stream.hasVisibleText ? 1 : 0
             trace.record(.requestFinished, metrics: metrics, reason: response.stopReason == .maxTokens ? .outputLimit : nil)
             trace.endRequest(requestIdentity)
-            try await record(response.usage, state: &state, events: events)
+            try await record(response.usage, request: requestIdentity, state: &state, events: events)
             if response.stopReason == .maxTokens,
                try await recoverOutput(response, streamed: stream.hasVisibleText, settings: &settings,
                                        state: &state, events: events, trace: trace) { continue }
@@ -135,10 +137,10 @@ extension NativeHarness {
         return state.cost >= ceiling
     }
 
-    private func record(_ usage: AgentUsage?, state: inout AgentRunState,
+    private func record(_ usage: AgentUsage?, request: AgentRequestIdentity, state: inout AgentRunState,
                         events: AsyncThrowingStream<AgentEvent, Error>.Continuation) async throws {
         guard let usage else { return }
-        try await usageCommit(usage)
+        try await usageCommit(usage, request)
         state.usage = state.usage.adding(usage)
         if let price = costEstimator?(usage) { state.cost += max(0, price) } else { state.costKnown = false }
         events.yield(.usage(usage))
@@ -246,7 +248,8 @@ extension NativeHarness {
         do {
             let raw = try await model.streamTurn(request.identified(requestIdentity)) { stream.consume($0) }
             response = try stream.complete(raw)
-        } catch {
+        } catch let caught {
+            let error = AgentRetryAfter.unwrapped(caught)
             stream.fail(error)
             // Summary failures are protocol/audit data, never usable compaction checkpoints.
             try await recordFailure(stream, state: &state, events: events, trace: trace)
@@ -260,7 +263,7 @@ extension NativeHarness {
             state.history.append(message)
             try await AgentResponseAudit.appendBlocked(response, state: &state, events: events, trace: trace, toContext: false, commit: messageCommit)
         }
-        try await record(response.usage, state: &state, events: events)
+        try await record(response.usage, request: requestIdentity, state: &state, events: events)
         trace.record(.summaryFinished, metrics: response.diagnosticMetrics,
                      reason: response.stopReason == .maxTokens ? .outputLimit : nil)
         let text = response.text.trimmingCharacters(in: .whitespacesAndNewlines)

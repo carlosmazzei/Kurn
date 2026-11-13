@@ -139,7 +139,7 @@ public struct AgentSessionArchive: Sendable, Equatable {
 
     /// A host record's type is namespaced (`vendor.kind`), so it can never be read as an entry or a
     /// header.
-    static func isRecordType(_ type: String) -> Bool {
+    public static func isRecordType(_ type: String) -> Bool {
         type.contains(".") && AgentContentMessage.validID(type) && !["session", "entry"].contains(type)
     }
 }
