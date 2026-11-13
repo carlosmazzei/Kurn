@@ -388,6 +388,7 @@ final class MeetingChatViewModel {
         error = nil
         session = nil
         interruptedQuestionIDs = []
+        runProgress = AgentRunProgress()
         conversationID = UUID()
         artifacts = []
         workspace = ChatDocumentWorkspace()
@@ -441,6 +442,7 @@ final class MeetingChatViewModel {
             } ?? (turns: restored.turns, interrupted: [])
             turns = recovered.turns.map(Turn.init)
             interruptedQuestionIDs = recovered.interrupted
+            runProgress = AgentRunProgress()
             retryArtifacts = []
             retryOrigins = [:]
             error = nil
@@ -506,8 +508,8 @@ final class MeetingChatViewModel {
             for try await event in run.events {
                 try Task.checkCancellation()
                 if self.generation == generation {
-                    phase = phase.applying(event)
                     runProgress.apply(event)
+                    phase = phase.following(runProgress)
                 }
                 timeline.apply(event)
                 turns[index].steps = timeline.steps
@@ -535,6 +537,7 @@ final class MeetingChatViewModel {
             await run.settle()
         } catch {
             await run.terminate()
+            if self.generation == generation { runProgress.finish() }
             // A run whose end entry alone failed to save gets one more attempt at it, without
             // re-running anything; a branch still left open is closed by the next launch sweep.
             if ChatRunBranch.isWriteFailure(error), let owner {

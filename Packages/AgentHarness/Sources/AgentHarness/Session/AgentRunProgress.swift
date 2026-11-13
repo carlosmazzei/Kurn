@@ -6,7 +6,8 @@ import Foundation
 ///
 /// `compacting` covers a context compaction between `compactionStarted` and its finish, failure
 /// or skip; `retryWaiting` covers an output-limit retry from `outputRetryStarted` until its new
-/// request starts. A host owner adds its own states around these (cancellation, settlement);
+/// request starts, even across the retry's `turnStarted` and any compaction before it. A run that
+/// ends without `runFinished` is closed with `finish()`. A host owner adds its own states around these (cancellation, settlement);
 /// a tool confirmation would be `waitingForUser`, which no event reports yet.
 public struct AgentRunProgress: Sendable, Equatable {
     public enum Phase: String, Sendable, Equatable {
@@ -37,7 +38,8 @@ public struct AgentRunProgress: Sendable, Equatable {
         case .turnStarted(let index):
             turnIndex = index
             invocations = [:]
-            enter(.streaming)
+            // A retry's turn starts before its request does; the wait lasts until the request.
+            if phase != .retryWaiting, resumePhase != .retryWaiting { enter(.streaming) }
         case .textDelta, .modelContent:
             if phase == .preparing || phase == .retryWaiting { enter(.streaming) }
         case .invocationRegistered(let invocation):
@@ -56,6 +58,14 @@ public struct AgentRunProgress: Sendable, Equatable {
         case .messageAppended, .contextResolved, .toolProgress, .contextCompacted, .usage:
             break
         }
+    }
+
+    /// Ends the projection of a run that stopped without `runFinished` — it failed or was
+    /// cancelled — so no call is left looking active.
+    public mutating func finish() {
+        activeCallIDs = []
+        resumePhase = nil
+        phase = .finished
     }
 
     private mutating func applyDiagnostic(_ kind: AgentDiagnostic.Kind) {

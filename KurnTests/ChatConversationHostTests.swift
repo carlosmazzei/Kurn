@@ -314,38 +314,51 @@ struct BackgroundDeadlineTests {
 }
 
 struct ChatRunPhaseTests {
-    @Test func ownerStatesIgnoreEvents() {
-        #expect(ChatRunPhase.idle.applying(.textDelta("x")) == .idle)
-        #expect(ChatRunPhase.cancelling.applying(.toolStarted(callID: "1", name: "search", arguments: .object([:]))) == .cancelling)
+    private func progress(_ events: AgentEvent...) -> AgentRunProgress {
+        var progress = AgentRunProgress()
+        for event in events { progress.apply(event) }
+        return progress
+    }
+
+    private func diagnostic(_ kind: AgentDiagnostic.Kind) -> AgentEvent {
+        .diagnostic(AgentDiagnostic(runID: UUID(), sequence: 0, kind: kind))
+    }
+
+    @Test func ownerStatesIgnoreTheProjection() {
+        let streaming = progress(.textDelta("x"))
+        #expect(ChatRunPhase.idle.following(streaming) == .idle)
+        #expect(ChatRunPhase.cancelling.following(progress(.toolStarted(callID: "1", name: "search", arguments: .object([:])))) == .cancelling)
         #expect(!ChatRunPhase.idle.isBusy)
         #expect(ChatRunPhase.cancelling.isBusy)
     }
 
-    @Test func eventsMoveARunBetweenStreamingAndTools() {
-        let started = ChatRunPhase.preparing.applying(.toolStarted(callID: "1", name: "search", arguments: .object([:])))
-        #expect(started == .executingTools)
-        #expect(started.applying(.toolFinished(callID: "1", name: "search", summary: "", isError: false)) == .executingTools)
-        #expect(started.applying(.turnStarted(index: 1)) == .streaming)
-        #expect(ChatRunPhase.preparing.applying(.textDelta("x")) == .streaming)
-        #expect(ChatRunPhase.streaming.applying(.usage(AgentUsage(inputTokens: 1, outputTokens: 1))) == .streaming)
-        #expect(ChatRunPhase.preparing.applying(.runStarted) == .preparing)
+    @Test func theProjectionMovesARunBetweenStreamingAndTools() {
+        let tool = AgentEvent.toolStarted(callID: "1", name: "search", arguments: .object([:]))
+        #expect(ChatRunPhase.preparing.following(progress(tool)) == .executingTools)
+        #expect(ChatRunPhase.preparing.following(progress(tool, .toolFinished(callID: "1", name: "search", summary: "",
+                                                                             isError: false))) == .executingTools)
+        #expect(ChatRunPhase.preparing.following(progress(tool, .turnStarted(index: 1))) == .streaming)
+        #expect(ChatRunPhase.preparing.following(progress(.textDelta("x"))) == .streaming)
+        #expect(ChatRunPhase.preparing.following(progress(.runStarted)) == .preparing)
+        var finished = progress(.textDelta("x"))
+        finished.finish()
+        #expect(ChatRunPhase.streaming.following(finished) == .streaming)
     }
 
-    @Test func compactionAndAnOutputRetryHaveTheirOwnPhases() {
-        func diagnostic(_ kind: AgentDiagnostic.Kind) -> AgentEvent {
-            .diagnostic(AgentDiagnostic(runID: UUID(), sequence: 0, kind: kind))
-        }
-        let compacting = ChatRunPhase.streaming.applying(diagnostic(.compactionStarted))
-        #expect(compacting == .compacting)
-        #expect(compacting.isBusy)
-        #expect(compacting.applying(diagnostic(.compactionFinished)) == .streaming)
-        #expect(compacting.applying(diagnostic(.compactionSkipped)) == .streaming)
-        #expect(ChatRunPhase.executingTools.applying(diagnostic(.compactionFailed)) == .executingTools)
-        let retrying = ChatRunPhase.streaming.applying(diagnostic(.outputRetryStarted))
-        #expect(retrying == .retryWaiting)
-        #expect(retrying.applying(.requestStarted(AgentRequestIdentity())) == .streaming)
-        #expect(ChatRunPhase.streaming.applying(diagnostic(.requestFinished)) == .streaming)
-        #expect(ChatRunPhase.cancelling.applying(diagnostic(.compactionStarted)) == .cancelling)
+    @Test func compactionAndAnOutputRetryHaveTheirOwnPhases() throws {
+        #expect(ChatRunPhase.streaming.following(progress(.textDelta("x"), diagnostic(.compactionStarted))) == .compacting)
+        #expect(ChatRunPhase.compacting.isBusy)
+        #expect(ChatRunPhase.streaming.following(progress(.textDelta("x"), diagnostic(.compactionStarted),
+                                                          diagnostic(.compactionFinished))) == .streaming)
+        // The output-limit recovery as the harness emits it: retry, compaction, the next turn, then
+        // the request. The run waits on the retry until that request starts.
+        let recovery: [AgentEvent] = [.turnStarted(index: 0), diagnostic(.outputRetryStarted), diagnostic(.compactionStarted),
+                                      diagnostic(.compactionFinished), .turnStarted(index: 1)]
+        var projection = AgentRunProgress()
+        for event in recovery { projection.apply(event) }
+        #expect(ChatRunPhase.streaming.following(projection) == .retryWaiting)
+        projection.apply(.requestStarted(try AgentRequestIdentity(id: "req-2")))
+        #expect(ChatRunPhase.retryWaiting.following(projection) == .streaming)
     }
 
     @MainActor @Test func aConversationProjectsItsRunsTurnAndCalls() async throws {
@@ -364,5 +377,20 @@ struct ChatRunPhaseTests {
         #expect(vm.runProgress.request != nil)
         #expect(vm.runProgress.activeCallIDs.isEmpty)
         #expect(vm.phase == .idle)
+        // A new conversation does not show the last one's run.
+        vm.reset()
+        #expect(vm.runProgress == AgentRunProgress())
+    }
+
+    @MainActor @Test func aRunThatFailsLeavesNoCallActive() async throws {
+        let model = ChatAgentModel([AgentTurnResponse(text: "Monday.")], fails: true)
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model })
+        vm.configure(meeting: meeting, modelContext: context)
+        vm.send(question: "When?", provider: .openAI, model: "gpt-4o")
+        await vm.waitUntilSettled()
+        #expect(vm.runProgress.phase == .finished)
+        #expect(vm.runProgress.activeCallIDs.isEmpty)
     }
 }

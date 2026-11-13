@@ -2946,9 +2946,10 @@ command is the question turn a run answers (`MeetingChatViewModel.send(commandID
 interrupted phase), `retryWaiting` (an output-limit retry until its request starts) and
 `finished` — with the current turn index, request identity, started-but-unfinished call IDs and the
 turn's registered invocations. It is presentation only and never orders persistence; there is no
-`waitingForUser` until a tool asks for confirmation. The chat keeps it as
-`MeetingChatViewModel.runProgress`, and `ChatRunPhase` has the same `compacting`/`retryWaiting`
-phases beside its own `cancelling`.
+`waitingForUser` until a tool asks for confirmation. A retry's wait lasts across its `turnStarted`
+and any compaction until its request starts, and `finish()` closes a run that ended without
+`runFinished`. The chat keeps it as `MeetingChatViewModel.runProgress` (reset with the conversation),
+and `ChatRunPhase.following(_:)` derives the shown phase from it, beside its own `cancelling`.
 
 **Chat conversations are host-owned (NH05 host activation).** `ChatConversationHost`
 (`ViewModels/`, built by `AppComposition`, injected app-wide) retains one

@@ -9,22 +9,18 @@ enum ChatRunPhase: String, Sendable, Equatable {
 
     var isBusy: Bool { self != .idle }
 
-    /// The phase after observing `event`. Idle and cancelling are owner states that no event
-    /// can leave: only the owner settling a run returns it to idle.
-    func applying(_ event: AgentEvent) -> ChatRunPhase {
+    /// The phase a run's `AgentRunProgress` projects. Idle and cancelling are owner states that no
+    /// progress can leave: only the owner settling a run returns it to idle. A finished
+    /// projection keeps the current phase until the owner settles.
+    func following(_ progress: AgentRunProgress) -> ChatRunPhase {
         guard self != .idle, self != .cancelling else { return self }
-        switch event {
-        case .toolStarted, .toolProgress, .invocationRegistered: return .executingTools
-        case .requestStarted, .turnStarted, .textDelta, .modelContent: return .streaming
-        // The same phases `AgentRunProgress` projects with its identities (NH05).
-        case .diagnostic(let diagnostic):
-            switch diagnostic.kind {
-            case .compactionStarted: return .compacting
-            case .compactionFinished, .compactionFailed, .compactionSkipped: return self == .compacting ? .streaming : self
-            case .outputRetryStarted: return .retryWaiting
-            default: return self
-            }
-        default: return self
+        switch progress.phase {
+        case .preparing: return .preparing
+        case .streaming: return .streaming
+        case .executingTools: return .executingTools
+        case .compacting: return .compacting
+        case .retryWaiting: return .retryWaiting
+        case .finished: return self
         }
     }
 }

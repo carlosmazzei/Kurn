@@ -90,4 +90,31 @@ import Testing
         #expect(phases.last == .finished)
         #expect(progress.turnIndex == 1)
     }
+
+    @Test func theRetryWaitLastsAcrossItsTurnAndCompactionUntilItsRequest() throws {
+        var progress = AgentRunProgress()
+        progress.apply(.turnStarted(index: 0))
+        progress.apply(diagnostic(.outputRetryStarted))
+        progress.apply(diagnostic(.compactionStarted))
+        #expect(progress.phase == .compacting)
+        progress.apply(.turnStarted(index: 1))
+        progress.apply(diagnostic(.compactionFinished))
+        #expect(progress.phase == .retryWaiting)
+        progress.apply(.turnStarted(index: 1))
+        #expect(progress.phase == .retryWaiting)
+        #expect(progress.turnIndex == 1)
+        progress.apply(.requestStarted(try AgentRequestIdentity(id: "req-3")))
+        #expect(progress.phase == .streaming)
+    }
+
+    @Test func finishingAFailedRunLeavesNoCallActive() {
+        var progress = AgentRunProgress()
+        progress.apply(.toolStarted(callID: "call-1", name: "lookup", arguments: .null))
+        progress.apply(diagnostic(.compactionStarted))
+        progress.finish()
+        #expect(progress.phase == .finished)
+        #expect(progress.activeCallIDs.isEmpty)
+        progress.apply(diagnostic(.compactionFinished))
+        #expect(progress.phase == .finished)
+    }
 }
