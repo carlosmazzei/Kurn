@@ -75,16 +75,15 @@ final class MeetingChatViewModel {
     /// A question the background wind-down stopped, sent again once on return to the
     /// foreground (`resumeAfterForeground`). A user stop, a new question, `reset` or `load`
     /// clear it: only an interruption the user did not ask for is resumed.
-    @ObservationIgnored private(set) var pendingForegroundResume: ForegroundResume?
+    @ObservationIgnored var pendingForegroundResume: ForegroundResume?
+    /// A question a dead process left interrupted, which reopening its conversation resumes once
+    /// (`resumeInterruptedRun`, `ChatRunRecovery.resumableInterruptedRun`). Set by `load`;
+    /// cleared by `reset`, `send` and the resume itself.
+    var interruptedResume: InterruptedResume?
     /// Whether the last stopped run committed a document change before it stopped. A resumed
     /// run would call the tool again under a new invocation identity, which no receipt matches,
     /// so such a question is left for the user to retry instead of being resumed.
-    @ObservationIgnored private var stoppedRunCommittedEffects = false
-    struct ForegroundResume {
-        let question: String
-        let provider: AIProvider
-        let model: String
-    }
+    @ObservationIgnored var stoppedRunCommittedEffects = false
     /// The background-execution window held for the current run (see `send`).
     @ObservationIgnored private var backgroundWindow: (any BackgroundExecutionWindow)?
     @ObservationIgnored private let makeBackgroundWindow: @MainActor () -> any BackgroundExecutionWindow
@@ -108,6 +107,7 @@ final class MeetingChatViewModel {
         guard !trimmed.isEmpty, !isResponding, task == nil else { return }
         error = nil
         pendingForegroundResume = nil
+        interruptedResume = nil
         stoppedRunCommittedEffects = false
 
         generation = UUID()
@@ -255,32 +255,6 @@ final class MeetingChatViewModel {
         pendingForegroundResume = request
     }
 
-    /// Sends again, once, the question a background wind-down stopped (NH05 foreground
-    /// resumption). Waits for that run to settle first; does nothing if the user has since
-    /// answered, stopped, replaced or left the question, or if the stopped run had committed a
-    /// document change (its tool would run again under a new invocation identity). The run
-    /// starts over from the saved question with the same provider and model; nothing of the
-    /// stopped run is replayed.
-    func resumeAfterForeground() async {
-        await waitUntilSettled()
-        guard let pending = pendingForegroundResume else { return }
-        pendingForegroundResume = nil
-        guard retryableQuestion == pending.question, error == nil else { return }
-        guard !stoppedRunCommittedEffects else {
-            ReliabilityLog.record(ReliabilityEvent(
-                operationID: OperationID(), operation: "meeting_chat", stage: "background",
-                outcome: .cancelled, code: "background_resume_declined"
-            ))
-            return
-        }
-        ReliabilityLog.record(ReliabilityEvent(
-            operationID: OperationID(), operation: "meeting_chat", stage: "background",
-            outcome: .started, code: "background_resumed"
-        ))
-        dropRetryableQuestion()
-        send(question: pending.question, provider: pending.provider, model: pending.model)
-    }
-
     /// Returns once the current run, if any, has terminated and reconciled its reply.
     func waitUntilSettled() async {
         while let task { await task.value }
@@ -388,6 +362,7 @@ final class MeetingChatViewModel {
         error = nil
         session = nil
         interruptedQuestionIDs = []
+        interruptedResume = nil
         runProgress = AgentRunProgress()
         conversationID = UUID()
         artifacts = []
@@ -443,6 +418,9 @@ final class MeetingChatViewModel {
             turns = recovered.turns.map(Turn.init)
             interruptedQuestionIDs = recovered.interrupted
             runProgress = AgentRunProgress()
+            interruptedResume = modelContext.flatMap { context in
+                ChatRunRecovery.resumableInterruptedRun(in: recovered.turns, session: session, context: context)
+            }.flatMap { runID in recovered.turns.last.map { InterruptedResume(question: $0.text, runID: runID) } }
             retryArtifacts = []
             retryOrigins = [:]
             error = nil
@@ -522,7 +500,7 @@ final class MeetingChatViewModel {
                 // finished since the last snapshot seen.
                 let finished = view.finishedTools.dropFirst(toolsSeen)
                 toolsSeen = view.finishedTools.count
-                if finished.contains(where: { !$0.isError && Self.documentTools.contains($0.name) }) {
+                if finished.contains(where: { !$0.isError && ChatRunBranch.documentTools.contains($0.name) }) {
                     let snapshot = await workspace.snapshot()
                     try Task.checkCancellation()
                     turns[index].recordArtifacts(from: artifacts, to: snapshot,

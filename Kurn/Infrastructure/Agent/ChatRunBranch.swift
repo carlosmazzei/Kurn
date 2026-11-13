@@ -13,6 +13,13 @@ enum ChatRunBranch {
     static let usageType = "agent.usage.v1"
     static let endType = "agent.run-end.v1"
 
+    /// The tools whose successful result changed a document in the workspace.
+    static let documentTools: Set<String> = ["create_document", "update_document", "append_to_document"]
+
+    /// The durable command of the one automatic resume an interrupted run may get.
+    static func resumeCommand(for runID: String) -> String { resumePrefix + runID }
+    static let resumePrefix = "resume-"
+
     /// The owner of one run's branch in `session`.
     static func owner(session: ChatSession, store: SwiftDataAgentSessionStore) throws -> AgentSession {
         try AgentSession(sessionID: session.id.uuidString, store: store, appendMode: .branch)

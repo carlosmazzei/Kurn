@@ -3014,7 +3014,14 @@ question when it has none of its own. Only committed entries are shown — a res
 no output summary (that is a live event, never saved), a call without a saved result reads as
 failed, and there is no stop step without a saved end. Restoring writes nothing and never re-runs
 anything; a later save of the conversation keeps the shown steps on the question, as it does a
-stopped run's.
+stopped run's. The interruption is then resumed, once: `load` stages
+`MeetingChatViewModel.interruptedResume` when `ChatRunRecovery.resumableInterruptedRun` allows it
+(the run committed no document change, was not itself a resume and was not resumed before), and
+`MeetingChatView` calls `resumeInterruptedRun(provider:model:)` with the provider and model the chat
+uses now, as Retry would. The resume runs under the durable command
+`ChatRunBranch.resumeCommand(for:)` (`resume-<runID>`), so it never repeats in this process or after
+another launch (reliability code `interrupted_resumed`); a run that changed a document is left for
+the user's Retry. Both resumes live in `MeetingChatViewModel+Resume.swift`.
 
 **A run's model history is durable, on its own branch, written by `AgentSession`.** Each chat run
 is started through a per-run `AgentSession` owner in `.branch` mode (`ChatRunBranch`,

@@ -433,8 +433,13 @@ retryable; a retry starts a new branch), records `run_transcript_write_failed` a
 reply's progress could not be saved and nothing more was sent, instead of the store's error text. Run entries are
 recorded history only: replay still sends plain presentation history until NH06.
 
-Not yet activated: canonical history restoration beyond an interrupted run's steps, resumption of a run a
-dead process left interrupted and a `waitingForUser` phase (no tool asks for confirmation).
+Not yet activated: canonical history restoration beyond an interrupted run's steps, which NH06's
+canonical replay completes, and a `waitingForUser` phase (no tool asks for confirmation).
+
+Reopening a conversation a dead process interrupted resumes that run once, from the saved question
+with the chat's current provider and model, when the run committed no document change, was not
+itself a resume and was not resumed before: the resume runs under the durable command
+`resume-<runID>`, so it never repeats in this process or after another launch.
 
 The chat observes a run through `AgentRunSnapshots.coalescing`: a reducer drains the complete event
 observation into `AgentRunSnapshot`s (text, trace, `AgentRunProgress`, finished tool calls, outcome)

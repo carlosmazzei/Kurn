@@ -102,6 +102,13 @@ struct MeetingChatConversationView: View {
         // on every appearance (rather than a one-shot `.task`) needs no extra
         // state to guard against `meeting`/`modelContext` changing under it.
         .onAppear { vm.configure(meeting: meeting, modelContext: modelContext) }
+        // A reopened conversation a dead process interrupted is resumed once, with the provider
+        // and model the chat uses now (`MeetingChatViewModel.resumeInterruptedRun`).
+        .onChange(of: vm.interruptedResume?.runID) { _, runID in
+            guard runID != nil, canChat, sourceValidation == nil else { return }
+            let provider = settings.aiProvider
+            vm.resumeInterruptedRun(provider: provider, model: settings.summaryModel(for: provider))
+        }
     }
 
     /// "New conversation" and "History" — mirrors Claude's own chat history

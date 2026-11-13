@@ -4,9 +4,6 @@ import KurnCore
 
 /// Stateless helpers of `MeetingChatViewModel`, kept apart from its run and persistence state.
 extension MeetingChatViewModel {
-    /// The tools whose successful result changed a document in the workspace.
-    static let documentTools: Set<String> = ["create_document", "update_document", "append_to_document"]
-
     /// Prior turns as plain user/assistant history; old tool payloads are never replayed.
     static func buildHistory(from prior: [Turn]) -> [ChatMessage] {
         prior.map { ChatMessage(role: $0.role, content: $0.text) }

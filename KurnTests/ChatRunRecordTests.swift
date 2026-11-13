@@ -272,4 +272,63 @@ struct ChatRunRecordTests {
         vm.cancel()
         await vm.waitUntilSettled()
     }
+
+    @Test func aReopenedInterruptedRunIsResumedOnceAndOnlyOnce() async throws {
+        let paused = ChatAgentModel([AgentTurnResponse(text: "Partial")], pauseAt: 0)
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let crashed = MeetingChatViewModel(agentModelFactory: { _, _ in paused })
+        crashed.configure(meeting: meeting, modelContext: context)
+        crashed.send(question: "When?", provider: .openAI, model: "gpt-4o")
+        for _ in 0..<2_000 where await paused.requests.isEmpty { try? await Task.sleep(for: .milliseconds(5)) }
+        let session = try #require(crashed.pastSessions().first)
+        #expect(ChatRunRecovery.sweep(context: context) == 1)
+        let store = SwiftDataAgentSessionStore(context: context)
+        let runID = try #require(try store.records(session).compactMap(ChatRunRecord.init).first?.runID)
+        let interruptedTurns = try session.harnessSnapshot().turns
+
+        let model = ChatAgentModel([AgentTurnResponse(text: "Monday.")])
+        let reopened = MeetingChatViewModel(agentModelFactory: { _, _ in model })
+        reopened.configure(meeting: meeting, modelContext: context)
+        reopened.load(session: session)
+        #expect(reopened.interruptedResume == .init(question: "When?", runID: runID))
+        reopened.resumeInterruptedRun(provider: .openAI, model: "gpt-4o")
+        await reopened.waitUntilSettled()
+        #expect(reopened.turns.map(\.text) == ["When?", "Monday."])
+        #expect(reopened.interruptedResume == nil)
+        #expect(try store.snapshot(session).entries.contains { $0.commandID == ChatRunBranch.resumeCommand(for: runID) })
+
+        // Once only: neither this process nor a later launch resumes that run again.
+        reopened.resumeInterruptedRun(provider: .openAI, model: "gpt-4o")
+        #expect(await model.requests.count == 1)
+        #expect(ChatRunRecovery.resumableInterruptedRun(in: interruptedTurns, session: session, context: context) == nil)
+
+        crashed.cancel()
+        await crashed.waitUntilSettled()
+    }
+
+    @Test func anInterruptedRunThatChangedADocumentIsLeftForTheUser() async throws {
+        let create = try chatAgentCall("create_document", arguments: .object([
+            "title": .string("Minutes"), "markdown": .string("# Decisions")
+        ]))
+        let paused = ChatAgentModel([AgentTurnResponse(text: "", toolCalls: [create]), AgentTurnResponse(text: "Done")],
+                                    pauseAt: 1)
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let crashed = MeetingChatViewModel(agentModelFactory: { _, _ in paused })
+        crashed.configure(meeting: meeting, modelContext: context)
+        crashed.send(question: "Write the minutes", provider: .openAI, model: "gpt-4o")
+        for _ in 0..<2_000 where await paused.requests.count < 2 { try? await Task.sleep(for: .milliseconds(5)) }
+        let session = try #require(crashed.pastSessions().first)
+        #expect(ChatRunRecovery.sweep(context: context) == 1)
+
+        let reopened = MeetingChatViewModel(agentModelFactory: { _, _ in ChatAgentModel() })
+        reopened.configure(meeting: meeting, modelContext: context)
+        reopened.load(session: session)
+        #expect(reopened.retryableQuestionWasInterrupted)
+        #expect(reopened.interruptedResume == nil)
+
+        crashed.cancel()
+        await crashed.waitUntilSettled()
+    }
 }

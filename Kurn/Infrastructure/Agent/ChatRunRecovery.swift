@@ -89,4 +89,25 @@ enum ChatRunRecovery {
         }
         return (turns, Set(runs.keys))
     }
+
+    /// The run whose interruption a reopened conversation may resume automatically, once: the
+    /// interrupted run of the retryable question (the last turn, unanswered), provided it
+    /// committed no document change (a resumed run would call the tool again under a new
+    /// invocation identity no receipt matches), was not itself a resume, and has not been
+    /// resumed already — its resume command is durable in the log
+    /// (`ChatRunBranch.resumeCommand(for:)`), so a resume never repeats across launches.
+    static func resumableInterruptedRun(in turns: [PersistedChatTurn], session: ChatSession,
+                                        context: ModelContext) -> String? {
+        guard let last = turns.last, last.role == .user,
+              let runID = interruptedRuns(in: session, context: context)[last.id],
+              let entries = try? SwiftDataAgentSessionStore(context: context).snapshot(session).entries else { return nil }
+        let run = entries.filter { $0.runID == runID }
+        guard !run.contains(where: { $0.commandID?.hasPrefix(ChatRunBranch.resumePrefix) == true }),
+              !entries.contains(where: { $0.commandID == ChatRunBranch.resumeCommand(for: runID) }) else { return nil }
+        let changedDocument = run.contains { entry in
+            guard case .message(.tool(let result)) = entry.payload else { return false }
+            return !result.isError && ChatRunBranch.documentTools.contains(result.invocation.toolName)
+        }
+        return changedDocument ? nil : runID
+    }
 }
