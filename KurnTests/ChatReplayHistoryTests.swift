@@ -140,6 +140,66 @@ struct ChatReplayHistoryTests {
         #expect(!history.messages(for: narrowed).contains(reused[0]))
     }
 
+    @Test func aContextEditChangesOnlyWhatIsReplayed() async throws {
+        let model = ChatAgentModel([
+            AgentTurnResponse(text: "", toolCalls: [try chatAgentCall("list_sources")],
+                              usage: AgentUsage(inputTokens: 40, outputTokens: 5)),
+            AgentTurnResponse(text: "Monday.", usage: AgentUsage(inputTokens: 60, outputTokens: 5))
+        ])
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model })
+        vm.configure(meeting: meeting, modelContext: context)
+        vm.send(question: "When?", provider: .openAI, model: "gpt-4o")
+        await vm.waitUntilSettled()
+        let session = try #require(vm.pastSessions().first)
+        let store = SwiftDataAgentSessionStore(context: context)
+        let shown = try SwiftDataAgentSessionStore.projection(session).turns
+        let snapshot = try store.snapshot(session)
+        let resultID = try #require(snapshot.entries.compactMap { entry -> String? in
+            if case .message(.tool(let result)) = entry.payload { return result.id }; return nil
+        }.first)
+        let edit = try AgentSessionEntry(sessionID: snapshot.sessionID, id: UUID().uuidString, parentID: snapshot.leafID,
+            ordinal: snapshot.entries.count + 1, createdAt: AgentSessionEntry.time(),
+            payload: .custom(type: AgentContextEdit.entryType, data: .object(["removedMessageIDs": .array([.string(resultID)])])))
+        try store.commitNow(AgentSessionCommit(sessionID: snapshot.sessionID, expectedRevision: snapshot.revision,
+                                               entries: [edit], leafID: snapshot.leafID))
+
+        let history = ChatReplayHistory.load(turns: vm.turns.map { .init(id: $0.id, role: $0.role, text: $0.text) },
+                                             session: session, store: store)
+        let replayed = history.messages(for: try #require(ChatRunBranch.authorization(of: try #require(history.runs.first))))
+        let stub = replayed.compactMap { message -> AgentToolResultMessage? in
+            if case .tool(let result) = message { return result }; return nil
+        }
+        #expect(stub.map(\.id) == [resultID])
+        #expect(stub.first?.blocks.map(\.content) == [.text(AgentContextEdit.removedResult)])
+        // The log keeps the original result, and the shown conversation and its usage are unchanged.
+        let after = try store.snapshot(session).entries
+        #expect(after.contains { if case .message(.tool(let result)) = $0.payload { return result.id == resultID && result.text != AgentContextEdit.removedResult }; return false })
+        #expect(try SwiftDataAgentSessionStore.projection(session).turns.map(\.text) == shown.map(\.text))
+        #expect(try SwiftDataAgentSessionStore.projection(session).turns.map(\.usage) == shown.map(\.usage))
+    }
+
+    @Test func aRunForAQuestionNotOnTheShownPathIsNotReplayed() async throws {
+        let model = ChatAgentModel([
+            AgentTurnResponse(text: "", toolCalls: [try chatAgentCall("list_sources")]),
+            AgentTurnResponse(text: "Monday.")
+        ])
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model })
+        vm.configure(meeting: meeting, modelContext: context)
+        vm.send(question: "When?", provider: .openAI, model: "gpt-4o")
+        await vm.waitUntilSettled()
+        let session = try #require(vm.pastSessions().first)
+        // A sibling branch: the same words, but not the question turn this run answered.
+        let elsewhere = vm.turns.map { ChatReplayHistory.ShownTurn(id: UUID(), role: $0.role, text: $0.text) }
+        let history = ChatReplayHistory.load(turns: elsewhere, session: session, store: SwiftDataAgentSessionStore(context: context))
+        let replayed = history.messages(for: try #require(ChatRunBranch.authorization(of: try #require(history.runs.first))))
+        #expect(replayed.count == 2)
+        #expect(!replayed.contains(where: Self.isToolResult))
+    }
+
     @Test func aQuestionWithoutACompletedRunReplaysAsPlainText() throws {
         let question = ChatReplayHistory.ShownTurn(id: UUID(), role: .user, text: "When?")
         let answer = ChatReplayHistory.ShownTurn(id: UUID(), role: .assistant, text: "Monday.")

@@ -13,6 +13,9 @@ import KurnCore
 /// whose first kept message is in the history replaces everything before that message, so a
 /// reopened conversation does not summarize the same history again.
 ///
+/// Context edits recorded in the session (`AgentContextEdit`) apply to what is replayed, never to
+/// the log, the shown conversation or recorded usage.
+///
 /// Source boundary: a run's tool results hold what that run was authorized to read. They are
 /// replayed only when that authorization was the same source scope as this run's and resolved
 /// to no meeting this run cannot read, so narrowing the sources never lets an older answer's
@@ -28,10 +31,13 @@ struct ChatReplayHistory: Sendable {
     let turns: [ShownTurn]
     /// The runs recorded in the conversation's session, in the order they started.
     let runs: [AgentRunBranch]
+    /// Context edits recorded in the session, in commit order.
+    let edits: [AgentContextEdit]
 
-    init(turns: [ShownTurn], runs: [AgentRunBranch] = []) {
+    init(turns: [ShownTurn], runs: [AgentRunBranch] = [], edits: [AgentContextEdit] = []) {
         self.turns = turns
         self.runs = runs
+        self.edits = edits
     }
 
     /// The conversation's shown turns and the runs recorded in its saved session. Unreadable
@@ -39,7 +45,8 @@ struct ChatReplayHistory: Sendable {
     @MainActor
     static func load(turns: [ShownTurn], session: ChatSession?, store: SwiftDataAgentSessionStore) -> ChatReplayHistory {
         guard let session, let snapshot = try? store.snapshot(session) else { return ChatReplayHistory(turns: turns) }
-        return ChatReplayHistory(turns: turns, runs: AgentRunBranch.all(in: snapshot.entries))
+        return ChatReplayHistory(turns: turns, runs: AgentRunBranch.all(in: snapshot.entries),
+                                 edits: AgentContextEdit.all(in: snapshot.entries))
     }
 
     /// The model history for a run authorized by `authorization`.
@@ -62,9 +69,11 @@ struct ChatReplayHistory: Sendable {
             messages.append(Self.plain(turn))
             index = next
         }
-        // Persistent compaction: the newest summary a permitted run saved replaces what it covered.
+        // Context edits change only what is sent from now on; then the newest summary a permitted
+        // run saved replaces what it covered (an edit that removed its kept message voids it).
+        let edited = AgentContextEdit.applying(edits, to: messages)
         let checkpoints = runs.filter { Self.allows($0, under: authorization) }.flatMap(\.checkpoints)
-        return AgentCompactionCheckpoint.compacting(messages, with: checkpoints)
+        return AgentCompactionCheckpoint.compacting(edited, with: checkpoints)
     }
 
     static func plain(_ turn: ShownTurn) -> AgentMessage {
