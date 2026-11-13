@@ -38,7 +38,9 @@ extension NativeHarness {
                 ) { stream.consume($0) }
                 response = try stream.complete(raw)
                 try Task.checkCancellation()
-            } catch {
+            } catch let caught {
+                // A host's `Retry-After` hint only shapes the wait; everything else sees the failure.
+                let error = AgentRetryAfter.unwrapped(caught)
                 stream.fail(error)
                 try await recordFailure(stream, state: &state, events: events, trace: trace)
                 trace.record(.requestFailed, metrics: [.durationMs: Self.milliseconds(since: started), .protocolFailure: stream.failureCode])
@@ -47,7 +49,7 @@ extension NativeHarness {
                 // A transient failure before any visible text is sent again as a new request, after a
                 // cancellable wait; a cancel during it starts no new attempt.
                 if !stream.hasVisibleText,
-                   let delay = retryPolicy.delay(after: error, failedAttempts: attempts, waited: waited) {
+                   let delay = retryPolicy.delay(after: caught, failedAttempts: attempts, waited: waited) {
                     trace.record(.requestRetryScheduled, metrics: [.requestAttempt: attempts,
                                                                    .retryDelayMs: Int((delay * 1_000).rounded())])
                     try await retryPolicy.sleep(delay)
@@ -246,7 +248,8 @@ extension NativeHarness {
         do {
             let raw = try await model.streamTurn(request.identified(requestIdentity)) { stream.consume($0) }
             response = try stream.complete(raw)
-        } catch {
+        } catch let caught {
+            let error = AgentRetryAfter.unwrapped(caught)
             stream.fail(error)
             // Summary failures are protocol/audit data, never usable compaction checkpoints.
             try await recordFailure(stream, state: &state, events: events, trace: trace)

@@ -12,12 +12,18 @@ extension LLMHTTP {
         onEvent: @escaping @Sendable (AgentModelEvent) -> Void
     ) async throws -> AgentTurnResponse {
         let accumulator = AgentWireAccumulator(format: format, requestID: identity?.id ?? UUID().uuidString)
+        let retryAfter = RetryAfterBox()
         do {
-            try await streamSSE(request, session: session, policy: .interactive(totalDeadline: chatTimeout)) { payload in
+            try await streamSSE(request, session: session, policy: .interactive(totalDeadline: chatTimeout),
+                                onRetryAfter: { retryAfter.set($0) }) { payload in
                 for event in try accumulator.consume(payload) { onEvent(event) }
             }
             try Task.checkCancellation()
             return try accumulator.response()
+        } catch let error as AppError where error.isTransient && retryAfter.value != nil {
+            // The session owns agent retries (`AgentRetryPolicy`); it waits as long as the provider
+            // asked and sees only this `AppError` otherwise.
+            throw AgentRetryAfter(error, seconds: retryAfter.value ?? 0)
         } catch let error as AgentWireError {
             switch error {
             case .remote(let message): throw AppError.apiError(statusCode: 0, message: message)
@@ -41,4 +47,12 @@ extension LLMHTTP {
         return AgentStreamFailure.classify(error)
     }
 
+}
+
+/// The `Retry-After` of an agent request's rejected attempt, written by the transport's delegate.
+private final class RetryAfterBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var seconds: TimeInterval?
+    var value: TimeInterval? { lock.withLock { seconds } }
+    func set(_ value: TimeInterval) { lock.withLock { seconds = value } }
 }

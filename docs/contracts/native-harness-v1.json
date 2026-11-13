@@ -464,7 +464,7 @@
       "sourceDocument": "02-sessoes-contexto.md",
       "disposition": "required",
       "increment": "NH07",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputRecoveryTests.swift"
@@ -482,9 +482,17 @@
         {
           "path": "KurnTests/AppErrorTransientRetryTests.swift",
           "symbol": "otherFailuresAreNot"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRetryPolicyTests.swift",
+          "symbol": "aHostsRetryAfterHintShapesTheWaitAndNothingElse"
+        },
+        {
+          "path": "KurnTests/ProviderHTTPTests+Agent.swift",
+          "symbol": "aRejectedAgentRequestCarriesTheProvidersRetryAfter"
         }
       ],
-      "note": "NH07: the session is the one retry owner; transient failures before visible text are retried as new requests with bounded, cancellable backoff, failed attempts stay as audit data. Open: the agent transport does not carry Retry-After into its error yet."
+      "note": "NH07: the session is the one retry owner; transient failures before visible text are retried as new requests with bounded, cancellable backoff that honours the provider's Retry-After (carried by the agent stream as AgentRetryAfter), and failed attempts stay as audit data."
     },
     {
       "id": "C15",

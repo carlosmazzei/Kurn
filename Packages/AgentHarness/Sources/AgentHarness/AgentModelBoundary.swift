@@ -22,7 +22,7 @@ public enum AgentModelBoundary {
             return AgentTurnResponse(text: response.text, usage: response.usage, stopReason: response.stopReason,
                 providerMetadata: response.providerMetadata, discardedToolCalls: response.discardedToolCalls, message: message, blocksToolExecution: response.toolExecutionBlocked)
         } catch {
-            onEvent(.content(.failed(classifyFailure(error))))
+            onEvent(.content(.failed(classifyFailure(AgentRetryAfter.unwrapped(error)))))
             throw error
         }
     }

@@ -207,7 +207,10 @@ joined. Each failed attempt stays in the log as audit data, and `requestRetrySch
 the attempt and delay. `AgentRunProgress` shows the wait as `retryWaiting`. The chat uses `.standard`
 (three attempts). `AppError` is transient for 408/429/5xx statuses and connection failures, but not for
 timeouts or lost connections the provider may already be generating for, nor for auth, configuration,
-quota or context errors. Its `Retry-After` is not carried into the error yet.
+quota or context errors. `AppError` cannot carry a `Retry-After`, so the agent stream
+(`LLMHTTP.streamAgent`) throws a transient rejection whose response had one as an `AgentRetryAfter`
+around the `AppError`: the policy waits that long and the harness unwraps it everywhere else, so the
+run's failure, its audit and the stream classification only ever see the `AppError`.
 Credentials are resolved per request (NH07): `ProviderFactory.agentModel` returns an `AgentPerRequestModel`,
 which builds the vendor client from the Keychain for every request, compaction summaries included. A key
 replaced during a run is used from the next request on, and a key removed fails that request explicitly.

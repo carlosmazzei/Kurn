@@ -82,7 +82,8 @@ Recovery inside a run:
   nothing was streamed and the context shrank.
 - **Empty, cut-off reply.** One retry after a forced compaction, under the same conditions.
 - **Transient failure.** `AgentRetryPolicy` sends the request again as a new request after a
-  cancellable backoff (Retry-After when known). It is never retried after visible text.
+  cancellable backoff, waiting the provider's Retry-After when the error carries one
+  (`AgentTransientError.retryAfterSeconds`, or an `AgentRetryAfter` wrapper the harness unwraps). It is never retried after visible text.
 - **Output limit.** Hitting the output limit ends with `.outputLimit` and discards that turn's calls.
 
 Modifiers install the host's barriers. Each awaited sink must succeed before dependent work

@@ -37,6 +37,7 @@ extension LLMHTTP {
         policy: HTTPPolicy,
         clock: some MonotonicSleepClock = SystemClock(),
         retriesBeforeFirstPayload: Bool = false,
+        onRetryAfter: (@Sendable (TimeInterval) -> Void)? = nil,
         onPayload: @escaping @Sendable (String) throws -> Void
     ) async throws {
         guard let approvedURL = request.url else { throw AppError.invalidProviderURL }
@@ -64,7 +65,12 @@ extension LLMHTTP {
                       let delay = retryDelayBeforeFirstPayload(
                         after: error, attempt: attempt, retryAfter: delegate.retryAfter, policy: policy
                       ),
-                      delay < deadlineAt - clock.now else { throw error }
+                      delay < deadlineAt - clock.now else {
+                    // A caller that owns its own retries learns the server's wait for a
+                    // rejected attempt that delivered nothing.
+                    if !delegate.deliveredPayload, let retryAfter = delegate.retryAfter { onRetryAfter?(retryAfter) }
+                    throw error
+                }
                 let seconds = String(format: "%.2f", delay)
                 AppLog.transcription.atInfo.info(
                     "http: stream retrying after \(seconds, privacy: .public)s (attempt \(attempt + 2, privacy: .public)/\(maxAttempts, privacy: .public), code=\(error.publicLogCode, privacy: .public))"

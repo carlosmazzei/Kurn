@@ -583,7 +583,7 @@ fixture hashes and evidence links. The canonical v1 format is not activated and 
 store migration runs in that increment. NH02 implements the local message/stream profile described below; NH03 implements the store/migration boundary described below; NH04 implements the native tool pipeline and durable local artifact boundary described below; NH05 is complete (session ownership, canonical run branches, barriers, cancellation, recovery
 and resumption, see `CLAUDE.md`); NH06 is implemented except manual compaction and branch
 summaries (canonical replay, persistent compaction, context edits, system sections and tool loadouts,
-see `CLAUDE.md`); NH07 is implemented except a full capability snapshot and transport Retry-After
+see `CLAUDE.md`); NH07 is implemented except a full capability snapshot
 (usage/cache counters, cost estimation and an unverifiable-ceiling guard, session-owned retries,
 per-request credentials, see `CLAUDE.md`); NH08 is implemented except a session-retained owner,
 model changes at request boundaries and `waitingForUser` (steering/follow-up queues, continuation,
@@ -859,7 +859,6 @@ attempts kept as audit data); credentials resolved per request (`AgentPerRequest
 
 - A cached capability snapshot per provider and model (modalities, tools, thinking, usage/cache
   support); context and output limits already come from `AgentContextResolution`.
-- Carrying the provider's `Retry-After` from the agent streaming transport into its error.
 - Pricing cache reads and writes at their own rates, and provider-reported (rather than estimated) cost.
 - Deduplicating usage by request identity in persisted usage entries.
 
@@ -936,14 +935,13 @@ export through the share sheet. Still open:
 
 ### Remaining native-harness work (audit after NH10)
 
-NH00–NH10 are merged into `feature/native-harness`. Of the contract's 97 items, 54 are verified, 28 are
-excluded by the local profile, 12 are partial, 2 are conditional and 1 is pending
+NH00–NH10 are merged into `feature/native-harness`. Of the contract's 97 items, 55 are verified, 28 are
+excluded by the local profile, 11 are partial, 2 are conditional and 1 is pending
 (`docs/contracts/native-harness-v1.json`, checked by `Tools/check_native_harness_contracts.py`). Everything still open, grouped by where it lands, with the contract items it closes:
 
 | Area | Open item | Contract |
 | --- | --- | --- |
 | Capabilities | A versioned per-model capability snapshot (tools, reasoning, images, cache) recorded with the run, and alias/authenticated provider qualification | C03, C04 |
-| Retry | Carry the provider's `Retry-After` from the agent transport into `AgentTransientError` | C14 |
 | Usage and cost | Cache-aware pricing; usage deduplicated by request identity across retries | C17 follow-up |
 | Compaction | Manual compaction; branch summaries; checkpoint anchoring for plain (identity-less) history | C10, C13 |
 | Context | Refresh the `documents` system-prompt section inside a run after a mutation; a host writer that records context edits from the UI | C11, C12 follow-up |

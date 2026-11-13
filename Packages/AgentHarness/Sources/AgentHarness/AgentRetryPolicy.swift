@@ -11,6 +11,24 @@ public protocol AgentTransientError: Error {
     var retryAfterSeconds: Double? { get }
 }
 
+/// A model request's failure together with the provider's `Retry-After`, for a host whose own error
+/// type cannot carry it. The harness reads the wait from it and works with `underlying` everywhere
+/// else, so neither the run's failure nor its audit ever shows the wrapper.
+public struct AgentRetryAfter: Error {
+    public let underlying: any Error
+    public let seconds: Double
+
+    public init(_ underlying: any Error, seconds: Double) {
+        self.underlying = underlying
+        self.seconds = seconds
+    }
+
+    /// `error` without its `Retry-After`.
+    public static func unwrapped(_ error: any Error) -> any Error {
+        (error as? AgentRetryAfter)?.underlying ?? error
+    }
+}
+
 /// How the session retries a model request that failed before it produced anything (NH07). The
 /// harness is the one retry owner for its requests: hosts keep transport retries off for them.
 /// Each attempt is its own request with its own identity, its failure is recorded as audit data,
@@ -47,10 +65,11 @@ public struct AgentRetryPolicy: Sendable {
     /// not transient, attempts exhausted, a `Retry-After` beyond `maxDelaySeconds`, or a wait
     /// that would pass `maxWaitSeconds` given `waited` so far.
     public func delay(after error: Error, failedAttempts: Int, waited: Double) -> Double? {
-        guard failedAttempts < maxAttempts, let transient = error as? any AgentTransientError,
+        guard failedAttempts < maxAttempts,
+              let transient = AgentRetryAfter.unwrapped(error) as? any AgentTransientError,
               transient.isTransient else { return nil }
         let delay: Double
-        if let retryAfter = transient.retryAfterSeconds {
+        if let retryAfter = (error as? AgentRetryAfter)?.seconds ?? transient.retryAfterSeconds {
             guard retryAfter <= maxDelaySeconds else { return nil }
             delay = max(0, retryAfter)
         } else {
