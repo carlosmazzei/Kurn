@@ -583,7 +583,10 @@ fixture hashes and evidence links. The canonical v1 format is not activated and 
 store migration runs in that increment. NH02 implements the local message/stream profile described below; NH03 implements the store/migration boundary described below; NH04 implements the native tool pipeline and durable local artifact boundary described below; NH05 is complete (session ownership, canonical run branches, barriers, cancellation, recovery
 and resumption, see `CLAUDE.md`); NH06 is implemented except manual compaction and branch
 summaries (canonical replay, persistent compaction, context edits, system sections and tool loadouts,
-see `CLAUDE.md`); NH07–NH10 have not started. The next implementation increment is NH07. This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
+see `CLAUDE.md`); NH07 is implemented except a full capability snapshot and transport Retry-After
+(usage/cache counters, cost estimation and an unverifiable-ceiling guard, session-owned retries,
+per-request credentials, see `CLAUDE.md`); NH08–NH10 have not started. The next implementation
+increment is NH08. This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
 
 The first NH02 increment adds checked native user/assistant blocks, exact Unix-ms
 codecs, an ordered bounded reducer, authoritative final reconciliation and all four
@@ -842,6 +845,18 @@ backoff and `Retry-After`; retain the current no-transparent-retry-after-stream
 policy. A partial stream can offer an explicit new attempt with its own ID,
 never concatenate two generations. Persist attempt state; no automatic
 relaunch replay of an interrupted mutation or potentially billed request.
+
+**NH07 status.** Implemented: cache-read/cache-write counters counted once inside input (reasoning
+inside output) in all four wire formats; an app price table passed as the harness estimator, with
+unknown cost kept unknown and a cost ceiling that cannot be verified treated as reached; the session as
+the one retry owner (`AgentRetryPolicy`: bounded, cancellable, never after visible text, failed
+attempts kept as audit data); credentials resolved per request (`AgentPerRequestModel`). Still open:
+
+- A cached capability snapshot per provider and model (modalities, tools, thinking, usage/cache
+  support); context and output limits already come from `AgentContextResolution`.
+- Carrying the provider's `Retry-After` from the agent streaming transport into its error.
+- Pricing cache reads and writes at their own rates, and provider-reported (rather than estimated) cost.
+- Deduplicating usage by request identity in persisted usage entries.
 
 **NH08 details.** Keep FIFO steering and follow-up queues with one/all modes.
 Steering enters after the current response and its complete tool batch;
