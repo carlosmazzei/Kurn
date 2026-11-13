@@ -131,10 +131,7 @@ struct HarnessChatService {
         else { plannedLimits = AgentBudgetPlanner.limits(for: reader.workload) }
         // The run's cost comes from the app's price table; a model it cannot price stays unknown.
         let harness = NativeHarness(model: model, limits: plannedLimits,
-                                    costEstimator: { usage in
-                                        ModelPricing.estimatedCostUSD(model: modelIdentifier, usage: TokenUsage(
-                                            promptTokens: usage.inputTokens, completionTokens: usage.outputTokens))
-                                    },
+                                    costEstimator: { ModelPricing.estimatedCostUSD(model: modelIdentifier, usage: $0) },
                                     contextPolicy: AgentContextPolicy(contextWindow: resolution.contextWindowTokens,
                                                                       summaryPrompts: ChatCompactionPrompts.profile,
                                                                       maxOutputTokens: resolution.maxOutputTokens),

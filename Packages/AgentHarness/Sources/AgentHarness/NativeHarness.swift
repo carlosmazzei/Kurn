@@ -13,7 +13,7 @@ public struct NativeHarness: Sendable {
     let isContextOverflow: @Sendable (Error) -> Bool
     let retryPolicy: AgentRetryPolicy
     var messageCommit: @Sendable (AgentMessage) async throws -> Void = { _ in }
-    var usageCommit: @Sendable (AgentUsage) async throws -> Void = { _ in }
+    var usageCommit: @Sendable (AgentUsage, AgentRequestIdentity) async throws -> Void = { _, _ in }
     var compactionCommit: @Sendable (AgentCompactionCheckpoint) async throws -> Void = { _ in }
     var inputQueue: AgentInputQueue?
     private let diagnosticSink: @Sendable (AgentDiagnostic) -> Void
@@ -83,6 +83,12 @@ public struct NativeHarness: Sendable {
     }
 
     public func persistingUsage(_ commit: @escaping @Sendable (AgentUsage) async throws -> Void) -> Self {
+        persistingUsage { usage, _ in try await commit(usage) }
+    }
+
+    /// Like `persistingUsage(_:)`, with the request each usage belongs to, so a store can count one
+    /// request's usage once however often it is offered.
+    public func persistingUsage(_ commit: @escaping @Sendable (AgentUsage, AgentRequestIdentity) async throws -> Void) -> Self {
         var copy = self
         copy.usageCommit = commit
         return copy

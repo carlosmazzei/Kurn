@@ -155,7 +155,7 @@ Entry types written by the package:
 | --- | --- | --- |
 | `message` (payload) | `AgentSession` | A native user, assistant or tool-result message |
 | `agent.run-start.v1` | `AgentSession` | Run ID, host start fields, command ID, system prompt or patch, tool loadout |
-| `agent.usage.v1` | `AgentSession` | One request's reported usage, including reasoning and cache counters |
+| `agent.usage.v1` | `AgentSession` | One request's reported usage, including reasoning and cache counters, named by its `requestID` so it counts once |
 | `agent.compaction.v1` | `AgentSession` | A summary checkpoint: summary, first kept message, tokens before and after |
 | `agent.run-end.v1` | `AgentSession` | How the run ended and the harness stop reason |
 | `agent.context-edit.v1` | Host (via the store) | Messages later runs leave out of replay |

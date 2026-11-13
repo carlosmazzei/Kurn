@@ -191,12 +191,15 @@ provider reported them, both part of `inputTokens` — the whole input sent — 
 just as reasoning is part of output. Anthropic reports cached input apart from `input_tokens`, so its
 accumulator adds it to the total; OpenAI (`cached_tokens`), Responses and Gemini (`cachedContentTokenCount`)
 already include it. Unreported counts stay nil when usages are added. `agent.usage.v1` entries record
-them and `AgentRunTrace.restoring` reads them back.
+them with the request they belong to (`requestID`), and `AgentRunTrace.restoring` and
+`AgentSessionTree.usage` count one request's usage once (entries from before requests were named each count).
 The cost estimator returns nil for a usage it cannot price (NH07). `AgentRunOutcome.estimatedCostUSD`
 is the run's estimated cost, summaries included, or nil — unknown, never zero — when there was no estimator
 or any usage went unpriced. `AgentLimits.maxCostUSD` is checked only against a known cost: without an
 estimator, or once a usage could not be priced, the ceiling cannot be verified and counts as reached, so
-no further request is sent. `HarnessChatService` passes `ModelPricing` as the estimator. The figure is an
+no further request is sent. `HarnessChatService` passes `ModelPricing` as the estimator; it prices cache
+reads and writes at the vendor's own rates (OpenAI and Gemini discount reads, Anthropic also surcharges
+writes) and the rest of the input at the full rate, and the chat's per-answer cost uses the same usage. The figure is an
 estimate from a price table, not a provider billing cap.
 The session is the one retry owner for model requests (NH07, `AgentRetryPolicy`); the agent transport keeps
 its own retries off. A request that failed with an `AgentTransientError` before any visible text is sent

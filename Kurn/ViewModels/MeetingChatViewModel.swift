@@ -562,7 +562,7 @@ final class MeetingChatViewModel {
                 turns[index].steps = timeline.steps
                 turns[index].usage = timeline.hasUsage
                     ? TokenUsage(promptTokens: timeline.usage.inputTokens, completionTokens: timeline.usage.outputTokens) : nil
-                turns[index].costUSD = turns[index].usage.flatMap { ModelPricing.estimatedCostUSD(model: model, usage: $0) }
+                turns[index].costUSD = timeline.hasUsage ? ModelPricing.estimatedCostUSD(model: model, usage: timeline.usage) : nil
                 // Queued input the run took in shows as its own question and reply (NH08).
                 exchanges = view.exchanges
                 turns = Self.presenting(exchanges, fallback: view.text, in: turns, from: index)

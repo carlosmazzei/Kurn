@@ -114,6 +114,7 @@ extension AgentRunTrace {
         guard !run.isEmpty else { return nil }
         var trace = AgentRunTrace()
         var turn = 0
+        var counted = Set<String>()
         for entry in run {
             switch entry.payload {
             case .message(.content(let message)) where message.role == .assistant:
@@ -125,7 +126,8 @@ extension AgentRunTrace {
                 }
             case .message(.tool(let result)):
                 trace.restoreResult(callID: result.invocation.callID, name: result.invocation.toolName, isError: result.isError)
-            case .custom(type: "agent.usage.v1", data: .object(let fields)):
+            case .custom(type: "agent.usage.v1", data: .object(let fields))
+                where AgentUsageEntry.isFirst(.object(fields), of: runID, among: &counted):
                 trace.apply(.usage(AgentUsage(inputTokens: count(fields["inputTokens"]) ?? 0,
                                               outputTokens: count(fields["outputTokens"]) ?? 0,
                                               reasoningTokens: count(fields["reasoningTokens"]),
@@ -182,5 +184,15 @@ extension AgentSessionEntry {
         guard case .custom(type: "agent.run-start.v1", data: .object(let fields)) = payload,
               case .string(let id)? = fields["commandID"] else { return nil }
         return id
+    }
+}
+
+/// `agent.usage.v1` entries name the request they belong to (`requestID`), so one request's usage
+/// counts once however often it was recorded. Entries written before requests were named carry
+/// none and each counts.
+enum AgentUsageEntry {
+    static func isFirst(_ data: JSONValue, of runID: String, among counted: inout Set<String>) -> Bool {
+        guard case .object(let fields) = data, case .string(let requestID)? = fields["requestID"] else { return true }
+        return counted.insert(runID + "\u{0}" + requestID).inserted
     }
 }

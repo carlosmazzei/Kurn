@@ -859,8 +859,7 @@ attempts kept as audit data); credentials resolved per request (`AgentPerRequest
 
 - A cached capability snapshot per provider and model (modalities, tools, thinking, usage/cache
   support); context and output limits already come from `AgentContextResolution`.
-- Pricing cache reads and writes at their own rates, and provider-reported (rather than estimated) cost.
-- Deduplicating usage by request identity in persisted usage entries.
+- Provider-reported (rather than estimated) cost, where a vendor reports one.
 
 **NH08 details.** Keep FIFO steering and follow-up queues with one/all modes.
 Steering enters after the current response and its complete tool batch;
@@ -943,7 +942,7 @@ excluded by the local profile, 12 are partial, 2 are conditional and none is pen
 | Area | Open item | Contract |
 | --- | --- | --- |
 | Capabilities | A versioned per-model capability snapshot (tools, reasoning, images, cache) recorded with the run, and alias/authenticated provider qualification | C03, C04 |
-| Usage and cost | Cache-aware pricing; usage deduplicated by request identity across retries | C17 follow-up |
+| Usage and cost | Provider-reported cost where a vendor reports one (cache-aware pricing and per-request usage are done) | C17 follow-up |
 | Compaction | Manual compaction; branch summaries; checkpoint anchoring for plain (identity-less) history | C10, C13 |
 | Context | Refresh the `documents` system-prompt section inside a run after a mutation; a host writer that records context edits from the UI | C11, C12 follow-up |
 | Run ownership | One owner retained per session across runs; model/provider changes at request boundaries; a `waitingForUser` phase once a tool asks for confirmation | C24 |

@@ -206,8 +206,8 @@ public actor AgentSession {
             if cancellationRequested { throw CancellationError() }
             let owned = request.harness.persistingMessages { [self] message in
                 try await appendMessage(message, runID: runID)
-            }.persistingUsage { [self] usage in
-                try await appendUsage(usage, runID: runID)
+            }.persistingUsage { [self] (usage: AgentUsage, request: AgentRequestIdentity) in
+                try await appendUsage(usage, request: request, runID: runID)
             }.persistingCompaction { [self] checkpoint in
                 try await appendCompaction(checkpoint, runID: runID)
             }
@@ -275,10 +275,11 @@ public actor AgentSession {
         catch { persistenceFailed = true; throw AgentSessionOwnerError.persistenceFailed }
     }
 
-    private func appendUsage(_ usage: AgentUsage, runID: UUID) async throws {
+    private func appendUsage(_ usage: AgentUsage, request: AgentRequestIdentity, runID: UUID) async throws {
         guard state.runID == runID else { throw AgentSessionStoreError.conflict }
         do {
             let data: JSONValue = .object([
+                "requestID": .string(request.id),
                 "inputTokens": .number(Double(usage.inputTokens)), "outputTokens": .number(Double(usage.outputTokens)),
                 "reasoningTokens": usage.reasoningTokens.map { .number(Double($0)) } ?? .null,
                 "cacheReadTokens": usage.cacheReadTokens.map { .number(Double($0)) } ?? .null,

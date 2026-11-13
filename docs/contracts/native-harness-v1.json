@@ -575,9 +575,17 @@
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunTraceRestorationTests.swift",
           "symbol": "restoredUsageKeepsItsCacheCounts"
+        },
+        {
+          "path": "KurnTests/ModelPricingTests.swift",
+          "symbol": "cacheReadsAndWritesArePricedAtTheirOwnRates"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunTraceRestorationTests.swift",
+          "symbol": "aRequestsUsageCountsOnce"
         }
       ],
-      "note": "NH07: input/output/reasoning/cache-read/cache-write counters with reasoning and cache counted once; unknown cost stays unknown and an unverifiable cost ceiling stops the run; the app passes its price table as the estimator."
+      "note": "NH07: input/output/reasoning/cache-read/cache-write counters with reasoning and cache counted once; unknown cost stays unknown and an unverifiable cost ceiling stops the run; the app passes its price table as the estimator. Cache reads and writes are priced at their own rates, and usage entries name their request so one request counts once."
     },
     {
       "id": "C18",
