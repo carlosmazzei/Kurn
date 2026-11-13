@@ -88,10 +88,10 @@ struct ChatSessionArchiveTests {
         // A revision a branch shows is missing.
         let missing = try data(records: Array(revisions.dropFirst()))
         // A revision's bytes do not match its identity.
+        let forged = try HarnessPresentationCodec.encode(ChatDocumentArtifact(title: "Forged", markdown: "Forged"))
         let tampered = try data(records: revisions.map { record in
             guard case .object(var fields) = record.data else { return record }
-            let payload = try! HarnessPresentationCodec.encode(ChatDocumentArtifact(title: "Forged", markdown: "Forged"))
-            fields["payload"] = .string(payload.base64EncodedString())
+            fields["payload"] = .string(forged.base64EncodedString())
             return .init(type: record.type, data: .object(fields))
         })
 
