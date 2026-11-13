@@ -1227,6 +1227,17 @@
 "chat.storage.run_failed" = "No se pudo guardar el progreso de esta respuesta, así que se detuvo antes de enviar nada más. Tu pregunta se conserva; inténtalo de nuevo.";
 "chat.command.duplicate" = "Esta pregunta ya se envió, así que no se volvió a enviar.";
 "chat.context.reduction_failed" = "Esta conversación es demasiado larga para que el modelo continúe. Inicia una conversación nueva o elige un modelo con una ventana de contexto mayor.";
+"chat.queue.steer" = "Orientar";
+"chat.queue.follow_up" = "Después de esta tarea";
+"chat.queue.steering_label" = "Orientación";
+"chat.queue.follow_up_label" = "Después de esta tarea";
+"chat.queue.edit" = "Toca para editar";
+"chat.queue.remove" = "Quitar mensaje de la cola";
+"chat.queue.save_failed" = "No se pudo poner el mensaje en cola. Volvió al cuadro de mensaje.";
+"chat.step.compacting" = "Condensando la conversación anterior…";
+"chat.step.retrying" = "Reintentando…";
+"chat.step.retrying_in" = "Reintentando en %d s…";
+"chat.run.stopped" = "Detuviste esta respuesta.";
 
 // Native tool pipeline diagnostics.
 "chat.diagnostic.toolValidationFailed" = "Argumentos de herramienta rechazados";

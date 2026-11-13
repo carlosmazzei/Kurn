@@ -69,13 +69,16 @@ struct HarnessChatService {
         model: any AgentModel, provider: AIProvider, modelIdentifier: String,
         context: ModelContext, scope: ChatSourceScope, workspace: ChatDocumentWorkspace,
         history: [ChatMessage], question: String, owner: AgentSession? = nil, runID: UUID = UUID(),
-        commandID: String? = nil, questionID: UUID? = nil, replay: ChatReplayHistory? = nil
+        commandID: String? = nil, questionID: UUID? = nil, replay: ChatReplayHistory? = nil,
+        inputQueue: AgentInputQueue? = nil
     ) async throws -> Run {
         let run = try await prepare(model: model, provider: provider, modelIdentifier: modelIdentifier, context: context,
                                     scope: scope, workspace: workspace, history: history, question: question,
                                     replay: replay)
+        // Queued input (NH08) enters the run at its boundaries.
+        let harness = inputQueue.map { run.harness.receivingInput($0) } ?? run.harness
         guard let owner else {
-            let handle = run.harness.start(systemPrompt: run.systemPrompt, history: run.history, prompt: run.question,
+            let handle = harness.start(systemPrompt: run.systemPrompt, history: run.history, prompt: run.question,
                                            tools: run.tools, contextResolution: run.resolution, context: run.context,
                                            observation: .complete)
             return Run(snapshots: AgentRunSnapshots.coalescing(handle.events), abort: { handle.cancel() },
@@ -83,7 +86,7 @@ struct HarnessChatService {
         }
         // A stop that arrived while preparing must not open a branch.
         try Task.checkCancellation()
-        let owned = try await owner.start(harness: run.harness, systemPrompt: run.systemPrompt, history: run.history,
+        let owned = try await owner.start(harness: harness, systemPrompt: run.systemPrompt, history: run.history,
                                           prompt: run.question, tools: run.tools, contextResolution: run.resolution,
                                           runID: runID, commandID: commandID,
                                           startFields: try ChatRunBranch.startFields(run.authorization, questionID: questionID),

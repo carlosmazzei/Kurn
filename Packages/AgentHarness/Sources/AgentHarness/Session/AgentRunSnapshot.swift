@@ -12,6 +12,15 @@ public struct AgentRunSnapshot: Sendable, Equatable {
         public let isError: Bool
     }
 
+    /// One part of the run's conversation (NH08): the run's own request, or a queued input it
+    /// took in, with the reply to it — streamed, then the reply's final text.
+    public struct Exchange: Sendable, Equatable {
+        /// The queued input that opened it, by its item ID; nil for the run's own request.
+        public let inputID: String?
+        public let input: String?
+        public fileprivate(set) var text = ""
+    }
+
     /// How many events this snapshot reflects.
     public private(set) var eventCount = 0
     public private(set) var text = ""
@@ -21,6 +30,9 @@ public struct AgentRunSnapshot: Sendable, Equatable {
     /// snapshot it last saw by count.
     public private(set) var finishedTools: [FinishedTool] = []
     public private(set) var outcome: AgentRunOutcome?
+    /// The run's exchanges in order; more than one once it took in queued input.
+    public private(set) var exchanges = [Exchange(inputID: nil, input: nil)]
+    private var sawRequest = false
 
     public init() {}
 
@@ -30,13 +42,32 @@ public struct AgentRunSnapshot: Sendable, Equatable {
         trace.apply(event)
         progress.apply(event)
         switch event {
-        case .textDelta(let delta): text += delta
+        case .textDelta(let delta):
+            text += delta
+            exchanges[exchanges.count - 1].text += delta
+        case .messageAppended(.content(let message)) where message.role == .user:
+            // The first user message is the run's request; each later one is queued input.
+            if sawRequest { exchanges.append(Exchange(inputID: message.id, input: message.text)) }
+            sawRequest = true
+        case .messageAppended(.content(let message)) where message.role == .assistant:
+            // A reply that calls no tool is the exchange's answer, replacing what streamed before it.
+            if message.toolCalls.isEmpty, !message.text.isEmpty, Self.answers(message.stopReason) {
+                exchanges[exchanges.count - 1].text = message.text
+            }
         case .toolFinished(let callID, let name, _, let isError):
             finishedTools.append(FinishedTool(callID: callID, name: name, isError: isError))
         case .runFinished(let finished):
             text = finished.finalText
             outcome = finished
+            if exchanges.count > 1 { exchanges[exchanges.count - 1].text = finished.finalText }
         default: break
+        }
+    }
+
+    private static func answers(_ reason: AgentModelStopReason?) -> Bool {
+        switch reason {
+        case .error?, .aborted?, .deferred?: return false
+        default: return true
         }
     }
 }

@@ -1227,6 +1227,17 @@
 "chat.storage.run_failed" = "无法保存此回复的进度，因此在发送更多内容之前已停止。你的问题已保留，请重试。";
 "chat.command.duplicate" = "这个问题已经发送过，因此没有再次发送。";
 "chat.context.reduction_failed" = "这段对话太长，模型无法继续。请开始新的对话，或选择上下文窗口更大的模型。";
+"chat.queue.steer" = "引导";
+"chat.queue.follow_up" = "完成此任务后";
+"chat.queue.steering_label" = "引导";
+"chat.queue.follow_up_label" = "完成此任务后";
+"chat.queue.edit" = "轻点以编辑";
+"chat.queue.remove" = "从队列中移除消息";
+"chat.queue.save_failed" = "无法将消息加入队列，它已回到输入框。";
+"chat.step.compacting" = "正在压缩之前的对话…";
+"chat.step.retrying" = "正在重试…";
+"chat.step.retrying_in" = "%d 秒后重试…";
+"chat.run.stopped" = "你已停止此回复。";
 
 // Native tool pipeline diagnostics.
 "chat.diagnostic.toolValidationFailed" = "工具参数被拒绝";

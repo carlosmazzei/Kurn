@@ -4,8 +4,8 @@ import Foundation
 enum AgentMessageFactory {
     static var now: Int64 { Int64(Date().timeIntervalSince1970 * 1_000) }
 
-    static func user(_ text: String) throws -> AgentMessage {
-        .content(try AgentContentMessage(id: UUID().uuidString, timestampMilliseconds: now, role: .user,
+    static func user(_ text: String, id: String = UUID().uuidString) throws -> AgentMessage {
+        .content(try AgentContentMessage(id: id, timestampMilliseconds: now, role: .user,
             blocks: [AgentContentBlock(id: "text", content: .text(text))]))
     }
 

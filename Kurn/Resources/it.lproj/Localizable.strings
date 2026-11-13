@@ -1227,6 +1227,17 @@
 "chat.storage.run_failed" = "Impossibile salvare l’avanzamento di questa risposta, quindi si è interrotta prima di inviare altro. La tua domanda è stata conservata; riprova.";
 "chat.command.duplicate" = "Questa domanda è già stata inviata, quindi non è stata inviata di nuovo.";
 "chat.context.reduction_failed" = "Questa conversazione è troppo lunga perché il modello possa continuare. Avvia una nuova conversazione o scegli un modello con una finestra di contesto più ampia.";
+"chat.queue.steer" = "Orienta";
+"chat.queue.follow_up" = "Dopo questa attività";
+"chat.queue.steering_label" = "Orientamento";
+"chat.queue.follow_up_label" = "Dopo questa attività";
+"chat.queue.edit" = "Tocca per modificare";
+"chat.queue.remove" = "Rimuovi messaggio dalla coda";
+"chat.queue.save_failed" = "Impossibile mettere in coda il messaggio. È tornato nella casella di testo.";
+"chat.step.compacting" = "Condensazione della conversazione precedente…";
+"chat.step.retrying" = "Nuovo tentativo…";
+"chat.step.retrying_in" = "Nuovo tentativo tra %d s…";
+"chat.run.stopped" = "Hai interrotto questa risposta.";
 
 // Native tool pipeline diagnostics.
 "chat.diagnostic.toolValidationFailed" = "Argomenti dello strumento rifiutati";

@@ -15,6 +15,7 @@ public struct AgentDiagnostic: Codable, Sendable, Equatable {
         case outputBudgetExtended, outputBudgetExtensionDenied
         case outputRetryStarted, outputRetryDenied
         case requestRetryScheduled
+        case queuedInputDrained
         case outputBudgetAdjusted, replayPrepared
         case toolValidationFailed, toolPolicyDenied, toolProgress, toolAborted, toolRegistryRejected
     }
@@ -38,6 +39,7 @@ public struct AgentDiagnostic: Codable, Sendable, Equatable {
         case visibleTextScalars, streamedText, returnedToolCalls, discardedToolCalls, outputLimited, usageReported, reasoningTokens, costLimitReached
         case toolPhase, completedItems
         case requestAttempt, retryDelayMs
+        case queuedItems, queueKind
     }
 
     public let runID: UUID

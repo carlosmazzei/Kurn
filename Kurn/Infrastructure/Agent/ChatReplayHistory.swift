@@ -64,6 +64,16 @@ struct ChatReplayHistory: Sendable {
                let run = answers[turn.id] {
                 messages += run.contextMessages
                 index = turns.index(after: next)
+                // Queued input the run took in (NH08) is already in its messages, shown as its own
+                // question and reply turns: skip those, not replay them twice.
+                let taken = Set(run.contextMessages.dropFirst().compactMap { message -> UUID? in
+                    guard case .content(let value) = message, value.role == .user else { return nil }
+                    return UUID(uuidString: value.id)
+                })
+                while index < turns.endIndex, turns[index].role == .user, taken.contains(turns[index].id) {
+                    index = turns.index(after: index)
+                    if index < turns.endIndex, turns[index].role == .assistant { index = turns.index(after: index) }
+                }
                 continue
             }
             messages.append(Self.plain(turn))

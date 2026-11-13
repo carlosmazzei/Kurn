@@ -87,6 +87,16 @@ final class MeetingChatViewModel {
     /// The background-execution window held for the current run (see `send`).
     @ObservationIgnored private var backgroundWindow: (any BackgroundExecutionWindow)?
     @ObservationIgnored private let makeBackgroundWindow: @MainActor () -> any BackgroundExecutionWindow
+    /// Input queued for the running reply (NH08, `MeetingChatViewModel+Queue`); nil with no run.
+    @ObservationIgnored var inputQueue: AgentInputQueue?
+    @ObservationIgnored var queueObserver: Task<Void, Never>?
+    /// The queued lists shown above the composer.
+    var queued = AgentInputQueue.Snapshot()
+    /// Text handed back to the composer: queued input a stop or a failed run did not answer.
+    var restoredDraft: String?
+    /// Whether the person stopped the last reply; shown once the stop settled. A new question,
+    /// `reset` and `load` clear it.
+    var replyWasStopped = false
 
     /// Tests pass a scripted `AgentModel` through `agentModelFactory`.
     init(agentModelFactory: @escaping HarnessChatService.ModelFactory = { try ProviderFactory.agentModel(for: $0, model: $1) },
@@ -113,6 +123,7 @@ final class MeetingChatViewModel {
             return
         }
         error = nil
+        replyWasStopped = false
         pendingForegroundResume = nil
         interruptedResume = nil
         stoppedRunCommittedEffects = false
@@ -264,6 +275,8 @@ final class MeetingChatViewModel {
         ))
         let request = currentRequest
         cancel()
+        // The system stopped it, not the person.
+        replyWasStopped = false
         pendingForegroundResume = request
     }
 
@@ -358,7 +371,14 @@ final class MeetingChatViewModel {
         pendingForegroundResume = nil
         guard let task else { return }
         phase = .cancelling
-        task.cancel()
+        replyWasStopped = true
+        // Queued input is cleared before the stop and handed back to the composer (NH08).
+        guard let queue = inputQueue else { task.cancel(); return }
+        Task { [weak self] in
+            let pending = (try? await queue.clear()) ?? []
+            self?.restoreToDraft(pending.map(\.text))
+            task.cancel()
+        }
     }
 
     /// Starts a brand-new, unsaved conversation — the "new chat" affordance.
@@ -374,6 +394,7 @@ final class MeetingChatViewModel {
         error = nil
         session = nil
         interruptedQuestionIDs = []
+        replyWasStopped = false
         interruptedResume = nil
         runProgress = AgentRunProgress()
         conversationID = UUID()
@@ -429,6 +450,7 @@ final class MeetingChatViewModel {
             } ?? (turns: restored.turns, interrupted: [])
             turns = recovered.turns.map(Turn.init)
             interruptedQuestionIDs = recovered.interrupted
+            replyWasStopped = false
             runProgress = AgentRunProgress()
             interruptedResume = modelContext.flatMap { context in
                 ChatRunRecovery.resumableInterruptedRun(in: recovered.turns, session: session, context: context)
@@ -436,6 +458,7 @@ final class MeetingChatViewModel {
             retryArtifacts = []
             retryOrigins = [:]
             error = nil
+            restoreLeftoverQueue(of: session)
         } catch {
             self.error = .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.invalid", comment: "Saved chat storage error"))
         }
@@ -484,13 +507,16 @@ final class MeetingChatViewModel {
         let owner = try savedSession.map {
             try ChatRunBranch.owner(session: $0, store: SwiftDataAgentSessionStore(context: modelContext))
         }
+        let queue = startInputQueue()
+        defer { stopInputQueue() }
         let run = try await service.start(model: agentModel, provider: provider, modelIdentifier: model,
                                           context: modelContext, scope: scope, workspace: workspace,
                                           history: Self.buildHistory(from: priorTurns), question: question,
                                           owner: owner, runID: runID, commandID: commandID, questionID: questionID,
                                           replay: ChatReplayHistory.load(
                                               turns: priorTurns.map { .init(id: $0.id, role: $0.role, text: $0.text) },
-                                              session: savedSession, store: SwiftDataAgentSessionStore(context: modelContext)))
+                                              session: savedSession, store: SwiftDataAgentSessionStore(context: modelContext)),
+                                          inputQueue: queue)
         // Whatever ends this function, the run has settled first: a cancelled or failed run is
         // only reported once nothing can still call a tool or write its effect.
         do { try Task.checkCancellation() } catch {
@@ -501,6 +527,7 @@ final class MeetingChatViewModel {
         turns.append(Turn(role: .assistant, text: ""))
         var timeline = AgentRunTrace()
         var toolsSeen = 0
+        var exchanges: [AgentRunSnapshot.Exchange] = []
         do {
             for try await view in run.snapshots {
                 try Task.checkCancellation()
@@ -513,7 +540,9 @@ final class MeetingChatViewModel {
                 turns[index].usage = timeline.hasUsage
                     ? TokenUsage(promptTokens: timeline.usage.inputTokens, completionTokens: timeline.usage.outputTokens) : nil
                 turns[index].costUSD = turns[index].usage.flatMap { ModelPricing.estimatedCostUSD(model: model, usage: $0) }
-                turns[index].text = view.text
+                // Queued input the run took in shows as its own question and reply (NH08).
+                exchanges = view.exchanges
+                turns = Self.presenting(exchanges, fallback: view.text, in: turns, from: index)
                 // Coalescing can fold several tool calls into one snapshot: take every one that
                 // finished since the last snapshot seen.
                 let finished = view.finishedTools.dropFirst(toolsSeen)
@@ -534,6 +563,8 @@ final class MeetingChatViewModel {
         } catch {
             await run.terminate()
             if self.generation == generation { runProgress.finish() }
+            // Queued input this run took in but did not finish answering goes back to the composer.
+            await restoreUnansweredInput(exchanges.dropFirst().compactMap(\.input))
             // A run whose end entry alone failed to save gets one more attempt at it, without
             // re-running anything; a branch still left open is closed by the next launch sweep.
             if ChatRunBranch.isWriteFailure(error), let owner {
@@ -554,7 +585,9 @@ final class MeetingChatViewModel {
             throw error
         }
         turns[index].elapsedSeconds = Date().timeIntervalSince(startedAt)
-        if ChatRunNotice.needsRetry(steps: timeline.steps, answer: turns[index].text) {
+        // A run that stopped at a limit leaves its queue: that input goes back to the composer.
+        await restoreUnansweredInput([])
+        if exchanges.count <= 1, ChatRunNotice.needsRetry(steps: timeline.steps, answer: turns[index].text) {
             let stopped = turns.removeLast()
             turns[index - 1].steps = stopped.steps
             turns[index - 1].inheritArtifacts(from: stopped)

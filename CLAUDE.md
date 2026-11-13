@@ -317,6 +317,19 @@ form a stable prefix, its `documents` index is the section a document mutation c
 run's (`systemPatch`: changed or added sections, `null` removing one), plus its declared tools and their
 delta from the previous run (`tools`: `AgentToolLoadout`). `AgentRunBranch.systemPrompts(of:)` folds
 the patches back into each run's prompt.
+Queued input (NH08, `AgentInputQueue`): two FIFO queues, *steering* and *follow-up*, each draining one item
+or all of them per boundary. Every change saves the complete lists through `persist` before it is applied
+or acknowledged, and `updates()` streams the complete lists with stable item IDs. A harness given a queue
+(`receivingInput`) injects steering after each complete tool batch and before it would finish, and a
+follow-up only once no tool call and no steering is left. Each drained item is committed as a user
+message carrying the item's ID; a run that stops leaves the rest queued, and `clear()` returns it.
+`AgentRunSnapshot.exchanges` splits a run's conversation at each item it took in. In the chat, a reply that
+is running offers "Steer" and "After this task" for the typed text (`MeetingChatViewModel+Queue`,
+`ChatQueuedInputView`). The lists are saved in the session's `.queue` record (`ChatInputQueueRecord`), and
+each item taken in shows as its own question and answer turn. A stop clears the queue before it aborts
+and hands pending input back to the composer (`restoredDraft`), as does a failed run with the input it
+took in. A reopened conversation hands back what a dead process left queued. `ChatReplayHistory` skips
+the turns of input a replayed run already contains.
 Context edits (`AgentContextEdit`, `agent.context-edit.v1`) change only what later runs replay: removing
 an assistant message removes the results of its calls, a removed tool result becomes a stub so its call
 keeps a result, and the log, the shown conversation and recorded usage are unchanged. `ChatReplayHistory`

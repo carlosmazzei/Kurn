@@ -585,8 +585,10 @@ and resumption, see `CLAUDE.md`); NH06 is implemented except manual compaction a
 summaries (canonical replay, persistent compaction, context edits, system sections and tool loadouts,
 see `CLAUDE.md`); NH07 is implemented except a full capability snapshot and transport Retry-After
 (usage/cache counters, cost estimation and an unverifiable-ceiling guard, session-owned retries,
-per-request credentials, see `CLAUDE.md`); NH08–NH10 have not started. The next implementation
-increment is NH08. This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
+per-request credentials, see `CLAUDE.md`); NH08 is implemented except a session-retained owner,
+model changes at request boundaries and `waitingForUser` (steering/follow-up queues, continuation,
+queue UI, run status and reading position, see `CLAUDE.md`); NH09–NH10 have not started. The next
+implementation increment is NH09. This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
 
 The first NH02 increment adds checked native user/assistant blocks, exact Unix-ms
 codecs, an ordered bounded reducer, authoritative final reconciliation and all four
@@ -869,6 +871,18 @@ queued messages carry the same binding. Model changes apply only at defined
 request boundaries. Preserve scroll when reading older messages, text selection,
 safe Markdown, unknown-tool fallback, Dynamic Type, VoiceOver and iPad layouts.
 New UI strings ship in all seven locales; use existing glass/navigation patterns.
+
+**NH08 status.** Implemented: `AgentInputQueue` (steering and follow-up, one/all, saved before
+acknowledgement, complete-list updates), injection at the documented boundaries, `continueRun`, the
+chat's Steer/After this task actions with an editable queued list, queue persistence and restoration
+into the composer, run status in words (retry delay, compaction, confirmed stop) and a kept reading
+position. Still open:
+
+- A session-retained `AgentSession` owner (the chat still creates one owner per run, safe while its
+  view model admits one run at a time).
+- Model changes at defined request boundaries during a run.
+- A `waitingForUser` phase, once a tool asks for confirmation.
+- A Dynamic Type/VoiceOver pass over a running conversation (the audit only sees the idle chat).
 
 **NH09 details.** Navigate only while settled, with atomic leaf updates and no
 partial switch on conflict. Fork creates a new session from before the selected

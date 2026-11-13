@@ -1,6 +1,6 @@
 # Native harness contract v1
 
-Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04); session ownership implemented (NH05); projection and persistent compaction implemented (NH06, except manual compaction and branch summaries); usage, cost, retries and credentials implemented (NH07, except a capability snapshot and transport Retry-After)**. NH01 froze the NH00
+Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04); session ownership implemented (NH05); projection and persistent compaction implemented (NH06, except manual compaction and branch summaries); usage, cost, retries and credentials implemented (NH07, except a capability snapshot and transport Retry-After); queued input implemented (NH08, except a session-retained owner, model changes at request boundaries and `waitingForUser`)**. NH01 froze the NH00
 compatibility baseline. NH02 now produces native v1 assistant blocks at the provider
 boundary and consumes them in the harness. Indexed session storage and lazy legacy conversion are active; detailed runtime
 message persistence barriers (NH05) and canonical tool-history replay (NH06) are active; complete pi compatibility is not claimed.
@@ -493,3 +493,17 @@ their own identities, with bounded and cancellable backoff that honours `Retry-A
 agent transport keeps its own retries off. Credentials are resolved per request (`AgentPerRequestModel`).
 Open: a capability snapshot per model, transport `Retry-After`, cache-rate pricing and usage
 deduplication by request identity.
+
+## Queued input and execution UI — NH08
+
+`AgentInputQueue` keeps FIFO steering and follow-up queues that drain one or all items per boundary.
+Every change is saved (complete lists) before it is applied or acknowledged; updates carry the complete
+lists and stable IDs. A harness given a queue injects steering after each complete tool batch and before
+it would finish, and follow-ups only when no tool call and no steering is left; drained items are
+committed as user messages with the item's ID, and a stopped run leaves the rest queued. `continueRun`
+answers an open request or tool result directly, takes one queue selection after a finished reply, and
+fails with `AgentContinueError.nothingToContinue` — consuming nothing — when there is nothing to answer.
+The chat saves the queue as the session's `.queue` record, shows taken-in input as its own question and
+answer, clears the queue before a stop and hands pending input back to the composer, keeps the reader's
+position, and states retry delay, compaction and a confirmed stop in words. Open: a session-retained
+owner, model changes at request boundaries and `waitingForUser`.

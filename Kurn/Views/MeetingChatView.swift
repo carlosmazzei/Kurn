@@ -9,6 +9,7 @@
 //  agent support; tapping a cited timestamp calls `onJumpToTime`.
 //
 
+import AgentHarness
 import Combine
 import KurnCore
 import SwiftData
@@ -54,6 +55,11 @@ struct MeetingChatConversationView: View {
     /// beneath it (see `conversation`), so scrolling to the latest message has
     /// to clear this much on top of the bottom safe area.
     @State private var composerHeight: CGFloat = 0
+    /// Whether the reader is at the end of the conversation (NH08): turns added while they read
+    /// older messages do not move them.
+    @State private var scrollFollowing = ChatScrollFollowing()
+    /// Set by `send`, so the reader's own question is always brought into view.
+    @State private var sentQuestion = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -101,7 +107,12 @@ struct MeetingChatConversationView: View {
         // Wiring the persistence scope is cheap and idempotent, so redoing it
         // on every appearance (rather than a one-shot `.task`) needs no extra
         // state to guard against `meeting`/`modelContext` changing under it.
-        .onAppear { vm.configure(meeting: meeting, modelContext: modelContext) }
+        .onAppear {
+            vm.configure(meeting: meeting, modelContext: modelContext)
+            takeRestoredDraft()
+        }
+        // Queued input a stop or a failed run did not answer comes back into the composer (NH08).
+        .onChange(of: vm.restoredDraft) { _, _ in takeRestoredDraft() }
         // A reopened conversation a dead process interrupted is resumed once, with the provider
         // and model the chat uses now (`MeetingChatViewModel.resumeInterruptedRun`).
         .onChange(of: vm.interruptedResume?.runID) { _, runID in
@@ -182,6 +193,12 @@ struct MeetingChatConversationView: View {
                                 .font(Theme.footnote)
                                 .foregroundStyle(Theme.textSecondary)
                                 .accessibilityIdentifier("chat.run_interrupted")
+                        } else if vm.replyWasStopped {
+                            // The stop is confirmed only once the run settled.
+                            Text(NSLocalizedString("chat.run.stopped", comment: "The person stopped this reply"))
+                                .font(Theme.footnote)
+                                .foregroundStyle(Theme.textSecondary)
+                                .accessibilityIdentifier("chat.run_stopped")
                         }
                         retryRow(question: question)
                     }
@@ -222,8 +239,17 @@ struct MeetingChatConversationView: View {
                     .onTapGesture { dismissKeyboard() }
             )
             .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
+            .onScrollGeometryChange(for: ChatScrollFollowing.self) { geometry in
+                var following = ChatScrollFollowing()
+                following.observe(contentOffsetY: geometry.contentOffset.y, visibleHeight: geometry.containerSize.height,
+                                  contentHeight: geometry.contentSize.height)
+                return following
+            } action: { _, following in scrollFollowing = following }
             .onChange(of: vm.turns.count) { _, _ in
                 guard let last = vm.turns.last else { return }
+                let ownQuestion = sentQuestion && last.role == .user
+                sentQuestion = false
+                guard scrollFollowing.follows(newTurnIsOwnQuestion: ownQuestion) else { return }
                 if reduceMotion {
                     proxy.scrollTo(last.id, anchor: .bottom)
                 } else {
@@ -254,10 +280,9 @@ struct MeetingChatConversationView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 ProgressView().accessibilityHidden(true)
-                Text(vm.phase == .cancelling
-                     ? NSLocalizedString("chat.step.cancelling", comment: "Stopping a reply")
-                     : NSLocalizedString("chat.step.running", comment: "Running"))
+                Text(vm.phase.statusText(retryDelaySeconds: vm.runProgress.retryDelaySeconds))
                     .font(.footnote).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("chat.run_status")
             }
             if let turn = vm.turns.last, turn.role == .assistant, let usage = turn.usage {
                 Text(MeetingChatTurnView.usageCaptionText(usage: usage, costUSD: turn.costUSD, elapsedSeconds: nil))
@@ -317,6 +342,11 @@ struct MeetingChatConversationView: View {
     private var composer: some View {
         VStack(alignment: .leading, spacing: 12) {
             if usesHarness, let sourceValidation { ChatSourceValidationView(validation: sourceValidation) }
+            if !vm.queued.isEmpty {
+                ChatQueuedInputView(queued: vm.queued,
+                                    edit: { item in Task { await vm.editQueued(item) } },
+                                    remove: { item in Task { await vm.removeQueued(item.id) } })
+            }
             TextField(
                 NSLocalizedString("chat.placeholder", comment: "Chat input placeholder"),
                 text: $input,
@@ -329,7 +359,7 @@ struct MeetingChatConversationView: View {
             .disabled(!canChat)
 
             HStack(spacing: 10) {
-                modelChip
+                if canQueue { queueButtons } else { modelChip }
                 Spacer(minLength: 0)
                 sendOrStopButton
             }
@@ -341,6 +371,35 @@ struct MeetingChatConversationView: View {
         .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).stroke(Theme.separator, lineWidth: 1))
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
+    }
+
+    /// While a reply runs, a typed message can steer it after its current step, or wait until
+    /// it finishes (NH08).
+    @ViewBuilder
+    private var queueButtons: some View {
+        Button(NSLocalizedString("chat.queue.steer", comment: "Steer the running reply")) { queueInput(.steering) }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("chat.queue.steer")
+        Button(NSLocalizedString("chat.queue.follow_up", comment: "Send after this task")) { queueInput(.followUp) }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("chat.queue.follow_up")
+    }
+
+    private var canQueue: Bool {
+        vm.isResponding && vm.phase != .cancelling && !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Queues the composer's text; it stays in the composer when the queue refuses it.
+    private func queueInput(_ kind: AgentInputQueue.Kind) {
+        let text = input
+        input = ""
+        Task { if !(await vm.queue(text, as: kind)) { input = text } }
+    }
+
+    private func takeRestoredDraft() {
+        guard let draft = vm.restoredDraft else { return }
+        vm.restoredDraft = nil
+        input = input.isEmpty ? draft : input + "\n\n" + draft
     }
 
     /// Which model answers — the summary provider's model, since chat shares
@@ -453,6 +512,7 @@ struct MeetingChatConversationView: View {
     }
 
     private func send() {
+        sentQuestion = true
         sendQuestion(input)
         input = ""
         dismissKeyboard()

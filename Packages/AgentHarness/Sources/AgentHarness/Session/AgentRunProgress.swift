@@ -28,6 +28,8 @@ public struct AgentRunProgress: Sendable, Equatable {
     /// reported size no longer describes the context) and when a provider reports no input. Unknown
     /// is never zero. Summary requests' usage is not the conversation's context and never sets it.
     public private(set) var contextTokens: Int?
+    /// How long a failed request waits before its retry (NH07/NH08), while that wait lasts.
+    public private(set) var retryDelaySeconds: Double?
     /// The phase a compaction interrupted, restored when it ends.
     private var resumePhase: Phase?
 
@@ -39,6 +41,7 @@ public struct AgentRunProgress: Sendable, Equatable {
             self = AgentRunProgress()
         case .requestStarted(let identity):
             request = identity
+            retryDelaySeconds = nil
             enter(.streaming)
         case .turnStarted(let index):
             turnIndex = index
@@ -55,6 +58,9 @@ public struct AgentRunProgress: Sendable, Equatable {
         case .toolFinished(let callID, _, _, _):
             activeCallIDs.removeAll { $0 == callID }
         case .diagnostic(let diagnostic):
+            if diagnostic.kind == .requestRetryScheduled, let delay = diagnostic.metrics[.retryDelayMs] {
+                retryDelaySeconds = Double(delay) / 1_000
+            }
             applyDiagnostic(diagnostic.kind)
         case .runFinished:
             activeCallIDs = []
