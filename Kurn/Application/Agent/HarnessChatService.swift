@@ -44,8 +44,9 @@ struct HarnessChatService {
 
     /// A started chat run: its observation, and the owner's explicit stop and settlement.
     struct Run: Sendable {
-        /// Every event, because the chat rebuilds its timeline and artifact state from them.
-        let events: AsyncThrowingStream<AgentEvent, Error>
+        /// Newest-only snapshots of the run (`AgentRunSnapshots.coalescing`): a busy view skips
+        /// intermediate ones instead of queueing every event, and still sees the last.
+        let snapshots: AsyncThrowingStream<AgentRunSnapshot, Error>
         let abort: @Sendable () async -> Void
         let settle: @Sendable () async -> Void
 
@@ -74,7 +75,8 @@ struct HarnessChatService {
             let handle = run.harness.start(systemPrompt: run.systemPrompt, history: run.history, prompt: run.question,
                                            tools: run.tools, contextResolution: run.resolution, context: run.context,
                                            observation: .complete)
-            return Run(events: handle.events, abort: { handle.cancel() }, settle: { _ = try? await handle.result() })
+            return Run(snapshots: AgentRunSnapshots.coalescing(handle.events), abort: { handle.cancel() },
+                       settle: { _ = try? await handle.result() })
         }
         // A stop that arrived while preparing must not open a branch.
         try Task.checkCancellation()
@@ -83,7 +85,8 @@ struct HarnessChatService {
                                           runID: runID, commandID: commandID,
                                           startFields: try ChatRunBranch.startFields(run.authorization),
                                           observation: .complete)
-        return Run(events: owned.events, abort: { await owner.abort() }, settle: { _ = await owner.waitUntilSettled() })
+        return Run(snapshots: AgentRunSnapshots.coalescing(owned.events), abort: { await owner.abort() },
+                   settle: { _ = await owner.waitUntilSettled() })
     }
 
     func prepare(

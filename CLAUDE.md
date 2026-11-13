@@ -2950,6 +2950,13 @@ turn's registered invocations. It is presentation only and never orders persiste
 and any compaction until its request starts, and `finish()` closes a run that ended without
 `runFinished`. The chat keeps it as `MeetingChatViewModel.runProgress` (reset with the conversation),
 and `ChatRunPhase.following(_:)` derives the shown phase from it, beside its own `cancelling`.
+The chat does not read the event stream itself: `HarnessChatService.Run.snapshots` is
+`AgentRunSnapshots.coalescing(events)`, a reducer that drains the complete observation into
+`AgentRunSnapshot`s (streamed text, trace, progress, finished tool calls, outcome) and keeps only the
+newest for the view. A busy view skips intermediate snapshots instead of growing a queue, the last
+snapshot always arrives before the stream ends with the run's failure, and the view model finds the
+document tools finished since the last snapshot it saw by count. Ending observation stops the
+reducer, never the run.
 
 **Chat conversations are host-owned (NH05 host activation).** `ChatConversationHost`
 (`ViewModels/`, built by `AppComposition`, injected app-wide) retains one

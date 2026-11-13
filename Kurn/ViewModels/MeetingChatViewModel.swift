@@ -504,33 +504,33 @@ final class MeetingChatViewModel {
         let index = turns.count
         turns.append(Turn(role: .assistant, text: ""))
         var timeline = AgentRunTrace()
+        var toolsSeen = 0
         do {
-            for try await event in run.events {
+            for try await view in run.snapshots {
                 try Task.checkCancellation()
                 if self.generation == generation {
-                    runProgress.apply(event)
+                    runProgress = view.progress
                     phase = phase.following(runProgress)
                 }
-                timeline.apply(event)
+                timeline = view.trace
                 turns[index].steps = timeline.steps
                 turns[index].usage = timeline.hasUsage
                     ? TokenUsage(promptTokens: timeline.usage.inputTokens, completionTokens: timeline.usage.outputTokens) : nil
                 turns[index].costUSD = turns[index].usage.flatMap { ModelPricing.estimatedCostUSD(model: model, usage: $0) }
-                switch event {
-                case .textDelta(let text): turns[index].text += text
-                case .runFinished(let outcome): turns[index].text = outcome.finalText
-                case .toolFinished(_, let name, _, let isError):
-                    if !isError && ["create_document", "update_document", "append_to_document"].contains(name) {
-                        let snapshot = await workspace.snapshot()
-                        try Task.checkCancellation()
-                        turns[index].recordArtifacts(from: artifacts, to: snapshot,
-                                                    origin: origin, priorOrigins: priorOrigins)
-                        artifacts = snapshot
-                        var pending = turns[index - 1]
-                        pending.inheritArtifacts(from: turns[index])
-                        persist(turns: completedTurns + [pending])
-                    }
-                default: break
+                turns[index].text = view.text
+                // Coalescing can fold several tool calls into one snapshot: take every one that
+                // finished since the last snapshot seen.
+                let finished = view.finishedTools.dropFirst(toolsSeen)
+                toolsSeen = view.finishedTools.count
+                if finished.contains(where: { !$0.isError && Self.documentTools.contains($0.name) }) {
+                    let snapshot = await workspace.snapshot()
+                    try Task.checkCancellation()
+                    turns[index].recordArtifacts(from: artifacts, to: snapshot,
+                                                origin: origin, priorOrigins: priorOrigins)
+                    artifacts = snapshot
+                    var pending = turns[index - 1]
+                    pending.inheritArtifacts(from: turns[index])
+                    persist(turns: completedTurns + [pending])
                 }
             }
             try Task.checkCancellation()

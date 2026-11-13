@@ -433,9 +433,17 @@ retryable; a retry starts a new branch), records `run_transcript_write_failed` a
 reply's progress could not be saved and nothing more was sent, instead of the store's error text. Run entries are
 recorded history only: replay still sends plain presentation history until NH06.
 
-Not yet activated: canonical history restoration beyond an interrupted run's steps, durable command idempotency,
-resumption of a run a dead process left interrupted, persistence-failure recovery beyond retry, compaction/retry/waiting
-phases and coalesced, back-pressured observation.
+Not yet activated: canonical history restoration beyond an interrupted run's steps, resumption of a run a
+dead process left interrupted and a `waitingForUser` phase (no tool asks for confirmation).
+
+The chat observes a run through `AgentRunSnapshots.coalescing`: a reducer drains the complete event
+observation into `AgentRunSnapshot`s (text, trace, `AgentRunProgress`, finished tool calls, outcome)
+and keeps only the newest for the view, so a slow observer skips snapshots instead of queueing every
+event, and the last snapshot always arrives before the stream ends with the run's failure. Ending
+observation stops the reducer, never the run; canonical writes never pass through it. A run carries
+a durable command ID in its start entry, and a command already in the log runs nothing. Each run's
+phase is projected with its turn, request and tool-call identities (`AgentRunProgress`). The launch
+sweep closes every run branch nothing ended with the end the run could not write.
 
 The package infrastructure above is not by itself completion of session acceptance criteria. UI/coordinator lifetime, canonical replay/provenance, crash/effect
 recovery, durable command deduplication and complete phase projection remain open in NH05;
