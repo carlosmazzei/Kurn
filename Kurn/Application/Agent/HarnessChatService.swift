@@ -137,6 +137,8 @@ struct HarnessChatService {
                                                                       maxOutputTokens: resolution.maxOutputTokens),
                                     retryPolicy: .standard,
                                     diagnosticSink: { HarnessDiagnostics.record($0) })
+            // A document tool changes the index the prompt lists; the next request sees it (C12).
+            .refreshingSystemPrompt { try? await Self.system(artifacts: workspace.snapshot()).text }
         let authorization = ChatRunAuthorization(scope: effective, meetingIDs: ids, model: "\(provider.id):\(modelIdentifier)")
         // Canonical replay (NH06) when the conversation's runs are known; otherwise plain text.
         let replayed = replay?.messages(for: authorization) ?? history.map {

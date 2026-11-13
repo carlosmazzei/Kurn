@@ -16,6 +16,7 @@ public struct NativeHarness: Sendable {
     var usageCommit: @Sendable (AgentUsage, AgentRequestIdentity) async throws -> Void = { _, _ in }
     var compactionCommit: @Sendable (AgentCompactionCheckpoint) async throws -> Void = { _ in }
     var inputQueue: AgentInputQueue?
+    var systemPromptRefresh: (@Sendable () async -> String?)?
     private let diagnosticSink: @Sendable (AgentDiagnostic) -> Void
 
     /// Appended to the system prompt for the tool-less wrap-up turn after a turn or tool-call limit.
@@ -94,6 +95,16 @@ public struct NativeHarness: Sendable {
         return copy
     }
 
+    /// Asks `refresh` for the system prompt after each complete tool batch, before the next request:
+    /// a tool that changes what the prompt describes (a document index, say) is seen by the request
+    /// that follows it, not only by the next run. Nil keeps the current prompt. The run's start
+    /// entry keeps the prompt the run started with.
+    public func refreshingSystemPrompt(_ refresh: @escaping @Sendable () async -> String?) -> Self {
+        var copy = self
+        copy.systemPromptRefresh = refresh
+        return copy
+    }
+
     /// Drains `queue` at the run's boundaries (NH08): steering after each complete tool batch and
     /// before the run would finish, follow-ups only once no tool call and no steering is left.
     /// Each drained item is committed as a user message (its ID is the item's) before the next
@@ -159,7 +170,7 @@ public struct NativeHarness: Sendable {
     }
 
     struct TurnSettings {
-        let systemPrompt: String
+        var systemPrompt: String
         let tools: [AgentToolSpec]
         var outputBudget: AgentOutputBudget
         var maxOutputTokens: Int { outputBudget.tokens }
@@ -234,6 +245,10 @@ public struct NativeHarness: Sendable {
             }
             let stop = try await execute(calls, requestID: response.message?.identity?.requestID, tools: tools, state: &state, events: events, trace: trace)
             if let stop { reason = stop; break }
+            if let refreshed = await systemPromptRefresh?(), refreshed != settings.systemPrompt {
+                settings.systemPrompt = refreshed
+                trace.record(.systemPromptRefreshed)
+            }
             // Steering enters after the whole tool batch, before the next request.
             _ = try await injectQueued(.steering, state: &state, events: events, trace: trace)
         }

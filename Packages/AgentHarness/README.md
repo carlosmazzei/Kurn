@@ -95,6 +95,7 @@ continues:
 | `persistingUsage(_:)` | Each request's usage is recorded |
 | `persistingCompaction(_:)` | Any request uses compacted context |
 | `receivingInput(_:)` | (Not a barrier.) Injects queued steering after each tool batch and follow-ups when it would finish |
+| `refreshingSystemPrompt(_:)` | (Not a barrier.) Asks for the system prompt again after each tool batch, before the next request |
 
 `start(...)` returns an `AgentRunHandle` (events plus `result()`); `run(...)` is the legacy stream form;
 `continueRun(...)` answers an open request or one queued input without a new prompt.

@@ -325,6 +325,9 @@ form a stable prefix, its `documents` index is the section a document mutation c
 run's (`systemPatch`: changed or added sections, `null` removing one), plus its declared tools and their
 delta from the previous run (`tools`: `AgentToolLoadout`). `AgentRunBranch.systemPrompts(of:)` folds
 the patches back into each run's prompt.
+Within a run, `NativeHarness.refreshingSystemPrompt` asks for the prompt again after each complete tool
+batch: the chat rebuilds it from the workspace, so the request after a document mutation lists the new
+version (diagnostic `systemPromptRefreshed`); the run-start entry keeps the prompt the run began with.
 Queued input (NH08, `AgentInputQueue`): two FIFO queues, *steering* and *follow-up*, each draining one item
 or all of them per boundary. Every change saves the complete lists through `persist` before it is applied
 or acknowledged, and `updates()` streams the complete lists with stable item IDs. A harness given a queue

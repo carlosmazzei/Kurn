@@ -57,6 +57,10 @@ struct MeetingChatHarnessTests {
         let requests = await model.requests
         #expect(!requests[0].tools.contains { $0.name == "read_wiki" })
         #expect(requests[0].systemPrompt.contains("SAME LANGUAGE as the question"))
+        // The document index in the prompt follows the run's own mutations (C12).
+        #expect(!requests[0].systemPrompt.contains(artifact.id.uuidString))
+        #expect(requests[1].systemPrompt.contains(artifact.id.uuidString))
+        #expect(requests[1].systemPrompt.hasPrefix(String(requests[0].systemPrompt.prefix(200))))
         #expect(requests[1].messages.contains { if case .toolResult(_, "create_document", _, false) = $0.legacyProjection { return true }; return false })
 
         let revision = ChatAgentModel([

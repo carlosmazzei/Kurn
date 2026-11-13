@@ -426,9 +426,13 @@
         {
           "path": "KurnTests/ChatReplayHistoryTests.swift",
           "symbol": "aSecondQuestionReplaysTheFirstRunsCallsAndResults"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSystemPromptTests.swift",
+          "symbol": "theNextRequestSeesAPromptChangedByATool"
         }
       ],
-      "note": "NH06: ordered system sections with Kurn's meeting-assistant instructions as a stable prefix and the document index as its own section; each run records its prompt as a patch on the previous run's and its declared tools with their delta. A document mutation inside a run is reflected from the next run on."
+      "note": "NH06: ordered system sections with Kurn's meeting-assistant instructions as a stable prefix and the document index as its own section; each run records its prompt as a patch on the previous run's and its declared tools with their delta. Within a run the prompt is refreshed after each tool batch, so the request after a document mutation lists the new version."
     },
     {
       "id": "C13",
