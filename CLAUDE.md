@@ -282,6 +282,15 @@ fails the run. Only real summaries are checkpoints; an unusable or failed summar
 a kept message without an identity (legacy plain history) writes none. Replay applies the newest
 checkpoint of a permitted run whose kept message is in the history (`ChatReplayHistory`), so a reopened
 conversation reuses the summary and a later compaction updates it.
+`AgentRunProgress.contextTokens` is the context size the provider last reported for a response (input
+plus reply); it is nil — unknown, never zero — before any reported usage, after a compaction and when a
+provider reports no input, and a summary request's usage never sets it.
+System prompts are ordered sections (`AgentSystemPrompt`): the chat's `instructions` never change and
+form a stable prefix, its `documents` index is the section a document mutation changes. Each run's
+`agent.run-start.v1` records the first run's whole prompt (`system`) and then a patch on the previous
+run's (`systemPatch`: changed or added sections, `null` removing one), plus its declared tools and their
+delta from the previous run (`tools`: `AgentToolLoadout`). `AgentRunBranch.systemPrompts(of:)` folds
+the patches back into each run's prompt.
 `AgentLimits.wrapUpOnLimit` runs one extra turn after a turn/tool-call limit with
 `NativeHarness.wrapUpInstruction` appended and `AgentTurnRequest.allowsToolCalls` false
 (tools stay declared; the wire formats send `tool_choice: none` / Gemini mode `NONE`, and

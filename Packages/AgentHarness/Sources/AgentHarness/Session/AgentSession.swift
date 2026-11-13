@@ -95,6 +95,7 @@ public actor AgentSession {
                       tools: [AgentTool], maxOutputTokens: Int? = nil,
                       contextResolution: AgentContextResolution? = nil, runID: UUID = UUID(),
                       commandID: String? = nil, startFields: [String: JSONValue] = [:],
+                      system: AgentSystemPrompt? = nil,
                       observation: AgentRunObservation = .bounded) throws -> AgentSessionRun {
         guard commandID.map(AgentContentMessage.validID) ?? true else { throw AgentSessionStoreError.invalidEntry }
         guard task == nil else { throw AgentSessionOwnerError.busy }
@@ -105,7 +106,8 @@ public actor AgentSession {
         branchAnchor = nil
         let (events, observer) = AsyncThrowingStream<AgentEvent, Error>.makeStream(
             bufferingPolicy: observation == .bounded ? .bufferingNewest(128) : .unbounded)
-        let request = RunRequest(harness: harness, systemPrompt: systemPrompt, history: history, prompt: prompt,
+        let request = RunRequest(harness: harness, systemPrompt: system?.text ?? systemPrompt, system: system,
+            history: history, prompt: prompt,
             tools: tools, maxOutputTokens: maxOutputTokens, contextResolution: contextResolution,
             commandID: commandID, startFields: startFields, observation: observation)
         task = Task { await perform(request, runID: runID, observer: observer) }
@@ -150,6 +152,7 @@ public actor AgentSession {
     private struct RunRequest: Sendable {
         let harness: NativeHarness
         let systemPrompt: String
+        let system: AgentSystemPrompt?
         let history: [AgentMessage]
         let prompt: String
         let tools: [AgentTool]
@@ -169,11 +172,30 @@ public actor AgentSession {
         fields["runID"] = .string(runID.uuidString)
         if let commandID = request.commandID { fields["commandID"] = .string(commandID) }
         var startSaved = true
+        let startID = UUID().uuidString
+        let tools = request.tools.map(\.spec.name)
         do {
-            try await append(payload: .custom(type: "agent.run-start.v1", data: .object(fields))) { snapshot in
+            try await append(id: startID, precondition: { snapshot in
                 guard let commandID = request.commandID else { return }
                 if snapshot.entries.contains(where: { $0.commandID == commandID }) { throw AgentSessionOwnerError.duplicateCommand }
-            }
+            }, payload: { snapshot in
+                // The loadout and system prompt are recorded relative to the previous run (NH06).
+                // Runs before this one; after a lost acknowledgement, only those before its entry.
+                let own = snapshot.entries.first { $0.id == startID }
+                let earlier = AgentRunBranch.all(in: snapshot.entries.filter { entry in
+                    entry.id != startID && own.map { entry.ordinal < $0.ordinal } ?? true
+                })
+                var fields = fields
+                fields["tools"] = try Self.json(AgentToolLoadout(names: tools, previous: earlier.last?.toolLoadout?.names))
+                if let system = request.system {
+                    if let previous = AgentRunBranch.systemPrompts(of: earlier).compactMap({ $0 }).last {
+                        fields["systemPatch"] = try Self.json(previous.patch(to: system))
+                    } else {
+                        fields["system"] = try Self.json(system)
+                    }
+                }
+                return .custom(type: AgentRunBranch.startType, data: .object(fields))
+            })
         } catch AgentSessionOwnerError.duplicateCommand {
             return refuseDuplicate(observer: observer)
         } catch {
@@ -264,6 +286,10 @@ public actor AgentSession {
         } catch { persistenceFailed = true; throw AgentSessionOwnerError.persistenceFailed }
     }
 
+    private static func json<Value: Encodable>(_ value: Value) throws -> JSONValue {
+        try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))
+    }
+
     private func appendCompaction(_ checkpoint: AgentCompactionCheckpoint, runID: UUID) async throws {
         guard state.runID == runID else { throw AgentSessionStoreError.conflict }
         do {
@@ -281,10 +307,19 @@ public actor AgentSession {
     /// command already in the log) also holds against a writer that committed in between.
     private func append(payload: AgentSessionEntry.Payload, id: String = UUID().uuidString,
                         precondition: (AgentSessionSnapshot) throws -> Void = { _ in }) async throws {
+        try await append(id: id, precondition: precondition, payload: { _ in payload })
+    }
+
+    /// `append` with a payload built from the snapshot the attempt commits on (a run start records
+    /// what changed since the previous run). The own-entry check compares against the payload
+    /// built from that same snapshot, so a lost acknowledgement is still recognized.
+    private func append(id: String, precondition: (AgentSessionSnapshot) throws -> Void,
+                        payload build: (AgentSessionSnapshot) throws -> AgentSessionEntry.Payload) async throws {
         var attempt = 0
         while true {
             attempt += 1
             let snapshot = try await store.load(sessionID: sessionID)
+            let payload = try build(snapshot)
             // This append's own entry first: a commit whose acknowledgement was lost is not a
             // duplicate of itself, whatever the precondition would say about it.
             if let existing = snapshot.entries.first(where: { $0.id == id }) {

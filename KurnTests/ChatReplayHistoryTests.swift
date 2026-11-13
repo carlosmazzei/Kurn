@@ -62,6 +62,13 @@ struct ChatReplayHistoryTests {
         let session = try #require(vm.pastSessions().first)
         let runs = AgentRunBranch.all(in: try SwiftDataAgentSessionStore(context: context).snapshot(session).entries)
         #expect(runs.compactMap(ChatRunBranch.questionID(of:)) == vm.turns.filter { $0.role == .user }.map(\.id))
+        // The first run records its sections; the second, with no document changed, an empty patch.
+        let prompts = AgentRunBranch.systemPrompts(of: runs)
+        #expect(prompts.first??.sections.map(\.name) == ["instructions", "documents"])
+        #expect(prompts.count == 2 && prompts[0] == prompts[1])
+        #expect(runs[1].startFields["systemPatch"] == .object(["changes": .array([])]))
+        #expect(runs[0].toolLoadout?.names.contains("list_sources") == true)
+        #expect(runs[1].toolLoadout?.added == [] && runs[1].toolLoadout?.removed == [])
     }
 
     @Test func runsOutsideTheCurrentSourcesReplayAsPlainText() async throws {
