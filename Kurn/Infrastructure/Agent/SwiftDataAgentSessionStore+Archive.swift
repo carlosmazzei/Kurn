@@ -55,7 +55,13 @@ extension SwiftDataAgentSessionStore {
         }
         let newID = target.id.uuidString
         let moved = newID == archive.sessionID ? archive : try archive.copy(into: newID)
+        // Every branch must open, not only the selected one: each conversation message and each
+        // saved state is read here (a state that does not decode fails `rebased`), before anything is
+        // written.
         let entries = try moved.entries.map { try Self.rebased($0, from: archive.sessionID, to: newID) }
+        for entry in entries where entry.runID == nil {
+            if case .message = entry.payload { _ = try HarnessPresentationCodec.turn(entry) }
+        }
         let revisions = try archive.records.filter { $0.type == Self.revisionRecord }.map { record -> HarnessArtifactRevision in
             guard case .object(let fields) = record.data, case .string(let id)? = fields["id"],
                   case .string(let encoded)? = fields["payload"], let payload = Data(base64Encoded: encoded) else {
@@ -100,7 +106,8 @@ extension SwiftDataAgentSessionStore {
 }
 
 /// The conversation shown, as Markdown to read (NH10): the selected branch's questions and
-/// answers and the documents it shows, never other branches or the archive's internals. It is
+/// answers and the documents it shows, with their text, never other branches or the archive's
+/// internals. It is
 /// text for a reader, not an archive, and carries no HTML of its own.
 enum ChatConversationMarkdown {
     static func render(title: String, turns: [PersistedChatTurn], artifacts: [ChatDocumentArtifact]) -> String {
@@ -112,8 +119,10 @@ enum ChatConversationMarkdown {
             lines += ["**" + speaker + "**", "", turn.text, ""]
         }
         if !artifacts.isEmpty {
-            lines += ["---", "", NSLocalizedString("chat.export.documents", comment: "Documents in an exported conversation"), ""]
-            lines += artifacts.map { "- " + $0.title + " (v" + String($0.version) + ")" }
+            lines += ["---", "", "## " + NSLocalizedString("chat.export.documents", comment: "Documents in an exported conversation"), ""]
+            for artifact in artifacts {
+                lines += ["### " + artifact.title + " (v" + String(artifact.version) + ")", "", artifact.markdown, ""]
+            }
         }
         return lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines) + "\n"
     }

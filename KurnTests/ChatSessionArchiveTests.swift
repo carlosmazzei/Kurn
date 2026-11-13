@@ -106,7 +106,8 @@ struct ChatSessionArchiveTests {
         let markdown = ChatConversationMarkdown.render(title: "Planning", turns: [turn(.user, "When?"), turn(.assistant, "Monday.")],
                                                        artifacts: [ChatDocumentArtifact(title: "Minutes", markdown: "x", version: 3)])
         #expect(markdown.hasPrefix("# Planning\n"))
-        #expect(markdown.contains("When?") && markdown.contains("Monday.") && markdown.contains("- Minutes (v3)"))
+        #expect(markdown.contains("When?") && markdown.contains("Monday."))
+        #expect(markdown.contains("### Minutes (v3)\n\nx"))
     }
 
     @Test func theChatExportsAndImportsConversations() throws {
@@ -130,5 +131,23 @@ struct ChatSessionArchiveTests {
         #expect(vm.error != nil)
         #expect(try sessionCount(context) == 2)
         try? FileManager.default.removeItem(at: bad)
+    }
+
+    @Test func aBranchThatCannotOpenRejectsTheWholeImport() throws {
+        let context = ModelContext(TestModelContainer.make())
+        let seeded = try seed(context)
+        let store = SwiftDataAgentSessionStore(context: context)
+        let archive = try AgentSessionArchive.decode(try store.archive(seeded.session))
+        // A question on a branch that is not selected loses the metadata its turn is read from.
+        let broken = try archive.entries.map { entry -> AgentSessionEntry in
+            guard case .message(.content(let message)) = entry.payload, message.id == seeded.q1.id.uuidString else { return entry }
+            return try AgentSessionEntry(sessionID: entry.sessionID, id: entry.id, parentID: entry.parentID, ordinal: entry.ordinal,
+                                         createdAt: entry.createdAt, payload: entry.payload, metadata: nil)
+        }
+        let data = try AgentSessionArchive(sessionID: archive.sessionID, leafID: archive.leafID, entries: broken,
+                                           records: archive.records).jsonl()
+
+        #expect(throws: (any Error).self) { try store.importArchive(data, meeting: nil, defaultTitle: "Imported") }
+        #expect(try sessionCount(context) == 1)
     }
 }

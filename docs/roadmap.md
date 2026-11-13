@@ -930,6 +930,8 @@ export through the share sheet. Still open:
   demonstrate it.
 - A safe HTML export (no scripts, remote embeds or hosted links).
 - Keeping unknown host records and header fields when an archive is imported into the app's store.
+- Exact integers past 2^53 in opaque host records and unknown header fields: those pass through
+  `JSONValue`, whose numbers are `Double` (entries are encoded directly and keep exact integers).
 - Background/foreground draft preservation (A68), and migration/stress/device qualification.
 
 ### Local suspension, recovery and resource limits

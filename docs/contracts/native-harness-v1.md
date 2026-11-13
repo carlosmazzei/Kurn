@@ -534,4 +534,5 @@ moves the graph to a new session identity. The app exports a conversation with i
 conversation whose revisions are checked against their bytes before anything is written, and a
 restore keeps the identity only when no conversation has it. The reading export is the branch shown
 as Markdown. Not claimed: pi JSONL v3 interchange, an HTML export, keeping unknown host records inside
-the app's store, and device/migration/stress qualification.
+the app's store, exact integers past 2^53 in opaque records and header fields (they pass through
+`JSONValue` doubles), and device/migration/stress qualification.
