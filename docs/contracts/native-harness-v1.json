@@ -1931,10 +1931,23 @@
       "requirement": "Draft preservado e estado reconciliado, sem conclusão inventada",
       "disposition": "required",
       "increment": "NH10",
-      "targetStatus": "pending",
+      "targetStatus": "partial",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Open: a draft typed but not sent is not yet persisted (the draft recovery record exists but is unused), and reconciliation across background/foreground is device-only (release physical checklist). Runs interrupted by the background window already settle as retryable and resume once."
+      "targetEvidence": [
+        {
+          "path": "KurnTests/MeetingChatDraftTests.swift",
+          "symbol": "aDraftSavedInTheBackgroundComesBackAndASentQuestionClearsIt"
+        },
+        {
+          "path": "KurnTests/MeetingChatDraftTests.swift",
+          "symbol": "theHostKeepsAConversationWhoseDraftHasNowhereToGo"
+        },
+        {
+          "path": "KurnTests/ChatConversationHostTests.swift",
+          "symbol": "aReplyStoppedInTheBackgroundResumesOnceInTheForeground"
+        }
+      ],
+      "note": "The unsent draft of a saved conversation is a .draft recovery record saved on going to the background, on switching conversations and before the host lets a conversation go; an unsaved conversation's draft keeps its view model retained. Runs stopped by the background window settle as interruptions and resume once. Open: the device check in docs/release-physical-checklist.md."
     },
     {
       "id": "A69",

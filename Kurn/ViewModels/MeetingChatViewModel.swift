@@ -97,6 +97,9 @@ final class MeetingChatViewModel {
     var queued = AgentInputQueue.Snapshot()
     /// Text handed back to the composer: queued input a stop or a failed run did not answer.
     var restoredDraft: String?
+    /// The composer's unsent text, and what of it is saved (`MeetingChatViewModel+Draft`).
+    var draft = ""
+    @ObservationIgnored var savedDraft = ""
     /// Whether the person stopped the last reply; shown once the stop settled. A new question,
     /// `reset` and `load` clear it.
     var replyWasStopped = false
@@ -152,6 +155,11 @@ final class MeetingChatViewModel {
                 self.error = .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.invalid", comment: "Saved chat storage error"))
             }
             return
+        }
+        // The question is sent, so its saved draft is not one any more.
+        if !savedDraft.isEmpty {
+            draft = ""
+            saveDraft()
         }
         isResponding = true
         phase = .preparing
@@ -391,6 +399,7 @@ final class MeetingChatViewModel {
     /// Nothing is written until the first exchange completes (`persist()`),
     /// so an abandoned new chat never leaves an empty row in history.
     func reset() {
+        saveDraft()
         cancel()
         // Fences the cancelled run: it can no longer touch what is shown from here on.
         generation = UUID()
@@ -408,6 +417,8 @@ final class MeetingChatViewModel {
         workspace = ChatDocumentWorkspace()
         scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id)
         branches = ChatBranchPresentation()
+        draft = ""
+        savedDraft = ""
     }
 
     // MARK: - Session history
@@ -440,6 +451,9 @@ final class MeetingChatViewModel {
     /// Loads a previously saved conversation for display and continuation.
     func load(session: ChatSession) {
         guard session.meeting?.id == meeting?.id else { return }
+        // Text typed in a new, unsaved conversation goes along to one with no draft of its own.
+        let carried = self.session == nil ? draft : ""
+        saveDraft()
         cancel()
         generation = UUID()
         do {
@@ -465,6 +479,7 @@ final class MeetingChatViewModel {
             retryArtifacts = []
             retryOrigins = [:]
             error = nil
+            restoreDraft(of: session, carrying: carried)
             restoreLeftoverQueue(of: session)
             refreshBranches()
         } catch {

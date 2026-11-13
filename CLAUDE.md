@@ -3100,6 +3100,12 @@ between meetings does not. The host does
 not evict a conversation that holds one. The resumed run starts over from the saved question; nothing
 of the stopped run is replayed. The transcription coordinator's background cancellation
 gets the same earlier, checkpointable moment.
+The composer's unsent text (A68) is `MeetingChatViewModel.draft`, not view state, so it outlives the
+view; a saved conversation keeps it as its `.draft` recovery record (`ChatDraftRecord`), written when the
+scene goes to the background (`ChatConversationHost.saveDrafts()`), when another conversation opens and
+before the host evicts the view model — never per keystroke. A reopened conversation puts it back; a
+sent question clears it; a new, unsaved conversation's draft lives in memory only, carries into an opened
+conversation that has none of its own, and keeps its view model from being evicted.
 
 **The question is a barrier, and every run leaves a record.** `send` saves the conversation
 with the new question before any request; if that save fails nothing is sent and the question

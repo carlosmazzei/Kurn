@@ -57,6 +57,11 @@ final class ChatConversationHost {
     }
 
     /// On return to the foreground, resumes once each reply the background wind-down stopped.
+    /// Saves every retained conversation's unsent draft; the scene calls it on going to the background.
+    func saveDrafts() {
+        for conversation in conversations.values { conversation.saveDraft() }
+    }
+
     func resumeAfterForeground() async {
         for conversation in Array(conversations.values) { await conversation.resumeAfterForeground() }
     }
@@ -67,8 +72,14 @@ final class ChatConversationHost {
             .map(\.key)
             .sorted { (lastOpened[$0] ?? 0) < (lastOpened[$1] ?? 0) }
         for scope in idle where conversations.count > capacity {
+            // A saved conversation's draft is saved before it goes; an unsaved one's has nowhere
+            // to go, so that conversation stays.
+            guard let conversation = conversations[scope] else { continue }
+            conversation.saveDraft()
+            guard !conversation.holdsUnsavedDraft else { continue }
             conversations[scope] = nil
             lastOpened[scope] = nil
         }
     }
+
 }

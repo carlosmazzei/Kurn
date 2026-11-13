@@ -254,6 +254,8 @@ struct KurnApp: App {
         // the app-switcher snapshot captures.
         if phase == .background {
             accessGate.lock()
+            // Unsent chat text survives the process (A68).
+            environment.chatConversations.saveDrafts()
             #if canImport(BackgroundTasks)
             // Ask the system for a processing window to advance any
             // interrupted transcription while we're backgrounded.

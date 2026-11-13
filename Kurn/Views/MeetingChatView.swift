@@ -45,7 +45,11 @@ struct MeetingChatConversationView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @State private var input = ""
+    /// The composer's text, held by the view model so it outlives this view and the process (A68).
+    private var input: String {
+        get { vm.draft }
+        nonmutating set { vm.draft = newValue }
+    }
     @FocusState private var inputFocused: Bool
     @State private var showingHistory = false
     @State private var showingSources = false
@@ -391,7 +395,7 @@ struct MeetingChatConversationView: View {
             }
             TextField(
                 NSLocalizedString("chat.placeholder", comment: "Chat input placeholder"),
-                text: $input,
+                text: $vm.draft,
                 axis: .vertical
             )
             .lineLimit(1...5)
