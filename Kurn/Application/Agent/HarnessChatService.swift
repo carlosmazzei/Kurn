@@ -126,10 +126,16 @@ struct HarnessChatService {
         let plannedLimits: AgentLimits
         if let limits { plannedLimits = limits }
         else { plannedLimits = AgentBudgetPlanner.limits(for: reader.workload) }
+        // The run's cost comes from the app's price table; a model it cannot price stays unknown.
         let harness = NativeHarness(model: model, limits: plannedLimits,
+                                    costEstimator: { usage in
+                                        ModelPricing.estimatedCostUSD(model: modelIdentifier, usage: TokenUsage(
+                                            promptTokens: usage.inputTokens, completionTokens: usage.outputTokens))
+                                    },
                                     contextPolicy: AgentContextPolicy(contextWindow: resolution.contextWindowTokens,
                                                                       summaryPrompts: ChatCompactionPrompts.profile,
                                                                       maxOutputTokens: resolution.maxOutputTokens),
+                                    retryPolicy: .standard,
                                     diagnosticSink: { HarnessDiagnostics.record($0) })
         let authorization = ChatRunAuthorization(scope: effective, meetingIDs: ids, model: "\(provider.id):\(modelIdentifier)")
         // Canonical replay (NH06) when the conversation's runs are known; otherwise plain text.

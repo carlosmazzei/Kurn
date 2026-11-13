@@ -4,12 +4,14 @@ import Foundation
 public struct NativeHarness: Sendable {
     let model: any AgentModel
     let limits: AgentLimits
-    let costEstimator: (@Sendable (AgentUsage) -> Double)?
+    /// Prices a request's reported usage in USD; nil for a usage it cannot price (NH07).
+    let costEstimator: (@Sendable (AgentUsage) -> Double?)?
     let compactor: AgentContextCompactor
     let confirm: @Sendable (AgentToolCall) async -> Bool
     let toolPolicy: AgentToolPolicy
     let maxParallelReads: Int
     let isContextOverflow: @Sendable (Error) -> Bool
+    let retryPolicy: AgentRetryPolicy
     var messageCommit: @Sendable (AgentMessage) async throws -> Void = { _ in }
     var usageCommit: @Sendable (AgentUsage) async throws -> Void = { _ in }
     var compactionCommit: @Sendable (AgentCompactionCheckpoint) async throws -> Void = { _ in }
@@ -24,13 +26,14 @@ public struct NativeHarness: Sendable {
     /// - Parameter isContextOverflow: recognizes a provider rejecting a request as too long; the
     ///   harness then compacts and retries that turn once.
     public init(model: any AgentModel, limits: AgentLimits = AgentLimits(),
-                costEstimator: (@Sendable (AgentUsage) -> Double)? = nil,
+                costEstimator: (@Sendable (AgentUsage) -> Double?)? = nil,
                 contextPolicy: AgentContextPolicy = AgentContextPolicy(contextWindow: 128_000),
                 tokenEstimator: @escaping @Sendable (String) -> Int = { TokenEstimate.tokens(in: $0) },
                 isContextOverflow: @escaping @Sendable (Error) -> Bool = {
                     ($0 as? any AgentContextOverflowError)?.isContextOverflow == true
                 },
                 maxParallelReads: Int = 4,
+                retryPolicy: AgentRetryPolicy = .none,
                 toolPolicy: @escaping AgentToolPolicy = { _, arguments in .allow(arguments) },
                 confirm: @escaping @Sendable (AgentToolCall) async -> Bool = { _ in false },
                 diagnosticSink: @escaping @Sendable (AgentDiagnostic) -> Void = { _ in }) {
@@ -39,6 +42,7 @@ public struct NativeHarness: Sendable {
         self.costEstimator = costEstimator
         self.compactor = AgentContextCompactor(policy: contextPolicy, tokenEstimator: tokenEstimator)
         self.isContextOverflow = isContextOverflow
+        self.retryPolicy = retryPolicy
         self.confirm = confirm
         self.toolPolicy = toolPolicy
         self.maxParallelReads = min(16, max(1, maxParallelReads))
@@ -205,7 +209,8 @@ public struct NativeHarness: Sendable {
                                             .outputTokens: state.usage.outputTokens,
                                             .blockedCalls: state.requestedCalls - state.toolCalls], reason: reason)
         let outcome = AgentRunOutcome(messages: state.history, finalText: state.finalText,
-                                      stopReason: reason, totalUsage: state.usage)
+                                      stopReason: reason, totalUsage: state.usage,
+                                      estimatedCostUSD: costEstimator != nil && state.costKnown ? state.cost : nil)
         events.yield(.runFinished(outcome))
         return outcome
     }

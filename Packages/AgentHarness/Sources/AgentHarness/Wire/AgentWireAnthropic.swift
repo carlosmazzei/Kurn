@@ -13,12 +13,14 @@ extension AgentWireState {
             responseID = message["id"].string
             inputTokens = message["usage"]["input_tokens"].int
             outputTokens = message["usage"]["output_tokens"].int
+            anthropicCache(message["usage"])
         case "content_block_start": try anthropicBlockStart(value)
         case "content_block_delta": try anthropicBlockDelta(value)
         case "content_block_stop": try anthropicBlockStop(value)
         case "message_delta":
             if let input = value["usage"]["input_tokens"].int { inputTokens = input }
             if let output = value["usage"]["output_tokens"].int { outputTokens = output }
+            anthropicCache(value["usage"])
             guard let reason = value["delta"]["stop_reason"].string else { return }
             rawStopReason = reason
             stopReason = reason == "max_tokens" ? .maxTokens : reason == "tool_use" ? .toolUse
@@ -32,6 +34,11 @@ extension AgentWireState {
             terminal = true
         default: break
         }
+    }
+
+    private mutating func anthropicCache(_ usage: JSONValue) {
+        if let read = usage["cache_read_input_tokens"].int { cacheReadTokens = read }
+        if let write = usage["cache_creation_input_tokens"].int { cacheWriteTokens = write }
     }
 
     private mutating func anthropicBlockStart(_ value: JSONValue) throws {

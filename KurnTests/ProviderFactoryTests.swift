@@ -30,6 +30,13 @@ struct ProviderFactoryTests {
         return try body()
     }
 
+    private func withClearedKeyAsync(_ key: KeychainKey, _ body: () async -> Void) async {
+        let original = KeychainManager.shared.value(for: key)
+        KeychainManager.shared.delete(key)
+        await body()
+        if let original { KeychainManager.shared.set(original, for: key) } else { KeychainManager.shared.delete(key) }
+    }
+
     @discardableResult
     private func withKey<R>(_ key: KeychainKey, value: String, _ body: () throws -> R) rethrows -> R {
         let original = KeychainManager.shared.value(for: key)
@@ -54,20 +61,35 @@ struct ProviderFactoryTests {
     }
 
     @Test func agentFactoryBuildsCloudModelsAndKeepsKeyValidation() throws {
+        // Every model resolves its credentials per request (NH07) and keeps its vendor's identity.
         try withKey(.openAI, value: "test-key") {
             let model = try ProviderFactory.agentModel(for: .openAI, model: "")
-            #expect(model is OpenAIProvider)
+            #expect(model is AgentPerRequestModel)
+            #expect(model?.descriptor?.api == (try ProviderFactory.summaryProvider(for: .openAI, model: "") as? any AgentModel)?.descriptor?.api)
         }
         try withKey(.anthropic, value: "test-key") {
             let model = try ProviderFactory.agentModel(for: .anthropic, model: "")
-            #expect(model is AnthropicProvider)
+            #expect(model?.descriptor?.api == "anthropic")
         }
         try withKey(.google, value: "test-key") {
             let model = try ProviderFactory.agentModel(for: .google, model: "")
-            #expect(model is GoogleProvider)
+            #expect(model?.descriptor?.api == "gemini")
         }
         withClearedKey(.openAI) {
             #expect(throws: AppError.self) { try ProviderFactory.agentModel(for: .openAI, model: "gpt-test") }
+        }
+    }
+
+    @Test func aKeyRemovedDuringARunFailsTheNextRequest() async throws {
+        let model = try withKey(.anthropic, value: "test-key") {
+            try #require(try ProviderFactory.agentModel(for: .anthropic, model: "claude-test"))
+        }
+        // The key is resolved again for the request, not carried from when the run started.
+        await withClearedKeyAsync(.anthropic) {
+            await #expect(throws: AppError.self) {
+                _ = try await model.streamTurn(AgentTurnRequest(systemPrompt: "", messages: [.user("Q")], tools: [],
+                                                                maxOutputTokens: 16)) { _ in }
+            }
         }
     }
 

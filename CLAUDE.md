@@ -184,6 +184,32 @@ size, discarded tool-call count and output-limit flag; missing usage remains mar
 unreported. Responses/Chat Completions reasoning-token details and Gemini thought-token
 counts are logged when reported, never inferred or accompanied by reasoning content.
 Run totals are cumulative over requests and must not be read as current context usage.
+`AgentUsage` also carries `cacheReadTokens`/`cacheWriteTokens` (NH07): prompt-cache reads and writes as the
+provider reported them, both part of `inputTokens` — the whole input sent — and never added to it again,
+just as reasoning is part of output. Anthropic reports cached input apart from `input_tokens`, so its
+accumulator adds it to the total; OpenAI (`cached_tokens`), Responses and Gemini (`cachedContentTokenCount`)
+already include it. Unreported counts stay nil when usages are added. `agent.usage.v1` entries record
+them and `AgentRunTrace.restoring` reads them back.
+The cost estimator returns nil for a usage it cannot price (NH07). `AgentRunOutcome.estimatedCostUSD`
+is the run's estimated cost, summaries included, or nil — unknown, never zero — when there was no estimator
+or any usage went unpriced. `AgentLimits.maxCostUSD` is checked only against a known cost: without an
+estimator, or once a usage could not be priced, the ceiling cannot be verified and counts as reached, so
+no further request is sent. `HarnessChatService` passes `ModelPricing` as the estimator. The figure is an
+estimate from a price table, not a provider billing cap.
+The session is the one retry owner for model requests (NH07, `AgentRetryPolicy`); the agent transport keeps
+its own retries off. A request that failed with an `AgentTransientError` before any visible text is sent
+again as a new request with its own identity, after a cancellable wait: exponential backoff from one
+second, the provider's `Retry-After` when the error carries one, at most `maxAttempts` attempts and
+`maxWaitSeconds` of waiting. A cancel during the wait starts no new attempt, and two generations are never
+joined. Each failed attempt stays in the log as audit data, and `requestRetryScheduled` diagnostics record
+the attempt and delay. `AgentRunProgress` shows the wait as `retryWaiting`. The chat uses `.standard`
+(three attempts). `AppError` is transient for 408/429/5xx statuses and connection failures, but not for
+timeouts or lost connections the provider may already be generating for, nor for auth, configuration,
+quota or context errors. Its `Retry-After` is not carried into the error yet.
+Credentials are resolved per request (NH07): `ProviderFactory.agentModel` returns an `AgentPerRequestModel`,
+which builds the vendor client from the Keychain for every request, compaction summaries included. A key
+replaced during a run is used from the next request on, and a key removed fails that request explicitly.
+The first resolution happens when the model is created, so a missing key still fails before the run.
 
 
 `AgentDiagnostic` carries only fixed event/metric vocabulary, numeric counts and

@@ -23,8 +23,15 @@ enum ProviderFactory {
 
     /// Nil means callers should keep using the existing chat pipeline.
     static func agentModel(for provider: AIProvider, model: String) throws -> (any AgentModel)? {
-        guard provider.kind.supportsAgentChat else { return nil }
-        return try summaryProvider(for: provider, model: model) as? any AgentModel
+        guard provider.kind.supportsAgentChat,
+              try summaryProvider(for: provider, model: model) is any AgentModel else { return nil }
+        // Credentials are resolved for every request, compaction included (NH07).
+        return try AgentPerRequestModel {
+            guard let client = try summaryProvider(for: provider, model: model) as? any AgentModel else {
+                throw AppError.noAPIKey(provider: provider.displayName)
+            }
+            return client
+        }
     }
 
     /// Whether a provider can be used right now (a stored key, or the

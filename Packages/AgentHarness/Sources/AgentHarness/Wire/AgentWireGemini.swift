@@ -18,6 +18,7 @@ extension AgentWireState {
     mutating func geminiUsage(_ usage: JSONValue) {
         if let input = usage["promptTokenCount"].int { inputTokens = input }
         if let reasoning = usage["thoughtsTokenCount"].int { reasoningTokens = reasoning }
+        if let cached = usage["cachedContentTokenCount"].int { cacheReadTokens = cached }
         if let output = usage["candidatesTokenCount"].int { geminiOutputTokens = output }
         if let output = geminiOutputTokens { outputTokens = output + (reasoningTokens ?? 0) }
     }

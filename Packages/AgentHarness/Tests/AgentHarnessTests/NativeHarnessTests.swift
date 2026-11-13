@@ -188,6 +188,36 @@ func agentOutcome(_ events: [AgentEvent]) throws -> AgentRunOutcome {
         #expect(await model.requests.count == 1)
     }
 
+    @Test func aRunsCostIsKnownOnlyWhenEveryUsageWasPriced() async throws {
+        let usage = AgentUsage(inputTokens: 50, outputTokens: 10)
+        let priced = try agentOutcome(await agentEvents(NativeHarness(
+            model: ScriptedAgentModel([AgentTurnResponse(text: "Done", usage: usage)]), costEstimator: { _ in 0.25 })))
+        #expect(priced.estimatedCostUSD == 0.25)
+        // A usage the estimator cannot price leaves the cost unknown, never zero.
+        let unpriced = try agentOutcome(await agentEvents(NativeHarness(
+            model: ScriptedAgentModel([AgentTurnResponse(text: "Done", usage: usage)]), costEstimator: { _ in nil })))
+        #expect(unpriced.estimatedCostUSD == nil)
+        let noEstimator = try agentOutcome(await agentEvents(NativeHarness(
+            model: ScriptedAgentModel([AgentTurnResponse(text: "Done", usage: usage)]))))
+        #expect(noEstimator.estimatedCostUSD == nil)
+    }
+
+    @Test func aCostCeilingItCannotCheckStopsTheRun() async throws {
+        // No price source: the ceiling cannot be verified, so no request is sent.
+        let unguarded = ScriptedAgentModel([AgentTurnResponse(text: "Done")])
+        let stopped = try agentOutcome(await agentEvents(NativeHarness(model: unguarded, limits: AgentLimits(maxCostUSD: 100))))
+        #expect(stopped.stopReason == .costLimit)
+        #expect(await unguarded.requests.isEmpty)
+        // A usage the estimator could not price stops the next request the same way.
+        let model = ScriptedAgentModel([AgentTurnResponse(text: "", toolCalls: [agentCall()], usage: AgentUsage(inputTokens: 5)),
+                                       AgentTurnResponse(text: "Done")])
+        let outcome = try agentOutcome(await agentEvents(NativeHarness(model: model, limits: AgentLimits(maxCostUSD: 100),
+                                                                       costEstimator: { _ in nil }), tools: [agentTool()]))
+        #expect(outcome.stopReason == .costLimit)
+        #expect(outcome.estimatedCostUSD == nil)
+        #expect(await model.requests.count == 1)
+    }
+
     @Test func modelFailurePropagates() async {
         await #expect(throws: ScriptedAgentModel.Failure.provider) {
             try await agentEvents(NativeHarness(model: ScriptedAgentModel([], fails: true)))

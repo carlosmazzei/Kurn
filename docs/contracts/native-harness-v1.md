@@ -1,6 +1,6 @@
 # Native harness contract v1
 
-Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04); session ownership implemented (NH05); projection and persistent compaction implemented (NH06, except manual compaction and branch summaries)**. NH01 froze the NH00
+Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04); session ownership implemented (NH05); projection and persistent compaction implemented (NH06, except manual compaction and branch summaries); usage, cost, retries and credentials implemented (NH07, except a capability snapshot and transport Retry-After)**. NH01 froze the NH00
 compatibility baseline. NH02 now produces native v1 assistant blocks at the provider
 boundary and consumes them in the harness. Indexed session storage and lazy legacy conversion are active; detailed runtime
 message persistence barriers (NH05) and canonical tool-history replay (NH06) are active; complete pi compatibility is not claimed.
@@ -480,3 +480,16 @@ form a stable prefix and the `documents` index is its own section. Each `agent.r
 records the first run's prompt (`system`), later runs' `systemPatch` (changed sections, `null`
 removing one) and the declared tools with their delta (`tools`). Open: manual compaction and
 optional branch summaries.
+
+## Usage, cost, retries and credentials — NH07
+
+`AgentUsage` carries input, output, reasoning, cache-read and cache-write counts. Reasoning is part of
+output and cache reads/writes are part of input, each counted once; Anthropic's separately reported
+cached input is added to its total. Unreported counts stay unknown. The estimator returns nil for an
+unpriced usage; `AgentRunOutcome.estimatedCostUSD` is nil (unknown, never zero) unless every usage was
+priced, and `maxCostUSD` counts as reached when it cannot be verified. The session owns retries of model
+requests (`AgentRetryPolicy`): only `AgentTransientError`s before visible text, as new requests with
+their own identities, with bounded and cancellable backoff that honours `Retry-After` when carried; the
+agent transport keeps its own retries off. Credentials are resolved per request (`AgentPerRequestModel`).
+Open: a capability snapshot per model, transport `Retry-After`, cache-rate pricing and usage
+deduplication by request identity.

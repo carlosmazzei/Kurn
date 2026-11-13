@@ -412,8 +412,21 @@
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputRecoveryTests.swift"
         }
       ],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRetryPolicyTests.swift",
+          "symbol": "aTransientFailureIsSentAgainAsANewRequest"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRetryPolicyTests.swift",
+          "symbol": "permanentFailuresAndVisibleTextAreNeverRetried"
+        },
+        {
+          "path": "KurnTests/AppErrorTransientRetryTests.swift",
+          "symbol": "otherFailuresAreNot"
+        }
+      ],
+      "note": "NH07: the session is the one retry owner; transient failures before visible text are retried as new requests with bounded, cancellable backoff, failed attempts stay as audit data. Open: the agent transport does not carry Retry-After into its error yet."
     },
     {
       "id": "C15",
@@ -441,10 +454,23 @@
       "sourceDocument": "02-sessoes-contexto.md",
       "disposition": "required",
       "increment": "NH07",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentPerRequestModelTests.swift",
+          "symbol": "everyRequestResolvesItsCredentialsAgain"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentPerRequestModelTests.swift",
+          "symbol": "aRevokedCredentialFailsTheNextRequest"
+        },
+        {
+          "path": "KurnTests/ProviderFactoryTests.swift",
+          "symbol": "aKeyRemovedDuringARunFailsTheNextRequest"
+        }
+      ],
+      "note": "NH07: credentials are resolved for every request, compaction included; a removed key fails the next request. OAuth remains separate work."
     },
     {
       "id": "C17",
@@ -452,15 +478,32 @@
       "sourceDocument": "02-sessoes-contexto.md",
       "disposition": "required",
       "increment": "NH07",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContractFixtureTests.swift",
           "symbol": "savedTraceRetainsIdentityCapacityAndLegacyDateUnits"
         }
       ],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputUsageTests.swift",
+          "symbol": "cachedInputIsCountedOnceInTheInputTotal"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/NativeHarnessTests.swift",
+          "symbol": "aRunsCostIsKnownOnlyWhenEveryUsageWasPriced"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/NativeHarnessTests.swift",
+          "symbol": "aCostCeilingItCannotCheckStopsTheRun"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunTraceRestorationTests.swift",
+          "symbol": "restoredUsageKeepsItsCacheCounts"
+        }
+      ],
+      "note": "NH07: input/output/reasoning/cache-read/cache-write counters with reasoning and cache counted once; unknown cost stays unknown and an unverifiable cost ceiling stops the run; the app passes its price table as the estimator."
     },
     {
       "id": "C18",
@@ -1281,10 +1324,23 @@
       "requirement": "Tentativas limitadas; abort não inicia outra",
       "disposition": "required",
       "increment": "NH07",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRetryPolicyTests.swift",
+          "symbol": "attemptsAreBounded"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRetryPolicyTests.swift",
+          "symbol": "cancellingDuringTheWaitStartsNoOtherAttempt"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRetryPolicyTests.swift",
+          "symbol": "delaysBackOffHonourRetryAfterAndStayBounded"
+        }
+      ],
+      "note": "NH07: attempts and total wait are bounded, Retry-After is honoured when the error carries it, and a cancel during the wait starts no new attempt."
     },
     {
       "id": "A42",
@@ -1292,14 +1348,27 @@
       "requirement": "Sem dupla contagem",
       "disposition": "required",
       "increment": "NH07",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputUsageTests.swift"
         }
       ],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputUsageTests.swift",
+          "symbol": "cachedInputIsCountedOnceInTheInputTotal"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputUsageTests.swift",
+          "symbol": "unreportedCountsStayUnknownWhenUsagesAreAdded"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputUsageTests.swift",
+          "symbol": "reportedReasoningCountsSurviveLimitedEmptyReplies"
+        }
+      ],
+      "note": "NH07: reasoning is part of output and cache reads/writes part of input, each counted once in all four wire formats; unreported counts stay unknown when added."
     },
     {
       "id": "A43",

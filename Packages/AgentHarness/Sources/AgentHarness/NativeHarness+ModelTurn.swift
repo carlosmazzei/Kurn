@@ -11,6 +11,9 @@ extension NativeHarness {
         events.yield(.turnStarted(index: state.turns))
         state.turns += 1
         var retried = false
+        // Session-owned retries (NH07): attempts of this turn's request and the time waited.
+        var attempts = 1
+        var waited = 0.0
         while true {
             state.responseAlreadyAudited = false
             if costLimitReached(state) { return nil }
@@ -41,6 +44,18 @@ extension NativeHarness {
                 trace.record(.requestFailed, metrics: [.durationMs: Self.milliseconds(since: started), .protocolFailure: stream.failureCode])
                 trace.endRequest(requestIdentity)
                 try Task.checkCancellation()
+                // A transient failure before any visible text is sent again as a new request, after a
+                // cancellable wait; a cancel during it starts no new attempt.
+                if !stream.hasVisibleText,
+                   let delay = retryPolicy.delay(after: error, failedAttempts: attempts, waited: waited) {
+                    trace.record(.requestRetryScheduled, metrics: [.requestAttempt: attempts,
+                                                                   .retryDelayMs: Int((delay * 1_000).rounded())])
+                    try await retryPolicy.sleep(delay)
+                    try Task.checkCancellation()
+                    attempts += 1
+                    waited += delay
+                    continue
+                }
                 guard !retried, !stream.hasVisibleText, isContextOverflow(error) else { throw error }
                 retried = true
                 switch try await compact(settings, state: &state, events: events, trace: trace, force: true) {
@@ -111,8 +126,13 @@ extension NativeHarness {
                                              .turnIndex: state.turns, .maxTurns: state.allowedTurns], reason: reason)
     }
 
+    /// A cost ceiling is checked only against a known cost (NH07). Without a price source, or
+    /// once a usage could not be priced, the ceiling cannot be verified, so it counts as reached:
+    /// an unchecked ceiling must never let a run keep spending.
     func costLimitReached(_ state: AgentRunState) -> Bool {
-        limits.maxCostUSD.map { state.cost >= $0 } ?? false
+        guard let ceiling = limits.maxCostUSD else { return false }
+        guard costEstimator != nil, state.costKnown else { return true }
+        return state.cost >= ceiling
     }
 
     private func record(_ usage: AgentUsage?, state: inout AgentRunState,
@@ -120,7 +140,7 @@ extension NativeHarness {
         guard let usage else { return }
         try await usageCommit(usage)
         state.usage = state.usage.adding(usage)
-        state.cost += max(0, costEstimator?(usage) ?? 0)
+        if let price = costEstimator?(usage) { state.cost += max(0, price) } else { state.costKnown = false }
         events.yield(.usage(usage))
     }
 
