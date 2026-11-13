@@ -12,6 +12,7 @@ public struct NativeHarness: Sendable {
     let isContextOverflow: @Sendable (Error) -> Bool
     var messageCommit: @Sendable (AgentMessage) async throws -> Void = { _ in }
     var usageCommit: @Sendable (AgentUsage) async throws -> Void = { _ in }
+    var compactionCommit: @Sendable (AgentCompactionCheckpoint) async throws -> Void = { _ in }
     private let diagnosticSink: @Sendable (AgentDiagnostic) -> Void
 
     /// Appended to the system prompt for the tool-less wrap-up turn after a turn or tool-call limit.
@@ -79,6 +80,14 @@ public struct NativeHarness: Sendable {
     public func persistingUsage(_ commit: @escaping @Sendable (AgentUsage) async throws -> Void) -> Self {
         var copy = self
         copy.usageCommit = commit
+        return copy
+    }
+
+    /// Called with each summary compaction before any request uses the compacted context. A
+    /// throw fails the run: no request runs on context the log does not have.
+    public func persistingCompaction(_ commit: @escaping @Sendable (AgentCompactionCheckpoint) async throws -> Void) -> Self {
+        var copy = self
+        copy.compactionCommit = commit
         return copy
     }
 

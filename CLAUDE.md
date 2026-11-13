@@ -271,6 +271,14 @@ provider rejects a turn as too long (`isContextOverflow`; the adapter passes
 and the context actually shrank. When a forced summary is unusable or itself overflows, the
 older part is replaced by a fixed omission note. Compaction changes only model context;
 outcomes retain full history.
+A summary compaction is a durable checkpoint (NH06, `AgentCompactionCheckpoint`): the harness hands it
+to the awaited `persistingCompaction` sink before any request uses the compacted context, and
+`AgentSession` commits it on the run's branch as `agent.compaction.v1` (summary, first kept message ID,
+tokens before/after, split turn), so a request never runs on context the log lacks and a failed save
+fails the run. Only real summaries are checkpoints; an omission note, an unusable or failed summary, or
+a kept message without an identity (legacy plain history) writes none. Replay applies the newest
+checkpoint of a permitted run whose kept message is in the history (`ChatReplayHistory`), so a reopened
+conversation reuses the summary and a later compaction updates it.
 `AgentLimits.wrapUpOnLimit` runs one extra turn after a turn/tool-call limit with
 `NativeHarness.wrapUpInstruction` appended and `AgentTurnRequest.allowsToolCalls` false
 (tools stay declared; the wire formats send `tool_choice: none` / Gemini mode `NONE`, and

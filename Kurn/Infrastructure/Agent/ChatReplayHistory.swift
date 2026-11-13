@@ -9,10 +9,14 @@ import KurnCore
 /// conversation, a failed or stopped run, a run that read outside what this run may read) goes
 /// back as its plain text, as every question did before.
 ///
+/// A summary a run saved when it compacted (`AgentCompactionCheckpoint`) is reused: the newest one
+/// whose first kept message is in the history replaces everything before that message, so a
+/// reopened conversation does not summarize the same history again.
+///
 /// Source boundary: a run's tool results hold what that run was authorized to read. They are
 /// replayed only when that authorization was the same source scope as this run's and resolved
 /// to no meeting this run cannot read, so narrowing the sources never lets an older answer's
-/// reads reach the model.
+/// reads reach the model. The same rule decides whose summaries are reused.
 struct ChatReplayHistory: Sendable {
     /// One shown turn: its ID, role and text.
     struct ShownTurn: Sendable, Equatable {
@@ -58,7 +62,9 @@ struct ChatReplayHistory: Sendable {
             messages.append(Self.plain(turn))
             index = next
         }
-        return messages
+        // Persistent compaction: the newest summary a permitted run saved replaces what it covered.
+        let checkpoints = runs.filter { Self.allows($0, under: authorization) }.flatMap(\.checkpoints)
+        return AgentCompactionCheckpoint.compacting(messages, with: checkpoints)
     }
 
     static func plain(_ turn: ShownTurn) -> AgentMessage {

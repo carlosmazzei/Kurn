@@ -150,11 +150,13 @@ extension NativeHarness {
               let plan = compactor.plan(for: state.context) else { return }
         trace.record(.compactionStarted, metrics: [.contextTokens: before, .forced: force ? 1 : 0])
         let replacement: [AgentMessage]?
+        var summarized = false
         do {
             let history = try await summarize(compactor.historySummaryRequest(for: plan), state: &state, events: events, trace: trace)
             let prefix = try await summarize(compactor.turnPrefixSummaryRequest(for: plan), state: &state, events: events, trace: trace)
             if history != .unusable, prefix != .unusable {
                 replacement = compactor.applying(plan, historySummary: history.text, turnPrefixSummary: prefix.text)
+                summarized = true
             } else {
                 replacement = force ? compactor.omitting(plan) : nil
             }
@@ -172,6 +174,11 @@ extension NativeHarness {
         guard estimatedAfter < before else {
             trace.record(.compactionSkipped, metrics: [.contextTokens: before, .afterTokens: estimatedAfter])
             return
+        }
+        // A summary is a checkpoint, saved before any request uses it; an omission note is not.
+        if summarized, let checkpoint = AgentCompactionCheckpoint(compacted: compacted, tokensBefore: before,
+                                                                  tokensAfter: estimatedAfter, splitTurn: plan.isSplitTurn) {
+            try await compactionCommit(checkpoint)
         }
         state.context = compacted
         state.usageAnchor = nil

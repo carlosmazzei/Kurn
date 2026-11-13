@@ -186,6 +186,8 @@ public actor AgentSession {
                 try await appendMessage(message, runID: runID)
             }.persistingUsage { [self] usage in
                 try await appendUsage(usage, runID: runID)
+            }.persistingCompaction { [self] checkpoint in
+                try await appendCompaction(checkpoint, runID: runID)
             }
             let run = owned.start(systemPrompt: request.systemPrompt, history: request.history, prompt: request.prompt,
                 tools: request.tools, maxOutputTokens: request.maxOutputTokens, contextResolution: request.contextResolution,
@@ -259,6 +261,14 @@ public actor AgentSession {
                 "reasoningTokens": usage.reasoningTokens.map { .number(Double($0)) } ?? .null
             ])
             try await append(payload: .custom(type: "agent.usage.v1", data: data))
+        } catch { persistenceFailed = true; throw AgentSessionOwnerError.persistenceFailed }
+    }
+
+    private func appendCompaction(_ checkpoint: AgentCompactionCheckpoint, runID: UUID) async throws {
+        guard state.runID == runID else { throw AgentSessionStoreError.conflict }
+        do {
+            let data = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(checkpoint))
+            try await append(payload: .custom(type: AgentCompactionCheckpoint.entryType, data: data))
         } catch { persistenceFailed = true; throw AgentSessionOwnerError.persistenceFailed }
     }
 
