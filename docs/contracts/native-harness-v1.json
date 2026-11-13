@@ -470,9 +470,13 @@
         {
           "path": "KurnTests/ChatReplayHistoryTests.swift",
           "symbol": "aSavedCompactionIsReusedOnlyWhereItsRunMayBeRead"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "aRunAskedToCompactFirstSummarizesBeforeItsFirstRequest"
         }
       ],
-      "note": "NH06: durable summary checkpoints committed before use and reused on replay; no omission note stands in for a summary. Manual compaction and optional branch summaries remain open."
+      "note": "NH06: durable summary checkpoints committed before use and reused on replay; no omission note stands in for a summary. Manual compaction summarizes before the next answer's first request. Optional branch summaries remain open."
     },
     {
       "id": "C14",

@@ -1283,3 +1283,4 @@
 "chat.context.include" = "In spätere Antworten einbeziehen";
 "chat.context.left_out" = "Aus späteren Antworten ausgeschlossen";
 "chat.branch.tree" = "Alle Zweige";
+"chat.context.compact_next" = "Zuerst frühere Nachrichten zusammenfassen";

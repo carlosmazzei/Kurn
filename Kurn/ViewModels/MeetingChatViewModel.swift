@@ -100,6 +100,8 @@ final class MeetingChatViewModel {
     /// The composer's unsent text, and what of it is saved (`MeetingChatViewModel+Draft`).
     var draft = ""
     @ObservationIgnored var savedDraft = ""
+    /// Whether the next answer starts by summarizing the earlier conversation (manual compaction).
+    var compactsNextAnswer = false
     /// Whether the person stopped the last reply; shown once the stop settled. A new question,
     /// `reset` and `load` clear it.
     var replyWasStopped = false
@@ -419,6 +421,7 @@ final class MeetingChatViewModel {
         branches = ChatBranchPresentation()
         draft = ""
         savedDraft = ""
+        compactsNextAnswer = false
     }
 
     // MARK: - Session history
@@ -480,6 +483,7 @@ final class MeetingChatViewModel {
             retryOrigins = [:]
             error = nil
             restoreDraft(of: session, carrying: carried)
+            compactsNextAnswer = false
             restoreLeftoverQueue(of: session)
             refreshBranches()
         } catch {
@@ -539,7 +543,8 @@ final class MeetingChatViewModel {
                                           replay: ChatReplayHistory.load(
                                               turns: priorTurns.map { .init(id: $0.id, role: $0.role, text: $0.text) },
                                               session: savedSession, store: SwiftDataAgentSessionStore(context: modelContext)),
-                                          inputQueue: queue)
+                                          inputQueue: queue, compactFirst: compactsNextAnswer && savedSession != nil)
+        compactsNextAnswer = false
         // Whatever ends this function, the run has settled first: a cancelled or failed run is
         // only reported once nothing can still call a tool or write its effect.
         do { try Task.checkCancellation() } catch {

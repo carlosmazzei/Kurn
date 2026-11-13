@@ -1283,3 +1283,4 @@
 "chat.context.include" = "在后续回答中包含";
 "chat.context.left_out" = "已从后续回答中排除";
 "chat.branch.tree" = "所有分支";
+"chat.context.compact_next" = "先总结之前的消息";

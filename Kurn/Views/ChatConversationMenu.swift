@@ -17,6 +17,11 @@ struct ChatConversationMenu: View {
                       systemImage: "arrow.triangle.branch")
             }
             .disabled(!vm.canChangeBranch || !vm.branches.outline.hasBranches)
+            Toggle(isOn: Binding(get: { vm.compactsNextAnswer }, set: { vm.compactsNextAnswer = $0 })) {
+                Label(NSLocalizedString("chat.context.compact_next", comment: "Summarize the earlier conversation before the next answer"),
+                      systemImage: "arrow.down.right.and.arrow.up.left")
+            }
+            .disabled(!vm.canChangeBranch)
             Button {
                 vm.duplicateConversation()
             } label: {

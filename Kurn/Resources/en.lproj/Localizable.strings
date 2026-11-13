@@ -1283,3 +1283,4 @@
 "chat.context.include" = "Include in later answers";
 "chat.context.left_out" = "Left out of later answers";
 "chat.branch.tree" = "All branches";
+"chat.context.compact_next" = "Summarize earlier messages first";

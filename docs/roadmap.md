@@ -817,7 +817,7 @@ of the omission note, context edits applied to the projection only (`AgentContex
 context usage after a compaction, ordered system sections recorded as per-run patches and tool
 loadouts with their delta (`AgentSystemPrompt`, `AgentToolLoadout`). Still open:
 
-- Manual compaction (a user action that summarizes now) and optional branch summaries.
+- Optional branch summaries.
 - Plain fallback history (`.user`/`.assistant` without identities) cannot anchor a checkpoint.
 
 **NH07 details.** Model identity is provider plus ID, with a cached capability
@@ -937,7 +937,7 @@ excluded by the local profile, 11 are partial, 2 are conditional and none is pen
 | --- | --- | --- |
 | Capabilities | A versioned per-model capability snapshot (tools, reasoning, images, cache) recorded with the run, and alias/authenticated provider qualification | C03, C04 |
 | Usage and cost | Provider-reported cost where a vendor reports one (cache-aware pricing and per-request usage are done) | C17 follow-up |
-| Compaction | Manual compaction; branch summaries; checkpoint anchoring for plain (identity-less) history | C10, C13 |
+| Compaction | Branch summaries; checkpoint anchoring for plain (identity-less) history | C10, C13 |
 | Run ownership | One owner retained per session across runs; model/provider changes at request boundaries; a `waitingForUser` phase once a tool asks for confirmation | C24 |
 | Interchange | The pi JSONL v3 subset (only with fixtures); exact integers past 2^53 in opaque fields (accepted limitation) | C25, C26 |
 | Suspension | Reconcile background/foreground on a device (the release checklist's chat item); the unsent draft is saved | A68 |

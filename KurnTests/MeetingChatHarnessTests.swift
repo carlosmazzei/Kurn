@@ -16,6 +16,29 @@ struct MeetingChatHarnessTests {
         #expect(condition())
     }
 
+    /// "Summarize earlier messages first" applies to the next answer of a saved conversation only,
+    /// and is cleared once that answer starts or another conversation opens.
+    @Test func manualCompactionAppliesToTheNextAnswerOnly() async throws {
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let model = ChatAgentModel([AgentTurnResponse(text: "Monday."), AgentTurnResponse(text: "Friday.")])
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model })
+        vm.configure(meeting: meeting, modelContext: context)
+        ask(vm, "When do we ship?")
+        await waitUntil { !vm.isResponding }
+        vm.compactsNextAnswer = true
+        ask(vm, "And the review?")
+        await waitUntil { !vm.isResponding }
+        #expect(vm.error == nil)
+        #expect(!vm.compactsNextAnswer)
+        // The conversation is far too short to summarize: both answers were requested as they are.
+        #expect(await model.requests.count == 2)
+        #expect(vm.turns.last?.text == "Friday.")
+        vm.compactsNextAnswer = true
+        vm.reset()
+        #expect(!vm.compactsNextAnswer)
+    }
+
     @Test func harnessProducesStepsArtifactsUsageAndRestoresForRevision() async throws {
         let context = ModelContext(TestModelContainer.make())
         let meeting = MeetingFixtures.transcribed("Planning", in: context)

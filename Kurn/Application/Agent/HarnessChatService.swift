@@ -70,13 +70,15 @@ struct HarnessChatService {
         context: ModelContext, scope: ChatSourceScope, workspace: ChatDocumentWorkspace,
         history: [ChatMessage], question: String, owner: AgentSession? = nil, runID: UUID = UUID(),
         commandID: String? = nil, questionID: UUID? = nil, replay: ChatReplayHistory? = nil,
-        inputQueue: AgentInputQueue? = nil
+        inputQueue: AgentInputQueue? = nil, compactFirst: Bool = false
     ) async throws -> Run {
         let run = try await prepare(model: model, provider: provider, modelIdentifier: modelIdentifier, context: context,
                                     scope: scope, workspace: workspace, history: history, question: question,
                                     replay: replay)
         // Queued input (NH08) enters the run at its boundaries.
-        let harness = inputQueue.map { run.harness.receivingInput($0) } ?? run.harness
+        let queued = inputQueue.map { run.harness.receivingInput($0) } ?? run.harness
+        // Manual compaction: the earlier conversation is summarized before this run's first request.
+        let harness = compactFirst ? queued.compactingFirst() : queued
         guard let owner else {
             let handle = harness.start(systemPrompt: run.systemPrompt, history: run.history, prompt: run.question,
                                            tools: run.tools, contextResolution: run.resolution, context: run.context,

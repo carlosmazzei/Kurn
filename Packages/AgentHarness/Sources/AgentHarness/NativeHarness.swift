@@ -17,6 +17,7 @@ public struct NativeHarness: Sendable {
     var compactionCommit: @Sendable (AgentCompactionCheckpoint) async throws -> Void = { _ in }
     var inputQueue: AgentInputQueue?
     var systemPromptRefresh: (@Sendable () async -> String?)?
+    var compactsFirst = false
     private let diagnosticSink: @Sendable (AgentDiagnostic) -> Void
 
     /// Appended to the system prompt for the tool-less wrap-up turn after a turn or tool-call limit.
@@ -102,6 +103,17 @@ public struct NativeHarness: Sendable {
     public func refreshingSystemPrompt(_ refresh: @escaping @Sendable () async -> String?) -> Self {
         var copy = self
         copy.systemPromptRefresh = refresh
+        return copy
+    }
+
+    /// Compacts the context before the run's first request whatever its size (manual compaction):
+    /// the older messages are summarized into a durable checkpoint, as a threshold compaction
+    /// would, and the newest are kept. A conversation too short to compact is sent as it is, and a
+    /// summary that fails leaves the context unchanged and the run goes on; nothing stands in for a
+    /// summary.
+    public func compactingFirst() -> Self {
+        var copy = self
+        copy.compactsFirst = true
         return copy
     }
 
@@ -209,6 +221,9 @@ public struct NativeHarness: Sendable {
         var reason = AgentRunStopReason.turnLimit
         var settings = TurnSettings(systemPrompt: systemPrompt, tools: specs,
                                     outputBudget: AgentOutputBudget(requested: maxOutputTokens, policy: compactor.policy))
+        if compactsFirst {
+            try await compact(settings, state: &state, events: events, trace: trace, force: true)
+        }
         while true {
             try Task.checkCancellation()
             if costLimitReached(state) { reason = .costLimit; break }

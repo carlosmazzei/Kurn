@@ -1283,3 +1283,4 @@
 "chat.context.include" = "Incluir en las próximas respuestas";
 "chat.context.left_out" = "Fuera de las próximas respuestas";
 "chat.branch.tree" = "Todas las ramas";
+"chat.context.compact_next" = "Resumir antes los mensajes anteriores";

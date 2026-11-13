@@ -308,6 +308,10 @@ compaction failed. After an overflow that ends the run with `AgentContextReducti
 says the conversation is too long for the model, `chat.context.reduction_failed`); an output-limit
 recovery is denied and the run keeps its `.outputLimit` outcome; a threshold compaction sends the
 request as it is. Compaction changes only model context; outcomes retain full history.
+Manual compaction (`NativeHarness.compactingFirst`) summarizes the earlier context before a run's first
+request whatever its size, through the same durable checkpoint; a conversation too short to summarize is sent
+as it is and a failed summary changes nothing. The chat's "Summarize earlier messages first" toggle
+(`MeetingChatViewModel.compactsNextAnswer`) applies it to the next answer of a saved conversation.
 A summary compaction is a durable checkpoint (NH06, `AgentCompactionCheckpoint`): the harness hands it
 to the awaited `persistingCompaction` sink before any request uses the compacted context, and
 `AgentSession` commits it on the run's branch as `agent.compaction.v1` (summary, first kept message ID,
