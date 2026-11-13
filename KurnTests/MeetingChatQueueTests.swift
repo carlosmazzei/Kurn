@@ -64,6 +64,13 @@ struct MeetingChatQueueTests {
         return ChatInputQueueRecord.load(from: session, store: SwiftDataAgentSessionStore(context: context))
     }
 
+    /// The view model mirrors the queue's lists from its update stream, so they arrive a moment later.
+    private func waitForQueued(_ vm: MeetingChatViewModel, count: Int) async {
+        for _ in 0..<2_000 where vm.queued.steering.count + vm.queued.followUp.count < count {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+    }
+
     @Test func steeringEntersTheReplyAndShowsAsItsOwnQuestionAndAnswer() async throws {
         let model = GatedChatModel([AgentTurnResponse(text: "", toolCalls: [try chatAgentCall("list_sources")]),
                                     AgentTurnResponse(text: "Monday, as asked.")])
@@ -112,6 +119,7 @@ struct MeetingChatQueueTests {
         let model = GatedChatModel([AgentTurnResponse(text: "Monday.")])
         let (vm, context) = try await started(model)
         #expect(await vm.queue("Also Tuesday", as: .followUp))
+        await waitForQueued(vm, count: 1)
         #expect(vm.queued.followUp.map(\.text) == ["Also Tuesday"])
         vm.cancel()
         await vm.waitUntilSettled()
@@ -129,7 +137,7 @@ struct MeetingChatQueueTests {
         let (vm, context) = try await started(model)
         #expect(await vm.queue("First", as: .followUp))
         #expect(await vm.queue("Second", as: .followUp))
-        for _ in 0..<200 where vm.queued.followUp.count < 2 { try? await Task.sleep(for: .milliseconds(5)) }
+        await waitForQueued(vm, count: 2)
         let items = vm.queued.followUp
         await vm.editQueued(items[0])
         await vm.removeQueued(items[1].id)
