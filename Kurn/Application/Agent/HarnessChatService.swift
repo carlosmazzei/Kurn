@@ -60,11 +60,13 @@ struct HarnessChatService {
     /// waits for settlement before reporting the run settled. With `owner`, the run is an
     /// `AgentSession` run on its own branch of the saved session (`ChatRunBranch`): its
     /// authorization, every canonical message and every usage report are committed before the
-    /// work that depends on them, under `runID`.
+    /// work that depends on them, under `runID`. `commandID` makes the run idempotent: a command
+    /// already in the session's log runs nothing (`AgentSessionOwnerError.duplicateCommand`).
     func start(
         model: any AgentModel, provider: AIProvider, modelIdentifier: String,
         context: ModelContext, scope: ChatSourceScope, workspace: ChatDocumentWorkspace,
-        history: [ChatMessage], question: String, owner: AgentSession? = nil, runID: UUID = UUID()
+        history: [ChatMessage], question: String, owner: AgentSession? = nil, runID: UUID = UUID(),
+        commandID: String? = nil
     ) async throws -> Run {
         let run = try await prepare(model: model, provider: provider, modelIdentifier: modelIdentifier, context: context,
                                     scope: scope, workspace: workspace, history: history, question: question)
@@ -78,7 +80,8 @@ struct HarnessChatService {
         try Task.checkCancellation()
         let owned = try await owner.start(harness: run.harness, systemPrompt: run.systemPrompt, history: run.history,
                                           prompt: run.question, tools: run.tools, contextResolution: run.resolution,
-                                          runID: runID, startFields: try ChatRunBranch.startFields(run.authorization),
+                                          runID: runID, commandID: commandID,
+                                          startFields: try ChatRunBranch.startFields(run.authorization),
                                           observation: .complete)
         return Run(events: owned.events, abort: { await owner.abort() }, settle: { _ = await owner.waitUntilSettled() })
     }

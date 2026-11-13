@@ -52,6 +52,10 @@ actor SessionTestStore: AgentSessionStore {
             interleavedWrites -= 1
             try appendHostEntry("host-\(interleavedWrites)-\(entries.count)")
         }
+        if let command = interleavedCommand {
+            interleavedCommand = nil
+            try appendRunStart(command: command)
+        }
         guard group.expectedRevision == revision else { throw AgentSessionStoreError.conflict }
         if failMessages, group.entries.contains(where: { $0.kind == "message" }) { throw Failure.disk }
         let terminal = group.entries.contains { $0.kind == "agent.run-end.v1" }
@@ -69,6 +73,16 @@ actor SessionTestStore: AgentSessionStore {
         entries.append(entry); leaf = id; revision += 1
     }
     func interleave(_ count: Int) { interleavedWrites = count }
+    /// Another writer's run for `command` commits just before the owner's next commit.
+    var interleavedCommand: String?
+    func interleaveRun(command: String) { interleavedCommand = command }
+    func appendRunStart(command: String) throws {
+        let entry = try AgentSessionEntry(sessionID: sessionID, id: "other-run-\(entries.count)", parentID: leaf,
+            ordinal: entries.count + 1, createdAt: AgentSessionEntry.time(),
+            payload: .custom(type: "agent.run-start.v1", data: .object(["runID": .string("other"), "commandID": .string(command)])),
+            metadata: .object(["runID": .string("other")]))
+        entries.append(entry); leaf = entry.id; revision += 1
+    }
     /// Enough racing host writes to exhaust one append's retries, and no more.
     static let conflictsToExhaustOneAppend = AgentSession.conflictAttempts
 }
@@ -374,5 +388,50 @@ actor SessionTestStore: AgentSessionStore {
         await gate.release()
         await #expect(throws: AgentSessionOwnerError.persistenceFailed) { for try await _ in run.events {} }
         #expect(await session.snapshot().end == .persistenceFailed)
+    }
+
+    @Test func aCommandAlreadyInTheLogDoesNothing() async throws {
+        let store = SessionTestStore()
+        let session = try AgentSession(sessionID: "session", store: store)
+        let first = ScriptedAgentModel([AgentTurnResponse(text: "Answer")])
+        let run = try await session.start(harness: NativeHarness(model: first), systemPrompt: "", history: [], prompt: "Q",
+                                          tools: [], commandID: "cmd-1", observation: .complete)
+        for try await _ in run.events {}
+        let count = await store.entries.count
+        #expect(await store.entries.compactMap(\.commandID) == ["cmd-1"])
+
+        // The same command again, even from a new owner after a relaunch, writes and asks nothing.
+        let reopened = try AgentSession(sessionID: "session", store: store)
+        let second = ScriptedAgentModel([AgentTurnResponse(text: "Unused")])
+        let repeated = try await reopened.start(harness: NativeHarness(model: second), systemPrompt: "", history: [],
+                                                prompt: "Q", tools: [], commandID: "cmd-1", observation: .complete)
+        await #expect(throws: AgentSessionOwnerError.duplicateCommand) { for try await _ in repeated.events {} }
+        #expect(await reopened.snapshot().end == .duplicateCommand)
+        #expect(await reopened.snapshot().phase == .idle)
+        #expect(await store.entries.count == count)
+        #expect(await second.requests.isEmpty)
+        // A different command still runs.
+        let third = ScriptedAgentModel([AgentTurnResponse(text: "Again")])
+        try await reopened.start(harness: NativeHarness(model: third), systemPrompt: "", history: [], prompt: "Q",
+                                 tools: [], commandID: "cmd-2")
+        #expect(await reopened.waitUntilSettled().end == .completed)
+        await #expect(throws: AgentSessionStoreError.invalidEntry) {
+            _ = try await reopened.start(harness: NativeHarness(model: third), systemPrompt: "", history: [], prompt: "Q",
+                                         tools: [], commandID: "")
+        }
+    }
+
+    @Test func aCommandAnotherWriterCommitsFirstIsCaughtOnTheRetriedSnapshot() async throws {
+        let store = SessionTestStore()
+        try await store.appendHostEntry("question")
+        // The other writer's run for the same command lands between this owner's load and commit.
+        await store.interleaveRun(command: "cmd-1")
+        let session = try AgentSession(sessionID: "session", store: store, appendMode: .branch)
+        let model = ScriptedAgentModel([AgentTurnResponse(text: "Unused")])
+        let run = try await session.start(harness: NativeHarness(model: model), systemPrompt: "", history: [], prompt: "Q",
+                                          tools: [], commandID: "cmd-1", observation: .complete)
+        await #expect(throws: AgentSessionOwnerError.duplicateCommand) { for try await _ in run.events {} }
+        #expect(await model.requests.isEmpty)
+        #expect(await store.entries.compactMap(\.commandID) == ["cmd-1"])
     }
 }

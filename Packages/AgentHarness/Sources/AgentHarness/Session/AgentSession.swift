@@ -5,6 +5,8 @@ public enum AgentSessionOwnerError: Error, Sendable, Equatable {
     /// The run's history could not be committed, so the run stopped before any work that
     /// depended on it. The store's own error is not passed on: it may describe storage, not the run.
     case persistenceFailed
+    /// A run with the same command ID is already in the session's log, so this one did nothing.
+    case duplicateCommand
 }
 
 /// An accepted run: its identity and a disposable observation of its events. The stream ends
@@ -19,7 +21,7 @@ public struct AgentSessionRun: Sendable {
 
 public struct AgentSessionState: Sendable, Equatable {
     public enum Phase: String, Sendable { case idle, preparing, running, cancelling, interrupted }
-    public enum End: String, Sendable { case completed, failed, cancelled, persistenceFailed }
+    public enum End: String, Sendable { case completed, failed, cancelled, persistenceFailed, duplicateCommand }
     public internal(set) var phase: Phase = .idle
     public internal(set) var runID: UUID?
     public internal(set) var end: End?
@@ -84,11 +86,17 @@ public actor AgentSession {
     /// `prompt` with the run's events. `runID` lets a host reuse an identity it has already
     /// recorded (its own run record); `startFields` are added to the `agent.run-start.v1` entry,
     /// such as the sources and model the host authorized, and cannot replace its `runID`.
+    ///
+    /// `commandID` makes the command idempotent across processes: it is written into the run's
+    /// start entry, and a run whose command ID is already in the session's log — even one another
+    /// writer committed while this append was being built — does nothing at all. Its stream ends
+    /// with `AgentSessionOwnerError.duplicateCommand`, no entry is written and no model is called.
     public func start(harness: NativeHarness, systemPrompt: String, history: [AgentMessage], prompt: String,
                       tools: [AgentTool], maxOutputTokens: Int? = nil,
                       contextResolution: AgentContextResolution? = nil, runID: UUID = UUID(),
-                      startFields: [String: JSONValue] = [:],
+                      commandID: String? = nil, startFields: [String: JSONValue] = [:],
                       observation: AgentRunObservation = .bounded) throws -> AgentSessionRun {
+        guard commandID.map(AgentContentMessage.validID) ?? true else { throw AgentSessionStoreError.invalidEntry }
         guard task == nil else { throw AgentSessionOwnerError.busy }
         guard !persistenceFailed else { throw AgentSessionOwnerError.persistenceBlocked }
         state = AgentSessionState(phase: .preparing, runID: runID)
@@ -99,7 +107,7 @@ public actor AgentSession {
             bufferingPolicy: observation == .bounded ? .bufferingNewest(128) : .unbounded)
         let request = RunRequest(harness: harness, systemPrompt: systemPrompt, history: history, prompt: prompt,
             tools: tools, maxOutputTokens: maxOutputTokens, contextResolution: contextResolution,
-            startFields: startFields, observation: observation)
+            commandID: commandID, startFields: startFields, observation: observation)
         task = Task { await perform(request, runID: runID, observer: observer) }
         return AgentSessionRun(runID: runID, events: events)
     }
@@ -147,6 +155,7 @@ public actor AgentSession {
         let tools: [AgentTool]
         let maxOutputTokens: Int?
         let contextResolution: AgentContextResolution?
+        let commandID: String?
         let startFields: [String: JSONValue]
         let observation: AgentRunObservation
     }
@@ -156,11 +165,22 @@ public actor AgentSession {
         var end = AgentSessionState.End.failed
         var outcome: AgentRunOutcome?
         var failure: Error?
+        var fields = request.startFields
+        fields["runID"] = .string(runID.uuidString)
+        if let commandID = request.commandID { fields["commandID"] = .string(commandID) }
+        var startSaved = true
         do {
-            var fields = request.startFields
-            fields["runID"] = .string(runID.uuidString)
-            do { try await append(payload: .custom(type: "agent.run-start.v1", data: .object(fields))) }
-            catch { throw AgentSessionOwnerError.persistenceFailed }
+            try await append(payload: .custom(type: "agent.run-start.v1", data: .object(fields))) { snapshot in
+                guard let commandID = request.commandID else { return }
+                if snapshot.entries.contains(where: { $0.commandID == commandID }) { throw AgentSessionOwnerError.duplicateCommand }
+            }
+        } catch AgentSessionOwnerError.duplicateCommand {
+            return refuseDuplicate(observer: observer)
+        } catch {
+            startSaved = false
+        }
+        do {
+            guard startSaved else { throw AgentSessionOwnerError.persistenceFailed }
             if cancellationRequested { throw CancellationError() }
             let owned = request.harness.persistingMessages { [self] message in
                 try await appendMessage(message, runID: runID)
@@ -207,6 +227,15 @@ public actor AgentSession {
         return state
     }
 
+    /// A command already in the log: nothing was written, so there is nothing to close.
+    private func refuseDuplicate(observer: AsyncThrowingStream<AgentEvent, Error>.Continuation) -> AgentSessionState {
+        state.end = .duplicateCommand
+        state.phase = .idle
+        task = nil
+        observer.finish(throwing: AgentSessionOwnerError.duplicateCommand)
+        return state
+    }
+
     private func commitTerminal() async throws {
         guard let terminalPayload else { throw AgentSessionOwnerError.persistenceBlocked }
         let id = pendingTerminalID ?? UUID().uuidString
@@ -238,11 +267,15 @@ public actor AgentSession {
     /// snapshot and tried again, a bounded number of times. A failed commit writes nothing, so a
     /// retry cannot duplicate an entry; an `id` already present with the same payload is a commit
     /// whose acknowledgement was lost.
-    private func append(payload: AgentSessionEntry.Payload, id: String = UUID().uuidString) async throws {
+    /// `precondition` sees every snapshot an attempt is built on, so a check it makes (such as a
+    /// command already in the log) also holds against a writer that committed in between.
+    private func append(payload: AgentSessionEntry.Payload, id: String = UUID().uuidString,
+                        precondition: (AgentSessionSnapshot) throws -> Void = { _ in }) async throws {
         var attempt = 0
         while true {
             attempt += 1
             let snapshot = try await store.load(sessionID: sessionID)
+            try precondition(snapshot)
             if let existing = snapshot.entries.first(where: { $0.id == id }) {
                 guard existing.payload == payload else { throw AgentSessionStoreError.conflict }
                 if appendMode == .branch { branchTip = id }

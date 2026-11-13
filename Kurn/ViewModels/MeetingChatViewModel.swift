@@ -102,7 +102,8 @@ final class MeetingChatViewModel {
     /// the summary settings. No-op while a previous reply is still in flight. A provider without
     /// an `AgentModel` (Apple's on-device model) fails with the cloud-provider notice; the view
     /// disables the composer for it before that can happen.
-    func send(question: String, provider: AIProvider, model: String, runID: OperationID = OperationID()) {
+    func send(question: String, provider: AIProvider, model: String, runID: OperationID = OperationID(),
+              commandID: String? = nil) {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isResponding, task == nil else { return }
         error = nil
@@ -113,6 +114,9 @@ final class MeetingChatViewModel {
         let generation = self.generation
 
         turns.append(Turn(role: .user, text: trimmed))
+        // The run's durable command identity (NH05): the question turn it answers, unless the
+        // caller names one, so the same command is never run twice from the session's log.
+        let command = commandID ?? turns[turns.count - 1].id.uuidString
         turns[turns.count - 1].artifacts = retryArtifacts
         turns[turns.count - 1].artifactOrigins = retryOrigins
         retryArtifacts = []
@@ -159,7 +163,7 @@ final class MeetingChatViewModel {
                     throw AppError.apiError(statusCode: 0, message: NSLocalizedString(
                         "chat.artifact.cloud_required", comment: "Chat provider requirement"))
                 }
-                let answered = try await self.runHarness(agentModel, runID: token, question: trimmed,
+                let answered = try await self.runHarness(agentModel, runID: token, commandID: command, question: trimmed,
                                                          history: Self.buildHistory(from: priorTurns),
                                                          provider: provider, model: model, startedAt: startedAt)
                 try Task.checkCancellation()
@@ -451,7 +455,7 @@ final class MeetingChatViewModel {
         if session != nil { persist() }
     }
 
-    private func runHarness(_ agentModel: any AgentModel, runID: UUID, question: String, history: [ChatMessage],
+    private func runHarness(_ agentModel: any AgentModel, runID: UUID, commandID: String, question: String, history: [ChatMessage],
                             provider: AIProvider, model: String, startedAt: Date) async throws -> Bool {
         guard let modelContext else {
             throw AppError.apiError(statusCode: 0, message: "Chat requires a configured model context.")
@@ -487,7 +491,8 @@ final class MeetingChatViewModel {
         }
         let run = try await service.start(model: agentModel, provider: provider, modelIdentifier: model,
                                           context: modelContext, scope: scope, workspace: workspace,
-                                          history: history, question: question, owner: owner, runID: runID)
+                                          history: history, question: question, owner: owner, runID: runID,
+                                          commandID: commandID)
         // Whatever ends this function, the run has settled first: a cancelled or failed run is
         // only reported once nothing can still call a tool or write its effect.
         do { try Task.checkCancellation() } catch {

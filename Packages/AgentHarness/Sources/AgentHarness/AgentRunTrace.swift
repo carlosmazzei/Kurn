@@ -174,4 +174,11 @@ extension AgentSessionEntry {
         guard case .object(let fields)? = metadata, case .string(let id)? = fields["runID"] else { return nil }
         return id
     }
+
+    /// The command a run-start entry was written for (`AgentSession.start(commandID:)`), if any.
+    public var commandID: String? {
+        guard case .custom(type: "agent.run-start.v1", data: .object(let fields)) = payload,
+              case .string(let id)? = fields["commandID"] else { return nil }
+        return id
+    }
 }

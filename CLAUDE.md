@@ -2936,6 +2936,11 @@ has settled, throwing the run's failure — `AgentSessionOwnerError.persistenceF
 write that failed (a terminal entry that could not be saved after an answer included, ahead of any
 other failure), never the store's own error, and otherwise `CancellationError` after `abort()`. A run-start
 that cannot be saved fails the run without blocking the session, since nothing of it was written.
+`start(commandID:)` makes a command idempotent across processes: the ID is written into the run-start
+entry (`AgentSessionEntry.commandID`), and a start whose command is already in the log — checked on
+every snapshot an append attempt is built on, so a writer that committed in between is caught too —
+writes nothing, calls no model and ends with `AgentSessionOwnerError.duplicateCommand`. The chat's
+command is the question turn a run answers (`MeetingChatViewModel.send(commandID:)` can name another).
 `AgentRunProgress` projects a run's phase with its identities from its events — `preparing`,
 `streaming`, `executingTools`, `compacting` (between `compactionStarted` and its end, restoring the
 interrupted phase), `retryWaiting` (an output-limit retry until its request starts) and
