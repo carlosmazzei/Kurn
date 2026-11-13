@@ -228,4 +228,9 @@ struct ChatRunTranscriptTests {
         #expect(vm.retryableQuestion == nil)
         #expect(Self.message(of: vm.error) == NSLocalizedString("chat.command.duplicate", comment: ""))
     }
+
+    @Test func aContextThatCannotBeReducedSaysSo() {
+        let error = MeetingChatViewModel.presentedError(AgentContextReductionError())
+        #expect(Self.message(of: error) == NSLocalizedString("chat.context.reduction_failed", comment: ""))
+    }
 }

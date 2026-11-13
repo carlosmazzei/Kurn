@@ -226,7 +226,12 @@ not document bodies. Models are instructed to use artifacts for documents/report
 rather than paste them in chat. Saving artifacts into the document library is an app concern.
 Each session restores its workspace and source scope. Document mutations persist artifacts
 immediately, even if the reply is later cancelled; partial assistant turns are not saved.
-Replayed history contains plain user/assistant turns, not old source-tool payloads.
+Replayed history is canonical (NH06, `ChatReplayHistory`): an earlier answered question goes back
+as the run that answered it recorded it on its branch (`AgentRunBranch.contextMessages` — its request,
+tool calls, tool results and answer, without failed, aborted, deferred or output-limited replies and
+their results). Runs record the question turn they answer (`questionID` start field). A question with
+no completed run, or whose run was authorized for other sources or for a meeting the current run may
+not read, replays as plain text, so narrowing the sources never replays older reads.
 
 `NativeHarness` is an Apple-free, provider-neutral sequential tool loop. `AgentModel`
 supplies streaming text and turn responses; `AgentTool` supplies schemas, optional
@@ -263,9 +268,33 @@ limit is not used. Compaction runs before a turn when over the threshold, and is
 provider rejects a turn as too long (`isContextOverflow`; the adapter passes
 `AppError` conformance to `AgentContextOverflowError`, delegating to the harness's
 `AgentContextOverflow` classifier, whose markers exclude rate limiting/throttling); the turn is then retried once, only if nothing was streamed
-and the context actually shrank. When a forced summary is unusable or itself overflows, the
-older part is replaced by a fixed omission note. Compaction changes only model context;
-outcomes retain full history.
+and the context actually shrank. No note ever stands in for a summary (NH06): a summary that is
+cut off, unusable or whose own request overflows leaves the context unchanged and reports the
+compaction failed. After an overflow that ends the run with `AgentContextReductionError` (the chat
+says the conversation is too long for the model, `chat.context.reduction_failed`); an output-limit
+recovery is denied and the run keeps its `.outputLimit` outcome; a threshold compaction sends the
+request as it is. Compaction changes only model context; outcomes retain full history.
+A summary compaction is a durable checkpoint (NH06, `AgentCompactionCheckpoint`): the harness hands it
+to the awaited `persistingCompaction` sink before any request uses the compacted context, and
+`AgentSession` commits it on the run's branch as `agent.compaction.v1` (summary, first kept message ID,
+tokens before/after, split turn), so a request never runs on context the log lacks and a failed save
+fails the run. Only real summaries are checkpoints; an unusable or failed summary, or
+a kept message without an identity (legacy plain history) writes none. Replay applies the newest
+checkpoint of a permitted run whose kept message is in the history (`ChatReplayHistory`), so a reopened
+conversation reuses the summary and a later compaction updates it.
+`AgentRunProgress.contextTokens` is the context size the provider last reported for a response (input
+plus reply); it is nil — unknown, never zero — before any reported usage, after a compaction and when a
+provider reports no input, and a summary request's usage never sets it.
+System prompts are ordered sections (`AgentSystemPrompt`): the chat's `instructions` never change and
+form a stable prefix, its `documents` index is the section a document mutation changes. Each run's
+`agent.run-start.v1` records the first run's whole prompt (`system`) and then a patch on the previous
+run's (`systemPatch`: changed or added sections, `null` removing one), plus its declared tools and their
+delta from the previous run (`tools`: `AgentToolLoadout`). `AgentRunBranch.systemPrompts(of:)` folds
+the patches back into each run's prompt.
+Context edits (`AgentContextEdit`, `agent.context-edit.v1`) change only what later runs replay: removing
+an assistant message removes the results of its calls, a removed tool result becomes a stub so its call
+keeps a result, and the log, the shown conversation and recorded usage are unchanged. `ChatReplayHistory`
+applies them before the newest checkpoint.
 `AgentLimits.wrapUpOnLimit` runs one extra turn after a turn/tool-call limit with
 `NativeHarness.wrapUpInstruction` appended and `AgentTurnRequest.allowsToolCalls` false
 (tools stay declared; the wire formats send `tool_choice: none` / Gemini mode `NONE`, and
@@ -3041,5 +3070,5 @@ history write ends the stream with `AgentSessionOwnerError.persistenceFailed`, w
 (question retryable, `run_transcript_write_failed`) and shows `chat.storage.run_failed` — saying
 nothing more was sent — instead of the store's own error text (`MeetingChatViewModel.presentedError`);
 a run whose session was deleted under it ends as a cancellation. One owner per run is safe because the
-view model admits one run at a time and a retry starts a new branch. Replay still sends plain
-presentation history.
+view model admits one run at a time and a retry starts a new branch. The next run replays these
+branches as canonical history (see "Agent harness", `ChatReplayHistory`).

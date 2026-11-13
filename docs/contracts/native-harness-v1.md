@@ -1,9 +1,9 @@
 # Native harness contract v1
 
-Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04)**. NH01 froze the NH00
+Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04); session ownership implemented (NH05); projection and persistent compaction implemented (NH06, except manual compaction and branch summaries)**. NH01 froze the NH00
 compatibility baseline. NH02 now produces native v1 assistant blocks at the provider
 boundary and consumes them in the harness. Indexed session storage and lazy legacy conversion are active; detailed runtime
-message persistence barriers and tool-history replay remain NH05/NH06; complete pi compatibility is not claimed.
+message persistence barriers (NH05) and canonical tool-history replay (NH06) are active; complete pi compatibility is not claimed.
 
 Baseline: `6ec656b93c6cf59cbc3dc32f9bd08e1abb1517ed`. The attached reference documents
 describe pi revision `f064465d10d6a8e5c19f687bba1b5b5499b51680`. Their A/C identifiers
@@ -57,13 +57,14 @@ Important current adaptations/gaps:
   The next request replays plain user/assistant text. Old retrieval citations, tool audit
   payloads and document bodies do not enter that history; artifact title/version metadata
   is supplied separately. Plain earlier assistant text remains memory under the current
-  default, even after narrowing sources. Strict-current-sources behavior is future NH06.
+  default, even after narrowing sources. NH06 replaces this for questions a recorded run answered:
+  see "Canonical replay (NH06)" below.
 - Artifacts retain their own latest body/version. A historical reference retains its saved
   title/version and must not silently become the newest revision. Saving again updates the
   same library document for the session/artifact identity. Legacy missing model provenance
   stays unknown; it is not reconstructed from today's selected model.
-- Runtime compaction changes only the current request projection. Reopen/another question
-  does not yet reuse a durable checkpoint. Retained branches and local effect receipts
+- Runtime compaction changes only the current request projection. Since NH06 a summary is a
+  durable checkpoint that reopen/another question reuses. Retained branches and local effect receipts
   are stored, but automatic session recovery and canonical replay remain NH05/NH06.
 - Output-limited calls never execute. NH02 retains native call blocks/raw arguments and
   appends synthetic error results in the in-memory audit history. A successful output
@@ -269,8 +270,8 @@ scope/artifact revision references as append-only entries. A changed/deleted suf
 a new branch; retained siblings stay available. Checked loads derive from the active path,
 not `turnsData`/`scopeData`/`artifactsData` caches. This is the sole production presentation
 writer. Since NH05 host increment 2, live model/tool messages are written behind awaited
-barriers on per-run branches that never move the selected leaf (below). Current model replay remains plain history; NH06 adds the
-qualified source-aware canonical projection.
+barriers on per-run branches that never move the selected leaf (below). NH06 replays those branches as the
+qualified source-aware canonical projection (below).
 
 Recovery records persist versioned run/queue/draft/effect metadata only. Their presence
 never resumes work or consumes a prompt. Generic effect metadata alone does not prove
@@ -431,10 +432,9 @@ authorization as a host start field; a presentation or effect write landing betw
 load and commit is a revision conflict, rebuilt on the new snapshot. A failed commit fails the run (the question stays
 retryable; a retry starts a new branch), records `run_transcript_write_failed` and tells the user the
 reply's progress could not be saved and nothing more was sent, instead of the store's error text. Run entries are
-recorded history only: replay still sends plain presentation history until NH06.
+replayed by later runs as canonical history (NH06, below).
 
-Not yet activated: canonical history restoration beyond an interrupted run's steps, which NH06's
-canonical replay completes, and a `waitingForUser` phase (no tool asks for confirmation).
+Not yet activated: a `waitingForUser` phase (no tool asks for confirmation).
 
 Reopening a conversation a dead process interrupted resumes that run once, from the saved question
 with the chat's current provider and model, when the run committed no document change, was not
@@ -453,3 +453,30 @@ sweep closes every run branch nothing ended with the end the run could not write
 The package infrastructure above is not by itself completion of session acceptance criteria. UI/coordinator lifetime, canonical replay/provenance, crash/effect
 recovery, durable command deduplication and complete phase projection remain open in NH05;
 compaction/projection and queues retain their later roadmap boundaries.
+
+## Canonical replay and persistent compaction — NH06
+
+Raw entries, the selected (presentation) path, the model projection and each provider request copy
+stay distinct. `AgentRunBranch` reads a run back from the log; its `contextMessages` are what the
+run's model context held (audit-only failed, aborted, deferred or output-limited replies and their
+paired results are excluded) and `answer` exists only for a completed run ending in a final reply.
+`ChatReplayHistory` walks the shown turns: an answered question is replaced by the messages of the
+latest completed run recorded for it (`questionID` start field, or its command for older runs),
+provided that run was authorized for the same source scope and for no meeting the current run may
+not read; otherwise the question replays as plain text. Sibling branches never enter context.
+
+Context edits (`agent.context-edit.v1`, `AgentContextEdit`) change only the projection: removing an
+assistant message removes its results, a removed result becomes a stub, and the log, the shown
+conversation and recorded usage are unchanged. A summary compaction is a checkpoint
+(`agent.compaction.v1`: summary, first kept message ID, tokens before/after, split turn) committed
+through an awaited sink before any request uses it; replay applies the newest checkpoint of a
+permitted run whose kept message is present, and a later compaction updates its summary. Unusable,
+failed or overflowing summaries write nothing and no omission note stands in for one: after a
+provider overflow the run ends with `AgentContextReductionError`. Context usage after a compaction
+is unknown (`nil`), never zero. Budgets come from the effective model's own window and output limit.
+
+System prompts are ordered sections (`AgentSystemPrompt`): Kurn's meeting-assistant `instructions`
+form a stable prefix and the `documents` index is its own section. Each `agent.run-start.v1`
+records the first run's prompt (`system`), later runs' `systemPatch` (changed sections, `null`
+removing one) and the declared tools with their delta (`tools`). Open: manual compaction and
+optional branch summaries.

@@ -1226,6 +1226,7 @@
 "chat.storage.invalid" = "Diese Unterhaltung konnte nicht gelesen oder gespeichert werden. Die gespeicherten Daten wurden beibehalten.";
 "chat.storage.run_failed" = "Der Fortschritt dieser Antwort konnte nicht gespeichert werden, daher wurde sie angehalten, bevor weiteres gesendet wurde. Ihre Frage bleibt erhalten; versuchen Sie es erneut.";
 "chat.command.duplicate" = "Diese Frage wurde bereits gesendet und daher nicht erneut gesendet.";
+"chat.context.reduction_failed" = "Diese Unterhaltung ist zu lang, als dass das Modell fortfahren könnte. Beginne eine neue Unterhaltung oder wähle ein Modell mit einem größeren Kontextfenster.";
 
 // Native tool pipeline diagnostics.
 "chat.diagnostic.toolValidationFailed" = "Werkzeugargumente abgelehnt";

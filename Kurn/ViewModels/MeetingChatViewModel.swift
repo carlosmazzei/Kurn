@@ -171,7 +171,7 @@ final class MeetingChatViewModel {
                         "chat.artifact.cloud_required", comment: "Chat provider requirement"))
                 }
                 let answered = try await self.runHarness(agentModel, runID: token, commandID: command, question: trimmed,
-                                                         history: Self.buildHistory(from: priorTurns),
+                                                         history: priorTurns,
                                                          provider: provider, model: model, startedAt: startedAt)
                 try Task.checkCancellation()
                 guard self.generation == generation else { throw CancellationError() }
@@ -447,13 +447,16 @@ final class MeetingChatViewModel {
         if session != nil { persist() }
     }
 
-    private func runHarness(_ agentModel: any AgentModel, runID: UUID, commandID: String, question: String, history: [ChatMessage],
+    private func runHarness(_ agentModel: any AgentModel, runID: UUID, commandID: String, question: String,
+                            history priorTurns: [Turn],
                             provider: AIProvider, model: String, startedAt: Date) async throws -> Bool {
         guard let modelContext else {
             throw AppError.apiError(statusCode: 0, message: "Chat requires a configured model context.")
         }
         let workspace = workspace
         let generation = self.generation
+        // The question this run answers is the turn `send` just appended.
+        let questionID = turns.last?.id
         let completedTurns = Array(turns.dropLast())
         let initialArtifacts = await workspace.snapshot()
         let origin = ChatArtifactOrigin(question: question, modelIdentifier: "\(provider.id):\(model)",
@@ -483,8 +486,11 @@ final class MeetingChatViewModel {
         }
         let run = try await service.start(model: agentModel, provider: provider, modelIdentifier: model,
                                           context: modelContext, scope: scope, workspace: workspace,
-                                          history: history, question: question, owner: owner, runID: runID,
-                                          commandID: commandID)
+                                          history: Self.buildHistory(from: priorTurns), question: question,
+                                          owner: owner, runID: runID, commandID: commandID, questionID: questionID,
+                                          replay: ChatReplayHistory.load(
+                                              turns: priorTurns.map { .init(id: $0.id, role: $0.role, text: $0.text) },
+                                              session: savedSession, store: SwiftDataAgentSessionStore(context: modelContext)))
         // Whatever ends this function, the run has settled first: a cancelled or failed run is
         // only reported once nothing can still call a tool or write its effect.
         do { try Task.checkCancellation() } catch {

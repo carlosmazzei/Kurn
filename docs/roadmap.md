@@ -581,8 +581,9 @@ requests, source parts/empty overrides, legacy session/history restoration, and
 save/update of conversation artifacts as library documents. CI checks versions,
 fixture hashes and evidence links. The canonical v1 format is not activated and no
 store migration runs in that increment. NH02 implements the local message/stream profile described below; NH03 implements the store/migration boundary described below; NH04 implements the native tool pipeline and durable local artifact boundary described below; NH05 is complete (session ownership, canonical run branches, barriers, cancellation, recovery
-and resumption, see `CLAUDE.md`); NH06–NH10 have not started. The next implementation increment is
-NH06 projection and persistent compaction. This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
+and resumption, see `CLAUDE.md`); NH06 is implemented except manual compaction and branch
+summaries (canonical replay, persistent compaction, context edits, system sections and tool loadouts,
+see `CLAUDE.md`); NH07–NH10 have not started. The next implementation increment is NH07. This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
 
 The first NH02 increment adds checked native user/assistant blocks, exact Unix-ms
 codecs, an ordered bounded reducer, authoritative final reconciliation and all four
@@ -674,8 +675,7 @@ retryable.
 idempotency, closure of branches nothing ended, newest-only snapshot observation and the one-time
 resume of a run a dead process interrupted. What it left is carried by later increments:
 
-- **NH06:** canonical replay. A stopped or failed run's steps are still the presentation copy, and
-  replay still sends presentation history.
+- **NH06:** canonical replay — done; see below.
 - **NH08:**
   - A session-retained owner. This includes uniqueness across independently created actors; the
     chat's one owner per run is safe while its view model admits one run at a time.
@@ -801,6 +801,19 @@ For overflow, record the failed attempt, context edit and successful checkpoint
 before one bounded retry. Replace the current forced omission-note fallback
 with an explicit context-reduction failure/action: an omission notice must not
 masquerade as a successful summary. The next request cannot use unsaved context.
+
+**NH06 status.** Implemented: canonical replay of each answered question's run branch with the
+source boundary (`ChatReplayHistory`, `AgentRunBranch`), durable summary checkpoints committed before
+use and reused on replay (`AgentCompactionCheckpoint`), explicit `AgentContextReductionError` instead
+of the omission note, context edits applied to the projection only (`AgentContextEdit`), unknown
+context usage after a compaction, ordered system sections recorded as per-run patches and tool
+loadouts with their delta (`AgentSystemPrompt`, `AgentToolLoadout`). Still open:
+
+- Manual compaction (a user action that summarizes now) and optional branch summaries.
+- Refreshing the `documents` system section inside a run after a document mutation (today the next
+  run records the change as a patch).
+- A host writer for context edits: the projection applies them, but no app action records one yet.
+- Plain fallback history (`.user`/`.assistant` without identities) cannot anchor a checkpoint.
 
 **NH07 details.** Model identity is provider plus ID, with a cached capability
 snapshot for context/output limits, modalities, tools, thinking and usage/cache.

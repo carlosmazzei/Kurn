@@ -1226,6 +1226,7 @@
 "chat.storage.invalid" = "Couldn’t read or save this conversation. Its stored data has been preserved.";
 "chat.storage.run_failed" = "Couldn’t save this reply’s progress, so it stopped before sending anything more. Your question is kept; try again.";
 "chat.command.duplicate" = "This question was already sent, so it wasn’t sent again.";
+"chat.context.reduction_failed" = "This conversation is too long for the model to continue. Start a new conversation, or choose a model with a larger context window.";
 
 // Native tool pipeline diagnostics.
 "chat.diagnostic.toolValidationFailed" = "Tool arguments rejected";

@@ -117,4 +117,29 @@ import Testing
         progress.apply(diagnostic(.compactionFinished))
         #expect(progress.phase == .finished)
     }
+
+    @Test func contextUsageIsUnknownUntilReportedAndAgainAfterACompaction() throws {
+        var progress = AgentRunProgress()
+        progress.apply(.runStarted)
+        #expect(progress.contextTokens == nil)
+        progress.apply(.requestStarted(try AgentRequestIdentity(id: "req-1")))
+        progress.apply(.usage(AgentUsage(inputTokens: 900, outputTokens: 100)))
+        #expect(progress.contextTokens == 1_000)
+
+        // A summary's own usage is not the conversation's context.
+        progress.apply(.requestStarted(try AgentRequestIdentity(id: "sum-1", purpose: .summary)))
+        progress.apply(.usage(AgentUsage(inputTokens: 5_000, outputTokens: 300)))
+        #expect(progress.contextTokens == 1_000)
+        // After a compaction the reported size no longer applies: unknown, not zero.
+        progress.apply(.contextCompacted(beforeTokens: 1_000, afterTokens: 200))
+        #expect(progress.contextTokens == nil)
+        progress.apply(.requestStarted(try AgentRequestIdentity(id: "req-2")))
+        // A provider that reports no input leaves it unknown too.
+        progress.apply(.usage(AgentUsage(inputTokens: 0, outputTokens: 40)))
+        #expect(progress.contextTokens == nil)
+        progress.apply(.usage(AgentUsage(inputTokens: 250, outputTokens: 50)))
+        #expect(progress.contextTokens == 300)
+        progress.apply(.runStarted)
+        #expect(progress.contextTokens == nil)
+    }
 }

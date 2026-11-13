@@ -65,9 +65,9 @@ struct MeetingChatViewModelSendTests {
         #expect(sessions.count == 1)
         #expect(sessions.first?.turns.count == 4)
         #expect(sessions.first?.meeting?.id == meeting.id)
-        // The follow-up carries the first exchange as plain history.
+        // The follow-up carries the first exchange as the run recorded it (NH06 canonical replay).
         let requests = await model.requests
-        #expect(requests.last.map { Array($0.messages.prefix(2)) }
+        #expect(requests.last.map { Array($0.messages.prefix(2)).map(\.legacyProjection) }
             == [.user("When do we ship?"), .assistant(text: "Answer 0 [0:42].", toolCalls: [])])
     }
 

@@ -43,10 +43,12 @@ extension NativeHarness {
                 try Task.checkCancellation()
                 guard !retried, !stream.hasVisibleText, isContextOverflow(error) else { throw error }
                 retried = true
-                let previous = state.context
-                try await compact(settings, state: &state, events: events, trace: trace, force: true)
-                guard state.context != previous else { throw error }
-                continue
+                switch try await compact(settings, state: &state, events: events, trace: trace, force: true) {
+                case .reduced: continue
+                // No usable summary: the run fails explicitly rather than continuing on a note.
+                case .failed: throw AgentContextReductionError()
+                case .unchanged: throw error
+                }
             }
             var metrics = response.diagnosticMetrics
             metrics[.durationMs] = Self.milliseconds(since: started)
@@ -88,9 +90,7 @@ extension NativeHarness {
             // Preserve reported input size without counting the discarded response or its calls.
             state.usageAnchor = (usage.inputTokens, state.context.count)
         }
-        let previous = state.context
-        try await compact(settings, state: &state, events: events, trace: trace, force: true)
-        guard state.context != previous else {
+        guard try await compact(settings, state: &state, events: events, trace: trace, force: true) == .reduced else {
             trace.record(.outputRetryDenied, metrics: facts, reason: .outputLimit)
             return false
         }
@@ -134,50 +134,66 @@ extension NativeHarness {
                                         tools: settings.tools)
     }
 
+    enum CompactionResult: Equatable {
+        /// The context was replaced by a summary and the kept messages, and is smaller.
+        case reduced
+        /// Nothing needed or could be compacted, or the result would not be smaller.
+        case unchanged
+        /// A summary was needed but none was usable: unusable, cut off, or too long to request.
+        case failed
+    }
+
     /// Compacts once the context exceeds the window minus the reserve, or unconditionally (`force`)
     /// after a provider rejected the request as too long. Older messages are replaced by a summary
-    /// and the newest `keepRecentTokens` are kept. A summary cut off by the output limit is not
-    /// used; when compaction was forced, or the summary request itself overflows, the older part
-    /// is replaced by a fixed omission note instead, so recovery never stalls.
-    private func compact(_ settings: TurnSettings, state: inout AgentRunState,
-                         events: AsyncThrowingStream<AgentEvent, Error>.Continuation, trace: AgentTraceEmitter,
-                         force: Bool = false) async throws {
+    /// and the newest `keepRecentTokens` are kept. A summary that is cut off, unusable, or whose own
+    /// request is too long leaves the context unchanged and reports `.failed`: nothing stands in
+    /// for a summary (NH06), so the caller decides whether that ends the run.
+    @discardableResult
+    func compact(_ settings: TurnSettings, state: inout AgentRunState,
+                 events: AsyncThrowingStream<AgentEvent, Error>.Continuation, trace: AgentTraceEmitter,
+                 force: Bool = false) async throws -> CompactionResult {
         let before = contextTokens(settings, state: state)
         let threshold = compactor.policy.compactionThreshold
         trace.record(.contextCheck, metrics: [.contextTokens: before, .thresholdTokens: threshold,
                                              .retainedTokens: compactor.policy.effectiveKeepRecentTokens, .forced: force ? 1 : 0])
         guard force || before > threshold,
-              let plan = compactor.plan(for: state.context) else { return }
+              let plan = compactor.plan(for: state.context) else { return .unchanged }
         trace.record(.compactionStarted, metrics: [.contextTokens: before, .forced: force ? 1 : 0])
-        let replacement: [AgentMessage]?
+        let compacted: [AgentMessage]
         do {
             let history = try await summarize(compactor.historySummaryRequest(for: plan), state: &state, events: events, trace: trace)
             let prefix = try await summarize(compactor.turnPrefixSummaryRequest(for: plan), state: &state, events: events, trace: trace)
-            if history != .unusable, prefix != .unusable {
-                replacement = compactor.applying(plan, historySummary: history.text, turnPrefixSummary: prefix.text)
-            } else {
-                replacement = force ? compactor.omitting(plan) : nil
+            guard history != .unusable, prefix != .unusable else {
+                trace.record(.compactionFailed)
+                return .failed
             }
+            compacted = compactor.applying(plan, historySummary: history.text, turnPrefixSummary: prefix.text)
         } catch {
             trace.record(.compactionFailed)
             try Task.checkCancellation()
             guard isContextOverflow(error) else { throw error }
-            replacement = compactor.omitting(plan)
+            return .failed
         }
-        guard let compacted = replacement, compacted != state.context else {
+        guard compacted != state.context else {
             trace.record(.compactionSkipped)
-            return
+            return .unchanged
         }
         let estimatedAfter = compactor.estimateTokens(systemPrompt: settings.systemPrompt, messages: compacted, tools: settings.tools)
         guard estimatedAfter < before else {
             trace.record(.compactionSkipped, metrics: [.contextTokens: before, .afterTokens: estimatedAfter])
-            return
+            return .unchanged
+        }
+        // The summary is a checkpoint, saved before any request uses it.
+        if let checkpoint = AgentCompactionCheckpoint(compacted: compacted, tokensBefore: before,
+                                                                  tokensAfter: estimatedAfter, splitTurn: plan.isSplitTurn) {
+            try await compactionCommit(checkpoint)
         }
         state.context = compacted
         state.usageAnchor = nil
         let after = contextTokens(settings, state: state)
         trace.record(.compactionFinished, metrics: [.contextTokens: before, .afterTokens: after])
         events.yield(.contextCompacted(beforeTokens: before, afterTokens: after))
+        return .reduced
     }
 
     private enum SummaryResult: Equatable {

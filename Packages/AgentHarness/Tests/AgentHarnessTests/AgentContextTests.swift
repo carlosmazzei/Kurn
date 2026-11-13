@@ -28,6 +28,19 @@ func tokens(_ count: Int, _ letter: Character = "a") -> String { String(repeatin
         #expect(degenerate.effectiveKeepRecentTokens == 1)
     }
 
+    @Test func aSmallModelsBudgetsComeFromItsOwnWindowNotTheDefaults() {
+        // The 16k reserve and 20k kept tail are defaults for large windows; an 8k model gets
+        // thresholds from its own window and summaries no larger than its own output limit.
+        let small = AgentContextPolicy(contextWindow: 8_192, maxOutputTokens: 2_048)
+        #expect(small.compactionThreshold == 4_096)
+        #expect(small.effectiveKeepRecentTokens == 2_048)
+        #expect(small.historySummaryMaxOutputTokens == 2_048)
+        #expect(small.turnPrefixSummaryMaxOutputTokens == 2_048)
+        var output = AgentOutputBudget(requested: nil, policy: small)
+        output.fit(inputTokens: 3_000)
+        #expect(output.tokens >= 1 && 3_000 + output.tokens <= 8_192)
+    }
+
     @Test func cutAtATurnStartSummarizesWholeTurns() throws {
         let messages: [AgentMessage] = [.user(tokens(50)), .assistant(text: tokens(50), toolCalls: []),
                                         .user(tokens(60)), .assistant(text: tokens(60), toolCalls: [])]
@@ -97,8 +110,6 @@ func tokens(_ count: Int, _ letter: Character = "a") -> String { String(repeatin
         #expect(compactor.turnPrefixSummaryRequest(for: plan) == nil)
         #expect(compactor.applying(plan, historySummary: "New facts", turnPrefixSummary: nil)
             == [.user(AgentContextCompactor.summaryPrefix + "New facts")] + Array(messages.suffix(2)))
-        #expect(compactor.omitting(plan) == [.user(AgentContextCompactor.summaryPrefix + "Old facts\n\n"
-            + AgentContextCompactor.omittedPrefixNote)] + Array(messages.suffix(2)))
     }
 
     @Test func splitTurnsGetAPrefixSummary() throws {

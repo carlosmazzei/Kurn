@@ -52,3 +52,11 @@ public enum AgentContextOverflow {
 public protocol AgentContextOverflowError: Error {
     var isContextOverflow: Bool { get }
 }
+
+/// The context could not be reduced enough for the model (NH06): the provider rejected the
+/// request as too long and no usable summary could replace the older part — the summary was cut
+/// off, unusable, or its own request was too long. The run ends here instead of continuing on a
+/// note that would stand in for a summary; nothing of the failed attempt is reused.
+public struct AgentContextReductionError: Error, Sendable, Equatable {
+    public init() {}
+}

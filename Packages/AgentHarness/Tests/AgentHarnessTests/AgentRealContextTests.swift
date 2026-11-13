@@ -116,20 +116,20 @@ actor ResultScriptedAgentModel: AgentModel {
     }
 
     @Test(arguments: [false, true])
-    func unusableSummaryAfterOverflowFallsBackToTheOmissionNote(summaryOverflows: Bool) async throws {
+    func unusableSummaryAfterOverflowFailsTheRunExplicitly(summaryOverflows: Bool) async throws {
         let summaryResult: Result<AgentTurnResponse, Error> = summaryOverflows
             ? .failure(ResultScriptedAgentModel.Overflow())
             : .success(AgentTurnResponse(text: "Cut sho", stopReason: .maxTokens))
         let model = ResultScriptedAgentModel([.failure(ResultScriptedAgentModel.Overflow()), summaryResult,
                                              .success(AgentTurnResponse(text: "Answer"))])
+        let saved = CheckpointCount()
         let harness = NativeHarness(model: model, contextPolicy: policy(),
                                     isContextOverflow: { $0 is ResultScriptedAgentModel.Overflow })
-        let outcome = try agentOutcome(await agentEvents(harness, history: history()))
-        #expect(outcome.finalText == "Answer")
-        let requests = await model.requests
-        #expect(requests.count == 3)
-        #expect(requests[2].messages.map(\.legacyProjection) == [.user(summary + AgentContextCompactor.omittedPrefixNote), history()[3],
-                                         .user("Question")])
+            .persistingCompaction { _ in await saved.increment() }
+        // No note stands in for the missing summary, and the turn is not retried on one.
+        await #expect(throws: AgentContextReductionError.self) { try await agentEvents(harness, history: history()) }
+        #expect(await model.requests.count == 2)
+        #expect(await saved.count == 0)
     }
 
     @Test func summaryProviderFailuresStillPropagate() async {
@@ -204,4 +204,9 @@ actor ResultScriptedAgentModel: AgentModel {
         guard case .content(let final) = limited.messages.last else { Issue.record("Missing interrupted wrap-up audit"); return }
         #expect(final.text == "Partial ans" && final.stopReason == .maxTokens && final.toolCalls.isEmpty)
     }
+}
+
+private actor CheckpointCount {
+    var count = 0
+    func increment() { count += 1 }
 }

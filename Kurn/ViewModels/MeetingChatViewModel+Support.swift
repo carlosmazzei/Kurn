@@ -4,7 +4,8 @@ import KurnCore
 
 /// Stateless helpers of `MeetingChatViewModel`, kept apart from its run and persistence state.
 extension MeetingChatViewModel {
-    /// Prior turns as plain user/assistant history; old tool payloads are never replayed.
+    /// Prior turns as plain user/assistant text: the history for a question no recorded run can
+    /// replay canonically (`ChatReplayHistory`).
     static func buildHistory(from prior: [Turn]) -> [ChatMessage] {
         prior.map { ChatMessage(role: $0.role, content: $0.text) }
     }
@@ -17,6 +18,10 @@ extension MeetingChatViewModel {
         }
         if (error as? AgentSessionOwnerError) == .duplicateCommand {
             return .apiError(statusCode: 0, message: NSLocalizedString("chat.command.duplicate", comment: "Chat command already run"))
+        }
+        if error is AgentContextReductionError {
+            return .apiError(statusCode: 0, message: NSLocalizedString("chat.context.reduction_failed",
+                                                                       comment: "Chat context could not be reduced"))
         }
         return error as? AppError ?? .apiError(statusCode: 0, message: error.localizedDescription)
     }

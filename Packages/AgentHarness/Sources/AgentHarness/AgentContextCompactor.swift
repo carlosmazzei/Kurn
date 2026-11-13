@@ -71,8 +71,6 @@ public struct AgentContextCompactor: Sendable {
     public static let messageOverheadTokens = 4
     /// Marks the user message that carries a compaction summary at the head of the context.
     public static let summaryPrefix = "[Summary of earlier conversation]\n"
-    /// Last resort when even the summary request exceeds the provider's window.
-    public static let omittedPrefixNote = "[Earlier conversation omitted to fit the model's context window]"
     /// Tool results are clipped to this many characters in a summary request: they are the
     /// largest part of the context, and an unclipped summary request could overflow the window
     /// it is meant to relieve.
@@ -222,13 +220,6 @@ public struct AgentContextCompactor: Sendable {
             summary += "\n\n---\n\n**Turn context (split turn):**\n\n" + turnPrefixSummary
         }
         return [.user(Self.summaryPrefix + summary)] + plan.kept
-    }
-
-    /// Keeps the previous summary (if any) and the kept messages, dropping what could not be
-    /// summarized; used only when the summary request itself exceeded the provider's window.
-    public func omitting(_ plan: AgentCompactionPlan) -> [AgentMessage] {
-        let note = [plan.previousSummary, Self.omittedPrefixNote].compactMap { $0 }.joined(separator: "\n\n")
-        return [.user(Self.summaryPrefix + note)] + plan.kept
     }
 
     // MARK: - Serialization

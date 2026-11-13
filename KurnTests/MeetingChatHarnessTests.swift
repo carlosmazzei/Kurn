@@ -80,7 +80,10 @@ struct MeetingChatHarnessTests {
         #expect(restored.artifacts.first?.markdown == "# Decisions\n\n## Follow-up")
         let revisionRequests = await revision.requests
         #expect(revisionRequests[0].systemPrompt.contains(artifact.id.uuidString))
-        #expect(revisionRequests[0].messages.contains(.assistant(text: "Created the minutes.", toolCalls: [])))
+        // The reopened conversation replays the first run canonically, its document call included.
+        let replayed = revisionRequests[0].messages.map(\.legacyProjection)
+        #expect(replayed.contains(.assistant(text: "Created the minutes.", toolCalls: [])))
+        #expect(replayed.contains { if case .toolResult(_, "create_document", _, false) = $0 { return true }; return false })
     }
 
     @Test func libraryScopesAndRecoverableToolErrorsReachTheTimeline() async throws {
