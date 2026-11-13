@@ -209,8 +209,10 @@ The app's side of the harness:
 
 - **Composition.** `HarnessChatService` resolves the model's context window and composes the
   harness with Kurn's tools, prompts and pricing.
-- **Tools.** `ChatSourceTools` and `ChatDocumentTools` read only the sources the run's frozen
-  authorization allows. Results are compact plain text.
+- **Tools.** `ChatSourceTools` are read-only and read only the sources the run's frozen
+  authorization allows. `ChatDocumentTools` also write: they create, replace and append to the
+  run's versioned document artifacts, which persist immediately with a receipt, even if the reply
+  is later cancelled. Results are compact plain text.
 - **Store.** `SwiftDataAgentSessionStore` is the store adapter. Each run is a branch off the question
   it answers, and it never moves the selected leaf. The presentation state shown in the UI is its
   own entry.
