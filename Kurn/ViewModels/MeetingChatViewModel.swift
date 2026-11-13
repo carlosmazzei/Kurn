@@ -428,8 +428,12 @@ final class MeetingChatViewModel {
             self.workspace = workspace
             artifacts = restored.artifacts
             scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id, scope: restored.scope)
-            turns = restored.turns.map(Turn.init)
-            interruptedQuestionIDs = modelContext.map { ChatRunRecovery.interruptedQuestionIDs(in: session, context: $0) } ?? []
+            // An interrupted run's recorded steps show under the question it left unanswered.
+            let recovered = modelContext.map {
+                ChatRunRecovery.restoringInterruptedRun(in: restored.turns, session: session, context: $0)
+            } ?? (turns: restored.turns, interrupted: [])
+            turns = recovered.turns.map(Turn.init)
+            interruptedQuestionIDs = recovered.interrupted
             retryArtifacts = []
             retryOrigins = [:]
             error = nil
