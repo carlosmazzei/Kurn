@@ -15,6 +15,9 @@ extension MeetingChatViewModel {
         if ChatRunBranch.isWriteFailure(error) {
             return .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.run_failed", comment: "Chat run history save error"))
         }
+        if (error as? AgentSessionOwnerError) == .duplicateCommand {
+            return .apiError(statusCode: 0, message: NSLocalizedString("chat.command.duplicate", comment: "Chat command already run"))
+        }
         return error as? AppError ?? .apiError(statusCode: 0, message: error.localizedDescription)
     }
 }

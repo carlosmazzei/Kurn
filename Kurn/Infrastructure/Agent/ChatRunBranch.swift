@@ -13,6 +13,13 @@ enum ChatRunBranch {
     static let usageType = "agent.usage.v1"
     static let endType = "agent.run-end.v1"
 
+    /// The tools whose successful result changed a document in the workspace.
+    static let documentTools: Set<String> = ["create_document", "update_document", "append_to_document"]
+
+    /// The durable command of the one automatic resume an interrupted run may get.
+    static func resumeCommand(for runID: String) -> String { resumePrefix + runID }
+    static let resumePrefix = "resume-"
+
     /// The owner of one run's branch in `session`.
     static func owner(session: ChatSession, store: SwiftDataAgentSessionStore) throws -> AgentSession {
         try AgentSession(sessionID: session.id.uuidString, store: store, appendMode: .branch)
@@ -27,6 +34,37 @@ enum ChatRunBranch {
     static func runID(of entry: AgentSessionEntry) -> String? {
         guard case .object(let fields)? = entry.metadata, case .string(let id)? = fields["runID"] else { return nil }
         return id
+    }
+
+    /// Closes the branch of `runID` with an `agent.run-end.v1` entry recording `end`, when the run
+    /// wrote a branch and nothing closed it: a process died mid-run, or the run's own end entry
+    /// could not be saved. The closing entry is the last one of that run's branch and the selected
+    /// leaf does not move, so the presentation path is unchanged. Returns whether it wrote one.
+    @MainActor
+    @discardableResult
+    static func closeIfOpen(runID: String, end: String, in session: ChatSession,
+                            store: SwiftDataAgentSessionStore) throws -> Bool {
+        let snapshot = try store.snapshot(session)
+        let run = snapshot.entries.filter { $0.runID == runID }
+        guard let last = run.max(by: { $0.ordinal < $1.ordinal }), !run.contains(where: { $0.kind == endType }) else {
+            return false
+        }
+        let entry = try AgentSessionEntry(sessionID: snapshot.sessionID, id: UUID().uuidString, parentID: last.id,
+            ordinal: snapshot.entries.count + 1, createdAt: AgentSessionEntry.time(),
+            payload: .custom(type: endType, data: .object([
+                "runID": .string(runID), "end": .string(end), "stopReason": .null
+            ])),
+            metadata: .object(["runID": .string(runID)]))
+        try store.commitNow(AgentSessionCommit(sessionID: snapshot.sessionID, expectedRevision: snapshot.revision,
+                                               entries: [entry], leafID: snapshot.leafID))
+        return true
+    }
+
+    /// Whether a run for `command` is already in the session's log. Unreadable history answers
+    /// no: the owner's own check at the run start is the authoritative one.
+    @MainActor
+    static func contains(command: String, in session: ChatSession, store: SwiftDataAgentSessionStore) -> Bool {
+        (try? store.snapshot(session).entries.contains { $0.commandID == command }) ?? false
     }
 
     /// Whether `error` is a run history write that failed; the chat says so rather than showing

@@ -1225,6 +1225,7 @@
 
 "chat.storage.invalid" = "无法读取或保存此对话。已保留存储的数据。";
 "chat.storage.run_failed" = "无法保存此回复的进度，因此在发送更多内容之前已停止。你的问题已保留，请重试。";
+"chat.command.duplicate" = "这个问题已经发送过，因此没有再次发送。";
 
 // Native tool pipeline diagnostics.
 "chat.diagnostic.toolValidationFailed" = "工具参数被拒绝";

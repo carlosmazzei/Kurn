@@ -1225,6 +1225,7 @@
 
 "chat.storage.invalid" = "Impossible de lire ou d’enregistrer cette conversation. Les données stockées ont été conservées.";
 "chat.storage.run_failed" = "Impossible d’enregistrer la progression de cette réponse : elle s’est arrêtée avant d’envoyer quoi que ce soit d’autre. Votre question est conservée ; réessayez.";
+"chat.command.duplicate" = "Cette question a déjà été envoyée ; elle n’a pas été renvoyée.";
 
 // Native tool pipeline diagnostics.
 "chat.diagnostic.toolValidationFailed" = "Arguments de l’outil refusés";

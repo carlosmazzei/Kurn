@@ -2936,6 +2936,27 @@ has settled, throwing the run's failure — `AgentSessionOwnerError.persistenceF
 write that failed (a terminal entry that could not be saved after an answer included, ahead of any
 other failure), never the store's own error, and otherwise `CancellationError` after `abort()`. A run-start
 that cannot be saved fails the run without blocking the session, since nothing of it was written.
+`start(commandID:)` makes a command idempotent across processes: the ID is written into the run-start
+entry (`AgentSessionEntry.commandID`), and a start whose command is already in the log — checked on
+every snapshot an append attempt is built on, so a writer that committed in between is caught too —
+writes nothing, calls no model and ends with `AgentSessionOwnerError.duplicateCommand`. The chat's
+command is the question turn a run answers (`MeetingChatViewModel.send(commandID:)` can name another).
+`AgentRunProgress` projects a run's phase with its identities from its events — `preparing`,
+`streaming`, `executingTools`, `compacting` (between `compactionStarted` and its end, restoring the
+interrupted phase), `retryWaiting` (an output-limit retry until its request starts) and
+`finished` — with the current turn index, request identity, started-but-unfinished call IDs and the
+turn's registered invocations. It is presentation only and never orders persistence; there is no
+`waitingForUser` until a tool asks for confirmation. A retry's wait lasts across its `turnStarted`
+and any compaction until its request starts, and `finish()` closes a run that ended without
+`runFinished`. The chat keeps it as `MeetingChatViewModel.runProgress` (reset with the conversation),
+and `ChatRunPhase.following(_:)` derives the shown phase from it, beside its own `cancelling`.
+The chat does not read the event stream itself: `HarnessChatService.Run.snapshots` is
+`AgentRunSnapshots.coalescing(events)`, a reducer that drains the complete observation into
+`AgentRunSnapshot`s (streamed text, trace, progress, finished tool calls, outcome) and keeps only the
+newest for the view. A busy view skips intermediate snapshots instead of growing a queue, the last
+snapshot always arrives before the stream ends with the run's failure, and the view model finds the
+document tools finished since the last snapshot it saw by count. Ending observation stops the
+reducer, never the run.
 
 **Chat conversations are host-owned (NH05 host activation).** `ChatConversationHost`
 (`ViewModels/`, built by `AppComposition`, injected app-wide) retains one
@@ -2978,7 +2999,12 @@ stays retryable. A `ChatRunRecord` (`Infrastructure/Agent/`, an `AgentRecoveryRe
 `ChatRunRecovery.sweep`, one of `AppComposition`'s launch sweeps, marks every record still
 `.running` as `.interrupted` (reliability code `run_interrupted`): no run is live when a store
 opens, the saved question already reopens as the retryable one, and committed document effects
-keep their own receipts. It never re-sends or resumes anything. A reopened conversation whose
+keep their own receipts. It never re-sends or resumes anything. Evidence is closed rather than
+deleted: any run's branch that nothing ended — a dead process's, or a run that settled without
+saving its own end entry — gets the `agent.run-end.v1` it is missing (`ChatRunBranch.closeIfOpen`,
+`end` `interrupted` or `persistenceFailed`, reliability code `run_branch_closed`), as the last entry
+of that branch, without moving the selected leaf. In process, a run that failed on a history write
+retries its own end entry once (`AgentSession.retrySettlement`) before it settles. A reopened conversation whose
 retryable question is one of those (`ChatRunRecovery.interruptedQuestionIDs`) says so above
 Retry (`retryableQuestionWasInterrupted`, `chat.run.interrupted`), so an unanswered question left
 by a crash reads differently from one the user stopped. It also shows what that run had done:
@@ -2988,7 +3014,14 @@ question when it has none of its own. Only committed entries are shown — a res
 no output summary (that is a live event, never saved), a call without a saved result reads as
 failed, and there is no stop step without a saved end. Restoring writes nothing and never re-runs
 anything; a later save of the conversation keeps the shown steps on the question, as it does a
-stopped run's.
+stopped run's. The interruption is then resumed, once: `load` stages
+`MeetingChatViewModel.interruptedResume` when `ChatRunRecovery.resumableInterruptedRun` allows it
+(the run committed no document change, was not itself a resume and was not resumed before), and
+`MeetingChatView` calls `resumeInterruptedRun(provider:model:)` with the provider and model the chat
+uses now, as Retry would. The resume runs under the durable command
+`ChatRunBranch.resumeCommand(for:)` (`resume-<runID>`), so it never repeats in this process or after
+another launch (reliability code `interrupted_resumed`); a run that changed a document is left for
+the user's Retry. Both resumes live in `MeetingChatViewModel+Resume.swift`.
 
 **A run's model history is durable, on its own branch, written by `AgentSession`.** Each chat run
 is started through a per-run `AgentSession` owner in `.branch` mode (`ChatRunBranch`,

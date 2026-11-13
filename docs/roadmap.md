@@ -580,9 +580,9 @@ claim target completion. The fixtures cover opaque replay data and four provider
 requests, source parts/empty overrides, legacy session/history restoration, and
 save/update of conversation artifacts as library documents. CI checks versions,
 fixture hashes and evidence links. The canonical v1 format is not activated and no
-store migration runs in that increment. NH02 implements the local message/stream profile described below; NH03 implements the store/migration boundary described below; NH04 implements the native tool pipeline and durable local artifact boundary described below; NH05 has an initial package ownership/barrier increment and a first host-activation
-increment (host-owned conversations, owned run handles, settled cancellation); NH06–NH10 have
-not started. The next implementation increment is NH05 canonical writer activation and recovery. This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
+store migration runs in that increment. NH02 implements the local message/stream profile described below; NH03 implements the store/migration boundary described below; NH04 implements the native tool pipeline and durable local artifact boundary described below; NH05 is complete (session ownership, canonical run branches, barriers, cancellation, recovery
+and resumption, see `CLAUDE.md`); NH06–NH10 have not started. The next implementation increment is
+NH06 projection and persistent compaction. This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
 
 The first NH02 increment adds checked native user/assistant blocks, exact Unix-ms
 codecs, an ordered bounded reducer, authoritative final reconciliation and all four
@@ -670,18 +670,19 @@ work, between start (frozen scope authorization and model) and end entries, on a
 moves, so the presentation path is unchanged, and a failed commit fails the run with the question
 retryable.
 
-**Still open in NH05:** canonical UI/history
-restoration from those branches beyond an interrupted run's steps (a crashed run's recorded steps and
-usage now show under its retryable question; a stopped or failed run's steps are still the
-presentation copy, and replay still sends presentation history until NH06); full phase/identity projection (run/turn/
-call IDs, compacting/retry/waiting phases); durable command idempotency; resuming a run a
-dead process left interrupted (the in-process background case is done); persistence-failure recovery beyond retry (a failed
-run-history write now says so and keeps the question retryable). The chat creates one owner per
-run, which is safe while its view model admits one run at a time; a session-retained owner (and
-uniqueness across independently created actors) arrives with queued commands. Failed message/usage commits require explicit host recovery, rather than
-retrying inference on an incomplete log. The chat now uses `start(observation: .complete)`; coalesced
-snapshots with back-pressure instead of an unbounded presentation stream remain open. NH06 projection and compaction, and NH08 queues, remain
-separate.
+**NH05 is closed.** Its last increment added the phase/identity projection, durable command
+idempotency, closure of branches nothing ended, newest-only snapshot observation and the one-time
+resume of a run a dead process interrupted. What it left is carried by later increments:
+
+- **NH06:** canonical replay. A stopped or failed run's steps are still the presentation copy, and
+  replay still sends presentation history.
+- **NH08:**
+  - A session-retained owner. This includes uniqueness across independently created actors; the
+    chat's one owner per run is safe while its view model admits one run at a time.
+  - Continue/queue commands (acceptance cases A16–A18).
+  - A `waitingForUser` phase once a tool asks for confirmation.
+- **Host recovery:** failed message/usage commits still need explicit host recovery rather than a
+  retried inference on an incomplete log.
 
 
 The architecture prerequisite separates domain from runtime:

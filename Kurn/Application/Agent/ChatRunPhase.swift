@@ -5,18 +5,22 @@ import Foundation
 /// has settled — the producer has terminated and its required writes have finished — so the
 /// UI never reports a stop that is still in progress (`CLAUDE.md`, "Agent harness").
 enum ChatRunPhase: String, Sendable, Equatable {
-    case idle, preparing, streaming, executingTools, cancelling
+    case idle, preparing, streaming, executingTools, compacting, retryWaiting, cancelling
 
     var isBusy: Bool { self != .idle }
 
-    /// The phase after observing `event`. Idle and cancelling are owner states that no event
-    /// can leave: only the owner settling a run returns it to idle.
-    func applying(_ event: AgentEvent) -> ChatRunPhase {
+    /// The phase a run's `AgentRunProgress` projects. Idle and cancelling are owner states that no
+    /// progress can leave: only the owner settling a run returns it to idle. A finished
+    /// projection keeps the current phase until the owner settles.
+    func following(_ progress: AgentRunProgress) -> ChatRunPhase {
         guard self != .idle, self != .cancelling else { return self }
-        switch event {
-        case .toolStarted, .toolProgress, .invocationRegistered: return .executingTools
-        case .requestStarted, .turnStarted, .textDelta, .modelContent: return .streaming
-        default: return self
+        switch progress.phase {
+        case .preparing: return .preparing
+        case .streaming: return .streaming
+        case .executingTools: return .executingTools
+        case .compacting: return .compacting
+        case .retryWaiting: return .retryWaiting
+        case .finished: return self
         }
     }
 }

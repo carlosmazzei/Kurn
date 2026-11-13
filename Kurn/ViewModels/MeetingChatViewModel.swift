@@ -33,6 +33,8 @@ final class MeetingChatViewModel {
     private(set) var isResponding = false
     /// What the current run is doing; `.idle` exactly when `isResponding` is false.
     private(set) var phase: ChatRunPhase = .idle
+    /// The current run's turn, request and tool calls (NH05 phase/identity projection).
+    private(set) var runProgress = AgentRunProgress()
     private(set) var scopeEditor = ChatSourceScopeEditor()
     var scope: ChatSourceScope { scopeEditor.scope }
     private(set) var artifacts: [ChatDocumentArtifact] = []
@@ -73,16 +75,15 @@ final class MeetingChatViewModel {
     /// A question the background wind-down stopped, sent again once on return to the
     /// foreground (`resumeAfterForeground`). A user stop, a new question, `reset` or `load`
     /// clear it: only an interruption the user did not ask for is resumed.
-    @ObservationIgnored private(set) var pendingForegroundResume: ForegroundResume?
+    @ObservationIgnored var pendingForegroundResume: ForegroundResume?
+    /// A question a dead process left interrupted, which reopening its conversation resumes once
+    /// (`resumeInterruptedRun`, `ChatRunRecovery.resumableInterruptedRun`). Set by `load`;
+    /// cleared by `reset`, `send` and the resume itself.
+    var interruptedResume: InterruptedResume?
     /// Whether the last stopped run committed a document change before it stopped. A resumed
     /// run would call the tool again under a new invocation identity, which no receipt matches,
     /// so such a question is left for the user to retry instead of being resumed.
-    @ObservationIgnored private var stoppedRunCommittedEffects = false
-    struct ForegroundResume {
-        let question: String
-        let provider: AIProvider
-        let model: String
-    }
+    @ObservationIgnored var stoppedRunCommittedEffects = false
     /// The background-execution window held for the current run (see `send`).
     @ObservationIgnored private var backgroundWindow: (any BackgroundExecutionWindow)?
     @ObservationIgnored private let makeBackgroundWindow: @MainActor () -> any BackgroundExecutionWindow
@@ -100,17 +101,29 @@ final class MeetingChatViewModel {
     /// the summary settings. No-op while a previous reply is still in flight. A provider without
     /// an `AgentModel` (Apple's on-device model) fails with the cloud-provider notice; the view
     /// disables the composer for it before that can happen.
-    func send(question: String, provider: AIProvider, model: String, runID: OperationID = OperationID()) {
+    func send(question: String, provider: AIProvider, model: String, runID: OperationID = OperationID(),
+              commandID: String? = nil) {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isResponding, task == nil else { return }
+        // A named command already in the log is refused before its question is saved, so a repeat
+        // leaves the conversation untouched (a concurrent repeat is undone below).
+        if let commandID, let session, let modelContext,
+           ChatRunBranch.contains(command: commandID, in: session, store: SwiftDataAgentSessionStore(context: modelContext)) {
+            error = Self.presentedError(AgentSessionOwnerError.duplicateCommand)
+            return
+        }
         error = nil
         pendingForegroundResume = nil
+        interruptedResume = nil
         stoppedRunCommittedEffects = false
 
         generation = UUID()
         let generation = self.generation
 
         turns.append(Turn(role: .user, text: trimmed))
+        // The run's durable command identity (NH05): the question turn it answers, unless the
+        // caller names one, so the same command is never run twice from the session's log.
+        let command = commandID ?? turns[turns.count - 1].id.uuidString
         turns[turns.count - 1].artifacts = retryArtifacts
         turns[turns.count - 1].artifactOrigins = retryOrigins
         retryArtifacts = []
@@ -126,6 +139,7 @@ final class MeetingChatViewModel {
         }
         isResponding = true
         phase = .preparing
+        runProgress = AgentRunProgress()
         currentRequest = ForegroundResume(question: trimmed, provider: provider, model: model)
         let token = UUID()
         runToken = token
@@ -156,7 +170,7 @@ final class MeetingChatViewModel {
                     throw AppError.apiError(statusCode: 0, message: NSLocalizedString(
                         "chat.artifact.cloud_required", comment: "Chat provider requirement"))
                 }
-                let answered = try await self.runHarness(agentModel, runID: token, question: trimmed,
+                let answered = try await self.runHarness(agentModel, runID: token, commandID: command, question: trimmed,
                                                          history: Self.buildHistory(from: priorTurns),
                                                          provider: provider, model: model, startedAt: startedAt)
                 try Task.checkCancellation()
@@ -177,6 +191,11 @@ final class MeetingChatViewModel {
                 let appError = Self.presentedError(error)
                 if self.generation == generation {
                     self.dropPartialReply(keeping: turnCountBeforeReply)
+                    // A repeat that raced past the check above ran nothing: its question goes too.
+                    if (error as? AgentSessionOwnerError) == .duplicateCommand, self.turns.last?.role == .user {
+                        self.turns.removeLast()
+                        self.persist()
+                    }
                     self.error = appError
                 }
                 ReliabilityLog.record(ReliabilityEvent(
@@ -246,32 +265,6 @@ final class MeetingChatViewModel {
         let request = currentRequest
         cancel()
         pendingForegroundResume = request
-    }
-
-    /// Sends again, once, the question a background wind-down stopped (NH05 foreground
-    /// resumption). Waits for that run to settle first; does nothing if the user has since
-    /// answered, stopped, replaced or left the question, or if the stopped run had committed a
-    /// document change (its tool would run again under a new invocation identity). The run
-    /// starts over from the saved question with the same provider and model; nothing of the
-    /// stopped run is replayed.
-    func resumeAfterForeground() async {
-        await waitUntilSettled()
-        guard let pending = pendingForegroundResume else { return }
-        pendingForegroundResume = nil
-        guard retryableQuestion == pending.question, error == nil else { return }
-        guard !stoppedRunCommittedEffects else {
-            ReliabilityLog.record(ReliabilityEvent(
-                operationID: OperationID(), operation: "meeting_chat", stage: "background",
-                outcome: .cancelled, code: "background_resume_declined"
-            ))
-            return
-        }
-        ReliabilityLog.record(ReliabilityEvent(
-            operationID: OperationID(), operation: "meeting_chat", stage: "background",
-            outcome: .started, code: "background_resumed"
-        ))
-        dropRetryableQuestion()
-        send(question: pending.question, provider: pending.provider, model: pending.model)
     }
 
     /// Returns once the current run, if any, has terminated and reconciled its reply.
@@ -381,6 +374,8 @@ final class MeetingChatViewModel {
         error = nil
         session = nil
         interruptedQuestionIDs = []
+        interruptedResume = nil
+        runProgress = AgentRunProgress()
         conversationID = UUID()
         artifacts = []
         workspace = ChatDocumentWorkspace()
@@ -434,6 +429,10 @@ final class MeetingChatViewModel {
             } ?? (turns: restored.turns, interrupted: [])
             turns = recovered.turns.map(Turn.init)
             interruptedQuestionIDs = recovered.interrupted
+            runProgress = AgentRunProgress()
+            interruptedResume = modelContext.flatMap { context in
+                ChatRunRecovery.resumableInterruptedRun(in: recovered.turns, session: session, context: context)
+            }.flatMap { runID in recovered.turns.last.map { InterruptedResume(question: $0.text, runID: runID) } }
             retryArtifacts = []
             retryOrigins = [:]
             error = nil
@@ -448,7 +447,7 @@ final class MeetingChatViewModel {
         if session != nil { persist() }
     }
 
-    private func runHarness(_ agentModel: any AgentModel, runID: UUID, question: String, history: [ChatMessage],
+    private func runHarness(_ agentModel: any AgentModel, runID: UUID, commandID: String, question: String, history: [ChatMessage],
                             provider: AIProvider, model: String, startedAt: Date) async throws -> Bool {
         guard let modelContext else {
             throw AppError.apiError(statusCode: 0, message: "Chat requires a configured model context.")
@@ -484,7 +483,8 @@ final class MeetingChatViewModel {
         }
         let run = try await service.start(model: agentModel, provider: provider, modelIdentifier: model,
                                           context: modelContext, scope: scope, workspace: workspace,
-                                          history: history, question: question, owner: owner, runID: runID)
+                                          history: history, question: question, owner: owner, runID: runID,
+                                          commandID: commandID)
         // Whatever ends this function, the run has settled first: a cancelled or failed run is
         // only reported once nothing can still call a tool or write its effect.
         do { try Task.checkCancellation() } catch {
@@ -494,36 +494,46 @@ final class MeetingChatViewModel {
         let index = turns.count
         turns.append(Turn(role: .assistant, text: ""))
         var timeline = AgentRunTrace()
+        var toolsSeen = 0
         do {
-            for try await event in run.events {
+            for try await view in run.snapshots {
                 try Task.checkCancellation()
-                if self.generation == generation { phase = phase.applying(event) }
-                timeline.apply(event)
+                if self.generation == generation {
+                    runProgress = view.progress
+                    phase = phase.following(runProgress)
+                }
+                timeline = view.trace
                 turns[index].steps = timeline.steps
                 turns[index].usage = timeline.hasUsage
                     ? TokenUsage(promptTokens: timeline.usage.inputTokens, completionTokens: timeline.usage.outputTokens) : nil
                 turns[index].costUSD = turns[index].usage.flatMap { ModelPricing.estimatedCostUSD(model: model, usage: $0) }
-                switch event {
-                case .textDelta(let text): turns[index].text += text
-                case .runFinished(let outcome): turns[index].text = outcome.finalText
-                case .toolFinished(_, let name, _, let isError):
-                    if !isError && ["create_document", "update_document", "append_to_document"].contains(name) {
-                        let snapshot = await workspace.snapshot()
-                        try Task.checkCancellation()
-                        turns[index].recordArtifacts(from: artifacts, to: snapshot,
-                                                    origin: origin, priorOrigins: priorOrigins)
-                        artifacts = snapshot
-                        var pending = turns[index - 1]
-                        pending.inheritArtifacts(from: turns[index])
-                        persist(turns: completedTurns + [pending])
-                    }
-                default: break
+                turns[index].text = view.text
+                // Coalescing can fold several tool calls into one snapshot: take every one that
+                // finished since the last snapshot seen.
+                let finished = view.finishedTools.dropFirst(toolsSeen)
+                toolsSeen = view.finishedTools.count
+                if finished.contains(where: { !$0.isError && ChatRunBranch.documentTools.contains($0.name) }) {
+                    let snapshot = await workspace.snapshot()
+                    try Task.checkCancellation()
+                    turns[index].recordArtifacts(from: artifacts, to: snapshot,
+                                                origin: origin, priorOrigins: priorOrigins)
+                    artifacts = snapshot
+                    var pending = turns[index - 1]
+                    pending.inheritArtifacts(from: turns[index])
+                    persist(turns: completedTurns + [pending])
                 }
             }
             try Task.checkCancellation()
             await run.settle()
         } catch {
             await run.terminate()
+            if self.generation == generation { runProgress.finish() }
+            // A run whose end entry alone failed to save gets one more attempt at it, without
+            // re-running anything; a branch still left open is closed by the next launch sweep.
+            if ChatRunBranch.isWriteFailure(error), let owner {
+                try? await owner.retrySettlement()
+                _ = await owner.waitUntilSettled()
+            }
             let snapshot = await workspace.snapshot()
             // Any document change this run committed rules out an automatic resume.
             if snapshot != initialArtifacts { stoppedRunCommittedEffects = true }

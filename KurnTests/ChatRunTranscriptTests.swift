@@ -202,4 +202,30 @@ struct ChatRunTranscriptTests {
         let remaining = try context.fetch(FetchDescriptor<ChatSession>(predicate: #Predicate { $0.id == sessionID }))
         #expect(remaining.isEmpty)
     }
+
+    @Test func aRunsCommandIsTheQuestionItAnswers() async throws {
+        let model = ChatAgentModel([AgentTurnResponse(text: "Monday."), AgentTurnResponse(text: "Unused")])
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model })
+        vm.configure(meeting: meeting, modelContext: context)
+        vm.send(question: "When?", provider: .openAI, model: "gpt-4o")
+        await vm.waitUntilSettled()
+        let session = try #require(vm.pastSessions().first)
+        let questionID = try #require(session.turns.first?.id)
+        let entries = try SwiftDataAgentSessionStore(context: context).snapshot(session).entries
+        #expect(entries.compactMap(\.commandID) == [questionID.uuidString])
+
+        // Sending that command again does nothing: no request, no new branch, and the chat says why.
+        vm.send(question: "When?", provider: .openAI, model: "gpt-4o", commandID: questionID.uuidString)
+        await vm.waitUntilSettled()
+        #expect(await model.requests.count == 1)
+        let after = try SwiftDataAgentSessionStore(context: context).snapshot(session).entries
+        #expect(after.compactMap(\.commandID) == [questionID.uuidString])
+        // Nor is the repeated question saved: the conversation is still one answered question.
+        #expect(vm.turns.count == 2)
+        #expect(session.turns.count == 2)
+        #expect(vm.retryableQuestion == nil)
+        #expect(Self.message(of: vm.error) == NSLocalizedString("chat.command.duplicate", comment: ""))
+    }
 }

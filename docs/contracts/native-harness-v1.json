@@ -178,8 +178,21 @@
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/NativeHarnessTests.swift"
         }
       ],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "startStreamsTheRunAndEndsOnlyOnceItHasSettled"
+        },
+        {
+          "path": "KurnTests/ChatRunTranscriptTests.swift",
+          "symbol": "aRunRecordsItsMessagesOnABranchAnchoredAtTheQuestion"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunSnapshotTests.swift",
+          "symbol": "anOwnedRunsEventsCoalesceIntoItsFinishedSnapshot"
+        }
+      ],
+      "note": "NH05: each chat run is owned by an AgentSession that persists its canonical branch and is observed through coalesced snapshots. Replaying canonical history to the model remains NH06."
     },
     {
       "id": "C06",
@@ -187,15 +200,32 @@
       "sourceDocument": "01-nucleo.md",
       "disposition": "required",
       "increment": "NH05",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "KurnTests/NativeHarnessContractFixtureTests.swift",
           "symbol": "legacySessionRestoresScopeTraceArtifactsAndRetryIdentity"
         }
       ],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "failedMessageSaveStopsModelAndRemainsExplicitlyBlocked"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "aRunWhoseStartAcknowledgementWasLostIsNotItsOwnDuplicate"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunProgressTests.swift",
+          "symbol": "aRunMovesThroughItsPhasesWithItsIdentities"
+        },
+        {
+          "path": "KurnTests/ChatRunRecordTests.swift",
+          "symbol": "aSettledRunWhoseEndWasNotSavedIsClosedAsAPersistenceFailure"
+        }
+      ],
+      "note": "NH05: awaited message/usage barriers, typed persistence failure, durable command idempotency, phase/identity projection and closure of unfinished branches."
     },
     {
       "id": "C07",
@@ -214,14 +244,27 @@
       "sourceDocument": "01-nucleo.md",
       "disposition": "required",
       "increment": "NH05",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "KurnTests/MeetingChatHarnessFailureTests.swift"
         }
       ],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "cancellationWaitsForProviderTerminationAndAuditWrites"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "anAbortEndsTheObservationCancelledAfterTheToolSettles"
+        },
+        {
+          "path": "KurnTests/ChatConversationHostTests.swift",
+          "symbol": "anExpiredBackgroundWindowStopsTheRunAsAnInterruption"
+        }
+      ],
+      "note": "NH05: an abort settles only after the producer and its tools terminated and the end entry was written; the chat stays cancelling until then."
     },
     {
       "id": "C09",
@@ -501,8 +544,21 @@
           "path": "KurnTests/MeetingChatHarnessTests.swift"
         }
       ],
-      "targetEvidence": [],
-      "note": "Local typed commands replace RPC; native export is required and pi interchange is a qualified subset."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "aCommandAlreadyInTheLogDoesNothing"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunSnapshotTests.swift",
+          "symbol": "aSlowObserverGetsTheNewestSnapshotAndNeverMissesTheLast"
+        },
+        {
+          "path": "KurnTests/ChatRunRecordTests.swift",
+          "symbol": "aReopenedInterruptedRunIsResumedOnceAndOnlyOnce"
+        }
+      ],
+      "note": "Local typed commands replace RPC: start with a durable command ID, abort, settle and retry settlement, observed through newest-only snapshots. Native export is required and pi interchange is a qualified subset."
     },
     {
       "id": "C26",
@@ -566,10 +622,23 @@
       "requirement": "Segundo é rejeitado ou enfileirado explicitamente na camada de sessão",
       "disposition": "required",
       "increment": "NH05",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "acceptanceExcludesConcurrentPromptsEvenDuringPreparation"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "aCommandAlreadyInTheLogDoesNothing"
+        },
+        {
+          "path": "KurnTests/ChatConversationHostTests.swift",
+          "symbol": "phaseFollowsTheRunUntilItSettles"
+        }
+      ],
+      "note": "NH05: the session owner rejects a second prompt as busy from acceptance, before any store await; the chat refuses a send until its run settles. A repeated command is refused durably from the log. Queueing it instead is NH08."
     },
     {
       "id": "A04",
@@ -687,10 +756,19 @@
       "requirement": "Agent permanece ocupado até listener terminar",
       "disposition": "required",
       "increment": "NH05",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "terminalPersistenceKeepsTheSessionBusyUntilItsSaveCompletes"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "startStreamsTheRunAndEndsOnlyOnceItHasSettled"
+        }
+      ],
+      "note": "NH05: the owner stays busy until the producer terminated and its terminal entry was saved, and its observation ends only then. There is no public listener API; the host awaits settlement."
     },
     {
       "id": "A11",
@@ -762,33 +840,33 @@
       "scenario": "continue com só system",
       "requirement": "Erro sem consumir pendências",
       "disposition": "required",
-      "increment": "NH05",
+      "increment": "NH08",
       "targetStatus": "pending",
       "baselineEvidence": [],
       "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "note": "Needs the continue/queue commands NH08 introduces; NH05 has no continue command."
     },
     {
       "id": "A17",
       "scenario": "continue após assistant com fila",
       "requirement": "Uma seleção de fila, sem duplicar drain inicial",
       "disposition": "required",
-      "increment": "NH05",
+      "increment": "NH08",
       "targetStatus": "pending",
       "baselineEvidence": [],
       "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "note": "Needs the continue/queue commands NH08 introduces; NH05 has no continue command."
     },
     {
       "id": "A18",
       "scenario": "Hooks end/continue",
       "requirement": "End não consulta filas; continue assegura uma request sem duplicar natural",
       "disposition": "adapted",
-      "increment": "NH05",
+      "increment": "NH08",
       "targetStatus": "pending",
       "baselineEvidence": [],
       "targetEvidence": [],
-      "note": "Internal scheduling only; no public hook/extension API."
+      "note": "Internal scheduling only; no public hook/extension API. Needs the continue/queue commands NH08 introduces."
     },
     {
       "id": "A19",
@@ -1145,10 +1223,23 @@
       "requirement": "UI continua ocupada até agent_settled",
       "disposition": "required",
       "increment": "NH05",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatConversationHostTests.swift",
+          "symbol": "phaseFollowsTheRunUntilItSettles"
+        },
+        {
+          "path": "KurnTests/ChatConversationHostTests.swift",
+          "symbol": "compactionAndAnOutputRetryHaveTheirOwnPhases"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunProgressTests.swift",
+          "symbol": "theRetryWaitLastsAcrossItsTurnAndCompactionUntilItsRequest"
+        }
+      ],
+      "note": "NH05: an output-limit retry keeps the run in retryWaiting until its request starts, and the chat stays busy (cancelling included) until the run settles. Bounded session retries across runs are NH07."
     },
     {
       "id": "A46",
@@ -1204,10 +1295,27 @@
       "requirement": "Conflito não move leaf parcialmente",
       "disposition": "required",
       "increment": "NH05",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "branchModeChainsTheRunWithoutMovingTheSelectedLeaf"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "aConflictingWriterIsRetriedOnTheNewSnapshot"
+        },
+        {
+          "path": "KurnTests/ChatConversationHostTests.swift",
+          "symbol": "resetFencesARunThatIsStillSettling"
+        },
+        {
+          "path": "KurnTests/ChatRunRecordTests.swift",
+          "symbol": "theLaunchSweepClosesTheBranchADeadProcessLeftOpen"
+        }
+      ],
+      "note": "NH05: a run writes on its own branch and never moves the selected leaf; a raced append is rebuilt on the new snapshot, a reset or reload fences the old run, and an unfinished branch is closed without moving the leaf."
     },
     {
       "id": "A51",
