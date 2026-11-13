@@ -1282,3 +1282,4 @@
 "chat.context.leave_out" = "Aus späteren Antworten ausschließen";
 "chat.context.include" = "In spätere Antworten einbeziehen";
 "chat.context.left_out" = "Aus späteren Antworten ausgeschlossen";
+"chat.branch.tree" = "Alle Zweige";

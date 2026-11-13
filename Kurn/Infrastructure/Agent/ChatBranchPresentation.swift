@@ -21,6 +21,8 @@ struct ChatBranchPresentation: Equatable {
     /// Questions asked more than once in the same place, by the shown turn's ID.
     private(set) var alternatives: [UUID: Alternatives] = [:]
     private(set) var labels: [UUID: String] = [:]
+    /// Every question of the conversation as a tree (`ChatBranchOutline`).
+    private(set) var outline = ChatBranchOutline()
     /// Shown turns later runs leave out of what they replay (`AgentContextEdit`).
     private(set) var leftOut: Set<UUID> = []
     /// Usage recorded by every branch's runs, and by the runs of the branch shown.
@@ -43,6 +45,7 @@ struct ChatBranchPresentation: Equatable {
         }
         leftOut = Set(AgentContextEdit.excluded(by: AgentContextEdit.all(in: tree.entries)).compactMap(UUID.init(uuidString:)))
             .intersection(entryIDs.keys)
+        outline = ChatBranchOutline(tree: tree)
         sessionUsage = tree.usage(.session)
         branchUsage = tree.usage(.activePath)
     }

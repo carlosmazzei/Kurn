@@ -1282,3 +1282,4 @@
 "chat.context.leave_out" = "Deixar fora das próximas respostas";
 "chat.context.include" = "Incluir nas próximas respostas";
 "chat.context.left_out" = "Fora das próximas respostas";
+"chat.branch.tree" = "Todas as ramificações";

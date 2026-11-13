@@ -897,7 +897,6 @@ shown. Still open:
 
 - Branch summaries: an explicit model operation that summarizes a branch being left, keeping its
   source restrictions, and that later runs replay.
-- A tree view of every branch (the chat moves between versions of one question at a time).
 
 **NH10 details.** Export a native versioned session bundle containing entries,
 branch/leaf state, scopes, context boundaries, artifact revisions/provenance and
@@ -940,7 +939,6 @@ excluded by the local profile, 11 are partial, 2 are conditional and none is pen
 | Usage and cost | Provider-reported cost where a vendor reports one (cache-aware pricing and per-request usage are done) | C17 follow-up |
 | Compaction | Manual compaction; branch summaries; checkpoint anchoring for plain (identity-less) history | C10, C13 |
 | Run ownership | One owner retained per session across runs; model/provider changes at request boundaries; a `waitingForUser` phase once a tool asks for confirmation | C24 |
-| Tree | A tree view of every branch | C10 follow-up |
 | Interchange | The pi JSONL v3 subset (only with fixtures); exact integers past 2^53 in opaque fields (accepted limitation) | C25, C26 |
 | Suspension | Reconcile background/foreground on a device (the release checklist's chat item); the unsent draft is saved | A68 |
 | Qualification | Real-transport chunking, Dynamic Type/VoiceOver over a running conversation, migration/stress, Thread Sanitizer on the session/store boundaries, and the physical-device checklist | A06, A51 |

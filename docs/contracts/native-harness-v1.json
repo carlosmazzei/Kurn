@@ -364,9 +364,13 @@
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTreeTests.swift",
           "symbol": "sessionUsageCoversEveryBranchAndContextUsageOnlyTheSelectedPath"
+        },
+        {
+          "path": "KurnTests/ChatSessionTreeTests.swift",
+          "symbol": "theTreeOfEveryBranchOpensTheOneChosen"
         }
       ],
-      "note": "NH09: alternatives, atomic navigation while settled, fork, clone, labels, rename, branch-aware artifact revisions and save actions, and usage over every branch versus the selected path. Open: branch summaries."
+      "note": "NH09: alternatives, atomic navigation while settled, fork, clone, labels, rename, branch-aware artifact revisions and save actions, and usage over every branch versus the selected path. A tree of every branch opens the one chosen. Open: branch summaries."
     },
     {
       "id": "C11",

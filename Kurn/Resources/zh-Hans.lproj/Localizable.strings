@@ -1282,3 +1282,4 @@
 "chat.context.leave_out" = "从后续回答中排除";
 "chat.context.include" = "在后续回答中包含";
 "chat.context.left_out" = "已从后续回答中排除";
+"chat.branch.tree" = "所有分支";

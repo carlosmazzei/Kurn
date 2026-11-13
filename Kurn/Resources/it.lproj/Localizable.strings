@@ -1282,3 +1282,4 @@
 "chat.context.leave_out" = "Escludi dalle prossime risposte";
 "chat.context.include" = "Includi nelle prossime risposte";
 "chat.context.left_out" = "Escluso dalle prossime risposte";
+"chat.branch.tree" = "Tutti i rami";

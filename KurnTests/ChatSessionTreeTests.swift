@@ -69,6 +69,34 @@ struct ChatSessionTreeTests {
         #expect(try session.harnessSnapshot().artifacts == [seeded.other])
     }
 
+    /// Every question as a tree: a linear stretch stays flat, a question asked again opens a level
+    /// with its versions, the branch shown is marked, and opening a node selects its branch.
+    @Test func theTreeOfEveryBranchOpensTheOneChosen() throws {
+        let context = ModelContext(TestModelContainer.make())
+        let seeded = try seed(context)
+        let store = SwiftDataAgentSessionStore(context: context)
+        let outline = ChatBranchOutline(tree: try store.tree(seeded.session))
+        #expect(outline.nodes.map(\.text) == ["First question", "Second question", "Asked again"])
+        #expect(outline.nodes.map(\.depth) == [0, 1, 1])
+        #expect(outline.nodes.map(\.isShown) == [true, false, true])
+        #expect(outline.hasBranches)
+
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in nil })
+        vm.configure(meeting: nil, modelContext: context)
+        vm.load(session: seeded.session)
+        #expect(vm.branches.outline == outline)
+        vm.showBranch(at: outline.nodes[1].id)
+        #expect(vm.error == nil)
+        #expect(vm.turns.map(\.text) == ["First question", "First answer", "Second question", "Second answer"])
+        #expect(vm.branches.outline.nodes.map(\.isShown) == [true, true, false])
+
+        // One branch only: nothing to show as a tree.
+        let linear = ChatSession(meeting: nil, title: "Linear")
+        context.insert(linear)
+        try store.writePresentation(linear, turns: [turn(.user, "Q"), turn(.assistant, "A")], scope: nil, artifacts: [])
+        #expect(!ChatBranchOutline(tree: try store.tree(linear)).hasBranches)
+    }
+
     @Test func aForkStartsBeforeItsQuestionAndACloneKeepsTheBranchShown() throws {
         let context = ModelContext(TestModelContainer.make())
         let seeded = try seed(context)

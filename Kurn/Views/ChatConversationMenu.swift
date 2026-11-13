@@ -6,9 +6,17 @@ struct ChatConversationMenu: View {
     let vm: MeetingChatViewModel
     @Binding var shareItem: ShareItem?
     @Binding var showingImporter: Bool
+    @State private var showingBranches = false
 
     var body: some View {
         Menu {
+            Button {
+                showingBranches = true
+            } label: {
+                Label(NSLocalizedString("chat.branch.tree", comment: "Every branch of the conversation"),
+                      systemImage: "arrow.triangle.branch")
+            }
+            .disabled(!vm.canChangeBranch || !vm.branches.outline.hasBranches)
             Button {
                 vm.duplicateConversation()
             } label: {
@@ -44,5 +52,8 @@ struct ChatConversationMenu: View {
         }
         .accessibilityLabel(NSLocalizedString("chat.conversation.more", comment: "Conversation actions"))
         .accessibilityIdentifier("chat.conversation.more")
+        .sheet(isPresented: $showingBranches) {
+            ChatBranchTreeView(outline: vm.branches.outline) { vm.showBranch(at: $0) }
+        }
     }
 }

@@ -24,6 +24,18 @@ extension MeetingChatViewModel {
         }
     }
 
+    /// Opens the branch through the question `entryID` (from the tree of every branch), where it
+    /// was left.
+    func showBranch(at entryID: String) {
+        guard canChangeBranch, let session = artifactSession, let context = session.modelContext else { return }
+        do {
+            try SwiftDataAgentSessionStore(context: context).navigate(session, to: entryID, expectedRevision: session.canonicalRevision)
+            load(session: session)
+        } catch {
+            branchFailed()
+        }
+    }
+
     /// Starts a new conversation from before the question `turnID`, with that question back in
     /// the composer to change and send. This conversation is unchanged.
     func fork(from turnID: UUID) {

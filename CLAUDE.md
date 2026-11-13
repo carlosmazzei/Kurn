@@ -360,7 +360,9 @@ branch. Labels and renames are metadata. Artifact revisions are per branch: the 
 other content is a revision of its own (`branchRevisionID`, the version's ID plus a digest of its bytes),
 never a conflict, and the save action reads a saved document as current only when it holds that version
 with the same body (`ChatArtifactStore.action`). `ChatBranchPresentation.usageSummary` lists the branch
-shown and every branch when they differ. Branch summaries are not implemented yet.
+shown and every branch when they differ. "All branches" (`ChatBranchOutline`, `ChatBranchTreeView`) lists
+every question as a tree — a question asked again opens a level, the branch shown is marked — and opens the
+one chosen where it was left. Branch summaries are not implemented yet.
 Session interchange (NH10, `AgentSessionArchive`): a native, versioned JSON Lines archive
 (`kurn.agent-session` v1) — a header, one line per entry (encoded directly, so integers keep their exact
 form) and namespaced host records kept opaque; unknown entries, record types and header fields survive a
