@@ -275,12 +275,14 @@ public actor AgentSession {
         while true {
             attempt += 1
             let snapshot = try await store.load(sessionID: sessionID)
-            try precondition(snapshot)
+            // This append's own entry first: a commit whose acknowledgement was lost is not a
+            // duplicate of itself, whatever the precondition would say about it.
             if let existing = snapshot.entries.first(where: { $0.id == id }) {
                 guard existing.payload == payload else { throw AgentSessionStoreError.conflict }
                 if appendMode == .branch { branchTip = id }
                 return
             }
+            try precondition(snapshot)
             if branchAnchor == nil { branchAnchor = .some(snapshot.leafID) }
             let parent = appendMode == .branch ? (branchTip ?? branchAnchor ?? snapshot.leafID) : snapshot.leafID
             let entry = try AgentSessionEntry(sessionID: sessionID, id: id, parentID: parent,

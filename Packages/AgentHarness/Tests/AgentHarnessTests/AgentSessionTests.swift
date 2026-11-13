@@ -52,6 +52,11 @@ actor SessionTestStore: AgentSessionStore {
             interleavedWrites -= 1
             try appendHostEntry("host-\(interleavedWrites)-\(entries.count)")
         }
+        if acknowledgeStartAsConflict, group.entries.contains(where: { $0.kind == "agent.run-start.v1" }) {
+            acknowledgeStartAsConflict = false
+            entries += group.entries; leaf = group.leafID; revision += 1
+            throw AgentSessionStoreError.conflict
+        }
         if let command = interleavedCommand {
             interleavedCommand = nil
             try appendRunStart(command: command)
@@ -75,6 +80,9 @@ actor SessionTestStore: AgentSessionStore {
     func interleave(_ count: Int) { interleavedWrites = count }
     /// Another writer's run for `command` commits just before the owner's next commit.
     var interleavedCommand: String?
+    /// The run-start commit lands but its acknowledgement comes back as a conflict.
+    var acknowledgeStartAsConflict = false
+    func loseStartAcknowledgement() { acknowledgeStartAsConflict = true }
     func interleaveRun(command: String) { interleavedCommand = command }
     func appendRunStart(command: String) throws {
         let entry = try AgentSessionEntry(sessionID: sessionID, id: "other-run-\(entries.count)", parentID: leaf,
@@ -432,6 +440,19 @@ actor SessionTestStore: AgentSessionStore {
                                           tools: [], commandID: "cmd-1", observation: .complete)
         await #expect(throws: AgentSessionOwnerError.duplicateCommand) { for try await _ in run.events {} }
         #expect(await model.requests.isEmpty)
+        #expect(await store.entries.compactMap(\.commandID) == ["cmd-1"])
+    }
+
+    @Test func aRunWhoseStartAcknowledgementWasLostIsNotItsOwnDuplicate() async throws {
+        let store = SessionTestStore()
+        await store.loseStartAcknowledgement()
+        let session = try AgentSession(sessionID: "session", store: store)
+        let model = ScriptedAgentModel([AgentTurnResponse(text: "Answer")])
+        let run = try await session.start(harness: NativeHarness(model: model), systemPrompt: "", history: [], prompt: "Q",
+                                          tools: [], commandID: "cmd-1", observation: .complete)
+        for try await _ in run.events {}
+        #expect(await session.snapshot().end == .completed)
+        #expect(await model.requests.count == 1)
         #expect(await store.entries.compactMap(\.commandID) == ["cmd-1"])
     }
 }
