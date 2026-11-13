@@ -50,7 +50,7 @@
       "sourceDocument": "01-nucleo.md",
       "disposition": "required",
       "increment": "NH02",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContractFixtureTests.swift",
@@ -69,9 +69,17 @@
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeIdentityTests.swift",
           "symbol": "repeatedProviderIDsGetDistinctLocalInvocationsAndCorrelatedResults"
+        },
+        {
+          "path": "KurnTests/SchemaV5MigrationTests.swift",
+          "symbol": "realV5DiskUpgradeConversionAndRepeatedReopenPreserveIdentityScopeArtifactsAndBytes"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionEntryTests.swift",
+          "symbol": "graphKeepsSiblingsAndSelectsAnOlderLeafIndependentlyOfAppendOrder"
         }
       ],
-      "note": "Native v1 user/assistant/tool-result codecs, exact or explicitly unknown timestamps, owner-assigned request/invocation identity and raw argument validation are implemented. Indexed entries, V5 conversion and durable storage remain NH03."
+      "note": "Native v1 user/assistant/tool-result codecs, exact or explicitly unknown timestamps, owner-assigned request/invocation identity and raw argument validation (NH02), stored as indexed checked entries with per-session V5 conversion (NH03)."
     },
     {
       "id": "C02",
@@ -79,7 +87,7 @@
       "sourceDocument": "01-nucleo.md",
       "disposition": "required",
       "increment": "NH02",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentWireStreamTests.swift"
@@ -113,9 +121,17 @@
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRequestCorrelationTests.swift",
           "symbol": "compactionDecisionsAreRunScopedAndOnlySummaryEventsCarryTheSummaryRequest"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentPersistenceBarrierTests.swift",
+          "symbol": "userAssistantAndResultCommitsPrecedeDependentWork"
+        },
+        {
+          "path": "KurnTests/ChatRunTranscriptTests.swift",
+          "symbol": "aRunRecordsItsMessagesOnABranchAnchoredAtTheQuestion"
         }
       ],
-      "note": "Ordered bounded blocks, final replacement and terminal fencing are implemented. Awaitable session barriers and durable event envelopes remain NH05."
+      "note": "Ordered bounded blocks, final replacement and terminal fencing (NH02); awaited message/usage barriers and durable run entries written by AgentSession (NH05)."
     },
     {
       "id": "C03",
@@ -131,7 +147,7 @@
         }
       ],
       "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "note": "Open (NH07): a versioned per-model capability snapshot (tools, reasoning, images, cache) recorded with the run; today only context/output capacity is resolved and recorded."
     },
     {
       "id": "C04",
@@ -164,7 +180,7 @@
           "symbol": "failedMessagesAndTheirResultsStayOutOfReplay"
         }
       ],
-      "note": "All four wire adapters accept native blocks and own preparation terminals. Per-model capabilities, aliases and authenticated qualification remain open."
+      "note": "All four wire adapters accept native blocks and own preparation terminals. Open: per-model capability flags, alias qualification and authenticated live-provider qualification."
     },
     {
       "id": "C05",
@@ -172,7 +188,7 @@
       "sourceDocument": "01-nucleo.md",
       "disposition": "required",
       "increment": "NH05",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/NativeHarnessTests.swift"
@@ -190,9 +206,13 @@
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunSnapshotTests.swift",
           "symbol": "anOwnedRunsEventsCoalesceIntoItsFinishedSnapshot"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "aSecondQuestionReplaysTheFirstRunsCallsAndResults"
         }
       ],
-      "note": "NH05: each chat run is owned by an AgentSession that persists its canonical branch and is observed through coalesced snapshots. Replaying canonical history to the model remains NH06."
+      "note": "NH05: each chat run is owned by an AgentSession that persists its canonical branch and is observed through coalesced snapshots. NH06: the next run replays those branches as canonical history."
     },
     {
       "id": "C06",
@@ -285,7 +305,7 @@
       "sourceDocument": "02-sessoes-contexto.md",
       "disposition": "required",
       "increment": "NH03",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "KurnTests/NativeHarnessContractFixtureTests.swift",
@@ -308,9 +328,17 @@
         {
           "path": "KurnTests/HarnessSessionStoreTests.swift",
           "symbol": "salvageAndErasureIncludeLibraryWideAndOrphanedHarnessData"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentPersistenceBarrierTests.swift",
+          "symbol": "userAssistantAndResultCommitsPrecedeDependentWork"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "aSecondQuestionReplaysTheFirstRunsCallsAndResults"
         }
       ],
-      "note": "NH03 supplies indexed checked entries, an independent active leaf, immutable artifact revisions and recovery metadata containers. Frozen V5 upgrades to additive V6; per-session conversion retains original bytes and historical unknowns. Detailed runtime barriers remain NH05; full active-path model replay remains NH06."
+      "note": "NH03 supplies indexed checked entries, an independent active leaf, immutable artifact revisions and recovery metadata containers; frozen V5 upgrades to additive V6 with original bytes retained. Runtime barriers landed in NH05 and active-path canonical replay in NH06."
     },
     {
       "id": "C10",
@@ -464,7 +492,7 @@
       "sourceDocument": "02-sessoes-contexto.md",
       "disposition": "required",
       "increment": "NH04",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/KurnCore/Tests/KurnCoreTests/ChatContractFixtureTests.swift",
@@ -474,9 +502,17 @@
       "targetEvidence": [
         {
           "path": "KurnTests/AuthorizedChatSourceReaderTests.swift"
+        },
+        {
+          "path": "KurnTests/ChatRunTranscriptTests.swift",
+          "symbol": "aRunRecordsItsMessagesOnABranchAnchoredAtTheQuestion"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "runsOutsideTheCurrentSourcesReplayAsPlainText"
         }
       ],
-      "note": "NH04 captures immutable source IDs/parts/content revisions and rejects deleted sources. Durable authorization entries and source-aware replay remain NH05/NH06."
+      "note": "NH04 captures immutable source IDs/parts/content revisions and rejects deleted sources; NH05 records the run authorization in its run-start entry; NH06 replays a run canonically only while it was authorized for sources the current run may read."
     },
     {
       "id": "C16",
@@ -659,7 +695,7 @@
           "symbol": "aReaderOfOlderMessagesStaysWhereTheyAreUnlessTheyAsk"
         }
       ],
-      "note": "NH08: Steer/After this task actions, queued list with edit/remove, retry delay, compaction and confirmed-stop status in words, reading position kept. Open: a session-retained owner and model changes at request boundaries."
+      "note": "NH08: Steer/After this task actions, queued list with edit/remove, retry delay, compaction and confirmed-stop status in words, reading position kept. Open: an owner retained per session across runs, model/provider changes at request boundaries, and a waitingForUser phase (no tool asks for confirmation yet)."
     },
     {
       "id": "C25",
@@ -687,7 +723,7 @@
           "symbol": "aReopenedInterruptedRunIsResumedOnceAndOnlyOnce"
         }
       ],
-      "note": "Local typed commands replace RPC: start with a durable command ID, abort, settle and retry settlement, observed through newest-only snapshots. Native export is required and pi interchange is a qualified subset."
+      "note": "Local typed commands replace RPC: start with a durable command ID, abort, settle and retry settlement, observed through newest-only snapshots. Open: the qualified pi JSONL v3 interchange subset (native export landed in NH10)."
     },
     {
       "id": "C26",
@@ -736,15 +772,20 @@
       "requirement": "Um turno, assistant final e settle",
       "disposition": "required",
       "increment": "NH02",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/NativeHarnessTests.swift",
           "symbol": "plainAnswer"
         }
       ],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "startStreamsTheRunAndEndsOnlyOnceItHasSettled"
+        }
+      ],
+      "note": "A prompt without tools is one request, one final assistant message and a run that settles only after its terminal entry is saved."
     },
     {
       "id": "A02",
@@ -752,15 +793,24 @@
       "requirement": "Segundo request recebe assistant e toolResult correlacionados",
       "disposition": "required",
       "increment": "NH02",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContractFixtureTests.swift",
           "symbol": "providerRequestsMatchTheFrozenBaseline"
         }
       ],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentPersistenceBarrierTests.swift",
+          "symbol": "userAssistantAndResultCommitsPrecedeDependentWork"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeIdentityTests.swift",
+          "symbol": "repeatedProviderIDsGetDistinctLocalInvocationsAndCorrelatedResults"
+        }
+      ],
+      "note": "The second request receives the committed assistant turn and its correlated tool results, with local invocation identities even when provider call IDs recur."
     },
     {
       "id": "A03",
@@ -840,7 +890,7 @@
           "symbol": "anthropicThinkingSignaturesAndInterleavedCallsRetainOrder"
         }
       ],
-      "note": "Indexed JSON fragments and Unicode native codecs are exercised; full transport/interchange qualification remains open."
+      "note": "Indexed JSON fragments and Unicode native codecs are exercised against synthetic SSE chunking. Open: qualification against real provider transports."
     },
     {
       "id": "A07",
@@ -896,7 +946,7 @@
       "requirement": "Mensagem final de erro e nenhum estado pendente eterno",
       "disposition": "required",
       "increment": "NH02",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [],
       "targetEvidence": [
         {
@@ -906,9 +956,21 @@
         {
           "path": "KurnTests/ProviderHTTPTests+Agent.swift",
           "symbol": "agentRejectsMissingKeyAndInvalidURL"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeIdentityTests.swift",
+          "symbol": "failuresProduceNativeAuditEvenBeforeFirstBlock"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "aRunStartThatCannotBeSavedFailsWithoutBlockingTheSession"
+        },
+        {
+          "path": "KurnTests/ChatRunTranscriptTests.swift",
+          "symbol": "aFailedCommitFailsTheRunBeforeAnyRequest"
         }
       ],
-      "note": "Preparation emits one typed failure before any start event and reaches normal app error handling. Persisted canonical error messages and session settlement remain NH03/NH05."
+      "note": "Preparation emits one typed failure before any start event; the failure is a committed native audit and the session settles without a pending state."
     },
     {
       "id": "A10",
@@ -1596,14 +1658,23 @@
       "requirement": "Fallback legível sem crash",
       "disposition": "required",
       "increment": "NH08",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "KurnTests/ChatStepPresentationTests.swift"
         }
       ],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatStepPresentationTests.swift",
+          "symbol": "documentTitlesPreferExplicitTitlesAndUnknownArgumentsHaveLocalizedFallbacks"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunTraceRestorationTests.swift",
+          "symbol": "aResultWithoutItsCallStillAppearsAndAnErrorReadsAsFailed"
+        }
+      ],
+      "note": "An unknown tool or stop reason from an older session presents a localized fallback, and a restored run with an unmatched result still reads without a crash."
     },
     {
       "id": "A49",
@@ -1855,7 +1926,7 @@
       "targetStatus": "pending",
       "baselineEvidence": [],
       "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "note": "Open: a draft typed but not sent is not yet persisted (the draft recovery record exists but is unused), and reconciliation across background/foreground is device-only (release physical checklist). Runs interrupted by the background window already settle as retryable and resume once."
     },
     {
       "id": "A69",

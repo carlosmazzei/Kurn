@@ -934,6 +934,30 @@ export through the share sheet. Still open:
   `JSONValue`, whose numbers are `Double` (entries are encoded directly and keep exact integers).
 - Background/foreground draft preservation (A68), and migration/stress/device qualification.
 
+### Remaining native-harness work (audit after NH10)
+
+NH00–NH10 are merged into `feature/native-harness`. Of the contract's 97 items, 54 are verified, 28 are
+excluded by the local profile, 12 are partial, 2 are conditional and 1 is pending
+(`docs/contracts/native-harness-v1.json`, checked by `Tools/check_native_harness_contracts.py`). Everything still open, grouped by where it lands, with the contract items it closes:
+
+| Area | Open item | Contract |
+| --- | --- | --- |
+| Capabilities | A versioned per-model capability snapshot (tools, reasoning, images, cache) recorded with the run, and alias/authenticated provider qualification | C03, C04 |
+| Retry | Carry the provider's `Retry-After` from the agent transport into `AgentTransientError` | C14 |
+| Usage and cost | Cache-aware pricing; usage deduplicated by request identity across retries | C17 follow-up |
+| Compaction | Manual compaction; branch summaries; checkpoint anchoring for plain (identity-less) history | C10, C13 |
+| Context | Refresh the `documents` system-prompt section inside a run after a mutation; a host writer that records context edits from the UI | C11, C12 follow-up |
+| Run ownership | One owner retained per session across runs; model/provider changes at request boundaries; a `waitingForUser` phase once a tool asks for confirmation | C24 |
+| Tree | A tree view of every branch | C10 follow-up |
+| Interchange | The pi JSONL v3 subset (only with fixtures); a safe HTML export; keeping unknown host records on app import; exact integers past 2^53 in opaque fields (accepted limitation) | C25, C26, A52 |
+| Suspension | Persist the unsent draft (the `draft` recovery record kind is unused) and reconcile background/foreground on a device | A68 |
+| Qualification | Real-transport chunking, Dynamic Type/VoiceOver over a running conversation, migration/stress, Thread Sanitizer on the session/store boundaries, and the physical-device checklist | A06, A51 |
+
+A18 stays partial by adaptation: Kurn exposes no end/continue hooks, and the loop consults the
+queues itself. A23 and A24 stay conditional: they apply only if result-replacement or unanimous-termination
+policies are ever exposed. The local profile is complete when this table is empty apart from
+accepted limitations and the device checks are recorded.
+
 ### Local suspension, recovery and resource limits
 
 Run interactive agent work in foreground. At background transition, persist

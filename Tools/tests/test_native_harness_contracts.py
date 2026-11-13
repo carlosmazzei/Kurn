@@ -34,6 +34,7 @@ class NativeHarnessContractTests(unittest.TestCase):
     def test_legacy_evidence_cannot_be_labeled_as_verified_target(self):
         value = copy.deepcopy(self.manifest)
         value["acceptance"][0]["targetStatus"] = "verified"
+        value["acceptance"][0]["targetEvidence"] = []
         self.assertTrue(any("verified target needs target evidence" in error for error in validate(self.root, value)))
 
     def test_partial_target_evidence_is_distinct_from_legacy_and_full_verification(self):
