@@ -5,7 +5,7 @@ import Foundation
 /// has settled — the producer has terminated and its required writes have finished — so the
 /// UI never reports a stop that is still in progress (`CLAUDE.md`, "Agent harness").
 enum ChatRunPhase: String, Sendable, Equatable {
-    case idle, preparing, streaming, executingTools, cancelling
+    case idle, preparing, streaming, executingTools, compacting, retryWaiting, cancelling
 
     var isBusy: Bool { self != .idle }
 
@@ -16,6 +16,14 @@ enum ChatRunPhase: String, Sendable, Equatable {
         switch event {
         case .toolStarted, .toolProgress, .invocationRegistered: return .executingTools
         case .requestStarted, .turnStarted, .textDelta, .modelContent: return .streaming
+        // The same phases `AgentRunProgress` projects with its identities (NH05).
+        case .diagnostic(let diagnostic):
+            switch diagnostic.kind {
+            case .compactionStarted: return .compacting
+            case .compactionFinished, .compactionFailed, .compactionSkipped: return self == .compacting ? .streaming : self
+            case .outputRetryStarted: return .retryWaiting
+            default: return self
+            }
         default: return self
         }
     }

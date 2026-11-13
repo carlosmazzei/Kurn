@@ -2936,6 +2936,14 @@ has settled, throwing the run's failure — `AgentSessionOwnerError.persistenceF
 write that failed (a terminal entry that could not be saved after an answer included, ahead of any
 other failure), never the store's own error, and otherwise `CancellationError` after `abort()`. A run-start
 that cannot be saved fails the run without blocking the session, since nothing of it was written.
+`AgentRunProgress` projects a run's phase with its identities from its events — `preparing`,
+`streaming`, `executingTools`, `compacting` (between `compactionStarted` and its end, restoring the
+interrupted phase), `retryWaiting` (an output-limit retry until its request starts) and
+`finished` — with the current turn index, request identity, started-but-unfinished call IDs and the
+turn's registered invocations. It is presentation only and never orders persistence; there is no
+`waitingForUser` until a tool asks for confirmation. The chat keeps it as
+`MeetingChatViewModel.runProgress`, and `ChatRunPhase` has the same `compacting`/`retryWaiting`
+phases beside its own `cancelling`.
 
 **Chat conversations are host-owned (NH05 host activation).** `ChatConversationHost`
 (`ViewModels/`, built by `AppComposition`, injected app-wide) retains one

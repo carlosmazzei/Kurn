@@ -673,8 +673,8 @@ retryable.
 **Still open in NH05:** canonical UI/history
 restoration from those branches beyond an interrupted run's steps (a crashed run's recorded steps and
 usage now show under its retryable question; a stopped or failed run's steps are still the
-presentation copy, and replay still sends presentation history until NH06); full phase/identity projection (run/turn/
-call IDs, compacting/retry/waiting phases); durable command idempotency; resuming a run a
+presentation copy, and replay still sends presentation history until NH06); a `waitingForUser` phase
+once a tool asks for confirmation (none does yet); durable command idempotency; resuming a run a
 dead process left interrupted (the in-process background case is done); persistence-failure recovery beyond retry (a failed
 run-history write now says so and keeps the question retryable). The chat creates one owner per
 run, which is safe while its view model admits one run at a time; a session-retained owner (and

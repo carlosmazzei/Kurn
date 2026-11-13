@@ -33,6 +33,8 @@ final class MeetingChatViewModel {
     private(set) var isResponding = false
     /// What the current run is doing; `.idle` exactly when `isResponding` is false.
     private(set) var phase: ChatRunPhase = .idle
+    /// The current run's turn, request and tool calls (NH05 phase/identity projection).
+    private(set) var runProgress = AgentRunProgress()
     private(set) var scopeEditor = ChatSourceScopeEditor()
     var scope: ChatSourceScope { scopeEditor.scope }
     private(set) var artifacts: [ChatDocumentArtifact] = []
@@ -126,6 +128,7 @@ final class MeetingChatViewModel {
         }
         isResponding = true
         phase = .preparing
+        runProgress = AgentRunProgress()
         currentRequest = ForegroundResume(question: trimmed, provider: provider, model: model)
         let token = UUID()
         runToken = token
@@ -497,7 +500,10 @@ final class MeetingChatViewModel {
         do {
             for try await event in run.events {
                 try Task.checkCancellation()
-                if self.generation == generation { phase = phase.applying(event) }
+                if self.generation == generation {
+                    phase = phase.applying(event)
+                    runProgress.apply(event)
+                }
                 timeline.apply(event)
                 turns[index].steps = timeline.steps
                 turns[index].usage = timeline.hasUsage

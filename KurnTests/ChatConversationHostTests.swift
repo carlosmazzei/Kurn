@@ -330,4 +330,39 @@ struct ChatRunPhaseTests {
         #expect(ChatRunPhase.streaming.applying(.usage(AgentUsage(inputTokens: 1, outputTokens: 1))) == .streaming)
         #expect(ChatRunPhase.preparing.applying(.runStarted) == .preparing)
     }
+
+    @Test func compactionAndAnOutputRetryHaveTheirOwnPhases() {
+        func diagnostic(_ kind: AgentDiagnostic.Kind) -> AgentEvent {
+            .diagnostic(AgentDiagnostic(runID: UUID(), sequence: 0, kind: kind))
+        }
+        let compacting = ChatRunPhase.streaming.applying(diagnostic(.compactionStarted))
+        #expect(compacting == .compacting)
+        #expect(compacting.isBusy)
+        #expect(compacting.applying(diagnostic(.compactionFinished)) == .streaming)
+        #expect(compacting.applying(diagnostic(.compactionSkipped)) == .streaming)
+        #expect(ChatRunPhase.executingTools.applying(diagnostic(.compactionFailed)) == .executingTools)
+        let retrying = ChatRunPhase.streaming.applying(diagnostic(.outputRetryStarted))
+        #expect(retrying == .retryWaiting)
+        #expect(retrying.applying(.requestStarted(AgentRequestIdentity())) == .streaming)
+        #expect(ChatRunPhase.streaming.applying(diagnostic(.requestFinished)) == .streaming)
+        #expect(ChatRunPhase.cancelling.applying(diagnostic(.compactionStarted)) == .cancelling)
+    }
+
+    @MainActor @Test func aConversationProjectsItsRunsTurnAndCalls() async throws {
+        let model = ChatAgentModel([
+            AgentTurnResponse(text: "", toolCalls: [try chatAgentCall("list_sources", id: "call-1")]),
+            AgentTurnResponse(text: "Monday.")
+        ])
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model })
+        vm.configure(meeting: meeting, modelContext: context)
+        vm.send(question: "When?", provider: .openAI, model: "gpt-4o")
+        await vm.waitUntilSettled()
+        #expect(vm.runProgress.phase == .finished)
+        #expect(vm.runProgress.turnIndex == 1)
+        #expect(vm.runProgress.request != nil)
+        #expect(vm.runProgress.activeCallIDs.isEmpty)
+        #expect(vm.phase == .idle)
+    }
 }
