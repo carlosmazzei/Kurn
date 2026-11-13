@@ -5,8 +5,8 @@ import Foundation
 /// canonical record, so it never blocks or orders persistence.
 ///
 /// `compacting` covers a context compaction between `compactionStarted` and its finish, failure
-/// or skip; `retryWaiting` covers an output-limit retry from `outputRetryStarted` until its new
-/// request starts, even across the retry's `turnStarted` and any compaction before it. A run that
+/// or skip; `retryWaiting` covers an output-limit retry from `outputRetryStarted`, or a failed
+/// request's retry wait from `requestRetryScheduled`, until its new request starts, even across the retry's `turnStarted` and any compaction before it. A run that
 /// ends without `runFinished` is closed with `finish()`. A host owner adds its own states around these (cancellation, settlement);
 /// a tool confirmation would be `waitingForUser`, which no event reports yet.
 public struct AgentRunProgress: Sendable, Equatable {
@@ -88,7 +88,7 @@ public struct AgentRunProgress: Sendable, Equatable {
             guard phase == .compacting else { return }
             phase = resumePhase ?? .preparing
             resumePhase = nil
-        case .outputRetryStarted:
+        case .outputRetryStarted, .requestRetryScheduled:
             guard phase != .finished else { return }
             phase = .retryWaiting
         default:

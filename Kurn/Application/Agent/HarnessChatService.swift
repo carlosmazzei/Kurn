@@ -135,6 +135,7 @@ struct HarnessChatService {
                                     contextPolicy: AgentContextPolicy(contextWindow: resolution.contextWindowTokens,
                                                                       summaryPrompts: ChatCompactionPrompts.profile,
                                                                       maxOutputTokens: resolution.maxOutputTokens),
+                                    retryPolicy: .standard,
                                     diagnosticSink: { HarnessDiagnostics.record($0) })
         let authorization = ChatRunAuthorization(scope: effective, meetingIDs: ids, model: "\(provider.id):\(modelIdentifier)")
         // Canonical replay (NH06) when the conversation's runs are known; otherwise plain text.

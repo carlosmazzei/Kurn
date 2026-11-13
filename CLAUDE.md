@@ -196,6 +196,16 @@ or any usage went unpriced. `AgentLimits.maxCostUSD` is checked only against a k
 estimator, or once a usage could not be priced, the ceiling cannot be verified and counts as reached, so
 no further request is sent. `HarnessChatService` passes `ModelPricing` as the estimator. The figure is an
 estimate from a price table, not a provider billing cap.
+The session is the one retry owner for model requests (NH07, `AgentRetryPolicy`); the agent transport keeps
+its own retries off. A request that failed with an `AgentTransientError` before any visible text is sent
+again as a new request with its own identity, after a cancellable wait: exponential backoff from one
+second, the provider's `Retry-After` when the error carries one, at most `maxAttempts` attempts and
+`maxWaitSeconds` of waiting. A cancel during the wait starts no new attempt, and two generations are never
+joined. Each failed attempt stays in the log as audit data, and `requestRetryScheduled` diagnostics record
+the attempt and delay. `AgentRunProgress` shows the wait as `retryWaiting`. The chat uses `.standard`
+(three attempts). `AppError` is transient for 408/429/5xx statuses and connection failures, but not for
+timeouts or lost connections the provider may already be generating for, nor for auth, configuration,
+quota or context errors. Its `Retry-After` is not carried into the error yet.
 
 
 `AgentDiagnostic` carries only fixed event/metric vocabulary, numeric counts and

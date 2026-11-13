@@ -11,6 +11,9 @@ extension NativeHarness {
         events.yield(.turnStarted(index: state.turns))
         state.turns += 1
         var retried = false
+        // Session-owned retries (NH07): attempts of this turn's request and the time waited.
+        var attempts = 1
+        var waited = 0.0
         while true {
             state.responseAlreadyAudited = false
             if costLimitReached(state) { return nil }
@@ -41,6 +44,18 @@ extension NativeHarness {
                 trace.record(.requestFailed, metrics: [.durationMs: Self.milliseconds(since: started), .protocolFailure: stream.failureCode])
                 trace.endRequest(requestIdentity)
                 try Task.checkCancellation()
+                // A transient failure before any visible text is sent again as a new request, after a
+                // cancellable wait; a cancel during it starts no new attempt.
+                if !stream.hasVisibleText,
+                   let delay = retryPolicy.delay(after: error, failedAttempts: attempts, waited: waited) {
+                    trace.record(.requestRetryScheduled, metrics: [.requestAttempt: attempts,
+                                                                   .retryDelayMs: Int((delay * 1_000).rounded())])
+                    try await retryPolicy.sleep(delay)
+                    try Task.checkCancellation()
+                    attempts += 1
+                    waited += delay
+                    continue
+                }
                 guard !retried, !stream.hasVisibleText, isContextOverflow(error) else { throw error }
                 retried = true
                 switch try await compact(settings, state: &state, events: events, trace: trace, force: true) {

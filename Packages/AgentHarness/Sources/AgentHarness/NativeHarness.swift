@@ -11,6 +11,7 @@ public struct NativeHarness: Sendable {
     let toolPolicy: AgentToolPolicy
     let maxParallelReads: Int
     let isContextOverflow: @Sendable (Error) -> Bool
+    let retryPolicy: AgentRetryPolicy
     var messageCommit: @Sendable (AgentMessage) async throws -> Void = { _ in }
     var usageCommit: @Sendable (AgentUsage) async throws -> Void = { _ in }
     var compactionCommit: @Sendable (AgentCompactionCheckpoint) async throws -> Void = { _ in }
@@ -32,6 +33,7 @@ public struct NativeHarness: Sendable {
                     ($0 as? any AgentContextOverflowError)?.isContextOverflow == true
                 },
                 maxParallelReads: Int = 4,
+                retryPolicy: AgentRetryPolicy = .none,
                 toolPolicy: @escaping AgentToolPolicy = { _, arguments in .allow(arguments) },
                 confirm: @escaping @Sendable (AgentToolCall) async -> Bool = { _ in false },
                 diagnosticSink: @escaping @Sendable (AgentDiagnostic) -> Void = { _ in }) {
@@ -40,6 +42,7 @@ public struct NativeHarness: Sendable {
         self.costEstimator = costEstimator
         self.compactor = AgentContextCompactor(policy: contextPolicy, tokenEstimator: tokenEstimator)
         self.isContextOverflow = isContextOverflow
+        self.retryPolicy = retryPolicy
         self.confirm = confirm
         self.toolPolicy = toolPolicy
         self.maxParallelReads = min(16, max(1, maxParallelReads))
