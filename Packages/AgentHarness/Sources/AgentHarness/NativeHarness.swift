@@ -15,6 +15,7 @@ public struct NativeHarness: Sendable {
     var messageCommit: @Sendable (AgentMessage) async throws -> Void = { _ in }
     var usageCommit: @Sendable (AgentUsage) async throws -> Void = { _ in }
     var compactionCommit: @Sendable (AgentCompactionCheckpoint) async throws -> Void = { _ in }
+    var inputQueue: AgentInputQueue?
     private let diagnosticSink: @Sendable (AgentDiagnostic) -> Void
 
     /// Appended to the system prompt for the tool-less wrap-up turn after a turn or tool-call limit.
@@ -84,6 +85,16 @@ public struct NativeHarness: Sendable {
     public func persistingUsage(_ commit: @escaping @Sendable (AgentUsage) async throws -> Void) -> Self {
         var copy = self
         copy.usageCommit = commit
+        return copy
+    }
+
+    /// Drains `queue` at the run's boundaries (NH08): steering after each complete tool batch and
+    /// before the run would finish, follow-ups only once no tool call and no steering is left.
+    /// Each drained item is committed as a user message (its ID is the item's) before the next
+    /// request. A run that stops for a limit, a failure or a cancel leaves the rest queued.
+    public func receivingInput(_ queue: AgentInputQueue) -> Self {
+        var copy = self
+        copy.inputQueue = queue
         return copy
     }
 
@@ -191,11 +202,16 @@ public struct NativeHarness: Sendable {
                 break
             }
             if calls.isEmpty {
+                // Queued input continues the run: steering first, then one follow-up selection.
+                if try await injectQueued(.steering, state: &state, events: events, trace: trace) { continue }
+                if try await injectQueued(.followUp, state: &state, events: events, trace: trace) { continue }
                 reason = costLimitReached(state) ? .costLimit : .completed
                 break
             }
             let stop = try await execute(calls, requestID: response.message?.identity?.requestID, tools: tools, state: &state, events: events, trace: trace)
             if let stop { reason = stop; break }
+            // Steering enters after the whole tool batch, before the next request.
+            _ = try await injectQueued(.steering, state: &state, events: events, trace: trace)
         }
         if reason != .completed { recordLimit(reason, state: &state, trace: trace) }
         try Task.checkCancellation()
@@ -213,6 +229,25 @@ public struct NativeHarness: Sendable {
                                       estimatedCostUSD: costEstimator != nil && state.costKnown ? state.cost : nil)
         events.yield(.runFinished(outcome))
         return outcome
+    }
+
+    /// Drains `kind` from the input queue and commits each item as a user message. Returns whether
+    /// anything was injected.
+    private func injectQueued(_ kind: AgentInputQueue.Kind, state: inout AgentRunState,
+                              events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
+                              trace: AgentTraceEmitter) async throws -> Bool {
+        guard let inputQueue else { return false }
+        try Task.checkCancellation()
+        let items = try await inputQueue.drain(kind)
+        guard !items.isEmpty else { return false }
+        trace.record(.queuedInputDrained, metrics: [.queuedItems: items.count, .queueKind: kind == .steering ? 0 : 1])
+        for item in items {
+            let message = try AgentMessageFactory.user(item.text, id: item.id)
+            try await publish(message, events: events)
+            state.history.append(message)
+            state.context.append(message)
+        }
+        return true
     }
 
     /// One text-only answer from what the run already gathered, instead of ending on tool results.
