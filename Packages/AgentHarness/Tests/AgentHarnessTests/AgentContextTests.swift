@@ -97,8 +97,6 @@ func tokens(_ count: Int, _ letter: Character = "a") -> String { String(repeatin
         #expect(compactor.turnPrefixSummaryRequest(for: plan) == nil)
         #expect(compactor.applying(plan, historySummary: "New facts", turnPrefixSummary: nil)
             == [.user(AgentContextCompactor.summaryPrefix + "New facts")] + Array(messages.suffix(2)))
-        #expect(compactor.omitting(plan) == [.user(AgentContextCompactor.summaryPrefix + "Old facts\n\n"
-            + AgentContextCompactor.omittedPrefixNote)] + Array(messages.suffix(2)))
     }
 
     @Test func splitTurnsGetAPrefixSummary() throws {

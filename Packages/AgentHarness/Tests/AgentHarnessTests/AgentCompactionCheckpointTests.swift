@@ -54,6 +54,37 @@ import Testing
         #expect(replayed.count == 1 + 1 + run.contextMessages.count)
     }
 
+    @Test func anOverflowRetryRunsOnlyAfterItsSummaryIsSaved() async throws {
+        let store = SessionTestStore()
+        try await store.appendHostEntry("question")
+        let session = try AgentSession(sessionID: "session", store: store, appendMode: .branch)
+        let model = ResultScriptedAgentModel([.failure(ResultScriptedAgentModel.Overflow()),
+                                             .success(AgentTurnResponse(text: "Turn summary")),
+                                             .success(AgentTurnResponse(text: "Answer"))])
+        // A large window: only the provider's rejection makes this run compact.
+        let harness = NativeHarness(model: model, contextPolicy: AgentContextPolicy(contextWindow: 100_000, reserveTokens: 0,
+                                                                                    keepRecentTokens: 100),
+                                    isContextOverflow: { $0 is ResultScriptedAgentModel.Overflow })
+        let run = try await session.start(harness: harness, systemPrompt: "", history: try history(), prompt: "Question", tools: [])
+        do { for try await _ in run.events {} } catch {}
+        #expect(await session.waitUntilSettled().end == .completed)
+        let entries = await store.entries
+        let branch = try #require(AgentRunBranch.all(in: entries).first)
+
+        #expect(await model.requests.count == 3)
+        #expect(branch.checkpoints.map(\.firstKeptMessageID) == ["h2"])
+        #expect(branch.answer?.text == "Answer")
+        let saved = try #require(entries.firstIndex { $0.kind == AgentCompactionCheckpoint.entryType })
+        let answer = try #require(entries.firstIndex {
+            if case .message(.content(let value)) = $0.payload { return value.role == .assistant && value.text == "Answer" }
+            return false
+        })
+        #expect(saved < answer)
+        // The retried request was the compacted one.
+        let retried = try #require(await model.requests.last)
+        #expect(retried.messages.first == .user(AgentContextCompactor.summaryPrefix + branch.checkpoints[0].summary))
+    }
+
     @Test func anUnusableSummaryWritesNoCheckpoint() async throws {
         let entries = try await record([AgentTurnResponse(text: "Cut off", stopReason: .maxTokens),
                                         AgentTurnResponse(text: "Answer")])

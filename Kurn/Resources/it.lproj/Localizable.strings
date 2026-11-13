@@ -1226,6 +1226,7 @@
 "chat.storage.invalid" = "Impossibile leggere o salvare questa conversazione. I dati archiviati sono stati conservati.";
 "chat.storage.run_failed" = "Impossibile salvare l’avanzamento di questa risposta, quindi si è interrotta prima di inviare altro. La tua domanda è stata conservata; riprova.";
 "chat.command.duplicate" = "Questa domanda è già stata inviata, quindi non è stata inviata di nuovo.";
+"chat.context.reduction_failed" = "Questa conversazione è troppo lunga perché il modello possa continuare. Avvia una nuova conversazione o scegli un modello con una finestra di contesto più ampia.";
 
 // Native tool pipeline diagnostics.
 "chat.diagnostic.toolValidationFailed" = "Argomenti dello strumento rifiutati";

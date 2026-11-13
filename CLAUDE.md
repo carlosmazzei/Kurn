@@ -268,14 +268,17 @@ limit is not used. Compaction runs before a turn when over the threshold, and is
 provider rejects a turn as too long (`isContextOverflow`; the adapter passes
 `AppError` conformance to `AgentContextOverflowError`, delegating to the harness's
 `AgentContextOverflow` classifier, whose markers exclude rate limiting/throttling); the turn is then retried once, only if nothing was streamed
-and the context actually shrank. When a forced summary is unusable or itself overflows, the
-older part is replaced by a fixed omission note. Compaction changes only model context;
-outcomes retain full history.
+and the context actually shrank. No note ever stands in for a summary (NH06): a summary that is
+cut off, unusable or whose own request overflows leaves the context unchanged and reports the
+compaction failed. After an overflow that ends the run with `AgentContextReductionError` (the chat
+says the conversation is too long for the model, `chat.context.reduction_failed`); an output-limit
+recovery is denied and the run keeps its `.outputLimit` outcome; a threshold compaction sends the
+request as it is. Compaction changes only model context; outcomes retain full history.
 A summary compaction is a durable checkpoint (NH06, `AgentCompactionCheckpoint`): the harness hands it
 to the awaited `persistingCompaction` sink before any request uses the compacted context, and
 `AgentSession` commits it on the run's branch as `agent.compaction.v1` (summary, first kept message ID,
 tokens before/after, split turn), so a request never runs on context the log lacks and a failed save
-fails the run. Only real summaries are checkpoints; an omission note, an unusable or failed summary, or
+fails the run. Only real summaries are checkpoints; an unusable or failed summary, or
 a kept message without an identity (legacy plain history) writes none. Replay applies the newest
 checkpoint of a permitted run whose kept message is in the history (`ChatReplayHistory`), so a reopened
 conversation reuses the summary and a later compaction updates it.
