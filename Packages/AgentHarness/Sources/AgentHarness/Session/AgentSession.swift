@@ -41,7 +41,7 @@ public enum AgentSessionAppendMode: Sendable, Equatable {
 
 /// Initial NH05 ownership boundary. One actor is retained per session by the host. Observation
 /// lifetime does not own execution. This does not activate host UI, queues or canonical replay.
-/// The caller supplies an authorized history projection until NH06 defines that projection.
+/// The caller supplies the authorized history; `AgentRunBranch` reads earlier runs back from the log.
 public actor AgentSession {
     public let sessionID: String
     private let store: any AgentSessionStore

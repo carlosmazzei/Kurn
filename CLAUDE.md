@@ -226,7 +226,12 @@ not document bodies. Models are instructed to use artifacts for documents/report
 rather than paste them in chat. Saving artifacts into the document library is an app concern.
 Each session restores its workspace and source scope. Document mutations persist artifacts
 immediately, even if the reply is later cancelled; partial assistant turns are not saved.
-Replayed history contains plain user/assistant turns, not old source-tool payloads.
+Replayed history is canonical (NH06, `ChatReplayHistory`): an earlier answered question goes back
+as the run that answered it recorded it on its branch (`AgentRunBranch.contextMessages` — its request,
+tool calls, tool results and answer, without failed, aborted, deferred or output-limited replies and
+their results). Runs record the question turn they answer (`questionID` start field). A question with
+no completed run, or whose run was authorized for other sources or for a meeting the current run may
+not read, replays as plain text, so narrowing the sources never replays older reads.
 
 `NativeHarness` is an Apple-free, provider-neutral sequential tool loop. `AgentModel`
 supplies streaming text and turn responses; `AgentTool` supplies schemas, optional
@@ -3041,5 +3046,5 @@ history write ends the stream with `AgentSessionOwnerError.persistenceFailed`, w
 (question retryable, `run_transcript_write_failed`) and shows `chat.storage.run_failed` — saying
 nothing more was sent — instead of the store's own error text (`MeetingChatViewModel.presentedError`);
 a run whose session was deleted under it ends as a cancellation. One owner per run is safe because the
-view model admits one run at a time and a retry starts a new branch. Replay still sends plain
-presentation history.
+view model admits one run at a time and a retry starts a new branch. The next run replays these
+branches as canonical history (see "Agent harness", `ChatReplayHistory`).

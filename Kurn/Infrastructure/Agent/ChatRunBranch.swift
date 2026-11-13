@@ -25,9 +25,26 @@ enum ChatRunBranch {
         try AgentSession(sessionID: session.id.uuidString, store: store, appendMode: .branch)
     }
 
-    /// The run-start fields the host adds: what the run was authorized to read and which model answers.
-    static func startFields(_ authorization: ChatRunAuthorization) throws -> [String: JSONValue] {
-        ["authorization": try HarnessPresentationCodec.json(authorization)]
+    /// The run-start fields the host adds: what the run was authorized to read, which model
+    /// answers, and the question turn it answers (which replay pairs it with, `ChatReplayHistory`).
+    static func startFields(_ authorization: ChatRunAuthorization, questionID: UUID? = nil) throws -> [String: JSONValue] {
+        var fields: [String: JSONValue] = ["authorization": try HarnessPresentationCodec.json(authorization)]
+        if let questionID { fields["questionID"] = .string(questionID.uuidString) }
+        return fields
+    }
+
+    /// The question turn `run` answers: its recorded `questionID`, or, for a run recorded before
+    /// that field, its command when that is a question turn's ID.
+    static func questionID(of run: AgentRunBranch) -> UUID? {
+        if case .string(let id)? = run.startFields["questionID"] { return UUID(uuidString: id) }
+        if case .string(let command)? = run.startFields["commandID"] { return UUID(uuidString: command) }
+        return nil
+    }
+
+    /// The authorization `run` recorded at its start, if it can be read.
+    static func authorization(of run: AgentRunBranch) -> ChatRunAuthorization? {
+        guard let value = run.startFields["authorization"], let data = try? JSONEncoder().encode(value) else { return nil }
+        return try? JSONDecoder().decode(ChatRunAuthorization.self, from: data)
     }
 
     /// Whether `entry` belongs to a run branch rather than the presentation path.

@@ -67,10 +67,11 @@ struct HarnessChatService {
         model: any AgentModel, provider: AIProvider, modelIdentifier: String,
         context: ModelContext, scope: ChatSourceScope, workspace: ChatDocumentWorkspace,
         history: [ChatMessage], question: String, owner: AgentSession? = nil, runID: UUID = UUID(),
-        commandID: String? = nil
+        commandID: String? = nil, questionID: UUID? = nil, replay: ChatReplayHistory? = nil
     ) async throws -> Run {
         let run = try await prepare(model: model, provider: provider, modelIdentifier: modelIdentifier, context: context,
-                                    scope: scope, workspace: workspace, history: history, question: question)
+                                    scope: scope, workspace: workspace, history: history, question: question,
+                                    replay: replay)
         guard let owner else {
             let handle = run.harness.start(systemPrompt: run.systemPrompt, history: run.history, prompt: run.question,
                                            tools: run.tools, contextResolution: run.resolution, context: run.context,
@@ -83,7 +84,7 @@ struct HarnessChatService {
         let owned = try await owner.start(harness: run.harness, systemPrompt: run.systemPrompt, history: run.history,
                                           prompt: run.question, tools: run.tools, contextResolution: run.resolution,
                                           runID: runID, commandID: commandID,
-                                          startFields: try ChatRunBranch.startFields(run.authorization),
+                                          startFields: try ChatRunBranch.startFields(run.authorization, questionID: questionID),
                                           observation: .complete)
         return Run(snapshots: AgentRunSnapshots.coalescing(owned.events), abort: { await owner.abort() },
                    settle: { _ = await owner.waitUntilSettled() })
@@ -92,7 +93,7 @@ struct HarnessChatService {
     func prepare(
         model: any AgentModel, provider: AIProvider, modelIdentifier: String,
         context: ModelContext, scope: ChatSourceScope, workspace: ChatDocumentWorkspace,
-        history: [ChatMessage], question: String
+        history: [ChatMessage], question: String, replay: ChatReplayHistory? = nil
     ) async throws -> PreparedRun {
         let effective = effectiveScope(scope)
         let reader = try LibraryChatSourceReader(context: context, scope: effective).authorizedSnapshot()
@@ -128,16 +129,18 @@ struct HarnessChatService {
                                                                       summaryPrompts: ChatCompactionPrompts.profile,
                                                                       maxOutputTokens: resolution.maxOutputTokens),
                                     diagnosticSink: { HarnessDiagnostics.record($0) })
+        let authorization = ChatRunAuthorization(scope: effective, meetingIDs: ids, model: "\(provider.id):\(modelIdentifier)")
+        // Canonical replay (NH06) when the conversation's runs are known; otherwise plain text.
+        let replayed = replay?.messages(for: authorization) ?? history.map {
+            $0.role == .assistant ? AgentMessage.assistant(text: $0.content, toolCalls: []) : AgentMessage.user($0.content)
+        }
         return PreparedRun(
             harness: harness,
             systemPrompt: try Self.systemPrompt(artifacts: artifacts),
-            history: history.map {
-                $0.role == .assistant ? AgentMessage.assistant(text: $0.content, toolCalls: []) : AgentMessage.user($0.content)
-            },
+            history: replayed,
             question: question, tools: tools,
             resolution: resolution, context: try AgentRunContext(sessionID: sessionID),
-            authorization: ChatRunAuthorization(scope: effective, meetingIDs: ids,
-                                                model: "\(provider.id):\(modelIdentifier)")
+            authorization: authorization
         )
     }
 
