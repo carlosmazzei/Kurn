@@ -405,8 +405,8 @@ execution window; when it expires the run is cancelled and settles as a retryabl
 The question is persisted before any request (a failed save sends nothing), and each run writes a
 `.run` recovery record, `running` then `ended`. A launch sweep marks records still `running` as
 `interrupted`; it never re-sends, resumes or replays a run. Reopening such a conversation shows
-that run's committed steps and usage under its retryable question, rebuilt read-only from its
-canonical branch (`AgentRunTrace.restoring`): no output summary, which was never saved, an
+that run's committed steps and usage under its retryable question, rebuilt without a write from its
+canonical branch (a later save of the conversation keeps them on the question, like a stopped run's) (`AgentRunTrace.restoring`): no output summary, which was never saved, an
 unanswered call as failed and no stop step without a saved end. A run the background wind-down stopped
 in a live process is sent again once when the app returns to the foreground, from the saved
 question with the same provider and model, only while that question is still the unanswered one

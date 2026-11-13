@@ -117,8 +117,9 @@ extension AgentRunTrace {
         for entry in run {
             switch entry.payload {
             case .message(.content(let message)) where message.role == .assistant:
-                turn += 1
+                // Zero-based, like the harness's own `turnStarted`.
                 trace.apply(.turnStarted(index: turn))
+                turn += 1
                 for call in message.toolCalls {
                     trace.apply(.toolStarted(callID: call.id, name: call.name, arguments: call.arguments))
                 }

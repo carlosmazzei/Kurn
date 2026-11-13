@@ -57,8 +57,10 @@ enum ChatRunRecovery {
     /// A reopened conversation's turns, with the interrupted run's canonical history shown under
     /// the question it left unanswered: the steps and usage `AgentRunTrace.restoring` rebuilds
     /// from the run's branch. Only the retryable question (the last turn, still unanswered and
-    /// with no steps of its own) gains them. Read-only: nothing is migrated or saved, and a branch
-    /// that cannot be read leaves the turns as they were.
+    /// with no steps of its own) gains them. Restoring writes nothing, and a branch that cannot be
+    /// read leaves the turns as they were. A later save of the conversation (a scope change, the
+    /// next question) keeps the shown steps on the question, as it does a stopped run's; the next
+    /// reopen then finds steps there and restores nothing again.
     static func restoringInterruptedRun(in turns: [PersistedChatTurn], session: ChatSession,
                                         context: ModelContext) -> (turns: [PersistedChatTurn], interrupted: Set<UUID>) {
         let runs = interruptedRuns(in: session, context: context)

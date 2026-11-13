@@ -32,7 +32,7 @@ import Testing
         #expect(tool.toolName == "lookup")
         // The live summary is an event, never committed; restoration does not invent one.
         #expect(tool.outputSummary == nil)
-        #expect(trace.steps.map(\.turnIndex).compactMap { $0 } == [1, 2])
+        #expect(trace.steps.map(\.turnIndex).compactMap { $0 } == [0, 1])
         #expect(trace.steps.last?.stopReason == .completed)
         #expect(trace.hasUsage)
         #expect(trace.usage == AgentUsage(inputTokens: 30, outputTokens: 7))

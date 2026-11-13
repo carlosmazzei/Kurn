@@ -2986,8 +2986,9 @@ by a crash reads differently from one the user stopped. It also shows what that 
 branch with AgentHarness's `AgentRunTrace.restoring(run:from:)` and puts them under the retryable
 question when it has none of its own. Only committed entries are shown — a restored tool call has
 no output summary (that is a live event, never saved), a call without a saved result reads as
-failed, and there is no stop step without a saved end. Restoration is read-only and never re-runs
-anything.
+failed, and there is no stop step without a saved end. Restoring writes nothing and never re-runs
+anything; a later save of the conversation keeps the shown steps on the question, as it does a
+stopped run's.
 
 **A run's model history is durable, on its own branch, written by `AgentSession`.** Each chat run
 is started through a per-run `AgentSession` owner in `.branch` mode (`ChatRunBranch`,
