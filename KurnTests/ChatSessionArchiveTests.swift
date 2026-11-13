@@ -71,8 +71,12 @@ struct ChatSessionArchiveTests {
         #expect(try sessionCount(context) == 1)
         context.delete(seeded.session)
         try context.save()
+        let created = seeded.session.createdAt
         let restored = try store.importArchive(data, meeting: nil, as: .restore, defaultTitle: "")
         #expect(restored.id == id)
+        #expect(abs(restored.createdAt.timeIntervalSince(created)) < 0.01)
+        let copy = try store.importArchive(data, meeting: nil, defaultTitle: "")
+        #expect(copy.createdAt > created)
         #expect(try restored.harnessSnapshot().turns.first?.id == seeded.q1.id)
     }
 

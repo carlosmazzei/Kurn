@@ -52,6 +52,13 @@ extension SwiftDataAgentSessionStore {
                 throw AgentSessionStoreError.conflict
             }
             target.id = id
+            // A restore is the same conversation, so it keeps the date it was created; a new copy
+            // is a new conversation, created now.
+            if case .object(let fields)? = conversation?.data, case .string(let saved)? = fields["createdAt"],
+               let date = Self.archiveDate(saved) {
+                target.createdAt = date
+                target.updatedAt = date
+            }
         }
         let newID = target.id.uuidString
         let moved = newID == archive.sessionID ? archive : try archive.copy(into: newID)
@@ -102,6 +109,14 @@ extension SwiftDataAgentSessionStore {
             context.delete(target)
             throw error
         }
+    }
+}
+
+extension SwiftDataAgentSessionStore {
+    nonisolated static func archiveDate(_ text: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: text)
     }
 }
 
