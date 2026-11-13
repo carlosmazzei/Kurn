@@ -55,6 +55,11 @@ struct MeetingChatConversationView: View {
     /// beneath it (see `conversation`), so scrolling to the latest message has
     /// to clear this much on top of the bottom safe area.
     @State private var composerHeight: CGFloat = 0
+    /// Whether the reader is at the end of the conversation (NH08): turns added while they read
+    /// older messages do not move them.
+    @State private var scrollFollowing = ChatScrollFollowing()
+    /// Set by `send`, so the reader's own question is always brought into view.
+    @State private var sentQuestion = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -234,8 +239,17 @@ struct MeetingChatConversationView: View {
                     .onTapGesture { dismissKeyboard() }
             )
             .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
+            .onScrollGeometryChange(for: ChatScrollFollowing.self) { geometry in
+                var following = ChatScrollFollowing()
+                following.observe(contentOffsetY: geometry.contentOffset.y, visibleHeight: geometry.containerSize.height,
+                                  contentHeight: geometry.contentSize.height)
+                return following
+            } action: { _, following in scrollFollowing = following }
             .onChange(of: vm.turns.count) { _, _ in
                 guard let last = vm.turns.last else { return }
+                let ownQuestion = sentQuestion && last.role == .user
+                sentQuestion = false
+                guard scrollFollowing.follows(newTurnIsOwnQuestion: ownQuestion) else { return }
                 if reduceMotion {
                     proxy.scrollTo(last.id, anchor: .bottom)
                 } else {
@@ -498,6 +512,7 @@ struct MeetingChatConversationView: View {
     }
 
     private func send() {
+        sentQuestion = true
         sendQuestion(input)
         input = ""
         dismissKeyboard()
