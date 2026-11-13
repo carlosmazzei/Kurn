@@ -73,8 +73,9 @@ Important current adaptations/gaps:
   across processes; queued input is saved before it is acknowledged (NH08). The chat stays busy
   (`cancelling`) after a stop until the run has settled. Open: one owner retained per session
   across runs (today one per run), and model changes at request boundaries.
-- Interchange is native (NH10, `kurn.agent-session` v1). The pi JSONL v3 subset and keeping unknown host records
-  through an app import are not implemented (the reading export is Markdown, Word or inert HTML); integers past
+- Interchange is native (NH10, `kurn.agent-session` v1). The pi JSONL v3 subset is not implemented; another host's records
+  and header fields survive an app import and the next export, and the reading export is Markdown, Word or
+  inert HTML; integers past
   2^53 inside opaque archive fields lose precision (documented limitation).
 - Legacy Codable Date fields use Foundation seconds since 2001. Preserve that codec while
   reading old data. Contract v1/pi timestamps below are different fields and units.

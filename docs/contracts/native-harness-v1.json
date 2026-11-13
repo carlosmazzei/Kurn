@@ -777,9 +777,13 @@
         {
           "path": "KurnTests/ChatSessionArchiveTests.swift",
           "symbol": "theChatExportsAndImportsConversations"
+        },
+        {
+          "path": "KurnTests/ChatSessionArchiveTests.swift",
+          "symbol": "anotherHostsRecordsAndHeaderFieldsGoOnToTheNextExport"
         }
       ],
-      "note": "NH10: native versioned JSONL archive with every branch, the leaf, runs, usage and document revisions; new-copy import and identity-preserving restore only when free; rejection of untrusted archives; reading export (Markdown, Word or inert HTML) through the share sheet. Open: the pi JSONL v3 subset and keeping unknown host records on import into the app."
+      "note": "NH10: native versioned JSONL archive with every branch, the leaf, runs, usage and document revisions; new-copy import and identity-preserving restore only when free; rejection of untrusted archives; reading export (Markdown, Word or inert HTML) through the share sheet. Another host's records and header fields survive an app import and the next export. Open: the pi JSONL v3 subset."
     },
     {
       "id": "C27",

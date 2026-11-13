@@ -923,7 +923,6 @@ export through the share sheet. Still open:
 
 - The supported pi JSONL v3 subset (message/system/compaction/usage entries), only once fixtures
   demonstrate it.
-- Keeping unknown host records and header fields when an archive is imported into the app's store.
 - Exact integers past 2^53 in opaque host records and unknown header fields: those pass through
   `JSONValue`, whose numbers are `Double` (entries are encoded directly and keep exact integers).
 - Migration/stress/device qualification, including the background/foreground chat check (A68) in
@@ -942,7 +941,7 @@ excluded by the local profile, 11 are partial, 2 are conditional and none is pen
 | Compaction | Manual compaction; branch summaries; checkpoint anchoring for plain (identity-less) history | C10, C13 |
 | Run ownership | One owner retained per session across runs; model/provider changes at request boundaries; a `waitingForUser` phase once a tool asks for confirmation | C24 |
 | Tree | A tree view of every branch | C10 follow-up |
-| Interchange | The pi JSONL v3 subset (only with fixtures); keeping unknown host records on app import; exact integers past 2^53 in opaque fields (accepted limitation) | C25, C26 |
+| Interchange | The pi JSONL v3 subset (only with fixtures); exact integers past 2^53 in opaque fields (accepted limitation) | C25, C26 |
 | Suspension | Reconcile background/foreground on a device (the release checklist's chat item); the unsent draft is saved | A68 |
 | Qualification | Real-transport chunking, Dynamic Type/VoiceOver over a running conversation, migration/stress, Thread Sanitizer on the session/store boundaries, and the physical-device checklist | A06, A51 |
 

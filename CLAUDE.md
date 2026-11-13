@@ -370,7 +370,9 @@ payloads past the line/total/entry/depth limits, entries of another session and 
 moves the graph to a new identity. The app (`SwiftDataAgentSessionStore+Archive`,
 `MeetingChatViewModel+Archive`, `ChatConversationMenu`) exports a conversation with its document revisions
 (`kurn.artifact-revision`, exact stored bytes) and title (`kurn.conversation`), never run records, queued
-input or receipts, through the share sheet as a protected temporary `.jsonl`. Import is a new conversation
+input or receipts, through the share sheet as a protected temporary `.jsonl`. Records and header fields of
+another host are kept as `.archived` recovery records on import and exported again unchanged (one past the
+1 MiB recovery-record limit is left out and counted in the log). Import is a new conversation
 in the current chat: revision IDs are rebased and checked against their bytes, every revision a branch
 shows must be present, and nothing is written unless the whole archive holds; a restore keeps the archived
 identity only when no conversation has it. "Export as…" writes the branch shown for a reader

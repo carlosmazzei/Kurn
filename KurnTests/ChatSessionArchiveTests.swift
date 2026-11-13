@@ -169,6 +169,29 @@ struct ChatSessionArchiveTests {
         #expect(word.pathExtension == "docx")
     }
 
+    /// Records and header fields another host put in an archive survive an import into the app and
+    /// the next export, unchanged and in order; the app's own records are still interpreted.
+    @Test func anotherHostsRecordsAndHeaderFieldsGoOnToTheNextExport() throws {
+        let context = ModelContext(TestModelContainer.make())
+        let seeded = try seed(context)
+        let store = SwiftDataAgentSessionStore(context: context)
+        let original = try AgentSessionArchive.decode(try store.archive(seeded.session))
+        let foreign: [AgentSessionArchive.Record] = [
+            .init(type: "other.notes", data: .object(["text": .string("kept"), "n": .number(3)])),
+            .init(type: "other.flags", data: .array([.bool(true), .null]))
+        ]
+        let metadata: [String: JSONValue] = ["origin": .object(["cwd": .string("/Users/someone/project")])]
+        let data = try AgentSessionArchive(sessionID: original.sessionID, leafID: original.leafID, entries: original.entries,
+                                           records: original.records + foreign, metadata: metadata).jsonl()
+
+        let imported = try store.importArchive(data, meeting: nil, defaultTitle: "Imported")
+        #expect(try imported.harnessSnapshot().artifacts == [seeded.other])
+        let again = try AgentSessionArchive.decode(try store.archive(imported))
+        #expect(Array(again.records.suffix(2)) == foreign)
+        #expect(again.metadata == metadata)
+        #expect(again.records.filter { $0.type == SwiftDataAgentSessionStore.revisionRecord }.count == 3)
+    }
+
     @Test func aBranchThatCannotOpenRejectsTheWholeImport() throws {
         let context = ModelContext(TestModelContainer.make())
         let seeded = try seed(context)
