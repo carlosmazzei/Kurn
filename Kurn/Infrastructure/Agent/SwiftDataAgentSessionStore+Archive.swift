@@ -21,7 +21,8 @@ extension SwiftDataAgentSessionStore {
     func archive(_ target: ChatSession) throws -> Data {
         let snapshot = try snapshot(target)
         var records = [AgentSessionArchive.Record(type: Self.conversationRecord, data: .object([
-            "title": .string(target.title), "createdAt": .string(AgentSessionEntry.time(target.createdAt))]))]
+            "title": .string(target.title), "createdAt": .string(AgentSessionEntry.time(target.createdAt)),
+            "updatedAt": .string(AgentSessionEntry.time(target.updatedAt))]))]
         for row in target.harnessRevisions.sorted(by: { $0.id < $1.id }) {
             _ = try Self.checkedRevision(row, session: target)
             records.append(.init(type: Self.revisionRecord, data: .object([
@@ -52,12 +53,12 @@ extension SwiftDataAgentSessionStore {
                 throw AgentSessionStoreError.conflict
             }
             target.id = id
-            // A restore is the same conversation, so it keeps the date it was created; a new copy
-            // is a new conversation, created now.
-            if case .object(let fields)? = conversation?.data, case .string(let saved)? = fields["createdAt"],
-               let date = Self.archiveDate(saved) {
-                target.createdAt = date
-                target.updatedAt = date
+            // A restore is the same conversation, so it keeps the date it was created and the date it
+            // was last active, which orders the history; a new copy is a new conversation, created
+            // now. An archive without a last-active date reads as active now.
+            if case .object(let fields)? = conversation?.data {
+                if case .string(let saved)? = fields["createdAt"], let date = Self.archiveDate(saved) { target.createdAt = date }
+                if case .string(let saved)? = fields["updatedAt"], let date = Self.archiveDate(saved) { target.updatedAt = date }
             }
         }
         let newID = target.id.uuidString

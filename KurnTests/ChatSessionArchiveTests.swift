@@ -67,6 +67,7 @@ struct ChatSessionArchiveTests {
         let data = try store.archive(seeded.session)
         let id = seeded.session.id
         let created = seeded.session.createdAt
+        let active = seeded.session.updatedAt
 
         #expect(throws: AgentSessionStoreError.conflict) { try store.importArchive(data, meeting: nil, as: .restore, defaultTitle: "") }
         #expect(try sessionCount(context) == 1)
@@ -75,6 +76,7 @@ struct ChatSessionArchiveTests {
         let restored = try store.importArchive(data, meeting: nil, as: .restore, defaultTitle: "")
         #expect(restored.id == id)
         #expect(abs(restored.createdAt.timeIntervalSince(created)) < 0.01)
+        #expect(abs(restored.updatedAt.timeIntervalSince(active)) < 0.01)
         let copy = try store.importArchive(data, meeting: nil, defaultTitle: "")
         #expect(copy.createdAt > created)
         #expect(try restored.harnessSnapshot().turns.first?.id == seeded.q1.id)
