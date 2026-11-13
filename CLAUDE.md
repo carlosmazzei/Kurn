@@ -43,6 +43,8 @@ package is FluidAudio.
 
 ### Agent harness (`Packages/AgentHarness/`)
 
+`Packages/AgentHarness/README.md` is the module guide (seams, loop, sessions, entry types,
+invariants); keep it current when the harness's public shape changes.
 `AgentHarness` and `KurnCore` are independent Foundation-only packages: neither
 imports or depends on the other. `AgentHarness` owns the generic runtime, tool
 execution, compaction, script-aware `TokenEstimate`, model capacity catalog/resolver,
@@ -432,6 +434,8 @@ SwiftData maintains inverse collections.
 This file is the architecture and conventions reference; `README.md` describes
 what the app does; `SECURITY_MODEL.md` is the threat model security scans
 rerank findings against (keep its component names stable). `docs/` holds only documents with a lasting job:
+`docs/architecture.md` (the module/layer/flow map, pointing back here for depth),
+`docs/contracts/` (the native-harness contract and its machine-checked catalog),
 `docs/roadmap.md` (the single list of open work — nothing shipped is described
 there), `docs/pipeline-evaluation.md` (the recorded accuracy history),
 `docs/supported-languages.md`, and the two release checklists

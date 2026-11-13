@@ -53,28 +53,29 @@ that a service accepts every opaque fixture field.
 
 Important current adaptations/gaps:
 
-- Reopen restores presentation turns, the current scope and latest artifact snapshots.
-  The next request replays plain user/assistant text. Old retrieval citations, tool audit
-  payloads and document bodies do not enter that history; artifact title/version metadata
-  is supplied separately. Plain earlier assistant text remains memory under the current
-  default, even after narrowing sources. NH06 replaces this for questions a recorded run answered:
-  see "Canonical replay (NH06)" below.
+- Replay is canonical since NH06: an earlier question a completed run answered goes back as that
+  run recorded it on its branch (request, calls, results, answer). A question with no completed
+  run, or whose run was authorized for other sources, replays as plain user/assistant text, so
+  narrowing sources never replays older reads. Old retrieval citations stored by the removed chat
+  never enter history; artifact title/version metadata is supplied as a system-prompt section.
 - Artifacts retain their own latest body/version. A historical reference retains its saved
   title/version and must not silently become the newest revision. Saving again updates the
   same library document for the session/artifact identity. Legacy missing model provenance
   stays unknown; it is not reconstructed from today's selected model.
-- Runtime compaction changes only the current request projection. Since NH06 a summary is a
-  durable checkpoint that reopen/another question reuses. Retained branches and local effect receipts
-  are stored, but automatic session recovery and canonical replay remain NH05/NH06.
-- Output-limited calls never execute. NH02 retains native call blocks/raw arguments and
-  appends synthetic error results in the in-memory audit history. A successful output
-  recovery excludes that interrupted exchange from retry context. The V6 app compatibility writer still saves
-  presentation turns/trace rather than this complete native tool history; the awaited
-  model-message/result barriers belong to NH05.
-- Since NH05 host activation the chat stays busy (`cancelling`) after a stop until the run's
-  producer has terminated and its partial reply is reconciled; a conversation reset or reload
-  fences the old run by generation. Durable barriers for app-written native messages, queues
-  and durable command deduplication remain open.
+- Runtime compaction changes only the request projection; a summary is a durable checkpoint
+  (NH06) that reopening or another question reuses. Manual compaction and branch summaries are
+  not implemented.
+- Output-limited calls never execute. Their native call blocks and raw arguments are kept with
+  synthetic error results in the run's audit history, and a successful output recovery excludes
+  that interrupted exchange from retry context and from replay.
+- Every chat run is owned by an `AgentSession` (NH05) that writes its messages, usage and end on
+  a branch before the work that depends on them; durable command IDs make a start idempotent
+  across processes; queued input is saved before it is acknowledged (NH08). The chat stays busy
+  (`cancelling`) after a stop until the run has settled. Open: one owner retained per session
+  across runs (today one per run), and model changes at request boundaries.
+- Interchange is native (NH10, `kurn.agent-session` v1). The pi JSONL v3 subset, an HTML export
+  and keeping unknown host records through an app import are not implemented; integers past
+  2^53 inside opaque archive fields lose precision (documented limitation).
 - Legacy Codable Date fields use Foundation seconds since 2001. Preserve that codec while
   reading old data. Contract v1/pi timestamps below are different fields and units.
 
