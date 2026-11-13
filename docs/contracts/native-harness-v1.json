@@ -233,10 +233,23 @@
       "sourceDocument": "01-nucleo.md",
       "disposition": "required",
       "increment": "NH08",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "steeringEntersAfterTheWholeToolBatchBeforeTheNextRequest"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "everyChangeIsSavedBeforeItIsAcknowledged"
+        },
+        {
+          "path": "KurnTests/MeetingChatQueueTests.swift",
+          "symbol": "steeringEntersTheReplyAndShowsAsItsOwnQuestionAndAnswer"
+        }
+      ],
+      "note": "NH08: FIFO steering and follow-up queues with one/all modes, complete-list updates and stable IDs, saved before acknowledgement; drained items are committed as user messages; continueRun answers an open request or one queued selection."
     },
     {
       "id": "C08",
@@ -615,8 +628,21 @@
           "path": "KurnTests/ChatStepPresentationTests.swift"
         }
       ],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "KurnTests/MeetingChatQueueTests.swift",
+          "symbol": "aStopHandsQueuedInputBackToTheComposer"
+        },
+        {
+          "path": "KurnTests/ChatRunStatusTests.swift",
+          "symbol": "eachPhaseHasItsOwnStatus"
+        },
+        {
+          "path": "KurnTests/ChatScrollFollowingTests.swift",
+          "symbol": "aReaderOfOlderMessagesStaysWhereTheyAreUnlessTheyAsk"
+        }
+      ],
+      "note": "NH08: Steer/After this task actions, queued list with edit/remove, retry delay, compaction and confirmed-stop status in words, reading position kept. Open: a session-retained owner and model changes at request boundaries."
     },
     {
       "id": "C25",
@@ -908,10 +934,19 @@
       "requirement": "Todas terminam antes da injeção; próxima request recebe steering",
       "disposition": "required",
       "increment": "NH08",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "steeringEntersAfterTheWholeToolBatchBeforeTheNextRequest"
+        },
+        {
+          "path": "KurnTests/MeetingChatQueueTests.swift",
+          "symbol": "steeringEntersTheReplyAndShowsAsItsOwnQuestionAndAnswer"
+        }
+      ],
+      "note": "NH08: every call of the batch finishes before steering is injected, and the next request carries it."
     },
     {
       "id": "A14",
@@ -919,10 +954,19 @@
       "requirement": "Só entra quando scheduler esgota tools e steering",
       "disposition": "required",
       "increment": "NH08",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "aFollowUpWaitsUntilTheRunWouldFinish"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "steeringIsTakenBeforeAFollowUpWhenBothWait"
+        }
+      ],
+      "note": "NH08: a follow-up enters only when no tool call and no steering is left."
     },
     {
       "id": "A15",
@@ -930,10 +974,15 @@
       "requirement": "Quantidade drenada correta em ambas as filas",
       "disposition": "required",
       "increment": "NH08",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "modesDrainOneOrAll"
+        }
+      ],
+      "note": "NH08: one and all modes drain the right number of items."
     },
     {
       "id": "A16",
@@ -941,10 +990,15 @@
       "requirement": "Erro sem consumir pendências",
       "disposition": "required",
       "increment": "NH08",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Needs the continue/queue commands NH08 introduces; NH05 has no continue command."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "continuingWithNothingToAnswerFailsWithoutConsumingTheQueue"
+        }
+      ],
+      "note": "NH08: continuing an empty history, or a finished reply with nothing queued, fails before any request without consuming the queues."
     },
     {
       "id": "A17",
@@ -952,10 +1006,19 @@
       "requirement": "Uma seleção de fila, sem duplicar drain inicial",
       "disposition": "required",
       "increment": "NH08",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Needs the continue/queue commands NH08 introduces; NH05 has no continue command."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "continuingAfterAReplyTakesOneSelectionWithoutDrainingTwice"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "continuingAnOpenRequestAnswersItWithoutTakingQueuedInput"
+        }
+      ],
+      "note": "NH08: continuing after a reply takes one queue selection; the run's own end drains the rest without taking any input twice."
     },
     {
       "id": "A18",
@@ -963,10 +1026,15 @@
       "requirement": "End não consulta filas; continue assegura uma request sem duplicar natural",
       "disposition": "adapted",
       "increment": "NH08",
-      "targetStatus": "pending",
+      "targetStatus": "partial",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Internal scheduling only; no public hook/extension API. Needs the continue/queue commands NH08 introduces."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "continuingAnOpenRequestAnswersItWithoutTakingQueuedInput"
+        }
+      ],
+      "note": "NH08: continuation ensures one request for an open history without a duplicate natural drain. Kurn has no end/continue hooks; a run's end consults the queues as part of its loop."
     },
     {
       "id": "A19",
@@ -1441,10 +1509,19 @@
       "requirement": "clear antes de abort; draft recebe pendências",
       "disposition": "required",
       "increment": "NH08",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "KurnTests/MeetingChatQueueTests.swift",
+          "symbol": "aStopHandsQueuedInputBackToTheComposer"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "everyChangeIsSavedBeforeItIsAcknowledged"
+        }
+      ],
+      "note": "NH08: a stop clears the queue before it aborts and hands pending input back to the composer; a reopened conversation hands back what a dead process left queued."
     },
     {
       "id": "A47",
@@ -1452,10 +1529,15 @@
       "requirement": "Atualizações não roubam posição de leitura",
       "disposition": "required",
       "increment": "NH08",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatScrollFollowingTests.swift",
+          "symbol": "aReaderOfOlderMessagesStaysWhereTheyAreUnlessTheyAsk"
+        }
+      ],
+      "note": "NH08: new turns scroll into view only while the reader is at the end or for their own question."
     },
     {
       "id": "A48",
@@ -1517,10 +1599,15 @@
       "requirement": "Controles utilizáveis, estados legíveis sem só cor",
       "disposition": "required",
       "increment": "NH08",
-      "targetStatus": "pending",
+      "targetStatus": "partial",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatRunStatusTests.swift",
+          "symbol": "eachPhaseHasItsOwnStatus"
+        }
+      ],
+      "note": "NH08: queue and run states are in words with labelled controls. The accessibility audit does not reach a running conversation (seeded data has no provider), so Dynamic Type/VoiceOver remain a manual check."
     },
     {
       "id": "A52",
