@@ -178,4 +178,64 @@ struct ChatSessionTreeTests {
         #expect(try fork.harnessSnapshot().scope == narrowed)
         #expect(try fork.harnessSnapshot().artifacts == [revised])
     }
+
+    @Test func aDamagedLogLeavesTheConversationAsItIsAndSaysSo() throws {
+        let context = ModelContext(TestModelContainer.make())
+        let seeded = try seed(context)
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in nil })
+        vm.configure(meeting: nil, modelContext: context)
+        vm.load(session: seeded.session)
+        let shown = vm.turns.map(\.id)
+        seeded.session.canonicalOrdinal += 1
+
+        vm.showVersion(of: seeded.q2b.id, offset: -1)
+        #expect(vm.error != nil && vm.turns.map(\.id) == shown)
+        vm.error = nil
+        vm.fork(from: seeded.q2b.id)
+        #expect(vm.error != nil && vm.currentSessionID == seeded.session.id)
+        vm.error = nil
+        vm.duplicateConversation()
+        #expect(vm.error != nil && vm.currentSessionID == seeded.session.id)
+        vm.error = nil
+        vm.label(turnID: seeded.q1.id, as: "Kickoff")
+        #expect(vm.error != nil)
+        vm.refreshBranches()
+        #expect(vm.branches == ChatBranchPresentation())
+
+        seeded.session.canonicalOrdinal -= 1
+        vm.rename(seeded.session, to: "Renamed")
+        #expect(seeded.session.title == "Renamed")
+    }
+
+    @Test func usageIsSummarizedOnlyWhenOtherBranchesRecordedSome() throws {
+        func entry(_ id: String, parent: String?, ordinal: Int, _ payload: AgentSessionEntry.Payload,
+                   run: String? = nil) throws -> AgentSessionEntry {
+            try AgentSessionEntry(sessionID: "session", id: id, parentID: parent, ordinal: ordinal, createdAt: AgentSessionEntry.time(),
+                                  payload: payload, metadata: run.map { .object(["runID": .string($0)]) })
+        }
+        func question(_ id: UUID) throws -> AgentSessionEntry.Payload {
+            .message(.content(try AgentContentMessage(id: id.uuidString, timestampMilliseconds: 1, role: .user,
+                                                      blocks: [AgentContentBlock(id: "text", content: .text("Q"))])))
+        }
+        func usage(_ input: Int) -> AgentSessionEntry.Payload {
+            .custom(type: "agent.usage.v1", data: .object(["inputTokens": .number(Double(input)), "outputTokens": .number(10)]))
+        }
+        let (first, second) = (UUID(), UUID())
+        let entries = [try entry("q1", parent: nil, ordinal: 1, question(first)),
+                       try entry("r1", parent: "q1", ordinal: 2, .custom(type: AgentRunBranch.startType, data: .object([:])), run: "r1"),
+                       try entry("u1", parent: "r1", ordinal: 3, usage(90), run: "r1"),
+                       try entry("q2", parent: nil, ordinal: 4, question(second)),
+                       try entry("r2", parent: "q2", ordinal: 5, .custom(type: AgentRunBranch.startType, data: .object([:])), run: "r2"),
+                       try entry("u2", parent: "r2", ordinal: 6, usage(40), run: "r2")]
+        let tree = try AgentSessionTree(AgentSessionSnapshot(sessionID: "session", revision: 1, leafID: "q2", entries: entries))
+        let branches = ChatBranchPresentation(tree: tree)
+
+        #expect(branches.alternatives[second]?.entryIDs == ["q1", "q2"])
+        #expect(branches.branchUsage == AgentUsage(inputTokens: 40, outputTokens: 10))
+        #expect(branches.sessionUsage == AgentUsage(inputTokens: 130, outputTokens: 20))
+        #expect(branches.usageSummary == String(format: NSLocalizedString("chat.branch.usage", comment: ""), 50, 150))
+        let single = try AgentSessionTree(AgentSessionSnapshot(sessionID: "session", revision: 1, leafID: "q1",
+                                                               entries: Array(entries.prefix(3))))
+        #expect(ChatBranchPresentation(tree: single).usageSummary == nil)
+    }
 }
