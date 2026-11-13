@@ -1256,3 +1256,16 @@
 "store_recovery.chat.artifacts" = "Documentos";
 "store_recovery.chat.artifact" = "Documento";
 "store_recovery.chat.decode_warning" = "Não foi possível ler: %@. Os dados originais do armazenamento não foram alterados.";
+"chat.branch.failed" = "Não foi possível mudar o ramo da conversa. Nada foi alterado.";
+"chat.branch.copy_title" = "%@ (cópia)";
+"chat.branch.previous" = "Versão anterior";
+"chat.branch.next" = "Próxima versão";
+"chat.branch.position" = "%1$d de %2$d";
+"chat.branch.label_value" = "Rótulo: %@";
+"chat.branch.fork" = "Criar conversa a partir daqui";
+"chat.branch.label" = "Rótulo";
+"chat.branch.label_placeholder" = "Rótulo (vazio remove)";
+"chat.branch.duplicate" = "Duplicar conversa";
+"chat.branch.usage" = "Este ramo: %1$d tokens · Todos os ramos: %2$d tokens";
+"chat.history.rename" = "Renomear";
+"chat.history.rename_placeholder" = "Título da conversa";

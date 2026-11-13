@@ -1,4 +1,5 @@
 import AgentHarness
+import CryptoKit
 import Foundation
 import KurnCore
 import SwiftData
@@ -90,7 +91,8 @@ struct SwiftDataAgentSessionStore: AgentSessionStore {
             }
             let artifact = try HarnessPresentationCodec.decode(ChatDocumentArtifact.self, from: row.payloadData)
             guard artifact.id == row.artifactID, artifact.version == row.version,
-                  row.id == revisionID(session: session, artifact: artifact), artifact.version > 0 else { throw AgentSessionStoreError.corruptPayload }
+                  isRevisionID(row.id, session: session, artifact: artifact, payload: row.payloadData),
+                  artifact.version > 0 else { throw AgentSessionStoreError.corruptPayload }
             return artifact
         }
         guard Set(artifacts.map(\.id)).count == artifacts.count else { throw AgentSessionStoreError.corruptPayload }
@@ -116,5 +118,17 @@ struct SwiftDataAgentSessionStore: AgentSessionStore {
     }
     static func revisionID(session: ChatSession, artifact: ChatDocumentArtifact) -> String {
         session.id.uuidString + ":" + artifact.id.uuidString + ":" + String(artifact.version)
+    }
+
+    /// The ID of a revision another branch wrote for an artifact version that already has one:
+    /// the version's ID followed by a digest of the revision's own bytes.
+    static func branchRevisionID(base: String, payload: Data) -> String {
+        base + ":" + SHA256.hash(data: payload).prefix(8).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Whether `id` names this revision: its version's ID, or a branch revision of its bytes.
+    static func isRevisionID(_ id: String, session: ChatSession, artifact: ChatDocumentArtifact, payload: Data) -> Bool {
+        let base = revisionID(session: session, artifact: artifact)
+        return id == base || id == branchRevisionID(base: base, payload: payload)
     }
 }

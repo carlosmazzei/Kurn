@@ -33,8 +33,8 @@ final class HarnessArtifactRevision {
     var payloadData: Data
     var session: ChatSession?
 
-    init(session: ChatSession, artifactID: UUID, version: Int, payloadData: Data) {
-        id = session.id.uuidString + ":" + artifactID.uuidString + ":" + String(version)
+    init(session: ChatSession, artifactID: UUID, version: Int, payloadData: Data, id: String? = nil) {
+        self.id = id ?? session.id.uuidString + ":" + artifactID.uuidString + ":" + String(version)
         sessionID = session.id; self.session = nil; self.artifactID = artifactID
         self.version = version; self.payloadData = payloadData
     }

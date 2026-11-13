@@ -1256,3 +1256,16 @@
 "store_recovery.chat.artifacts" = "Dokumente";
 "store_recovery.chat.artifact" = "Dokument";
 "store_recovery.chat.decode_warning" = "Nicht lesbar: %@. Die ursprünglichen gespeicherten Daten sind unverändert.";
+"chat.branch.failed" = "Der Zweig der Unterhaltung konnte nicht gewechselt werden. Es wurde nichts geändert.";
+"chat.branch.copy_title" = "%@ (Kopie)";
+"chat.branch.previous" = "Vorherige Version";
+"chat.branch.next" = "Nächste Version";
+"chat.branch.position" = "%1$d von %2$d";
+"chat.branch.label_value" = "Markierung: %@";
+"chat.branch.fork" = "Ab hier abzweigen";
+"chat.branch.label" = "Markierung";
+"chat.branch.label_placeholder" = "Markierung (leer entfernt sie)";
+"chat.branch.duplicate" = "Unterhaltung duplizieren";
+"chat.branch.usage" = "Dieser Zweig: %1$d Tokens · Alle Zweige: %2$d Tokens";
+"chat.history.rename" = "Umbenennen";
+"chat.history.rename_placeholder" = "Titel der Unterhaltung";

@@ -97,6 +97,8 @@ final class MeetingChatViewModel {
     /// Whether the person stopped the last reply; shown once the stop settled. A new question,
     /// `reset` and `load` clear it.
     var replyWasStopped = false
+    /// The saved conversation's tree as the chat shows it (NH09).
+    var branches = ChatBranchPresentation()
 
     /// Tests pass a scripted `AgentModel` through `agentModelFactory`.
     init(agentModelFactory: @escaping HarnessChatService.ModelFactory = { try ProviderFactory.agentModel(for: $0, model: $1) },
@@ -319,6 +321,7 @@ final class MeetingChatViewModel {
         try SwiftDataAgentSessionStore(context: modelContext).writePresentation(target,
             turns: (savedTurns ?? turns).map(PersistedChatTurn.init), scope: scope, artifacts: artifacts, preserveCommittedArtifacts: true)
         artifacts = try target.harnessSnapshot().artifacts
+        refreshBranches()
     }
 
     /// Removes any turn appended after `count` — the partial assistant reply
@@ -401,6 +404,7 @@ final class MeetingChatViewModel {
         artifacts = []
         workspace = ChatDocumentWorkspace()
         scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id)
+        branches = ChatBranchPresentation()
     }
 
     // MARK: - Session history
@@ -459,6 +463,7 @@ final class MeetingChatViewModel {
             retryOrigins = [:]
             error = nil
             restoreLeftoverQueue(of: session)
+            refreshBranches()
         } catch {
             self.error = .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.invalid", comment: "Saved chat storage error"))
         }

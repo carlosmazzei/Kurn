@@ -318,10 +318,27 @@
       "sourceDocument": "02-sessoes-contexto.md",
       "disposition": "required",
       "increment": "NH09",
-      "targetStatus": "pending",
+      "targetStatus": "partial",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTreeTests.swift",
+          "symbol": "navigationOpensABranchWhereItWasLeftAndChangesOnlyTheLeaf"
+        },
+        {
+          "path": "KurnTests/ChatSessionTreeTests.swift",
+          "symbol": "navigationSelectsAnotherBranchAndItsDocumentsWithoutLosingAny"
+        },
+        {
+          "path": "KurnTests/ChatSessionTreeTests.swift",
+          "symbol": "labelsAndRenamesAreMetadata"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTreeTests.swift",
+          "symbol": "sessionUsageCoversEveryBranchAndContextUsageOnlyTheSelectedPath"
+        }
+      ],
+      "note": "NH09: alternatives, atomic navigation while settled, fork, clone, labels, rename, branch-aware artifact revisions and save actions, and usage over every branch versus the selected path. Open: branch summaries."
     },
     {
       "id": "C11",
@@ -1268,10 +1285,27 @@
       "requirement": "Fork antes de user com draft; clone inclui posição atual",
       "disposition": "required",
       "increment": "NH09",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTreeTests.swift",
+          "symbol": "aForkCopiesThePathBeforeItsQuestionWithoutLaterRunsOrBranches"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTreeTests.swift",
+          "symbol": "aCloneCopiesTheSelectedPathWithTheRunsThatAnsweredIt"
+        },
+        {
+          "path": "KurnTests/ChatSessionTreeTests.swift",
+          "symbol": "aForkStartsBeforeItsQuestionAndACloneKeepsTheBranchShown"
+        },
+        {
+          "path": "KurnTests/ChatSessionTreeTests.swift",
+          "symbol": "theChatMovesBetweenVersionsForksAndDuplicates"
+        }
+      ],
+      "note": "NH09: fork copies the path before the selected question into a new conversation and restores the question as a draft; clone copies the branch shown; the source keeps every branch."
     },
     {
       "id": "A36",

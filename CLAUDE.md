@@ -330,6 +330,26 @@ each item taken in shows as its own question and answer turn. A stop clears the 
 and hands pending input back to the composer (`restoredDraft`), as does a failed run with the input it
 took in. A reopened conversation hands back what a dead process left queued. `ChatReplayHistory` skips
 the turns of input a replayed run already contains.
+The session tree (NH09, `AgentSessionTree`): an entry is never rewritten, a new branch is new entries
+under an older one, and the selected leaf picks the conversation. Runs hang off the question they answer
+and never move the leaf; labels (`agent.label.v1`) and context edits are detached metadata with no parent.
+The tree gives the alternatives at a message (the conversation's message entries with the same nearest
+message ancestor and role), the leaf a navigation opens (the newest conversation entry of that branch),
+a navigation commit that only moves the leaf, and copies for fork and clone (the path, the runs that
+answered it, its labels and context edits; IDs, times and payloads kept, ordinals renumbered). Usage is
+summed over every branch's runs or only over the runs of the selected path. In the app
+(`SwiftDataAgentSessionStore+Tree`, `MeetingChatViewModel+Branches`), a question asked again in the
+same place shows "‹ n of m ›"; navigating checks the revision, rebuilds the presentation caches and
+saves atomically, and is offered only while no reply runs (`canChangeBranch`). Fork copies the path
+before a question into a new conversation and hands the question back to the composer (nothing before
+the first question means a new, unsaved conversation); "Duplicate conversation" copies the branch shown.
+A copy ends on the conversation's state at that point (the state saved right there, else the nearest
+before it), rebases its revision IDs and copies only the revisions it shows; the source keeps every
+branch. Labels and renames are metadata. Artifact revisions are per branch: the same version written with
+other content is a revision of its own (`branchRevisionID`, the version's ID plus a digest of its bytes),
+never a conflict, and the save action reads a saved document as current only when it holds that version
+with the same body (`ChatArtifactStore.action`). `ChatBranchPresentation.usageSummary` lists the branch
+shown and every branch when they differ. Branch summaries are not implemented yet.
 Context edits (`AgentContextEdit`, `agent.context-edit.v1`) change only what later runs replay: removing
 an assistant message removes the results of its calls, a removed tool result becomes a stub so its call
 keeps a result, and the log, the shown conversation and recorded usage are unchanged. `ChatReplayHistory`

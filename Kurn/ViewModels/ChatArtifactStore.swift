@@ -13,9 +13,12 @@ struct ChatArtifactStore {
     let context: ModelContext
     var saveChanges: @MainActor (ModelContext) -> AppError? = { $0.saveOrError() }
 
+    /// Revision-aware (NH09): the saved document is this revision only when it holds the same
+    /// version with the same body. Another branch's revision — an older version, or the same
+    /// version with other content — offers to replace it, like a newer one does.
     static func action(artifact: ChatDocumentArtifact, saved: GeneratedDocument?) -> ArtifactSaveAction {
         guard let saved else { return .save }
-        return artifact.version > (saved.sourceArtifactVersion ?? 0) ? .update : .saved
+        return saved.sourceArtifactVersion == artifact.version && saved.bodyMarkdown == artifact.markdown ? .saved : .update
     }
 
     func savedDocument(artifactID: UUID, sessionID: UUID) throws -> GeneratedDocument? {

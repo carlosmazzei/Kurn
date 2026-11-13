@@ -20,7 +20,7 @@ struct HarnessTurnMetadata: Codable {
 struct HarnessPresentationState: Codable {
     static let type = "kurn.presentation-state.v1"
     let scope: ChatSourceScope?
-    let artifactRevisionIDs: [String]
+    var artifactRevisionIDs: [String]
 }
 
 enum HarnessPresentationCodec {

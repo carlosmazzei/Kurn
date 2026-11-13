@@ -60,6 +60,9 @@ struct MeetingChatConversationView: View {
     @State private var scrollFollowing = ChatScrollFollowing()
     /// Set by `send`, so the reader's own question is always brought into view.
     @State private var sentQuestion = false
+    /// The question being labelled, and the label being typed (NH09).
+    @State private var labelTarget: UUID?
+    @State private var labelText = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -92,13 +95,24 @@ struct MeetingChatConversationView: View {
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { composerHeight = $0 }
         }
         .errorAlert($vm.error)
+        // Typing a label needs a text field, which only the system alert offers.
+        .alert(NSLocalizedString("chat.branch.label", comment: "Label this question"),
+               isPresented: Binding(get: { labelTarget != nil }, set: { if !$0 { labelTarget = nil } })) {
+            TextField(NSLocalizedString("chat.branch.label_placeholder", comment: "Label text"), text: $labelText)
+            Button(NSLocalizedString("common.save", comment: "Save")) {
+                if let target = labelTarget { vm.label(turnID: target, as: labelText) }
+                labelTarget = nil
+            }
+            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) { labelTarget = nil }
+        }
         .toolbar { historyToolbar }
         .sheet(isPresented: $showingHistory) {
             ChatSessionListView(
                 sessions: vm.pastSessions(),
                 currentSessionID: vm.currentSessionID,
                 onSelect: { vm.load(session: $0) },
-                onDelete: { vm.delete($0) }
+                onDelete: { vm.delete($0) },
+                onRename: { vm.rename($0, to: $1) }
             )
         }
         .sheet(isPresented: $showingSources) {
@@ -150,6 +164,14 @@ struct MeetingChatConversationView: View {
             }
             .accessibilityLabel(NSLocalizedString("chat.history.button", comment: "Open chat history"))
             Button {
+                vm.duplicateConversation()
+            } label: {
+                Image(systemName: "plus.square.on.square")
+            }
+            .disabled(!vm.canChangeBranch)
+            .accessibilityLabel(NSLocalizedString("chat.branch.duplicate", comment: "Duplicate this conversation"))
+            .accessibilityIdentifier("chat.branch.duplicate")
+            Button {
                 vm.reset()
             } label: {
                 Image(systemName: "square.and.pencil")
@@ -183,8 +205,14 @@ struct MeetingChatConversationView: View {
                                             meetingTitles: Dictionary(uniqueKeysWithValues: sourceMeetings.map { ($0.id, $0.title) }),
                                             documentTitles: Dictionary(uniqueKeysWithValues: vm.artifacts.map { ($0.id, $0.title) }),
                                             artifacts: vm.artifacts, artifactSession: vm.artifactSession,
-                                            onJumpToTime: onJumpToTime)
+                                            onJumpToTime: onJumpToTime, branch: branchActions(for: turn))
                             .id(turn.id)
+                    }
+                    if let usage = vm.branches.usageSummary, !vm.isResponding {
+                        Text(usage)
+                            .font(Theme.caption2)
+                            .foregroundStyle(Theme.textTertiary)
+                            .accessibilityIdentifier("chat.branch.usage")
                     }
                     if vm.isResponding { respondingRow }
                     if let question = vm.retryableQuestion {
@@ -267,6 +295,19 @@ struct MeetingChatConversationView: View {
             // the content visibly jumps every time the keyboard shows or hides.
             .ignoresSafeArea(edges: .bottom)
         }
+    }
+
+    /// The branch actions of a saved question (NH09); none for a reply or an unsaved question.
+    private func branchActions(for turn: MeetingChatViewModel.Turn) -> ChatTurnBranchActions? {
+        guard turn.role == .user, vm.branches.entryIDs[turn.id] != nil else { return nil }
+        return ChatTurnBranchActions(versions: vm.branches.alternatives[turn.id], label: vm.branches.labels[turn.id],
+                                     isEnabled: vm.canChangeBranch,
+                                     showVersion: { vm.showVersion(of: turn.id, offset: $0) },
+                                     fork: { vm.fork(from: turn.id) },
+                                     editLabel: {
+                                         labelText = vm.branches.labels[turn.id] ?? ""
+                                         labelTarget = turn.id
+                                     })
     }
 
     /// Whether `turn` is the reply currently streaming in, so its bubble gets

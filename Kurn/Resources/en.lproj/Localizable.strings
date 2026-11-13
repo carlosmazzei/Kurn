@@ -1256,3 +1256,16 @@
 "store_recovery.chat.artifacts" = "Artifacts";
 "store_recovery.chat.artifact" = "Artifact";
 "store_recovery.chat.decode_warning" = "%@ could not be decoded. Original store bytes are unchanged.";
+"chat.branch.failed" = "The conversation could not change branches. Nothing was changed.";
+"chat.branch.copy_title" = "%@ (copy)";
+"chat.branch.previous" = "Previous version";
+"chat.branch.next" = "Next version";
+"chat.branch.position" = "%1$d of %2$d";
+"chat.branch.label_value" = "Label: %@";
+"chat.branch.fork" = "Fork from here";
+"chat.branch.label" = "Label";
+"chat.branch.label_placeholder" = "Label (empty removes it)";
+"chat.branch.duplicate" = "Duplicate conversation";
+"chat.branch.usage" = "This branch: %1$d tokens · All branches: %2$d tokens";
+"chat.history.rename" = "Rename";
+"chat.history.rename_placeholder" = "Conversation title";

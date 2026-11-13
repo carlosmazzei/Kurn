@@ -11,11 +11,15 @@ struct MeetingChatTurnView: View {
     var artifacts: [ChatDocumentArtifact] = []
     var artifactSession: ChatSession?
     var onJumpToTime: ((TimeInterval) -> Void)?
+    var branch: ChatTurnBranchActions?
 
     var body: some View {
         switch turn.role {
         case .user:
             VStack(alignment: .leading, spacing: 8) {
+                if let label = branch?.label {
+                    HStack { Spacer(minLength: 40); ChatTurnLabel(text: label) }
+                }
                 HStack {
                     Spacer(minLength: 40)
                     Text(turn.text)
@@ -23,6 +27,13 @@ struct MeetingChatTurnView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 14).padding(.vertical, 10)
                         .background(Theme.accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .contextMenu { branchMenu }
+                }
+                if let branch, let versions = branch.versions {
+                    HStack {
+                        Spacer(minLength: 40)
+                        ChatVersionSwitcher(versions: versions, isEnabled: branch.isEnabled, showVersion: branch.showVersion)
+                    }
                 }
                 ChatStepTimelineView(steps: turn.steps, isRunning: false,
                                      meetingTitles: meetingTitles, documentTitles: documentTitles)
@@ -70,6 +81,19 @@ struct MeetingChatTurnView: View {
                     timestampChips(ChatTimestampCitations.times(in: turn.text))
                 }
                 usageCaption(turn)
+            }
+        }
+    }
+
+    /// Fork and label, offered on a saved question while no reply runs (NH09).
+    @ViewBuilder
+    private var branchMenu: some View {
+        if let branch, branch.isEnabled {
+            Button(action: branch.fork) {
+                Label(NSLocalizedString("chat.branch.fork", comment: "Fork from this question"), systemImage: "arrow.triangle.branch")
+            }
+            Button(action: branch.editLabel) {
+                Label(NSLocalizedString("chat.branch.label", comment: "Label this question"), systemImage: "bookmark")
             }
         }
     }

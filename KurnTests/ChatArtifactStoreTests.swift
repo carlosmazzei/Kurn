@@ -50,6 +50,12 @@ struct ChatArtifactStoreTests {
         #expect(document.title == "New title")
         #expect(document.bodyMarkdown == "Revised")
         #expect(document.sourceArtifactVersion == 2)
+        #expect(ChatArtifactStore.action(artifact: revised, saved: document) == .saved)
+        // Another branch's revision is never read as saved: an older version, or the same version
+        // with other content, offers to replace the saved document.
+        #expect(ChatArtifactStore.action(artifact: artifact, saved: document) == .update)
+        let otherBranch = ChatDocumentArtifact(id: artifact.id, title: "New title", markdown: "Other branch", version: 2)
+        #expect(ChatArtifactStore.action(artifact: otherBranch, saved: document) == .update)
         #expect(document.createdAt == createdAt)
         #expect(document.userPrompt == "Revise it")
         #expect(document.generatorModelIdentifier == "anthropic:claude")
