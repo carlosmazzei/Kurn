@@ -1284,3 +1284,4 @@
 "chat.context.left_out" = "Exclu des prochaines réponses";
 "chat.branch.tree" = "Toutes les branches";
 "chat.context.compact_next" = "Résumer d’abord les messages précédents";
+"chat.draft.save_failed" = "Le texte non envoyé n’a pas pu être enregistré. Il est toujours dans le champ de message.";

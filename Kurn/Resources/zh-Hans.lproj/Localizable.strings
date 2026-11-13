@@ -1284,3 +1284,4 @@
 "chat.context.left_out" = "已从后续回答中排除";
 "chat.branch.tree" = "所有分支";
 "chat.context.compact_next" = "先总结之前的消息";
+"chat.draft.save_failed" = "未能保存未发送的文本，它仍在消息框中。";

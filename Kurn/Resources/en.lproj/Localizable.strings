@@ -1284,3 +1284,4 @@
 "chat.context.left_out" = "Left out of later answers";
 "chat.branch.tree" = "All branches";
 "chat.context.compact_next" = "Summarize earlier messages first";
+"chat.draft.save_failed" = "Your unsent text could not be saved. It is still in the message field.";

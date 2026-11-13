@@ -1284,3 +1284,4 @@
 "chat.context.left_out" = "Fora das próximas respostas";
 "chat.branch.tree" = "Todas as ramificações";
 "chat.context.compact_next" = "Resumir mensagens anteriores antes";
+"chat.draft.save_failed" = "Não foi possível salvar o texto não enviado. Ele continua no campo de mensagem.";

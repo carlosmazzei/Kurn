@@ -1284,3 +1284,4 @@
 "chat.context.left_out" = "Aus späteren Antworten ausgeschlossen";
 "chat.branch.tree" = "Alle Zweige";
 "chat.context.compact_next" = "Zuerst frühere Nachrichten zusammenfassen";
+"chat.draft.save_failed" = "Der nicht gesendete Text konnte nicht gespeichert werden. Er steht noch im Nachrichtenfeld.";

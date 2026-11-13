@@ -3124,8 +3124,9 @@ The composer's unsent text (A68) is `MeetingChatViewModel.draft`, not view state
 view; a saved conversation keeps it as its `.draft` recovery record (`ChatDraftRecord`), written when the
 scene goes to the background (`ChatConversationHost.saveDrafts()`), when another conversation opens and
 before the host evicts the view model — never per keystroke. A reopened conversation puts it back; a
-sent question clears it; a new, unsaved conversation's draft lives in memory only, carries into an opened
-conversation that has none of its own, and keeps its view model from being evicted.
+question sent from the composer clears it (a resumed question leaves it); a new, unsaved conversation's draft
+lives in memory only, goes along ahead of an opened conversation's own draft, and keeps its view model from
+being evicted. A draft that cannot be saved is never dropped: it stays in the composer and the chat says so.
 
 **The question is a barrier, and every run leaves a record.** `send` saves the conversation
 with the new question before any request; if that save fails nothing is sent and the question
