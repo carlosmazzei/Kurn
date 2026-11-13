@@ -105,6 +105,13 @@ final class MeetingChatViewModel {
               commandID: String? = nil) {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isResponding, task == nil else { return }
+        // A named command already in the log is refused before its question is saved, so a repeat
+        // leaves the conversation untouched (a concurrent repeat is undone below).
+        if let commandID, let session, let modelContext,
+           ChatRunBranch.contains(command: commandID, in: session, store: SwiftDataAgentSessionStore(context: modelContext)) {
+            error = Self.presentedError(AgentSessionOwnerError.duplicateCommand)
+            return
+        }
         error = nil
         pendingForegroundResume = nil
         interruptedResume = nil
@@ -184,6 +191,11 @@ final class MeetingChatViewModel {
                 let appError = Self.presentedError(error)
                 if self.generation == generation {
                     self.dropPartialReply(keeping: turnCountBeforeReply)
+                    // A repeat that raced past the check above ran nothing: its question goes too.
+                    if (error as? AgentSessionOwnerError) == .duplicateCommand, self.turns.last?.role == .user {
+                        self.turns.removeLast()
+                        self.persist()
+                    }
                     self.error = appError
                 }
                 ReliabilityLog.record(ReliabilityEvent(

@@ -35,7 +35,9 @@ enum ChatRunRecovery {
                     // could not write — `interrupted` for a dead process, `persistenceFailed` for a
                     // run that settled but could not save its own end.
                     let end = run.state == .interrupted ? "interrupted" : "persistenceFailed"
-                    if try ChatRunBranch.closeIfOpen(runID: run.runID, end: end, in: session, store: store) {
+                    // Each branch on its own: one that cannot be closed now stays for the next
+                    // launch without keeping the session's other runs from being reconciled.
+                    if (try? ChatRunBranch.closeIfOpen(runID: run.runID, end: end, in: session, store: store)) == true {
                         ReliabilityLog.record(ReliabilityEvent(
                             operationID: OperationID(String(run.runID.prefix(8))), operation: "meeting_chat",
                             stage: "launch_recovery", outcome: .succeeded, code: "run_branch_closed"

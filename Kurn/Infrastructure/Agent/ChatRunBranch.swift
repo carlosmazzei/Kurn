@@ -60,6 +60,13 @@ enum ChatRunBranch {
         return true
     }
 
+    /// Whether a run for `command` is already in the session's log. Unreadable history answers
+    /// no: the owner's own check at the run start is the authoritative one.
+    @MainActor
+    static func contains(command: String, in session: ChatSession, store: SwiftDataAgentSessionStore) -> Bool {
+        (try? store.snapshot(session).entries.contains { $0.commandID == command }) ?? false
+    }
+
     /// Whether `error` is a run history write that failed; the chat says so rather than showing
     /// the store's own error text.
     static func isWriteFailure(_ error: Error) -> Bool {

@@ -1225,6 +1225,7 @@
 
 "chat.storage.invalid" = "Não foi possível ler ou salvar esta conversa. Os dados armazenados foram preservados.";
 "chat.storage.run_failed" = "Não foi possível salvar o andamento desta resposta, então ela parou antes de enviar mais nada. Sua pergunta foi mantida; tente de novo.";
+"chat.command.duplicate" = "Esta pergunta já foi enviada, então não foi enviada de novo.";
 
 // Native tool pipeline diagnostics.
 "chat.diagnostic.toolValidationFailed" = "Argumentos da ferramenta rejeitados";

@@ -222,6 +222,10 @@ struct ChatRunTranscriptTests {
         #expect(await model.requests.count == 1)
         let after = try SwiftDataAgentSessionStore(context: context).snapshot(session).entries
         #expect(after.compactMap(\.commandID) == [questionID.uuidString])
-        #expect(vm.retryableQuestion == "When?")
+        // Nor is the repeated question saved: the conversation is still one answered question.
+        #expect(vm.turns.count == 2)
+        #expect(session.turns.count == 2)
+        #expect(vm.retryableQuestion == nil)
+        #expect(Self.message(of: vm.error) == NSLocalizedString("chat.command.duplicate", comment: ""))
     }
 }
