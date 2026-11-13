@@ -350,6 +350,20 @@ other content is a revision of its own (`branchRevisionID`, the version's ID plu
 never a conflict, and the save action reads a saved document as current only when it holds that version
 with the same body (`ChatArtifactStore.action`). `ChatBranchPresentation.usageSummary` lists the branch
 shown and every branch when they differ. Branch summaries are not implemented yet.
+Session interchange (NH10, `AgentSessionArchive`): a native, versioned JSON Lines archive
+(`kurn.agent-session` v1) — a header, one line per entry (encoded directly, so integers keep their exact
+form) and namespaced host records kept opaque; unknown entries, record types and header fields survive a
+round trip. Only LF separates records (`AgentJSONLLines` reads any chunking; U+2028/U+2029 are ordinary
+characters). Reading rejects a missing or repeated header, another format or version, untyped lines,
+payloads past the line/total/entry/depth limits, entries of another session and broken graphs; `copy(into:)`
+moves the graph to a new identity. The app (`SwiftDataAgentSessionStore+Archive`,
+`MeetingChatViewModel+Archive`, `ChatConversationMenu`) exports a conversation with its document revisions
+(`kurn.artifact-revision`, exact stored bytes) and title (`kurn.conversation`), never run records, queued
+input or receipts, through the share sheet as a protected temporary `.jsonl`. Import is a new conversation
+in the current chat: revision IDs are rebased and checked against their bytes, every revision a branch
+shows must be present, and nothing is written unless the whole archive holds; a restore keeps the archived
+identity only when no conversation has it. "Export as Markdown" writes the branch shown for a reader
+(`ChatConversationMarkdown`). The pi JSONL v3 subset and an HTML export are not implemented.
 Context edits (`AgentContextEdit`, `agent.context-edit.v1`) change only what later runs replay: removing
 an assistant message removes the results of its calls, a removed tool result becomes a stub so its call
 keeps a result, and the log, the shown conversation and recorded usage are unchanged. `ChatReplayHistory`

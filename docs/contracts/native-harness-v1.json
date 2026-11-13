@@ -695,10 +695,27 @@
       "sourceDocument": "05-interface-integracao.md",
       "disposition": "adapted",
       "increment": "NH10",
-      "targetStatus": "pending",
+      "targetStatus": "partial",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Local typed commands replace RPC; native export is required and pi interchange is a qualified subset."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionArchiveTests.swift",
+          "symbol": "aRoundTripKeepsIdentityEveryBranchOpaqueDataAndUsage"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionArchiveTests.swift",
+          "symbol": "whatCannotBeTrustedIsRejected"
+        },
+        {
+          "path": "KurnTests/ChatSessionArchiveTests.swift",
+          "symbol": "anImportIsANewConversationWithTheWholeTreeAndItsDocuments"
+        },
+        {
+          "path": "KurnTests/ChatSessionArchiveTests.swift",
+          "symbol": "theChatExportsAndImportsConversations"
+        }
+      ],
+      "note": "NH10: native versioned JSONL archive with every branch, the leaf, runs, usage and document revisions; new-copy import and identity-preserving restore only when free; rejection of untrusted archives; Markdown reading export through the share sheet. Open: the pi JSONL v3 subset, safe HTML export, and keeping unknown host records on import into the app."
     },
     {
       "id": "C27",
@@ -1649,10 +1666,15 @@
       "requirement": "Viewer não executa conteúdo de ferramenta como código ativo",
       "disposition": "required",
       "increment": "NH10",
-      "targetStatus": "pending",
+      "targetStatus": "partial",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatSessionArchiveTests.swift",
+          "symbol": "theReadingExportIsTheBranchShown"
+        }
+      ],
+      "note": "NH10: the reading export is Markdown text with no HTML of its own, and the chat renders model Markdown with links disabled. No HTML export exists yet, so hostile-HTML handling is not exercised."
     },
     {
       "id": "A53",
@@ -1792,10 +1814,15 @@
       "requirement": "Só LF separa registros",
       "disposition": "required",
       "increment": "NH10",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionArchiveTests.swift",
+          "symbol": "onlyLFSeparatesRecordsWhateverTheChunks"
+        }
+      ],
+      "note": "NH10: AgentJSONLLines splits on LF only, across any chunking; U+2028/U+2029 stay inside strings; a final line without LF is read."
     },
     {
       "id": "A66",
@@ -1836,10 +1863,23 @@
       "requirement": "Identidade, árvore, dados opacos e custo preservados",
       "disposition": "required",
       "increment": "NH10",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionArchiveTests.swift",
+          "symbol": "aRoundTripKeepsIdentityEveryBranchOpaqueDataAndUsage"
+        },
+        {
+          "path": "KurnTests/ChatSessionArchiveTests.swift",
+          "symbol": "anImportIsANewConversationWithTheWholeTreeAndItsDocuments"
+        },
+        {
+          "path": "KurnTests/ChatSessionArchiveTests.swift",
+          "symbol": "aRestoreKeepsTheIdentityOnlyWhenNoConversationHasIt"
+        }
+      ],
+      "note": "NH10: the native archive round-trips identity, the whole tree, unknown entries, records and header fields, and recorded usage; an app import keeps every branch and its document revisions. Native round trip is the requirement; pi JSONL v3 interchange is not claimed."
     },
     {
       "id": "A70",
