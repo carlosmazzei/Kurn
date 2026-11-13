@@ -1272,7 +1272,7 @@
 "chat.archive.export_failed" = "The conversation could not be exported.";
 "chat.archive.import_failed" = "This file is not a conversation archive Kurn can open. Nothing was imported.";
 "chat.archive.imported_title" = "Imported conversation";
-"chat.archive.export_markdown" = "Export as Markdown";
+"chat.archive.export_as" = "Export as…";
 "chat.archive.export" = "Export archive (all branches)";
 "chat.archive.import" = "Import archive";
 "chat.conversation.more" = "Conversation actions";

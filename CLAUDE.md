@@ -370,8 +370,10 @@ moves the graph to a new identity. The app (`SwiftDataAgentSessionStore+Archive`
 input or receipts, through the share sheet as a protected temporary `.jsonl`. Import is a new conversation
 in the current chat: revision IDs are rebased and checked against their bytes, every revision a branch
 shows must be present, and nothing is written unless the whole archive holds; a restore keeps the archived
-identity only when no conversation has it. "Export as Markdown" writes the branch shown for a reader
-(`ChatConversationMarkdown`). The pi JSONL v3 subset and an HTML export are not implemented.
+identity only when no conversation has it. "Export as…" writes the branch shown for a reader
+(`ChatConversationMarkdown`) as Markdown, or as Word or HTML through `DocumentExport` and the meeting
+export's renderers; the HTML is one self-contained page with every text escaped, no script, no external
+resource and no link. The pi JSONL v3 subset is not implemented.
 Context edits (`AgentContextEdit`, `agent.context-edit.v1`) change only what later runs replay: removing
 an assistant message removes the results of its calls, a removed tool result becomes a stub so its call
 keeps a result, and the log, the shown conversation and recorded usage are unchanged. `ChatReplayHistory`

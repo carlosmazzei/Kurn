@@ -1272,7 +1272,7 @@
 "chat.archive.export_failed" = "无法导出对话。";
 "chat.archive.import_failed" = "此文件不是 Kurn 可以打开的对话存档，未导入任何内容。";
 "chat.archive.imported_title" = "导入的对话";
-"chat.archive.export_markdown" = "导出为 Markdown";
+"chat.archive.export_as" = "导出为…";
 "chat.archive.export" = "导出存档（所有分支）";
 "chat.archive.import" = "导入存档";
 "chat.conversation.more" = "对话操作";

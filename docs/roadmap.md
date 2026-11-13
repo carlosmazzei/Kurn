@@ -926,7 +926,6 @@ export through the share sheet. Still open:
 
 - The supported pi JSONL v3 subset (message/system/compaction/usage entries), only once fixtures
   demonstrate it.
-- A safe HTML export (no scripts, remote embeds or hosted links).
 - Keeping unknown host records and header fields when an archive is imported into the app's store.
 - Exact integers past 2^53 in opaque host records and unknown header fields: those pass through
   `JSONValue`, whose numbers are `Double` (entries are encoded directly and keep exact integers).
@@ -935,8 +934,8 @@ export through the share sheet. Still open:
 
 ### Remaining native-harness work (audit after NH10)
 
-NH00–NH10 are merged into `feature/native-harness`. Of the contract's 97 items, 55 are verified, 28 are
-excluded by the local profile, 12 are partial, 2 are conditional and none is pending
+NH00–NH10 are merged into `feature/native-harness`. Of the contract's 97 items, 56 are verified, 28 are
+excluded by the local profile, 11 are partial, 2 are conditional and none is pending
 (`docs/contracts/native-harness-v1.json`, checked by `Tools/check_native_harness_contracts.py`). Everything still open, grouped by where it lands, with the contract items it closes:
 
 | Area | Open item | Contract |
@@ -947,7 +946,7 @@ excluded by the local profile, 12 are partial, 2 are conditional and none is pen
 | Context | Refresh the `documents` system-prompt section inside a run after a mutation; a host writer that records context edits from the UI | C11, C12 follow-up |
 | Run ownership | One owner retained per session across runs; model/provider changes at request boundaries; a `waitingForUser` phase once a tool asks for confirmation | C24 |
 | Tree | A tree view of every branch | C10 follow-up |
-| Interchange | The pi JSONL v3 subset (only with fixtures); a safe HTML export; keeping unknown host records on app import; exact integers past 2^53 in opaque fields (accepted limitation) | C25, C26, A52 |
+| Interchange | The pi JSONL v3 subset (only with fixtures); keeping unknown host records on app import; exact integers past 2^53 in opaque fields (accepted limitation) | C25, C26 |
 | Suspension | Reconcile background/foreground on a device (the release checklist's chat item); the unsent draft is saved | A68 |
 | Qualification | Real-transport chunking, Dynamic Type/VoiceOver over a running conversation, migration/stress, Thread Sanitizer on the session/store boundaries, and the physical-device checklist | A06, A51 |
 

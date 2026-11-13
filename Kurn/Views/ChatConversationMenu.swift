@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The open conversation's actions (NH09/NH10): duplicate it, export it whole as an archive or the
-/// branch shown as Markdown, and import an archive as a new conversation.
+/// branch shown to read (Markdown, Word or HTML), and import an archive as a new conversation.
 struct ChatConversationMenu: View {
     let vm: MeetingChatViewModel
     @Binding var shareItem: ShareItem?
@@ -15,10 +15,14 @@ struct ChatConversationMenu: View {
                 Label(NSLocalizedString("chat.branch.duplicate", comment: "Duplicate this conversation"), systemImage: "plus.square.on.square")
             }
             .disabled(!vm.canChangeBranch)
-            Button {
-                if let url = vm.exportReadable() { shareItem = ShareItem(urls: [url]) }
+            Menu {
+                ForEach(DocumentExport.formats, id: \.self) { format in
+                    Button(format.title) {
+                        if let url = vm.exportReadable(as: format) { shareItem = ShareItem(urls: [url]) }
+                    }
+                }
             } label: {
-                Label(NSLocalizedString("chat.archive.export_markdown", comment: "Export the conversation shown as Markdown"),
+                Label(NSLocalizedString("chat.archive.export_as", comment: "Export the conversation shown in a reading format"),
                       systemImage: "doc.text")
             }
             .disabled(vm.isResponding || vm.turns.isEmpty)

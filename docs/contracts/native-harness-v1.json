@@ -767,7 +767,7 @@
           "symbol": "theChatExportsAndImportsConversations"
         }
       ],
-      "note": "NH10: native versioned JSONL archive with every branch, the leaf, runs, usage and document revisions; new-copy import and identity-preserving restore only when free; rejection of untrusted archives; Markdown reading export through the share sheet. Open: the pi JSONL v3 subset, safe HTML export, and keeping unknown host records on import into the app."
+      "note": "NH10: native versioned JSONL archive with every branch, the leaf, runs, usage and document revisions; new-copy import and identity-preserving restore only when free; rejection of untrusted archives; reading export (Markdown, Word or inert HTML) through the share sheet. Open: the pi JSONL v3 subset and keeping unknown host records on import into the app."
     },
     {
       "id": "C27",
@@ -1753,15 +1753,19 @@
       "requirement": "Viewer não executa conteúdo de ferramenta como código ativo",
       "disposition": "required",
       "increment": "NH10",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [],
       "targetEvidence": [
         {
           "path": "KurnTests/ChatSessionArchiveTests.swift",
           "symbol": "theReadingExportIsTheBranchShown"
+        },
+        {
+          "path": "KurnTests/ChatSessionArchiveTests.swift",
+          "symbol": "theHTMLReadingExportIsInert"
         }
       ],
-      "note": "NH10: the reading export is Markdown text with no HTML of its own, and the chat renders model Markdown with links disabled. No HTML export exists yet, so hostile-HTML handling is not exercised."
+      "note": "The reading export is Markdown, Word or one self-contained HTML page: every text is escaped, links and images keep only their text, and there is no script or external resource; the chat renders model Markdown with links disabled."
     },
     {
       "id": "A53",

@@ -1272,7 +1272,7 @@
 "chat.archive.export_failed" = "Die Unterhaltung konnte nicht exportiert werden.";
 "chat.archive.import_failed" = "Diese Datei ist kein Unterhaltungsarchiv, das Kurn öffnen kann. Es wurde nichts importiert.";
 "chat.archive.imported_title" = "Importierte Unterhaltung";
-"chat.archive.export_markdown" = "Als Markdown exportieren";
+"chat.archive.export_as" = "Exportieren als…";
 "chat.archive.export" = "Archiv exportieren (alle Zweige)";
 "chat.archive.import" = "Archiv importieren";
 "chat.conversation.more" = "Aktionen der Unterhaltung";

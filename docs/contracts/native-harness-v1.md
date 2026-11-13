@@ -1,6 +1,6 @@
 # Native harness contract v1
 
-Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04); session ownership implemented (NH05); projection and persistent compaction implemented (NH06, except manual compaction and branch summaries); usage, cost, retries and credentials implemented (NH07, except a capability snapshot); queued input implemented (NH08, except a session-retained owner, model changes at request boundaries and `waitingForUser`); session tree implemented (NH09, except branch summaries); native archive, export and import implemented (NH10, except the pi JSONL v3 subset, HTML export and device qualification)**. NH01 froze the NH00
+Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04); session ownership implemented (NH05); projection and persistent compaction implemented (NH06, except manual compaction and branch summaries); usage, cost, retries and credentials implemented (NH07, except a capability snapshot); queued input implemented (NH08, except a session-retained owner, model changes at request boundaries and `waitingForUser`); session tree implemented (NH09, except branch summaries); native archive, export and import implemented (NH10, except the pi JSONL v3 subset and device qualification)**. NH01 froze the NH00
 compatibility baseline. NH02 now produces native v1 assistant blocks at the provider
 boundary and consumes them in the harness. Indexed session storage and lazy legacy conversion are active; detailed runtime
 message persistence barriers (NH05) and canonical tool-history replay (NH06) are active; complete pi compatibility is not claimed.
@@ -73,8 +73,8 @@ Important current adaptations/gaps:
   across processes; queued input is saved before it is acknowledged (NH08). The chat stays busy
   (`cancelling`) after a stop until the run has settled. Open: one owner retained per session
   across runs (today one per run), and model changes at request boundaries.
-- Interchange is native (NH10, `kurn.agent-session` v1). The pi JSONL v3 subset, an HTML export
-  and keeping unknown host records through an app import are not implemented; integers past
+- Interchange is native (NH10, `kurn.agent-session` v1). The pi JSONL v3 subset and keeping unknown host records
+  through an app import are not implemented (the reading export is Markdown, Word or inert HTML); integers past
   2^53 inside opaque archive fields lose precision (documented limitation).
 - Legacy Codable Date fields use Foundation seconds since 2001. Preserve that codec while
   reading old data. Contract v1/pi timestamps below are different fields and units.

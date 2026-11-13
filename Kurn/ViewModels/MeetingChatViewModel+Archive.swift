@@ -4,7 +4,7 @@ import KurnCore
 import SwiftData
 
 /// Exporting and importing saved conversations (NH10). The archive is the whole conversation —
-/// every branch, for a later import; the Markdown is the branch shown, for a reader. Both are
+/// every branch, for a later import; the reading export is the branch shown, as Markdown, Word or HTML. Both are
 /// written to a protected temporary file the share sheet hands on, and an import always becomes
 /// a new conversation in this chat, never a change to an existing one.
 extension MeetingChatViewModel {
@@ -20,13 +20,15 @@ extension MeetingChatViewModel {
         }
     }
 
-    /// The conversation shown as a Markdown file to read.
-    func exportReadable() -> URL? {
+    /// The conversation shown as a file to read: Markdown, or a Word or HTML document rendered from
+    /// it by the meeting export's renderers — the HTML is one self-contained page with every text
+    /// escaped, no script, no external resource and no link.
+    func exportReadable(as format: MeetingExportFormat = .standard) -> URL? {
         guard !isResponding, !turns.isEmpty else { return nil }
         let title = artifactSession?.title ?? ChatSession.title(from: turns.first { $0.role == .user }?.text ?? "")
         let markdown = ChatConversationMarkdown.render(title: title, turns: turns.map(PersistedChatTurn.init), artifacts: artifacts)
         do {
-            return try MeetingExport.temporaryFile(markdown: markdown, suggestedName: title)
+            return try DocumentExport.file(title: title, markdown: markdown, format: format)
         } catch {
             archiveFailed("chat.archive.export_failed")
             return nil
