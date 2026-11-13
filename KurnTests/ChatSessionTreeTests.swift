@@ -153,4 +153,29 @@ struct ChatSessionTreeTests {
         #expect(vm.turns.isEmpty && vm.restoredDraft == "First question")
         #expect(vm.error == nil)
     }
+
+    @Test func aForkOpensWithTheSourcesAndDocumentsItsQuestionWasAskedWith() throws {
+        let context = ModelContext(TestModelContainer.make())
+        let session = ChatSession(meeting: nil, title: "Planning")
+        context.insert(session)
+        let store = SwiftDataAgentSessionStore(context: context)
+        let (q1, a1) = (turn(.user, "First question"), turn(.assistant, "First answer"))
+        let (q2, q2b) = (turn(.user, "Second question"), turn(.user, "Asked again"))
+        let first = ChatDocumentArtifact(title: "Minutes", markdown: "One")
+        let revised = ChatDocumentArtifact(id: first.id, title: "Minutes", markdown: "Two", version: 2)
+        let narrowed = ChatSourceScope(kind: .library, parts: [.summary])
+        try store.writePresentation(session, turns: [q1, a1], scope: nil, artifacts: [first])
+        // Sources and the document change after the answer, then a question is asked, dropped and
+        // asked again: the new question is written under the answer, beside the older state.
+        try store.writePresentation(session, turns: [q1, a1], scope: narrowed, artifacts: [revised])
+        try store.writePresentation(session, turns: [q1, a1, q2], scope: narrowed, artifacts: [revised])
+        try store.writePresentation(session, turns: [q1, a1, q2b], scope: narrowed, artifacts: [revised])
+
+        let tree = try store.tree(session)
+        let question = try #require(ChatBranchPresentation(tree: tree).entryIDs[q2b.id])
+        let fork = try #require(try store.copy(session, through: tree.entry(question)?.parentID, title: session.title, askedAt: question))
+        #expect(try fork.harnessSnapshot().turns.map(\.id) == [q1.id, a1.id])
+        #expect(try fork.harnessSnapshot().scope == narrowed)
+        #expect(try fork.harnessSnapshot().artifacts == [revised])
+    }
 }

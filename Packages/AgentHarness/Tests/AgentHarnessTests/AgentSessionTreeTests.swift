@@ -136,4 +136,33 @@ import Testing
         try empty.message("q", .user, after: nil)
         #expect(try empty.tree(leaf: "q").usage(.session) == nil)
     }
+
+    @Test func aCopyRecordsEachCopiedRunsPromptAndToolsAgainstTheRunCopiedBeforeIt() throws {
+        let base = try AgentSystemPrompt(sections: [.init(name: "instructions", text: "Be brief."),
+                                                    .init(name: "documents", text: "None")])
+        let other = try AgentSystemPrompt(sections: [.init(name: "instructions", text: "Be brief."),
+                                                     .init(name: "documents", text: "Minutes v1")])
+        func json<Value: Encodable>(_ value: Value) throws -> JSONValue {
+            try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))
+        }
+        var log = Log()
+        try log.message("q1", .user, after: nil)
+        // The first run in the log records its prompt in full; the run on the other branch records
+        // only a patch on it, and a tool delta from it.
+        try log.custom("run1-start", AgentRunBranch.startType, after: "q1", run: "run1", data: .object([
+            "system": try json(base), "tools": try json(AgentToolLoadout(names: ["list_sources"], previous: nil))]))
+        try log.message("a1", .assistant, after: "q1")
+        try log.message("q1b", .user, after: nil)
+        try log.custom("run2-start", AgentRunBranch.startType, after: "q1b", run: "run2", data: .object([
+            "systemPatch": try json(base.patch(to: other)),
+            "tools": try json(AgentToolLoadout(names: ["list_sources", "read_document"], previous: ["list_sources"]))]))
+        try log.message("a1b", .assistant, after: "q1b")
+
+        let clone = try log.tree(leaf: "a1b").copy(through: "a1b", into: "clone")
+        let runs = AgentRunBranch.all(in: clone)
+        #expect(runs.map(\.runID) == ["run2"])
+        #expect(runs.first?.startFields["systemPatch"] == nil)
+        #expect(AgentRunBranch.systemPrompts(of: runs) == [other])
+        #expect(runs.first?.toolLoadout == AgentToolLoadout(names: ["list_sources", "read_document"], previous: nil))
+    }
 }

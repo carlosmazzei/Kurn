@@ -87,6 +87,10 @@ public struct AgentSessionTree: Sendable {
     /// answered a question on it, labels on the copied entries and every context edit. Entry IDs,
     /// times, payloads and metadata are kept; ordinals are renumbered in the original order. A fork
     /// passes the entry before the user message it starts from; a clone passes the selected leaf.
+    ///
+    /// A run records its system prompt and tools relative to the run before it in the whole log,
+    /// which may be on a branch the copy leaves out, so each copied run start records them again
+    /// relative to the copied run before it: the first in full, the rest as patches.
     public func copy(through throughID: String?, into newSessionID: String) throws -> [AgentSessionEntry] {
         let copiedPath = Set(path(to: throughID).map(\.id))
         let runs = Set(entries.compactMap { entry -> String? in
@@ -111,7 +115,37 @@ public struct AgentSessionTree: Sendable {
             copied.append(try AgentSessionEntry(sessionID: newSessionID, id: entry.id, parentID: entry.parentID,
                 ordinal: copied.count + 1, createdAt: entry.createdAt, payload: entry.payload, metadata: entry.metadata))
         }
-        return copied
+        return try rebasingRunStarts(copied)
+    }
+
+    /// `copied` with each run start's system prompt and tool loadout recorded relative to the
+    /// copied run before it, as the source log resolved them.
+    private func rebasingRunStarts(_ copied: [AgentSessionEntry]) throws -> [AgentSessionEntry] {
+        let sourceRuns = AgentRunBranch.all(in: entries)
+        let prompts = Dictionary(uniqueKeysWithValues: zip(sourceRuns.map(\.runID), AgentRunBranch.systemPrompts(of: sourceRuns)))
+        var previousPrompt: AgentSystemPrompt?
+        var previousTools: [String]?
+        return try copied.map { entry in
+            guard entry.kind == AgentRunBranch.startType, let runID = entry.runID,
+                  case .custom(let type, .object(var fields)) = entry.payload else { return entry }
+            if let loadout = AgentRunBranch.decode(AgentToolLoadout.self, fields["tools"]) {
+                fields["tools"] = try Self.json(AgentToolLoadout(names: loadout.names, previous: previousTools))
+                previousTools = loadout.names
+            }
+            if let prompt = prompts[runID] ?? nil {
+                fields["system"] = nil
+                fields["systemPatch"] = nil
+                if let previousPrompt { fields["systemPatch"] = try Self.json(previousPrompt.patch(to: prompt)) }
+                else { fields["system"] = try Self.json(prompt) }
+                previousPrompt = prompt
+            }
+            return try AgentSessionEntry(sessionID: entry.sessionID, id: entry.id, parentID: entry.parentID, ordinal: entry.ordinal,
+                createdAt: entry.createdAt, payload: .custom(type: type, data: .object(fields)), metadata: entry.metadata)
+        }
+    }
+
+    private static func json<Value: Encodable>(_ value: Value) throws -> JSONValue {
+        try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))
     }
 
     /// The newest label on each labelled entry; a removed label leaves no key.

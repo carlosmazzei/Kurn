@@ -32,7 +32,7 @@ extension MeetingChatViewModel {
         do {
             let store = SwiftDataAgentSessionStore(context: context)
             let before = try store.tree(session).entry(entryID)?.parentID
-            if let fork = try store.copy(session, through: before, title: session.title) {
+            if let fork = try store.copy(session, through: before, title: session.title, askedAt: entryID) {
                 load(session: fork)
             } else {
                 reset()

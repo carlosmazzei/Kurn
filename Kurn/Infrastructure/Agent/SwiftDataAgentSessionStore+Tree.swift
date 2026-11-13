@@ -53,20 +53,25 @@ extension SwiftDataAgentSessionStore {
 
     /// A new conversation holding `source`'s path through `entryID` with the runs that answered
     /// it, its labels and the document revisions it shows; nil when there is nothing before it.
-    /// A fork passes the entry before the question it starts from, a clone the selected leaf.
-    /// The source is unchanged.
-    func copy(_ source: ChatSession, through entryID: String?, title: String) throws -> ChatSession? {
+    /// A fork passes the entry before the question it starts from and the question as
+    /// `askedAt`, a clone the selected leaf. The source is unchanged.
+    func copy(_ source: ChatSession, through entryID: String?, title: String, askedAt question: String? = nil) throws -> ChatSession? {
         guard let entryID else { return nil }
         let tree = try tree(source)
         let target = ChatSession(meeting: source.meeting, title: title)
         let newID = target.id.uuidString
         var entries = try tree.copy(through: entryID, into: newID).map { try Self.rebased($0, from: source, to: target) }
         var leaf = entryID
-        // The copy ends on the conversation's state as it was at that point: the state saved right
-        // there, else the nearest one before it.
-        if tree.entry(entryID)?.kind != HarnessPresentationState.type {
-            let saved = tree.entries.last { $0.parentID == entryID && $0.kind == HarnessPresentationState.type }
-                ?? tree.path(to: entryID).last { $0.kind == HarnessPresentationState.type }
+        // The copy ends on the conversation's state as it was at that point. For a fork, that is the
+        // state saved with the question itself (its sources and documents when it was asked): a
+        // question asked again is written under the last common message, so the state saved there
+        // may predate later changes. Otherwise it is the state saved right there, else the nearest
+        // one before it.
+        let isState = { (entry: AgentSessionEntry) in entry.kind == HarnessPresentationState.type }
+        let shown = tree.activePath
+        let askedWith = question.flatMap { id in shown.firstIndex { $0.id == id } }.flatMap { shown[($0 + 1)...].first(where: isState) }
+        if askedWith != nil || tree.entry(entryID).map(isState) != true {
+            let saved = askedWith ?? tree.entries.last { $0.parentID == entryID && isState($0) } ?? tree.path(to: entryID).last(where: isState)
             guard let saved else { throw AgentSessionStoreError.corruptPayload }
             let state = try AgentSessionEntry(sessionID: newID, id: UUID().uuidString, parentID: entryID,
                 ordinal: entries.count + 1, createdAt: AgentSessionEntry.time(), payload: saved.payload, metadata: saved.metadata)
