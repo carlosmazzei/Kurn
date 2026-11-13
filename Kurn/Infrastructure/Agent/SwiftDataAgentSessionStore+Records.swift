@@ -16,7 +16,7 @@ extension SwiftDataAgentSessionStore {
     static func checkedRevision(_ row: HarnessArtifactRevision, session: ChatSession) throws -> ChatDocumentArtifact {
         let value = try HarnessPresentationCodec.decode(ChatDocumentArtifact.self, from: row.payloadData)
         guard row.sessionID == session.id, row.artifactID == value.id, row.version == value.version,
-              row.id == Self.revisionID(session: session, artifact: value) else { throw AgentSessionStoreError.corruptPayload }
+              Self.isRevisionID(row.id, session: session, artifact: value, payload: row.payloadData) else { throw AgentSessionStoreError.corruptPayload }
         _ = try ChatDocumentWorkspace(artifacts: [value])
         return value
     }

@@ -85,8 +85,18 @@ struct HarnessSessionStoreTests {
         #expect(try session.harnessSnapshot().turns.count == 1)
         #expect(try session.harnessSnapshot().artifacts == [second])
         #expect(Set(session.harnessRevisions.map(\.version)) == [1, 2])
-        let conflicting = ChatDocumentArtifact(id: first.id, title: first.title, markdown: "Changed without revision", version: 2)
-        #expect(throws: AgentSessionStoreError.conflict) { try store.writePresentation(session, turns: turns, scope: nil, artifacts: [conflicting]) }
+        // The same version written with other content, as another branch writes it, is a revision
+        // of its own (NH09); the first keeps its bytes.
+        let otherBranch = ChatDocumentArtifact(id: first.id, title: first.title, markdown: "Other branch", version: 2)
+        try store.writePresentation(session, turns: turns, scope: nil, artifacts: [otherBranch])
+        #expect(try session.harnessSnapshot().artifacts == [otherBranch])
+        #expect(session.harnessRevisions.filter { $0.version == 2 }.count == 2)
+        let base = SwiftDataAgentSessionStore.revisionID(session: session, artifact: second)
+        let original = try #require(session.harnessRevisions.first { $0.id == base })
+        #expect(try HarnessPresentationCodec.decode(ChatDocumentArtifact.self, from: original.payloadData) == second)
+        // Writing either revision again reuses it.
+        try store.writePresentation(session, turns: turns, scope: nil, artifacts: [second])
+        #expect(session.harnessRevisions.count == 3)
         #expect(try session.harnessSnapshot().artifacts == [second])
         // Saved library documents remain independent of session entry/revision deletion.
         let document = try #require(try ChatArtifactStore(context: context).save(artifactID: first.id, session: session))

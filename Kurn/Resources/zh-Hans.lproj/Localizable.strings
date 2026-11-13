@@ -1256,3 +1256,16 @@
 "store_recovery.chat.artifacts" = "文档";
 "store_recovery.chat.artifact" = "文档";
 "store_recovery.chat.decode_warning" = "无法读取%@。原始存储数据未更改。";
+"chat.branch.failed" = "无法切换对话分支，未做任何更改。";
+"chat.branch.copy_title" = "%@（副本）";
+"chat.branch.previous" = "上一个版本";
+"chat.branch.next" = "下一个版本";
+"chat.branch.position" = "第 %1$d 个，共 %2$d 个";
+"chat.branch.label_value" = "标签：%@";
+"chat.branch.fork" = "从此处分叉";
+"chat.branch.label" = "标签";
+"chat.branch.label_placeholder" = "标签（留空则移除）";
+"chat.branch.duplicate" = "复制对话";
+"chat.branch.usage" = "此分支：%1$d 个令牌 · 所有分支：%2$d 个令牌";
+"chat.history.rename" = "重命名";
+"chat.history.rename_placeholder" = "对话标题";

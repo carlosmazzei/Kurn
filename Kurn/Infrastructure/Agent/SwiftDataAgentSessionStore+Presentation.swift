@@ -69,8 +69,8 @@ extension SwiftDataAgentSessionStore {
             guard old.payload == .message(new.0), old.metadata == new.1 else { break }
             prefix += 1
         }
-        let revisionRows = try planRevisions(target, artifacts: artifacts)
-        let state = HarnessPresentationState(scope: scope, artifactRevisionIDs: artifacts.map { Self.revisionID(session: target, artifact: $0) })
+        let (revisionRows, revisionIDs) = try planRevisions(target, artifacts: artifacts)
+        let state = HarnessPresentationState(scope: scope, artifactRevisionIDs: revisionIDs)
         let stateJSON = try HarnessPresentationCodec.json(state)
         if effect == nil, !migrating, prefix == messages.count, prefix == proposed.count,
            path.last?.payload == .custom(type: HarnessPresentationState.type, data: stateJSON) { return }
@@ -98,19 +98,27 @@ extension SwiftDataAgentSessionStore {
         try applyPresentation(target, rows: rows, revisions: revisionRows, leaf: stateEntry.id, cache: cache, effect: record, preserveUpdatedAt: preserveUpdatedAt)
     }
 
-    private func planRevisions(_ target: ChatSession, artifacts: [ChatDocumentArtifact]) throws -> [HarnessArtifactRevision] {
+    /// The revision rows to add and the revision ID of each artifact. A revision is immutable and
+    /// belongs to the branch that wrote it (NH09): the same artifact version written with other
+    /// content on another branch is a revision of its own, never a conflict with the first.
+    private func planRevisions(_ target: ChatSession, artifacts: [ChatDocumentArtifact]) throws -> ([HarnessArtifactRevision], [String]) {
         var rows: [HarnessArtifactRevision] = []
+        var ids: [String] = []
         for artifact in artifacts {
-            let id = Self.revisionID(session: target, artifact: artifact)
-            if let existing = target.harnessRevisions.first(where: { $0.id == id }) {
-                let saved = try HarnessPresentationCodec.decode(ChatDocumentArtifact.self, from: existing.payloadData)
-                guard saved == artifact else { throw AgentSessionStoreError.conflict }
-            } else {
-                rows.append(HarnessArtifactRevision(session: target, artifactID: artifact.id, version: artifact.version,
-                                                    payloadData: try HarnessPresentationCodec.encode(artifact)))
+            let payload = try HarnessPresentationCodec.encode(artifact)
+            let saved = target.harnessRevisions.filter { $0.artifactID == artifact.id && $0.version == artifact.version }
+            if let existing = try saved.first(where: { try HarnessPresentationCodec.decode(ChatDocumentArtifact.self, from: $0.payloadData) == artifact }) {
+                ids.append(existing.id)
+                continue
             }
+            let base = Self.revisionID(session: target, artifact: artifact)
+            let id = saved.contains { $0.id == base } ? Self.branchRevisionID(base: base, payload: payload) : base
+            guard !saved.contains(where: { $0.id == id }) else { throw AgentSessionStoreError.conflict }
+            rows.append(HarnessArtifactRevision(session: target, artifactID: artifact.id, version: artifact.version,
+                                                payloadData: payload, id: id))
+            ids.append(id)
         }
-        return rows
+        return (rows, ids)
     }
 
     private func applyPresentation(_ target: ChatSession, rows: [HarnessSessionEntry], revisions: [HarnessArtifactRevision],
@@ -153,7 +161,7 @@ extension SwiftDataAgentSessionStore {
     }
 }
 
-private struct PresentationCache {
+struct PresentationCache {
     let turns: Data
     let scope: Data?
     let artifacts: Data
@@ -165,7 +173,7 @@ private struct PresentationCache {
 }
 
 @MainActor
-private struct PresentationCheckpoint {
+struct PresentationCheckpoint {
     let cache: (Data, Data?, Data?)
     let legacy: (Data?, Data?, Data?)
     let version: Int?

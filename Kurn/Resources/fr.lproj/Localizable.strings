@@ -1256,3 +1256,16 @@
 "store_recovery.chat.artifacts" = "Documents";
 "store_recovery.chat.artifact" = "Document";
 "store_recovery.chat.decode_warning" = "Impossible de lire : %@. Les données originales du stockage sont inchangées.";
+"chat.branch.failed" = "Impossible de changer de branche dans la conversation. Rien n’a été modifié.";
+"chat.branch.copy_title" = "%@ (copie)";
+"chat.branch.previous" = "Version précédente";
+"chat.branch.next" = "Version suivante";
+"chat.branch.position" = "%1$d sur %2$d";
+"chat.branch.label_value" = "Libellé : %@";
+"chat.branch.fork" = "Dupliquer à partir d’ici";
+"chat.branch.label" = "Libellé";
+"chat.branch.label_placeholder" = "Libellé (vide pour le retirer)";
+"chat.branch.duplicate" = "Dupliquer la conversation";
+"chat.branch.usage" = "Cette branche : %1$d jetons · Toutes les branches : %2$d jetons";
+"chat.history.rename" = "Renommer";
+"chat.history.rename_placeholder" = "Titre de la conversation";

@@ -21,19 +21,25 @@ struct ChatSessionListView: View {
     let currentSessionID: UUID?
     let onSelect: (ChatSession) -> Void
     let onDelete: (ChatSession) -> Bool
+    let onRename: (ChatSession, String) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    /// The conversation being renamed and the title being typed (NH09).
+    @State private var renaming: ChatSession?
+    @State private var newTitle = ""
 
     init(
         sessions: [ChatSession],
         currentSessionID: UUID?,
         onSelect: @escaping (ChatSession) -> Void,
-        onDelete: @escaping (ChatSession) -> Bool
+        onDelete: @escaping (ChatSession) -> Bool,
+        onRename: @escaping (ChatSession, String) -> Void = { _, _ in }
     ) {
         self._sessions = State(initialValue: sessions)
         self.currentSessionID = currentSessionID
         self.onSelect = onSelect
         self.onDelete = onDelete
+        self.onRename = onRename
     }
 
     var body: some View {
@@ -53,6 +59,16 @@ struct ChatSessionListView: View {
                         .onDelete(perform: delete)
                     }
                 }
+            }
+            // Typing a title needs a text field, which only the system alert offers.
+            .alert(NSLocalizedString("chat.history.rename", comment: "Rename conversation"),
+                   isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+                TextField(NSLocalizedString("chat.history.rename_placeholder", comment: "Conversation title"), text: $newTitle)
+                Button(NSLocalizedString("common.save", comment: "Save")) {
+                    if let renaming { onRename(renaming, newTitle) }
+                    renaming = nil
+                }
+                Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) { renaming = nil }
             }
             .navigationTitle(NSLocalizedString("chat.history.title", comment: "Chat history sheet title"))
             .navigationBarTitleDisplayMode(.inline)
@@ -89,6 +105,14 @@ struct ChatSessionListView: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(session.id == currentSessionID ? .isSelected : [])
+        .contextMenu {
+            Button {
+                newTitle = session.title
+                renaming = session
+            } label: {
+                Label(NSLocalizedString("chat.history.rename", comment: "Rename conversation"), systemImage: "pencil")
+            }
+        }
     }
 
     /// Hands each deletion to `onDelete` for the actual SwiftData delete +
