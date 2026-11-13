@@ -183,6 +183,39 @@ struct ChatReplayHistoryTests {
         #expect(try SwiftDataAgentSessionStore.projection(session).turns.map(\.usage) == shown.map(\.usage))
     }
 
+    /// "Leave out of later answers" on a question: the whole exchange stops reaching the model,
+    /// the conversation shown is unchanged, and "Include" brings it back.
+    @Test func anExchangeLeftOutIsNotReplayedUntilItIsIncludedAgain() async throws {
+        let model = ChatAgentModel([AgentTurnResponse(text: "Monday."), AgentTurnResponse(text: "Friday."),
+                                    AgentTurnResponse(text: "Noted."), AgentTurnResponse(text: "Again.")])
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model })
+        vm.configure(meeting: meeting, modelContext: context)
+        vm.send(question: "When do we ship?", provider: .openAI, model: "gpt-4o")
+        await vm.waitUntilSettled()
+        vm.send(question: "When is the review?", provider: .openAI, model: "gpt-4o")
+        await vm.waitUntilSettled()
+        let first = try #require(vm.turns.first)
+
+        vm.setLeftOut(true, question: first.id)
+        #expect(vm.error == nil && vm.branches.leftOut.contains(first.id))
+        #expect(vm.turns.count == 4)
+        vm.send(question: "Anything else?", provider: .openAI, model: "gpt-4o")
+        await vm.waitUntilSettled()
+        var requests = await model.requests
+        let leftOut = requests[2].messages.map(\.legacyProjection)
+        #expect(!leftOut.contains(.user("When do we ship?")) && !leftOut.contains(.assistant(text: "Monday.", toolCalls: [])))
+        #expect(leftOut.contains(.assistant(text: "Friday.", toolCalls: [])))
+
+        vm.setLeftOut(false, question: first.id)
+        #expect(!vm.branches.leftOut.contains(first.id))
+        vm.send(question: "And now?", provider: .openAI, model: "gpt-4o")
+        await vm.waitUntilSettled()
+        requests = await model.requests
+        #expect(requests[3].messages.map(\.legacyProjection).contains(.assistant(text: "Monday.", toolCalls: [])))
+    }
+
     @Test func aRunForAQuestionNotOnTheShownPathIsNotReplayed() async throws {
         let model = ChatAgentModel([
             AgentTurnResponse(text: "", toolCalls: [try chatAgentCall("list_sources")]),

@@ -312,7 +312,9 @@ struct MeetingChatConversationView: View {
                                      editLabel: {
                                          labelText = vm.branches.labels[turn.id] ?? ""
                                          labelTarget = turn.id
-                                     })
+                                     },
+                                     isLeftOut: vm.branches.leftOut.contains(turn.id),
+                                     setLeftOut: { vm.setLeftOut($0, question: turn.id) })
     }
 
     /// Whether `turn` is the reply currently streaming in, so its bubble gets

@@ -68,6 +68,22 @@ extension MeetingChatViewModel {
         }
     }
 
+    /// Leaves the exchange that starts with the question `turnID` out of what later answers read,
+    /// or includes it again. The conversation shown and its usage are unchanged.
+    func setLeftOut(_ leftOut: Bool, question turnID: UUID) {
+        guard canChangeBranch, let session = artifactSession, let context = session.modelContext,
+              let index = turns.firstIndex(where: { $0.id == turnID && $0.role == .user }) else { return }
+        var ids = [turnID]
+        if turns.indices.contains(index + 1), turns[index + 1].role == .assistant { ids.append(turns[index + 1].id) }
+        do {
+            let store = SwiftDataAgentSessionStore(context: context)
+            if leftOut { try store.editContext(session, leavingOut: ids) } else { try store.editContext(session, including: ids) }
+            refreshBranches()
+        } catch {
+            branchFailed()
+        }
+    }
+
     /// Renames a saved conversation in this chat's history.
     func rename(_ target: ChatSession, to title: String) {
         guard let context = target.modelContext else { return }

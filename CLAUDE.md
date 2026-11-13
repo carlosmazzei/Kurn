@@ -379,8 +379,12 @@ export's renderers; the HTML is one self-contained page with every text escaped,
 resource and no link. The pi JSONL v3 subset is not implemented.
 Context edits (`AgentContextEdit`, `agent.context-edit.v1`) change only what later runs replay: removing
 an assistant message removes the results of its calls, a removed tool result becomes a stub so its call
-keeps a result, and the log, the shown conversation and recorded usage are unchanged. `ChatReplayHistory`
-applies them before the newest checkpoint.
+keeps a result, and the log, the shown conversation and recorded usage are unchanged. A later edit can
+include a message again (`restoredMessageIDs`), so what is left out is the net of every edit in order.
+`ChatReplayHistory` applies them before the newest checkpoint. In the chat, a saved question's menu offers
+"Leave out of later answers" / "Include in later answers" (`MeetingChatViewModel.setLeftOut`,
+`SwiftDataAgentSessionStore.editContext`): the edit names the question and its answer turn, the whole
+exchange stops being replayed (run or plain text alike), and the question is marked as left out.
 `AgentLimits.wrapUpOnLimit` runs one extra turn after a turn/tool-call limit with
 `NativeHarness.wrapUpInstruction` appended and `AgentTurnRequest.allowsToolCalls` false
 (tools stay declared; the wire formats send `tool_choice: none` / Gemini mode `NONE`, and

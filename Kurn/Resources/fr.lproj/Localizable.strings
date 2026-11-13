@@ -1279,3 +1279,6 @@
 "chat.export.you" = "Vous";
 "chat.export.assistant" = "Assistant";
 "chat.export.documents" = "Documents";
+"chat.context.leave_out" = "Exclure des prochaines réponses";
+"chat.context.include" = "Inclure dans les prochaines réponses";
+"chat.context.left_out" = "Exclu des prochaines réponses";

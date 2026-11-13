@@ -8,6 +8,9 @@ struct ChatTurnBranchActions {
     var showVersion: (Int) -> Void
     var fork: () -> Void
     var editLabel: () -> Void
+    /// Whether later answers leave this exchange out, and the action that switches it.
+    var isLeftOut = false
+    var setLeftOut: (Bool) -> Void = { _ in }
 }
 
 /// "‹ 2 of 3 ›" under a question asked more than once in the same place: moves between its

@@ -42,6 +42,16 @@ extension SwiftDataAgentSessionStore {
                                          entries: [entry], leafID: snapshot.leafID))
     }
 
+    /// Leaves the turns `leavingOut` out of what later runs replay, or includes `including` again
+    /// (`AgentContextEdit`): the conversation shown, the log and recorded usage are unchanged.
+    func editContext(_ target: ChatSession, leavingOut: [UUID] = [], including: [UUID] = []) throws {
+        guard !leavingOut.isEmpty || !including.isEmpty else { return }
+        let snapshot = try snapshot(target)
+        let edit = AgentContextEdit(removedMessageIDs: leavingOut.map(\.uuidString), restoredMessageIDs: including.map(\.uuidString))
+        try commitNow(AgentSessionCommit(sessionID: snapshot.sessionID, expectedRevision: snapshot.revision,
+            entries: [try edit.entry(sessionID: snapshot.sessionID, ordinal: snapshot.entries.count + 1)], leafID: snapshot.leafID))
+    }
+
     /// Renames the conversation. An empty title is ignored.
     func rename(_ target: ChatSession, to title: String) throws {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)

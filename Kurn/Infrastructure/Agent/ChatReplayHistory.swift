@@ -14,7 +14,8 @@ import KurnCore
 /// reopened conversation does not summarize the same history again.
 ///
 /// Context edits recorded in the session (`AgentContextEdit`) apply to what is replayed, never to
-/// the log, the shown conversation or recorded usage.
+/// the log, the shown conversation or recorded usage. An edit naming a shown question leaves out
+/// its whole exchange (`MeetingChatViewModel.setLeftOut`).
 ///
 /// Source boundary: a run's tool results hold what that run was authorized to read. They are
 /// replayed only when that authorization was the same source scope as this run's and resolved
@@ -55,11 +56,18 @@ struct ChatReplayHistory: Sendable {
         for run in runs where run.answer != nil && Self.allows(run, under: authorization) {
             if let question = ChatRunBranch.questionID(of: run) { answers[question] = run }
         }
+        // Exchanges the person left out (a context edit naming the question's turn) are not
+        // replayed at all, whether a run or plain text would stand in for them.
+        let leftOut = AgentContextEdit.excluded(by: edits)
         var messages: [AgentMessage] = []
         var index = turns.startIndex
         while index < turns.endIndex {
             let turn = turns[index]
             let next = turns.index(after: index)
+            if leftOut.contains(turn.id.uuidString) {
+                index = turn.role == .user && next < turns.endIndex && turns[next].role == .assistant ? turns.index(after: next) : next
+                continue
+            }
             if turn.role == .user, next < turns.endIndex, turns[next].role == .assistant,
                let run = answers[turn.id] {
                 messages += run.contextMessages

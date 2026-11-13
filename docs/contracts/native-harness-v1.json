@@ -397,9 +397,17 @@
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextEditTests.swift",
           "symbol": "removingACallRemovesItsResultsWithIt"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "anExchangeLeftOutIsNotReplayedUntilItIsIncludedAgain"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextEditTests.swift",
+          "symbol": "aLaterEditCanIncludeAMessageAgain"
         }
       ],
-      "note": "NH06: replay projects each answered question's run branch (request, calls, results, answer) from the log, excludes audit-only replies, applies context edits and the newest permitted checkpoint, and keeps reads outside the current source authorization out of context."
+      "note": "NH06: replay projects each answered question's run branch (request, calls, results, answer) from the log, excludes audit-only replies, applies context edits and the newest permitted checkpoint, and keeps reads outside the current source authorization out of context. The chat records context edits from a question's menu (leave an exchange out of later answers, or include it again)."
     },
     {
       "id": "C12",

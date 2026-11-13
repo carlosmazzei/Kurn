@@ -159,7 +159,7 @@ Entry types written by the package:
 | `agent.usage.v1` | `AgentSession` | One request's reported usage, including reasoning and cache counters, named by its `requestID` so it counts once |
 | `agent.compaction.v1` | `AgentSession` | A summary checkpoint: summary, first kept message, tokens before and after |
 | `agent.run-end.v1` | `AgentSession` | How the run ended and the harness stop reason |
-| `agent.context-edit.v1` | Host (via the store) | Messages later runs leave out of replay |
+| `agent.context-edit.v1` | Host (`AgentContextEdit.entry`) | Messages later runs leave out of replay, or include again |
 | `agent.label.v1` | `AgentSessionTree.labelEntry` | A label on an entry (detached metadata) |
 
 Host entry types (for example the app's `kurn.presentation-state.v1`) are opaque to the package.
