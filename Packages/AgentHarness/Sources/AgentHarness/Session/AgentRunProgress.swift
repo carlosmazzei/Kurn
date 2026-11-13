@@ -23,6 +23,11 @@ public struct AgentRunProgress: Sendable, Equatable {
     public private(set) var activeCallIDs: [String] = []
     /// Local invocation identities registered for the current turn's calls, keyed by call ID.
     public private(set) var invocations: [String: AgentToolInvocation] = [:]
+    /// The context size the provider last reported for a response (its input plus its reply), or
+    /// nil while unknown (NH06): before any reported response usage, after a compaction (the
+    /// reported size no longer describes the context) and when a provider reports no input. Unknown
+    /// is never zero. Summary requests' usage is not the conversation's context and never sets it.
+    public private(set) var contextTokens: Int?
     /// The phase a compaction interrupted, restored when it ends.
     private var resumePhase: Phase?
 
@@ -55,7 +60,12 @@ public struct AgentRunProgress: Sendable, Equatable {
             activeCallIDs = []
             resumePhase = nil
             phase = .finished
-        case .messageAppended, .contextResolved, .toolProgress, .contextCompacted, .usage:
+        case .usage(let usage):
+            guard request?.purpose != .summary else { return }
+            contextTokens = usage.inputTokens > 0 ? usage.inputTokens + usage.outputTokens : nil
+        case .contextCompacted:
+            contextTokens = nil
+        case .messageAppended, .contextResolved, .toolProgress:
             break
         }
     }
