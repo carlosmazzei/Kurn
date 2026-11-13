@@ -206,6 +206,10 @@ the attempt and delay. `AgentRunProgress` shows the wait as `retryWaiting`. The 
 (three attempts). `AppError` is transient for 408/429/5xx statuses and connection failures, but not for
 timeouts or lost connections the provider may already be generating for, nor for auth, configuration,
 quota or context errors. Its `Retry-After` is not carried into the error yet.
+Credentials are resolved per request (NH07): `ProviderFactory.agentModel` returns an `AgentPerRequestModel`,
+which builds the vendor client from the Keychain for every request, compaction summaries included. A key
+replaced during a run is used from the next request on, and a key removed fails that request explicitly.
+The first resolution happens when the model is created, so a missing key still fails before the run.
 
 
 `AgentDiagnostic` carries only fixed event/metric vocabulary, numeric counts and
