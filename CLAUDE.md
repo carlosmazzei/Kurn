@@ -291,6 +291,10 @@ form a stable prefix, its `documents` index is the section a document mutation c
 run's (`systemPatch`: changed or added sections, `null` removing one), plus its declared tools and their
 delta from the previous run (`tools`: `AgentToolLoadout`). `AgentRunBranch.systemPrompts(of:)` folds
 the patches back into each run's prompt.
+Context edits (`AgentContextEdit`, `agent.context-edit.v1`) change only what later runs replay: removing
+an assistant message removes the results of its calls, a removed tool result becomes a stub so its call
+keeps a result, and the log, the shown conversation and recorded usage are unchanged. `ChatReplayHistory`
+applies them before the newest checkpoint.
 `AgentLimits.wrapUpOnLimit` runs one extra turn after a turn/tool-call limit with
 `NativeHarness.wrapUpInstruction` appended and `AgentTurnRequest.allowsToolCalls` false
 (tools stay declared; the wire formats send `tool_choice: none` / Gemini mode `NONE`, and

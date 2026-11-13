@@ -85,6 +85,45 @@ import Testing
         #expect(retried.messages.first == .user(AgentContextCompactor.summaryPrefix + branch.checkpoints[0].summary))
     }
 
+    @Test func aSecondCompactionUpdatesTheFirstAndReplayUsesTheNewest() async throws {
+        let store = SessionTestStore()
+        try await store.appendHostEntry("question")
+        let session = try AgentSession(sessionID: "session", store: store, appendMode: .branch)
+        let model = ScriptedAgentModel([
+            AgentTurnResponse(text: "First summary"),
+            AgentTurnResponse(text: "", toolCalls: [agentCall("call-1")]),
+            AgentTurnResponse(text: "History summary"),
+            AgentTurnResponse(text: "Prefix summary"),
+            AgentTurnResponse(text: "Answer")
+        ])
+        let large = AgentTool(spec: agentTool().spec) { _ in AgentToolOutput(content: tokens(700), summary: "Read") }
+        let run = try await session.start(harness: NativeHarness(model: model, contextPolicy: policy), systemPrompt: "",
+                                          history: try history(), prompt: "Question", tools: [large])
+        do { for try await _ in run.events {} } catch {}
+        #expect(await session.waitUntilSettled().end == .completed)
+        let branch = try #require(AgentRunBranch.all(in: await store.entries).first)
+        let requests = await model.requests
+
+        #expect(requests.count == 5)
+        #expect(branch.checkpoints.count == 2)
+        // The second summary updated the first rather than starting over.
+        guard case .user(let update)? = requests[2].messages.first?.legacyProjection else {
+            Issue.record("Expected the history summary request"); return
+        }
+        #expect(update.contains("<previous-summary>") && update.contains("First summary"))
+        // Its cut kept the call with its result: nothing that needed summarizing was dropped.
+        let call = try #require(branch.contextMessages.first {
+            if case .content(let value) = $0 { return !value.toolCalls.isEmpty }; return false
+        })
+        #expect(branch.checkpoints[1].firstKeptMessageID == call.canonicalID)
+        #expect(branch.checkpoints[1].summary.contains("History summary") && branch.checkpoints[1].summary.contains("Prefix summary"))
+        // Replay applies the newest, which covers everything the first one did.
+        let replayed = AgentCompactionCheckpoint.compacting(try history() + branch.contextMessages, with: branch.checkpoints)
+        #expect(replayed.first == .user(AgentContextCompactor.summaryPrefix + branch.checkpoints[1].summary))
+        #expect(replayed.dropFirst().first == call)
+        #expect(replayed.count == 1 + 3)
+    }
+
     @Test func anUnusableSummaryWritesNoCheckpoint() async throws {
         let entries = try await record([AgentTurnResponse(text: "Cut off", stopReason: .maxTokens),
                                         AgentTurnResponse(text: "Answer")])

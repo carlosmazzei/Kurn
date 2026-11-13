@@ -316,15 +316,32 @@
       "sourceDocument": "02-sessoes-contexto.md",
       "disposition": "required",
       "increment": "NH06",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "KurnTests/NativeHarnessContractFixtureTests.swift",
           "symbol": "narrowedScopeReplaysPlainHistoryWithoutLegacyCitationsToolsOrDocumentBodies"
         }
       ],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "aSecondQuestionReplaysTheFirstRunsCallsAndResults"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "runsOutsideTheCurrentSourcesReplayAsPlainText"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunBranchTests.swift",
+          "symbol": "aReplyCutOffByTheOutputLimitNeverReplays"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextEditTests.swift",
+          "symbol": "removingACallRemovesItsResultsWithIt"
+        }
+      ],
+      "note": "NH06: replay projects each answered question's run branch (request, calls, results, answer) from the log, excludes audit-only replies, applies context edits and the newest permitted checkpoint, and keeps reads outside the current source authorization out of context."
     },
     {
       "id": "C12",
@@ -332,15 +349,28 @@
       "sourceDocument": "02-sessoes-contexto.md",
       "disposition": "required",
       "increment": "NH06",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContractFixtureTests.swift",
           "symbol": "providerRequestsMatchTheFrozenBaseline"
         }
       ],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSystemPromptTests.swift",
+          "symbol": "aPatchChangesOnlyTheSectionsItNamesAndNullRemovesOne"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSystemPromptTests.swift",
+          "symbol": "eachRunRecordsItsPromptPatchAndToolDelta"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "aSecondQuestionReplaysTheFirstRunsCallsAndResults"
+        }
+      ],
+      "note": "NH06: ordered system sections with Kurn's meeting-assistant instructions as a stable prefix and the document index as its own section; each run records its prompt as a patch on the previous run's and its declared tools with their delta. A document mutation inside a run is reflected from the next run on."
     },
     {
       "id": "C13",
@@ -354,8 +384,21 @@
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextTests.swift"
         }
       ],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "aSummaryIsCommittedBeforeTheRequestThatUsesIt"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "aSecondCompactionUpdatesTheFirstAndReplayUsesTheNewest"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "aSavedCompactionIsReusedOnlyWhereItsRunMayBeRead"
+        }
+      ],
+      "note": "NH06: durable summary checkpoints committed before use and reused on replay; no omission note stands in for a summary. Manual compaction and optional branch summaries remain open."
     },
     {
       "id": "C14",
@@ -646,10 +689,19 @@
       "requirement": "Replay altera só seção indicada; null remove",
       "disposition": "required",
       "increment": "NH06",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSystemPromptTests.swift",
+          "symbol": "aPatchChangesOnlyTheSectionsItNamesAndNullRemovesOne"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSystemPromptTests.swift",
+          "symbol": "eachRunRecordsItsPromptPatchAndToolDelta"
+        }
+      ],
+      "note": "NH06: a run's systemPatch changes only the sections it names; an explicit null removes one."
     },
     {
       "id": "A05",
@@ -657,10 +709,15 @@
       "requirement": "Próxima request declara delta e conjunto efetivo correto",
       "disposition": "required",
       "increment": "NH06",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSystemPromptTests.swift",
+          "symbol": "eachRunRecordsItsPromptPatchAndToolDelta"
+        }
+      ],
+      "note": "NH06: each run-start records the declared tools and what was added or removed since the previous run."
     },
     {
       "id": "A06",
@@ -1080,10 +1137,19 @@
       "requirement": "Não entra no contexto ativo",
       "disposition": "required",
       "increment": "NH06",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "aRunForAQuestionNotOnTheShownPathIsNotReplayed"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunBranchTests.swift",
+          "symbol": "aFailedRunHasNoAnswer"
+        }
+      ],
+      "note": "NH06: only the run that answered a question on the shown path is replayed; sibling branches (failed, stopped or for another question) never enter context."
     },
     {
       "id": "A35",
@@ -1102,10 +1168,19 @@
       "requirement": "Altera futuro contexto; raw/UI/custo intactos",
       "disposition": "required",
       "increment": "NH06",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextEditTests.swift",
+          "symbol": "aRemovedResultIsStubbedSoItsCallKeepsAResult"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "aContextEditChangesOnlyWhatIsReplayed"
+        }
+      ],
+      "note": "NH06: context edits apply to replay only; the log, the shown conversation and recorded usage are unchanged, and calls keep their results."
     },
     {
       "id": "A37",
@@ -1113,14 +1188,23 @@
       "requirement": "Resumo + recente + checkpoint, sem toolResult órfão",
       "disposition": "required",
       "increment": "NH06",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextTests.swift"
         }
       ],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "aSummaryIsCommittedBeforeTheRequestThatUsesIt"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextTests.swift",
+          "symbol": "cutInsideATurnSplitsItAndNeverSeparatesResults"
+        }
+      ],
+      "note": "NH06: summary plus kept tail plus a durable checkpoint; the cut never separates a call from its result."
     },
     {
       "id": "A38",
@@ -1128,10 +1212,15 @@
       "requirement": "Fronteiras corretas e sem perda de trecho que precisava resumir",
       "disposition": "required",
       "increment": "NH06",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "aSecondCompactionUpdatesTheFirstAndReplayUsesTheNewest"
+        }
+      ],
+      "note": "NH06: a second compaction updates the previous summary and the newest checkpoint covers everything the first did. Retain-none does not apply: the policy always keeps the newest cut point (keepRecentTokens >= 1)."
     },
     {
       "id": "A39",
@@ -1139,15 +1228,28 @@
       "requirement": "Nenhuma compaction fictícia nem retry indevido",
       "disposition": "required",
       "increment": "NH06",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputLimitTests.swift",
           "symbol": "truncatedSummaryLeavesTheContextUnchanged"
         }
       ],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "anUnusableSummaryWritesNoCheckpoint"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRealContextTests.swift",
+          "symbol": "unusableSummaryAfterOverflowFailsTheRunExplicitly"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputLimitTests.swift",
+          "symbol": "truncatedSummaryLeavesTheContextUnchanged"
+        }
+      ],
+      "note": "NH06: an unusable, failed or overflowing summary writes no checkpoint and no omission note; after an overflow the run fails with AgentContextReductionError instead of retrying."
     },
     {
       "id": "A40",
@@ -1155,14 +1257,23 @@
       "requirement": "Falha persiste; edits após agent_end; retry depois de resumo salvo",
       "disposition": "required",
       "increment": "NH06",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputRecoveryTests.swift"
         }
       ],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "anOverflowRetryRunsOnlyAfterItsSummaryIsSaved"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "aCheckpointThatCannotBeSavedStopsTheRunBeforeItsRequest"
+        }
+      ],
+      "note": "NH06: the failed attempt stays in the log as audit data, the checkpoint is saved before the single retry, and a checkpoint that cannot be saved stops the run before any request uses it."
     },
     {
       "id": "A41",
@@ -1196,10 +1307,15 @@
       "requirement": "Desconhecido distinto de zero",
       "disposition": "required",
       "increment": "NH06",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunProgressTests.swift",
+          "symbol": "contextUsageIsUnknownUntilReportedAndAgainAfterACompaction"
+        }
+      ],
+      "note": "NH06: context usage is nil (unknown), never zero, before reported usage, after a compaction and when no input is reported; summary usage never sets it."
     },
     {
       "id": "A44",
@@ -1207,15 +1323,24 @@
       "requirement": "Budget do modelo efetivo e validação de settings corretos",
       "disposition": "required",
       "increment": "NH06",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputBudgetTests.swift",
           "symbol": "matchesPiHeadroomCases"
         }
       ],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextTests.swift",
+          "symbol": "aSmallModelsBudgetsComeFromItsOwnWindowNotTheDefaults"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextTests.swift",
+          "symbol": "summaryRequestsFitASmallWindow"
+        }
+      ],
+      "note": "NH06: thresholds, kept tail and summary output come from the effective model's own window and output limit; the 16k/20k defaults never apply to a small model. Kurn has no user compaction override setting."
     },
     {
       "id": "A45",
