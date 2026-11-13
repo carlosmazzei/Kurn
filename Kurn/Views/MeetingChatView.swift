@@ -9,6 +9,7 @@
 //  agent support; tapping a cited timestamp calls `onJumpToTime`.
 //
 
+import AgentHarness
 import Combine
 import KurnCore
 import SwiftData
@@ -101,7 +102,12 @@ struct MeetingChatConversationView: View {
         // Wiring the persistence scope is cheap and idempotent, so redoing it
         // on every appearance (rather than a one-shot `.task`) needs no extra
         // state to guard against `meeting`/`modelContext` changing under it.
-        .onAppear { vm.configure(meeting: meeting, modelContext: modelContext) }
+        .onAppear {
+            vm.configure(meeting: meeting, modelContext: modelContext)
+            takeRestoredDraft()
+        }
+        // Queued input a stop or a failed run did not answer comes back into the composer (NH08).
+        .onChange(of: vm.restoredDraft) { _, _ in takeRestoredDraft() }
         // A reopened conversation a dead process interrupted is resumed once, with the provider
         // and model the chat uses now (`MeetingChatViewModel.resumeInterruptedRun`).
         .onChange(of: vm.interruptedResume?.runID) { _, runID in
@@ -317,6 +323,11 @@ struct MeetingChatConversationView: View {
     private var composer: some View {
         VStack(alignment: .leading, spacing: 12) {
             if usesHarness, let sourceValidation { ChatSourceValidationView(validation: sourceValidation) }
+            if !vm.queued.isEmpty {
+                ChatQueuedInputView(queued: vm.queued,
+                                    edit: { item in Task { await vm.editQueued(item) } },
+                                    remove: { item in Task { await vm.removeQueued(item.id) } })
+            }
             TextField(
                 NSLocalizedString("chat.placeholder", comment: "Chat input placeholder"),
                 text: $input,
@@ -329,7 +340,7 @@ struct MeetingChatConversationView: View {
             .disabled(!canChat)
 
             HStack(spacing: 10) {
-                modelChip
+                if canQueue { queueButtons } else { modelChip }
                 Spacer(minLength: 0)
                 sendOrStopButton
             }
@@ -341,6 +352,35 @@ struct MeetingChatConversationView: View {
         .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).stroke(Theme.separator, lineWidth: 1))
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
+    }
+
+    /// While a reply runs, a typed message can steer it after its current step, or wait until
+    /// it finishes (NH08).
+    @ViewBuilder
+    private var queueButtons: some View {
+        Button(NSLocalizedString("chat.queue.steer", comment: "Steer the running reply")) { queueInput(.steering) }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("chat.queue.steer")
+        Button(NSLocalizedString("chat.queue.follow_up", comment: "Send after this task")) { queueInput(.followUp) }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("chat.queue.follow_up")
+    }
+
+    private var canQueue: Bool {
+        vm.isResponding && vm.phase != .cancelling && !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Queues the composer's text; it stays in the composer when the queue refuses it.
+    private func queueInput(_ kind: AgentInputQueue.Kind) {
+        let text = input
+        input = ""
+        Task { if !(await vm.queue(text, as: kind)) { input = text } }
+    }
+
+    private func takeRestoredDraft() {
+        guard let draft = vm.restoredDraft else { return }
+        vm.restoredDraft = nil
+        input = input.isEmpty ? draft : input + "\n\n" + draft
     }
 
     /// Which model answers — the summary provider's model, since chat shares

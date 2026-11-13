@@ -1227,6 +1227,13 @@
 "chat.storage.run_failed" = "Impossible d’enregistrer la progression de cette réponse : elle s’est arrêtée avant d’envoyer quoi que ce soit d’autre. Votre question est conservée ; réessayez.";
 "chat.command.duplicate" = "Cette question a déjà été envoyée ; elle n’a pas été renvoyée.";
 "chat.context.reduction_failed" = "Cette conversation est trop longue pour que le modèle continue. Commencez une nouvelle conversation ou choisissez un modèle avec une fenêtre de contexte plus grande.";
+"chat.queue.steer" = "Orienter";
+"chat.queue.follow_up" = "Après cette tâche";
+"chat.queue.steering_label" = "Orientation";
+"chat.queue.follow_up_label" = "Après cette tâche";
+"chat.queue.edit" = "Touchez pour modifier";
+"chat.queue.remove" = "Retirer le message de la file";
+"chat.queue.save_failed" = "Le message n’a pas pu être mis en file. Il est revenu dans la zone de saisie.";
 
 // Native tool pipeline diagnostics.
 "chat.diagnostic.toolValidationFailed" = "Arguments de l’outil refusés";

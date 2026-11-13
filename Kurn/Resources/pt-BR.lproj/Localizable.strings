@@ -1227,6 +1227,13 @@
 "chat.storage.run_failed" = "Não foi possível salvar o andamento desta resposta, então ela parou antes de enviar mais nada. Sua pergunta foi mantida; tente de novo.";
 "chat.command.duplicate" = "Esta pergunta já foi enviada, então não foi enviada de novo.";
 "chat.context.reduction_failed" = "Esta conversa ficou longa demais para o modelo continuar. Inicie uma nova conversa ou escolha um modelo com uma janela de contexto maior.";
+"chat.queue.steer" = "Orientar";
+"chat.queue.follow_up" = "Depois desta tarefa";
+"chat.queue.steering_label" = "Orientação";
+"chat.queue.follow_up_label" = "Depois desta tarefa";
+"chat.queue.edit" = "Toque para editar";
+"chat.queue.remove" = "Remover mensagem da fila";
+"chat.queue.save_failed" = "Não foi possível colocar a mensagem na fila. Ela voltou para a caixa de mensagem.";
 
 // Native tool pipeline diagnostics.
 "chat.diagnostic.toolValidationFailed" = "Argumentos da ferramenta rejeitados";
