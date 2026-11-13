@@ -106,8 +106,16 @@ extension SwiftDataAgentSessionStore {
         }
     }
 
-    /// `entry` with its presentation state's revision IDs moved to `target`'s.
     private static func rebased(_ entry: AgentSessionEntry, from source: ChatSession, to target: ChatSession) throws -> AgentSessionEntry {
+        try rebased(entry, from: source.id.uuidString, to: target.id.uuidString)
+    }
+
+    private static func rebased(_ revisionID: String, from source: ChatSession, to target: ChatSession) -> String {
+        rebased(revisionID, from: source.id.uuidString, to: target.id.uuidString)
+    }
+
+    /// `entry` with its presentation state's revision IDs moved from session `source` to `target`.
+    static func rebased(_ entry: AgentSessionEntry, from source: String, to target: String) throws -> AgentSessionEntry {
         guard case .custom(HarnessPresentationState.type, let data) = entry.payload else { return entry }
         var state = try JSONDecoder().decode(HarnessPresentationState.self, from: JSONEncoder().encode(data))
         state.artifactRevisionIDs = state.artifactRevisionIDs.map { rebased($0, from: source, to: target) }
@@ -116,13 +124,13 @@ extension SwiftDataAgentSessionStore {
             metadata: entry.metadata)
     }
 
-    private static func rebased(_ revisionID: String, from source: ChatSession, to target: ChatSession) -> String {
-        let prefix = source.id.uuidString + ":"
+    static func rebased(_ revisionID: String, from source: String, to target: String) -> String {
+        let prefix = source + ":"
         guard revisionID.hasPrefix(prefix) else { return revisionID }
-        return target.id.uuidString + ":" + revisionID.dropFirst(prefix.count)
+        return target + ":" + revisionID.dropFirst(prefix.count)
     }
 
-    private static func revisionIDs(_ entry: AgentSessionEntry) -> [String] {
+    static func revisionIDs(_ entry: AgentSessionEntry) -> [String] {
         guard case .custom(HarnessPresentationState.type, let data) = entry.payload,
               let state = try? JSONDecoder().decode(HarnessPresentationState.self, from: JSONEncoder().encode(data)) else { return [] }
         return state.artifactRevisionIDs

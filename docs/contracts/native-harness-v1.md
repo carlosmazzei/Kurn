@@ -1,6 +1,6 @@
 # Native harness contract v1
 
-Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04); session ownership implemented (NH05); projection and persistent compaction implemented (NH06, except manual compaction and branch summaries); usage, cost, retries and credentials implemented (NH07, except a capability snapshot and transport Retry-After); queued input implemented (NH08, except a session-retained owner, model changes at request boundaries and `waitingForUser`); session tree implemented (NH09, except branch summaries)**. NH01 froze the NH00
+Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04); session ownership implemented (NH05); projection and persistent compaction implemented (NH06, except manual compaction and branch summaries); usage, cost, retries and credentials implemented (NH07, except a capability snapshot and transport Retry-After); queued input implemented (NH08, except a session-retained owner, model changes at request boundaries and `waitingForUser`); session tree implemented (NH09, except branch summaries); native archive, export and import implemented (NH10, except the pi JSONL v3 subset, HTML export and device qualification)**. NH01 froze the NH00
 compatibility baseline. NH02 now produces native v1 assistant blocks at the provider
 boundary and consumes them in the harness. Indexed session storage and lazy legacy conversion are active; detailed runtime
 message persistence barriers (NH05) and canonical tool-history replay (NH06) are active; complete pi compatibility is not claimed.
@@ -520,3 +520,19 @@ runs for the branch shown. The host navigates only while no run is active, rebui
 from the selected branch (documents follow the branch's revision map), keeps per-branch document
 revisions distinct and treats a saved document as current only for the same version and body. Open:
 branch summaries.
+
+## Interchange — NH10
+
+`AgentSessionArchive` is the native, versioned interchange (`kurn.agent-session`, version 1): JSON
+Lines with a header, one line per entry (encoded directly, so integers keep their exact form) and
+namespaced host records kept opaque. Unknown entries, record types and header fields survive a round
+trip. Only LF separates records (`AgentJSONLLines`, any chunking); U+2028/U+2029 are ordinary string
+characters. Reading rejects a missing or repeated header, another format or version, untyped lines,
+payloads past the line/total/entry/depth limits, entries of another session and broken graphs. A copy
+moves the graph to a new session identity. The app exports a conversation with its document revisions
+(exact stored bytes) and title, never run records, queued input or receipts; an import is a new
+conversation whose revisions are checked against their bytes before anything is written, and a
+restore keeps the identity only when no conversation has it. The reading export is the branch shown
+as Markdown. Not claimed: pi JSONL v3 interchange, an HTML export, keeping unknown host records inside
+the app's store, exact integers past 2^53 in opaque records and header fields (they pass through
+`JSONValue` doubles), and device/migration/stress qualification.

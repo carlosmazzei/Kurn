@@ -589,8 +589,9 @@ per-request credentials, see `CLAUDE.md`); NH08 is implemented except a session-
 model changes at request boundaries and `waitingForUser` (steering/follow-up queues, continuation,
 queue UI, run status and reading position, see `CLAUDE.md`); NH09 is implemented except branch
 summaries (alternatives, navigation, fork, clone, labels, rename, branch-aware document revisions and
-save actions, usage per branch, see `CLAUDE.md`); NH10 has not started. The next implementation
-increment is NH10. This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
+save actions, usage per branch, see `CLAUDE.md`); NH10 is implemented except the pi JSONL v3
+subset, HTML export and release qualification (native archive, export/import, Markdown reading
+export, see `CLAUDE.md`). This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
 
 The first NH02 increment adds checked native user/assistant blocks, exact Unix-ms
 codecs, an ordered bounded reducer, authoritative final reconciliation and all four
@@ -919,6 +920,19 @@ interchange until fixtures demonstrate it; native round-trip is the release
 requirement. Use system share sheets and safe HTML without script execution,
 remote embeds or hosted links. Export active-path reading formats separately
 from full-session archival exports, making included historical sources clear.
+
+**NH10 status.** Implemented: `AgentSessionArchive` (native versioned JSON Lines, opaque unknown
+records and fields, LF-only framing over chunks, limits and graph validation), conversation export
+with document revisions, new-copy import and identity-preserving restore, and the Markdown reading
+export through the share sheet. Still open:
+
+- The supported pi JSONL v3 subset (message/system/compaction/usage entries), only once fixtures
+  demonstrate it.
+- A safe HTML export (no scripts, remote embeds or hosted links).
+- Keeping unknown host records and header fields when an archive is imported into the app's store.
+- Exact integers past 2^53 in opaque host records and unknown header fields: those pass through
+  `JSONValue`, whose numbers are `Double` (entries are encoded directly and keep exact integers).
+- Background/foreground draft preservation (A68), and migration/stress/device qualification.
 
 ### Local suspension, recovery and resource limits
 

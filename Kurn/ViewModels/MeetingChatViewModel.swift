@@ -57,6 +57,9 @@ final class MeetingChatViewModel {
     /// `session`'s id, exposed for the history list to highlight the
     /// currently open conversation. `nil` for one not yet saved.
     var currentSessionID: UUID? { session?.id }
+    /// The store and the meeting this chat saves into (nil meeting: the library).
+    var storeContext: ModelContext? { modelContext }
+    var scopeMeeting: Meeting? { meeting }
     var artifactSession: ChatSession? { session }
     var error: AppError?
 
