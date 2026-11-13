@@ -1269,3 +1269,13 @@
 "chat.branch.usage" = "This branch: %1$d tokens · All branches: %2$d tokens";
 "chat.history.rename" = "Rename";
 "chat.history.rename_placeholder" = "Conversation title";
+"chat.archive.export_failed" = "The conversation could not be exported.";
+"chat.archive.import_failed" = "This file is not a conversation archive Kurn can open. Nothing was imported.";
+"chat.archive.imported_title" = "Imported conversation";
+"chat.archive.export_markdown" = "Export as Markdown";
+"chat.archive.export" = "Export archive (all branches)";
+"chat.archive.import" = "Import archive";
+"chat.conversation.more" = "Conversation actions";
+"chat.export.you" = "You";
+"chat.export.assistant" = "Assistant";
+"chat.export.documents" = "Documents";

@@ -1269,3 +1269,13 @@
 "chat.branch.usage" = "Cette branche : %1$d jetons · Toutes les branches : %2$d jetons";
 "chat.history.rename" = "Renommer";
 "chat.history.rename_placeholder" = "Titre de la conversation";
+"chat.archive.export_failed" = "Impossible d’exporter la conversation.";
+"chat.archive.import_failed" = "Ce fichier n’est pas une archive de conversation que Kurn peut ouvrir. Rien n’a été importé.";
+"chat.archive.imported_title" = "Conversation importée";
+"chat.archive.export_markdown" = "Exporter en Markdown";
+"chat.archive.export" = "Exporter l’archive (toutes les branches)";
+"chat.archive.import" = "Importer une archive";
+"chat.conversation.more" = "Actions de la conversation";
+"chat.export.you" = "Vous";
+"chat.export.assistant" = "Assistant";
+"chat.export.documents" = "Documents";

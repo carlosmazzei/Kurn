@@ -1269,3 +1269,13 @@
 "chat.branch.usage" = "此分支：%1$d 个令牌 · 所有分支：%2$d 个令牌";
 "chat.history.rename" = "重命名";
 "chat.history.rename_placeholder" = "对话标题";
+"chat.archive.export_failed" = "无法导出对话。";
+"chat.archive.import_failed" = "此文件不是 Kurn 可以打开的对话存档，未导入任何内容。";
+"chat.archive.imported_title" = "导入的对话";
+"chat.archive.export_markdown" = "导出为 Markdown";
+"chat.archive.export" = "导出存档（所有分支）";
+"chat.archive.import" = "导入存档";
+"chat.conversation.more" = "对话操作";
+"chat.export.you" = "你";
+"chat.export.assistant" = "助手";
+"chat.export.documents" = "文档";

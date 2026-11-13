@@ -1269,3 +1269,13 @@
 "chat.branch.usage" = "Esta rama: %1$d tokens · Todas las ramas: %2$d tokens";
 "chat.history.rename" = "Cambiar nombre";
 "chat.history.rename_placeholder" = "Título de la conversación";
+"chat.archive.export_failed" = "No se pudo exportar la conversación.";
+"chat.archive.import_failed" = "Este archivo no es un archivo de conversación que Kurn pueda abrir. No se importó nada.";
+"chat.archive.imported_title" = "Conversación importada";
+"chat.archive.export_markdown" = "Exportar como Markdown";
+"chat.archive.export" = "Exportar archivo (todas las ramas)";
+"chat.archive.import" = "Importar archivo";
+"chat.conversation.more" = "Acciones de la conversación";
+"chat.export.you" = "Tú";
+"chat.export.assistant" = "Asistente";
+"chat.export.documents" = "Documentos";

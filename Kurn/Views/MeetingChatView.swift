@@ -15,6 +15,7 @@ import KurnCore
 import SwiftData
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct MeetingChatView: View {
     /// The meeting to chat about, or `nil` to ask across the whole library.
@@ -63,6 +64,9 @@ struct MeetingChatConversationView: View {
     /// The question being labelled, and the label being typed (NH09).
     @State private var labelTarget: UUID?
     @State private var labelText = ""
+    /// A conversation file being shared, and the archive picker (NH10).
+    @State private var shareItem: ShareItem?
+    @State private var showingImporter = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -115,6 +119,10 @@ struct MeetingChatConversationView: View {
                 onRename: { vm.rename($0, to: $1) }
             )
         }
+        .sheet(item: $shareItem) { ActivityView(items: $0.urls) }
+        .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.data]) { result in
+            if case .success(let url) = result { vm.importConversation(from: url) }
+        }
         .sheet(isPresented: $showingSources) {
             ChatSourceSheet(meeting: meeting, scope: Binding(get: { vm.scope }, set: { vm.updateScope($0) }))
         }
@@ -163,14 +171,7 @@ struct MeetingChatConversationView: View {
                 Image(systemName: "clock.arrow.circlepath")
             }
             .accessibilityLabel(NSLocalizedString("chat.history.button", comment: "Open chat history"))
-            Button {
-                vm.duplicateConversation()
-            } label: {
-                Image(systemName: "plus.square.on.square")
-            }
-            .disabled(!vm.canChangeBranch)
-            .accessibilityLabel(NSLocalizedString("chat.branch.duplicate", comment: "Duplicate this conversation"))
-            .accessibilityIdentifier("chat.branch.duplicate")
+            ChatConversationMenu(vm: vm, shareItem: $shareItem, showingImporter: $showingImporter)
             Button {
                 vm.reset()
             } label: {
