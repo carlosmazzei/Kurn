@@ -48,18 +48,33 @@ public struct AgentUsage: Codable, Sendable, Equatable {
     public let outputTokens: Int
     /// Sum of the reasoning-token counts actually reported (nil if none were reported).
     /// Missing counts are not inferred from output size. Never contains reasoning text.
+    /// Reasoning is part of `outputTokens`, never added to it again.
     public let reasoningTokens: Int?
+    /// Input tokens the provider read from its prompt cache, and wrote to it (NH07). Both are
+    /// part of `inputTokens` — the whole input the request sent, whatever the vendor's own
+    /// accounting — never added to it again; nil when the provider reported none.
+    public let cacheReadTokens: Int?
+    public let cacheWriteTokens: Int?
 
-    public init(inputTokens: Int = 0, outputTokens: Int = 0, reasoningTokens: Int? = nil) {
+    public init(inputTokens: Int = 0, outputTokens: Int = 0, reasoningTokens: Int? = nil,
+                cacheReadTokens: Int? = nil, cacheWriteTokens: Int? = nil) {
         self.inputTokens = max(0, inputTokens)
         self.outputTokens = max(0, outputTokens)
         self.reasoningTokens = reasoningTokens.map { max(0, $0) }
+        self.cacheReadTokens = cacheReadTokens.map { max(0, $0) }
+        self.cacheWriteTokens = cacheWriteTokens.map { max(0, $0) }
     }
 
     func adding(_ other: Self) -> Self {
         Self(inputTokens: inputTokens + other.inputTokens, outputTokens: outputTokens + other.outputTokens,
-             reasoningTokens: reasoningTokens == nil && other.reasoningTokens == nil ? nil
-                : (reasoningTokens ?? 0) + (other.reasoningTokens ?? 0))
+             reasoningTokens: Self.sum(reasoningTokens, other.reasoningTokens),
+             cacheReadTokens: Self.sum(cacheReadTokens, other.cacheReadTokens),
+             cacheWriteTokens: Self.sum(cacheWriteTokens, other.cacheWriteTokens))
+    }
+
+    /// Reported counts add up; unreported on both sides stays unreported, never zero.
+    private static func sum(_ lhs: Int?, _ rhs: Int?) -> Int? {
+        lhs == nil && rhs == nil ? nil : (lhs ?? 0) + (rhs ?? 0)
     }
 }
 

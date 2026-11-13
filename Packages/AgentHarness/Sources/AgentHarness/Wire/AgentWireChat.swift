@@ -5,6 +5,7 @@ extension AgentWireState {
         if let input = usage["prompt_tokens"].int { inputTokens = input }
         if let output = usage["completion_tokens"].int { outputTokens = output }
         if let reasoning = usage["completion_tokens_details"]["reasoning_tokens"].int { reasoningTokens = reasoning }
+        if let cached = usage["prompt_tokens_details"]["cached_tokens"].int { cacheReadTokens = cached }
     }
 
     mutating func openAI(_ value: JSONValue) throws {

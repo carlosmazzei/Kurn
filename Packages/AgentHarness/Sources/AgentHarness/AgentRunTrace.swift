@@ -128,7 +128,9 @@ extension AgentRunTrace {
             case .custom(type: "agent.usage.v1", data: .object(let fields)):
                 trace.apply(.usage(AgentUsage(inputTokens: count(fields["inputTokens"]) ?? 0,
                                               outputTokens: count(fields["outputTokens"]) ?? 0,
-                                              reasoningTokens: count(fields["reasoningTokens"]))))
+                                              reasoningTokens: count(fields["reasoningTokens"]),
+                                              cacheReadTokens: count(fields["cacheReadTokens"]),
+                                              cacheWriteTokens: count(fields["cacheWriteTokens"]))))
             case .custom(type: "agent.run-end.v1", data: .object(let fields)):
                 if case .string(let raw)? = fields["stopReason"], let reason = AgentRunStopReason(rawValue: raw) {
                     var step = AgentRunStep(kind: .stop, status: .finished)

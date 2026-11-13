@@ -132,6 +132,7 @@ extension AgentWireState {
         inputTokens = usage["input_tokens"].int ?? inputTokens
         outputTokens = usage["output_tokens"].int ?? outputTokens
         reasoningTokens = usage["output_tokens_details"]["reasoning_tokens"].int ?? reasoningTokens
+        cacheReadTokens = usage["input_tokens_details"]["cached_tokens"].int ?? cacheReadTokens
         let hasCalls = reducer.blocks.contains { if case .toolCall = $0.content { return true }; return false }
         stopReason = limited ? .maxTokens : hasCalls ? .toolUse : .endTurn
         rawStopReason = limited ? "max_output_tokens" : "completed"

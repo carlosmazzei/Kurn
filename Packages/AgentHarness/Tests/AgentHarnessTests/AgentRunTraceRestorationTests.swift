@@ -51,6 +51,19 @@ import Testing
         #expect(trace.usage == AgentUsage(inputTokens: 10, outputTokens: 2))
     }
 
+    @Test func restoredUsageKeepsItsCacheCounts() async throws {
+        let store = SessionTestStore()
+        try await store.appendHostEntry("question")
+        let session = try AgentSession(sessionID: "session", store: store, appendMode: .branch)
+        let usage = AgentUsage(inputTokens: 900, outputTokens: 20, cacheReadTokens: 700, cacheWriteTokens: 100)
+        let runID = try await session.prompt(harness: NativeHarness(model: ScriptedAgentModel([
+            AgentTurnResponse(text: "Answer", usage: usage)
+        ])), systemPrompt: "", history: [], prompt: "Q", tools: [])
+        _ = await session.waitUntilSettled()
+        let trace = try #require(AgentRunTrace.restoring(run: runID.uuidString, from: await store.entries))
+        #expect(trace.usage == usage)
+    }
+
     @Test func onlyTheNamedRunIsRead() async throws {
         let (_, entries) = try await recordedRun()
         #expect(AgentRunTrace.restoring(run: "another-run", from: entries) == nil)

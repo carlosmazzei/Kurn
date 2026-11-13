@@ -280,7 +280,9 @@ public actor AgentSession {
         do {
             let data: JSONValue = .object([
                 "inputTokens": .number(Double(usage.inputTokens)), "outputTokens": .number(Double(usage.outputTokens)),
-                "reasoningTokens": usage.reasoningTokens.map { .number(Double($0)) } ?? .null
+                "reasoningTokens": usage.reasoningTokens.map { .number(Double($0)) } ?? .null,
+                "cacheReadTokens": usage.cacheReadTokens.map { .number(Double($0)) } ?? .null,
+                "cacheWriteTokens": usage.cacheWriteTokens.map { .number(Double($0)) } ?? .null
             ])
             try await append(payload: .custom(type: "agent.usage.v1", data: data))
         } catch { persistenceFailed = true; throw AgentSessionOwnerError.persistenceFailed }

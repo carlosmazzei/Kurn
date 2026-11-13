@@ -184,6 +184,12 @@ size, discarded tool-call count and output-limit flag; missing usage remains mar
 unreported. Responses/Chat Completions reasoning-token details and Gemini thought-token
 counts are logged when reported, never inferred or accompanied by reasoning content.
 Run totals are cumulative over requests and must not be read as current context usage.
+`AgentUsage` also carries `cacheReadTokens`/`cacheWriteTokens` (NH07): prompt-cache reads and writes as the
+provider reported them, both part of `inputTokens` — the whole input sent — and never added to it again,
+just as reasoning is part of output. Anthropic reports cached input apart from `input_tokens`, so its
+accumulator adds it to the total; OpenAI (`cached_tokens`), Responses and Gemini (`cachedContentTokenCount`)
+already include it. Unreported counts stay nil when usages are added. `agent.usage.v1` entries record
+them and `AgentRunTrace.restoring` reads them back.
 
 
 `AgentDiagnostic` carries only fixed event/metric vocabulary, numeric counts and

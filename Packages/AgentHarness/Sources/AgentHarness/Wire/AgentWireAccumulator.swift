@@ -52,6 +52,8 @@ struct AgentWireState {
     var inputTokens: Int?
     var outputTokens: Int?
     var reasoningTokens: Int?
+    var cacheReadTokens: Int?
+    var cacheWriteTokens: Int?
     var stopReason: AgentModelStopReason = .other("unknown")
     var terminal = false
     var anthropicStopReceived = false
@@ -107,8 +109,12 @@ struct AgentWireState {
     }
 
     var usage: AgentUsage? {
-        inputTokens == nil && outputTokens == nil ? nil
-            : AgentUsage(inputTokens: inputTokens ?? 0, outputTokens: outputTokens ?? 0, reasoningTokens: reasoningTokens)
+        guard inputTokens != nil || outputTokens != nil else { return nil }
+        // Anthropic reports cached input apart from `input_tokens`; the others include it.
+        let cached = format == .anthropic ? (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0) : 0
+        return AgentUsage(inputTokens: (inputTokens ?? 0) + cached, outputTokens: outputTokens ?? 0,
+                          reasoningTokens: reasoningTokens, cacheReadTokens: cacheReadTokens,
+                          cacheWriteTokens: cacheWriteTokens)
     }
 
     var api: String {
