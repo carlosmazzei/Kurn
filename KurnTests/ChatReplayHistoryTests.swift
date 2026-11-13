@@ -131,7 +131,8 @@ struct ChatReplayHistoryTests {
 
         let history = ChatReplayHistory.load(turns: vm.turns.map { .init(id: $0.id, role: $0.role, text: $0.text) },
                                              session: session, store: store)
-        let recorded = try #require(ChatRunBranch.authorization(of: try #require(history.runs.first)))
+        let firstRun = try #require(history.runs.first)
+        let recorded = try #require(ChatRunBranch.authorization(of: firstRun))
         let reused = history.messages(for: recorded)
         #expect(reused.first == .user(AgentContextCompactor.summaryPrefix + checkpoint.summary))
         #expect(reused.dropFirst().map(\.canonicalID) == [answerID])
@@ -167,7 +168,9 @@ struct ChatReplayHistoryTests {
 
         let history = ChatReplayHistory.load(turns: vm.turns.map { .init(id: $0.id, role: $0.role, text: $0.text) },
                                              session: session, store: store)
-        let replayed = history.messages(for: try #require(ChatRunBranch.authorization(of: try #require(history.runs.first))))
+        let firstRun = try #require(history.runs.first)
+        let authorization = try #require(ChatRunBranch.authorization(of: firstRun))
+        let replayed = history.messages(for: authorization)
         let stub = replayed.compactMap { message -> AgentToolResultMessage? in
             if case .tool(let result) = message { return result }; return nil
         }
@@ -195,7 +198,9 @@ struct ChatReplayHistoryTests {
         // A sibling branch: the same words, but not the question turn this run answered.
         let elsewhere = vm.turns.map { ChatReplayHistory.ShownTurn(id: UUID(), role: $0.role, text: $0.text) }
         let history = ChatReplayHistory.load(turns: elsewhere, session: session, store: SwiftDataAgentSessionStore(context: context))
-        let replayed = history.messages(for: try #require(ChatRunBranch.authorization(of: try #require(history.runs.first))))
+        let firstRun = try #require(history.runs.first)
+        let authorization = try #require(ChatRunBranch.authorization(of: firstRun))
+        let replayed = history.messages(for: authorization)
         #expect(replayed.count == 2)
         #expect(!replayed.contains(where: Self.isToolResult))
     }

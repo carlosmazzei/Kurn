@@ -124,7 +124,6 @@ final class MeetingChatViewModel {
         // The run's durable command identity (NH05): the question turn it answers, unless the
         // caller names one, so the same command is never run twice from the session's log.
         let command = commandID ?? turns[turns.count - 1].id.uuidString
-        let questionID = turns[turns.count - 1].id
         turns[turns.count - 1].artifacts = retryArtifacts
         turns[turns.count - 1].artifactOrigins = retryOrigins
         retryArtifacts = []
@@ -172,7 +171,7 @@ final class MeetingChatViewModel {
                         "chat.artifact.cloud_required", comment: "Chat provider requirement"))
                 }
                 let answered = try await self.runHarness(agentModel, runID: token, commandID: command, question: trimmed,
-                                                         questionID: questionID, history: priorTurns,
+                                                         history: priorTurns,
                                                          provider: provider, model: model, startedAt: startedAt)
                 try Task.checkCancellation()
                 guard self.generation == generation else { throw CancellationError() }
@@ -449,13 +448,15 @@ final class MeetingChatViewModel {
     }
 
     private func runHarness(_ agentModel: any AgentModel, runID: UUID, commandID: String, question: String,
-                            questionID: UUID, history priorTurns: [Turn],
+                            history priorTurns: [Turn],
                             provider: AIProvider, model: String, startedAt: Date) async throws -> Bool {
         guard let modelContext else {
             throw AppError.apiError(statusCode: 0, message: "Chat requires a configured model context.")
         }
         let workspace = workspace
         let generation = self.generation
+        // The question this run answers is the turn `send` just appended.
+        let questionID = turns.last?.id
         let completedTurns = Array(turns.dropLast())
         let initialArtifacts = await workspace.snapshot()
         let origin = ChatArtifactOrigin(question: question, modelIdentifier: "\(provider.id):\(model)",
