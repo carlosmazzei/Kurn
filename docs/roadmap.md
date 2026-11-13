@@ -587,8 +587,10 @@ see `CLAUDE.md`); NH07 is implemented except a full capability snapshot and tran
 (usage/cache counters, cost estimation and an unverifiable-ceiling guard, session-owned retries,
 per-request credentials, see `CLAUDE.md`); NH08 is implemented except a session-retained owner,
 model changes at request boundaries and `waitingForUser` (steering/follow-up queues, continuation,
-queue UI, run status and reading position, see `CLAUDE.md`); NH09–NH10 have not started. The next
-implementation increment is NH09. This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
+queue UI, run status and reading position, see `CLAUDE.md`); NH09 is implemented except branch
+summaries (alternatives, navigation, fork, clone, labels, rename, branch-aware document revisions and
+save actions, usage per branch, see `CLAUDE.md`); NH10 has not started. The next implementation
+increment is NH10. This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
 
 The first NH02 increment adds checked native user/assistant blocks, exact Unix-ms
 codecs, an ordered bounded reducer, authoritative final reconciliation and all four
@@ -891,6 +893,15 @@ Labels and rename are metadata. Branch summaries require an explicit model
 operation and preserve source restrictions. Session totals include every branch;
 current-context usage describes only the active projection. Artifact state
 follows its branch revision map, not the newest append anywhere in the session.
+
+**NH09 status.** Implemented: `AgentSessionTree`, atomic navigation while settled with the versions of
+a question in the chat, fork (draft restored) and duplicate, labels and rename as metadata, per-branch
+document revisions and revision-aware save actions, and usage over every branch versus the branch
+shown. Still open:
+
+- Branch summaries: an explicit model operation that summarizes a branch being left, keeping its
+  source restrictions, and that later runs replay.
+- A tree view of every branch (the chat moves between versions of one question at a time).
 
 **NH10 details.** Export a native versioned session bundle containing entries,
 branch/leaf state, scopes, context boundaries, artifact revisions/provenance and
