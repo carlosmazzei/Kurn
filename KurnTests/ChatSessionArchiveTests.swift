@@ -66,12 +66,12 @@ struct ChatSessionArchiveTests {
         let store = SwiftDataAgentSessionStore(context: context)
         let data = try store.archive(seeded.session)
         let id = seeded.session.id
+        let created = seeded.session.createdAt
 
         #expect(throws: AgentSessionStoreError.conflict) { try store.importArchive(data, meeting: nil, as: .restore, defaultTitle: "") }
         #expect(try sessionCount(context) == 1)
         context.delete(seeded.session)
         try context.save()
-        let created = seeded.session.createdAt
         let restored = try store.importArchive(data, meeting: nil, as: .restore, defaultTitle: "")
         #expect(restored.id == id)
         #expect(abs(restored.createdAt.timeIntervalSince(created)) < 0.01)
