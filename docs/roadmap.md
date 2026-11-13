@@ -675,8 +675,7 @@ restoration from those branches beyond an interrupted run's steps (a crashed run
 usage now show under its retryable question; a stopped or failed run's steps are still the
 presentation copy, and replay still sends presentation history until NH06); a `waitingForUser` phase
 once a tool asks for confirmation (none does yet); resuming a run a
-dead process left interrupted (the in-process background case is done); persistence-failure recovery beyond retry (a failed
-run-history write now says so and keeps the question retryable). The chat creates one owner per
+dead process left interrupted (the in-process background case is done). The chat creates one owner per
 run, which is safe while its view model admits one run at a time; a session-retained owner (and
 uniqueness across independently created actors) arrives with queued commands. Failed message/usage commits require explicit host recovery, rather than
 retrying inference on an incomplete log. The chat now uses `start(observation: .complete)`; coalesced

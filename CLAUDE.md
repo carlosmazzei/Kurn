@@ -2991,7 +2991,12 @@ stays retryable. A `ChatRunRecord` (`Infrastructure/Agent/`, an `AgentRecoveryRe
 `ChatRunRecovery.sweep`, one of `AppComposition`'s launch sweeps, marks every record still
 `.running` as `.interrupted` (reliability code `run_interrupted`): no run is live when a store
 opens, the saved question already reopens as the retryable one, and committed document effects
-keep their own receipts. It never re-sends or resumes anything. A reopened conversation whose
+keep their own receipts. It never re-sends or resumes anything. Evidence is closed rather than
+deleted: any run's branch that nothing ended — a dead process's, or a run that settled without
+saving its own end entry — gets the `agent.run-end.v1` it is missing (`ChatRunBranch.closeIfOpen`,
+`end` `interrupted` or `persistenceFailed`, reliability code `run_branch_closed`), as the last entry
+of that branch, without moving the selected leaf. In process, a run that failed on a history write
+retries its own end entry once (`AgentSession.retrySettlement`) before it settles. A reopened conversation whose
 retryable question is one of those (`ChatRunRecovery.interruptedQuestionIDs`) says so above
 Retry (`retryableQuestionWasInterrupted`, `chat.run.interrupted`), so an unanswered question left
 by a crash reads differently from one the user stopped. It also shows what that run had done:

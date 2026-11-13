@@ -4,9 +4,11 @@ import KurnCore
 import SwiftData
 
 /// Launch reconciliation for chat runs (NH05). No run is live when a store opens, so every
-/// `ChatRunRecord` still `.running` was cut off with its process. Marking it `.interrupted` is all
-/// the repair there is: the question was saved before the run started and reopens as retryable,
-/// and committed document effects already carry their own receipts. Nothing is re-sent.
+/// `ChatRunRecord` still `.running` was cut off with its process and is marked `.interrupted`:
+/// the question was saved before the run started and reopens as retryable, and committed
+/// document effects already carry their own receipts. Any run's branch that nothing closed —
+/// that process's, or one whose own end entry failed to save — gets the end entry it is missing
+/// (`ChatRunBranch.closeIfOpen`). Nothing is re-sent.
 @MainActor
 enum ChatRunRecovery {
     /// Returns the number of runs marked interrupted. A session whose records cannot be read is
@@ -19,14 +21,26 @@ enum ChatRunRecovery {
         for session in sessions where !session.harnessRecords.isEmpty {
             do {
                 for record in try store.records(session) {
-                    guard var run = ChatRunRecord(record), run.state == .running else { continue }
-                    run.state = .interrupted
-                    try store.put(run.record(), in: session, expectedRevision: session.canonicalRevision)
-                    interrupted += 1
-                    ReliabilityLog.record(ReliabilityEvent(
-                        operationID: OperationID(String(run.runID.prefix(8))), operation: "meeting_chat",
-                        stage: "launch_recovery", outcome: .cancelled, code: "run_interrupted"
-                    ))
+                    guard var run = ChatRunRecord(record) else { continue }
+                    if run.state == .running {
+                        run.state = .interrupted
+                        try store.put(run.record(), in: session, expectedRevision: session.canonicalRevision)
+                        interrupted += 1
+                        ReliabilityLog.record(ReliabilityEvent(
+                            operationID: OperationID(String(run.runID.prefix(8))), operation: "meeting_chat",
+                            stage: "launch_recovery", outcome: .cancelled, code: "run_interrupted"
+                        ))
+                    }
+                    // Evidence is closed, not deleted: a branch nothing ended gets the end the run
+                    // could not write — `interrupted` for a dead process, `persistenceFailed` for a
+                    // run that settled but could not save its own end.
+                    let end = run.state == .interrupted ? "interrupted" : "persistenceFailed"
+                    if try ChatRunBranch.closeIfOpen(runID: run.runID, end: end, in: session, store: store) {
+                        ReliabilityLog.record(ReliabilityEvent(
+                            operationID: OperationID(String(run.runID.prefix(8))), operation: "meeting_chat",
+                            stage: "launch_recovery", outcome: .succeeded, code: "run_branch_closed"
+                        ))
+                    }
                 }
             } catch {
                 ReliabilityLog.record(ReliabilityEvent(

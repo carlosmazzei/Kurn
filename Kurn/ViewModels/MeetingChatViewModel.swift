@@ -535,6 +535,12 @@ final class MeetingChatViewModel {
             await run.settle()
         } catch {
             await run.terminate()
+            // A run whose end entry alone failed to save gets one more attempt at it, without
+            // re-running anything; a branch still left open is closed by the next launch sweep.
+            if ChatRunBranch.isWriteFailure(error), let owner {
+                try? await owner.retrySettlement()
+                _ = await owner.waitUntilSettled()
+            }
             let snapshot = await workspace.snapshot()
             // Any document change this run committed rules out an automatic resume.
             if snapshot != initialArtifacts { stoppedRunCommittedEffects = true }

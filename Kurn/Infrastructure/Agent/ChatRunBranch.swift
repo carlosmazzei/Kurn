@@ -29,6 +29,30 @@ enum ChatRunBranch {
         return id
     }
 
+    /// Closes the branch of `runID` with an `agent.run-end.v1` entry recording `end`, when the run
+    /// wrote a branch and nothing closed it: a process died mid-run, or the run's own end entry
+    /// could not be saved. The closing entry is the last one of that run's branch and the selected
+    /// leaf does not move, so the presentation path is unchanged. Returns whether it wrote one.
+    @MainActor
+    @discardableResult
+    static func closeIfOpen(runID: String, end: String, in session: ChatSession,
+                            store: SwiftDataAgentSessionStore) throws -> Bool {
+        let snapshot = try store.snapshot(session)
+        let run = snapshot.entries.filter { $0.runID == runID }
+        guard let last = run.max(by: { $0.ordinal < $1.ordinal }), !run.contains(where: { $0.kind == endType }) else {
+            return false
+        }
+        let entry = try AgentSessionEntry(sessionID: snapshot.sessionID, id: UUID().uuidString, parentID: last.id,
+            ordinal: snapshot.entries.count + 1, createdAt: AgentSessionEntry.time(),
+            payload: .custom(type: endType, data: .object([
+                "runID": .string(runID), "end": .string(end), "stopReason": .null
+            ])),
+            metadata: .object(["runID": .string(runID)]))
+        try store.commitNow(AgentSessionCommit(sessionID: snapshot.sessionID, expectedRevision: snapshot.revision,
+                                               entries: [entry], leafID: snapshot.leafID))
+        return true
+    }
+
     /// Whether `error` is a run history write that failed; the chat says so rather than showing
     /// the store's own error text.
     static func isWriteFailure(_ error: Error) -> Bool {
