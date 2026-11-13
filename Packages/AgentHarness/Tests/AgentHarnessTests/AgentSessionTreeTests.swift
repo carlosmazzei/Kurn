@@ -165,4 +165,25 @@ import Testing
         #expect(AgentRunBranch.systemPrompts(of: runs) == [other])
         #expect(runs.first?.toolLoadout == AgentToolLoadout(names: ["list_sources", "read_document"], previous: nil))
     }
+
+    @Test func aCopiedPromptWhoseSectionsMovedIsRecordedInFull() throws {
+        let first = try AgentSystemPrompt(sections: [.init(name: "instructions", text: "Be brief."),
+                                                     .init(name: "documents", text: "None")])
+        let reordered = try AgentSystemPrompt(sections: [.init(name: "documents", text: "None"),
+                                                         .init(name: "instructions", text: "Be brief.")])
+        func json<Value: Encodable>(_ value: Value) throws -> JSONValue {
+            try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))
+        }
+        var log = Log()
+        try log.message("q1", .user, after: nil)
+        try log.custom("run1-start", AgentRunBranch.startType, after: "q1", run: "run1", data: .object(["system": try json(first)]))
+        try log.message("a1", .assistant, after: "q1")
+        try log.message("q2", .user, after: "a1")
+        try log.custom("run2-start", AgentRunBranch.startType, after: "q2", run: "run2", data: .object(["system": try json(reordered)]))
+        try log.message("a2", .assistant, after: "q2")
+
+        let runs = AgentRunBranch.all(in: try log.tree(leaf: "a2").copy(through: "a2", into: "clone"))
+        #expect(AgentRunBranch.systemPrompts(of: runs) == [first, reordered])
+        #expect(runs.last?.startFields["system"] != nil && runs.last?.startFields["systemPatch"] == nil)
+    }
 }

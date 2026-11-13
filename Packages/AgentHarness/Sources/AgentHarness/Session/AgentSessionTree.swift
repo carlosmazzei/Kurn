@@ -135,8 +135,12 @@ public struct AgentSessionTree: Sendable {
             if let prompt = prompts[runID] ?? nil {
                 fields["system"] = nil
                 fields["systemPatch"] = nil
-                if let previousPrompt { fields["systemPatch"] = try Self.json(previousPrompt.patch(to: prompt)) }
-                else { fields["system"] = try Self.json(prompt) }
+                // A patch cannot reorder sections, so a prompt it does not reproduce is recorded in full.
+                if let previousPrompt, previousPrompt.applying(previousPrompt.patch(to: prompt)) == prompt {
+                    fields["systemPatch"] = try Self.json(previousPrompt.patch(to: prompt))
+                } else {
+                    fields["system"] = try Self.json(prompt)
+                }
                 previousPrompt = prompt
             }
             return try AgentSessionEntry(sessionID: entry.sessionID, id: entry.id, parentID: entry.parentID, ordinal: entry.ordinal,
