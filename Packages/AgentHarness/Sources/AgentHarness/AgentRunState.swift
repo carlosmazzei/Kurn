@@ -5,6 +5,8 @@ struct AgentRunState: Sendable {
     var context: [AgentMessage]
     var usage = AgentUsage()
     var cost = 0.0
+    /// False once a reported usage could not be priced: the run's cost is then unknown, not `cost`.
+    var costKnown = true
     var toolCalls = 0
     var requestedCalls = 0
     var turns = 0

@@ -4,7 +4,8 @@ import Foundation
 public struct NativeHarness: Sendable {
     let model: any AgentModel
     let limits: AgentLimits
-    let costEstimator: (@Sendable (AgentUsage) -> Double)?
+    /// Prices a request's reported usage in USD; nil for a usage it cannot price (NH07).
+    let costEstimator: (@Sendable (AgentUsage) -> Double?)?
     let compactor: AgentContextCompactor
     let confirm: @Sendable (AgentToolCall) async -> Bool
     let toolPolicy: AgentToolPolicy
@@ -24,7 +25,7 @@ public struct NativeHarness: Sendable {
     /// - Parameter isContextOverflow: recognizes a provider rejecting a request as too long; the
     ///   harness then compacts and retries that turn once.
     public init(model: any AgentModel, limits: AgentLimits = AgentLimits(),
-                costEstimator: (@Sendable (AgentUsage) -> Double)? = nil,
+                costEstimator: (@Sendable (AgentUsage) -> Double?)? = nil,
                 contextPolicy: AgentContextPolicy = AgentContextPolicy(contextWindow: 128_000),
                 tokenEstimator: @escaping @Sendable (String) -> Int = { TokenEstimate.tokens(in: $0) },
                 isContextOverflow: @escaping @Sendable (Error) -> Bool = {
@@ -205,7 +206,8 @@ public struct NativeHarness: Sendable {
                                             .outputTokens: state.usage.outputTokens,
                                             .blockedCalls: state.requestedCalls - state.toolCalls], reason: reason)
         let outcome = AgentRunOutcome(messages: state.history, finalText: state.finalText,
-                                      stopReason: reason, totalUsage: state.usage)
+                                      stopReason: reason, totalUsage: state.usage,
+                                      estimatedCostUSD: costEstimator != nil && state.costKnown ? state.cost : nil)
         events.yield(.runFinished(outcome))
         return outcome
     }

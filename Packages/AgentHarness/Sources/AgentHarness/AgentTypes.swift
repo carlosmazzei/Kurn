@@ -243,12 +243,18 @@ public struct AgentRunOutcome: Sendable, Equatable {
     public let finalText: String
     public let stopReason: AgentRunStopReason
     public let totalUsage: AgentUsage
+    /// The run's estimated cost in USD from the caller's estimator, including summary requests;
+    /// nil when there was no estimator or a reported usage could not be priced. Unknown is never
+    /// zero, and an estimate is not a provider billing figure.
+    public let estimatedCostUSD: Double?
 
-    public init(messages: [AgentMessage], finalText: String, stopReason: AgentRunStopReason, totalUsage: AgentUsage) {
+    public init(messages: [AgentMessage], finalText: String, stopReason: AgentRunStopReason, totalUsage: AgentUsage,
+                estimatedCostUSD: Double? = nil) {
         self.messages = messages
         self.finalText = finalText
         self.stopReason = stopReason
         self.totalUsage = totalUsage
+        self.estimatedCostUSD = estimatedCostUSD
     }
 }
 

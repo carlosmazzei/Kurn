@@ -111,8 +111,13 @@ extension NativeHarness {
                                              .turnIndex: state.turns, .maxTurns: state.allowedTurns], reason: reason)
     }
 
+    /// A cost ceiling is checked only against a known cost (NH07). Without a price source, or
+    /// once a usage could not be priced, the ceiling cannot be verified, so it counts as reached:
+    /// an unchecked ceiling must never let a run keep spending.
     func costLimitReached(_ state: AgentRunState) -> Bool {
-        limits.maxCostUSD.map { state.cost >= $0 } ?? false
+        guard let ceiling = limits.maxCostUSD else { return false }
+        guard costEstimator != nil, state.costKnown else { return true }
+        return state.cost >= ceiling
     }
 
     private func record(_ usage: AgentUsage?, state: inout AgentRunState,
@@ -120,7 +125,7 @@ extension NativeHarness {
         guard let usage else { return }
         try await usageCommit(usage)
         state.usage = state.usage.adding(usage)
-        state.cost += max(0, costEstimator?(usage) ?? 0)
+        if let price = costEstimator?(usage) { state.cost += max(0, price) } else { state.costKnown = false }
         events.yield(.usage(usage))
     }
 

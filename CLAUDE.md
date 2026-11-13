@@ -190,6 +190,12 @@ just as reasoning is part of output. Anthropic reports cached input apart from `
 accumulator adds it to the total; OpenAI (`cached_tokens`), Responses and Gemini (`cachedContentTokenCount`)
 already include it. Unreported counts stay nil when usages are added. `agent.usage.v1` entries record
 them and `AgentRunTrace.restoring` reads them back.
+The cost estimator returns nil for a usage it cannot price (NH07). `AgentRunOutcome.estimatedCostUSD`
+is the run's estimated cost, summaries included, or nil — unknown, never zero — when there was no estimator
+or any usage went unpriced. `AgentLimits.maxCostUSD` is checked only against a known cost: without an
+estimator, or once a usage could not be priced, the ceiling cannot be verified and counts as reached, so
+no further request is sent. `HarnessChatService` passes `ModelPricing` as the estimator. The figure is an
+estimate from a price table, not a provider billing cap.
 
 
 `AgentDiagnostic` carries only fixed event/metric vocabulary, numeric counts and
