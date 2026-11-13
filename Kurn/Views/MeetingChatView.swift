@@ -188,6 +188,12 @@ struct MeetingChatConversationView: View {
                                 .font(Theme.footnote)
                                 .foregroundStyle(Theme.textSecondary)
                                 .accessibilityIdentifier("chat.run_interrupted")
+                        } else if vm.replyWasStopped {
+                            // The stop is confirmed only once the run settled.
+                            Text(NSLocalizedString("chat.run.stopped", comment: "The person stopped this reply"))
+                                .font(Theme.footnote)
+                                .foregroundStyle(Theme.textSecondary)
+                                .accessibilityIdentifier("chat.run_stopped")
                         }
                         retryRow(question: question)
                     }
@@ -260,10 +266,9 @@ struct MeetingChatConversationView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 ProgressView().accessibilityHidden(true)
-                Text(vm.phase == .cancelling
-                     ? NSLocalizedString("chat.step.cancelling", comment: "Stopping a reply")
-                     : NSLocalizedString("chat.step.running", comment: "Running"))
+                Text(vm.phase.statusText(retryDelaySeconds: vm.runProgress.retryDelaySeconds))
                     .font(.footnote).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("chat.run_status")
             }
             if let turn = vm.turns.last, turn.role == .assistant, let usage = turn.usage {
                 Text(MeetingChatTurnView.usageCaptionText(usage: usage, costUSD: turn.costUSD, elapsedSeconds: nil))

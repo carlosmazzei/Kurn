@@ -1234,6 +1234,10 @@
 "chat.queue.edit" = "Zum Bearbeiten tippen";
 "chat.queue.remove" = "Nachricht aus der Warteschlange entfernen";
 "chat.queue.save_failed" = "Die Nachricht konnte nicht eingereiht werden. Sie steht wieder im Eingabefeld.";
+"chat.step.compacting" = "Frühere Unterhaltung wird verdichtet…";
+"chat.step.retrying" = "Erneuter Versuch…";
+"chat.step.retrying_in" = "Erneuter Versuch in %d s…";
+"chat.run.stopped" = "Du hast diese Antwort gestoppt.";
 
 // Native tool pipeline diagnostics.
 "chat.diagnostic.toolValidationFailed" = "Werkzeugargumente abgelehnt";

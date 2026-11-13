@@ -142,4 +142,17 @@ import Testing
         progress.apply(.runStarted)
         #expect(progress.contextTokens == nil)
     }
+
+    @Test func aRetryWaitCarriesItsDelayUntilTheRetriedRequestStarts() throws {
+        var progress = AgentRunProgress()
+        progress.apply(.runStarted)
+        progress.apply(.requestStarted(try AgentRequestIdentity(id: "req-1")))
+        progress.apply(.diagnostic(AgentDiagnostic(runID: UUID(), sequence: 1, kind: .requestRetryScheduled,
+                                                   metrics: [.requestAttempt: 1, .retryDelayMs: 2_500])))
+        #expect(progress.phase == .retryWaiting)
+        #expect(progress.retryDelaySeconds == 2.5)
+        progress.apply(.requestStarted(try AgentRequestIdentity(id: "req-2")))
+        #expect(progress.phase == .streaming)
+        #expect(progress.retryDelaySeconds == nil)
+    }
 }

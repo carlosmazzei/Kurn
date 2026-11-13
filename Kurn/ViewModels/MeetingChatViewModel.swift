@@ -94,6 +94,9 @@ final class MeetingChatViewModel {
     var queued = AgentInputQueue.Snapshot()
     /// Text handed back to the composer: queued input a stop or a failed run did not answer.
     var restoredDraft: String?
+    /// Whether the person stopped the last reply; shown once the stop settled. A new question,
+    /// `reset` and `load` clear it.
+    var replyWasStopped = false
 
     /// Tests pass a scripted `AgentModel` through `agentModelFactory`.
     init(agentModelFactory: @escaping HarnessChatService.ModelFactory = { try ProviderFactory.agentModel(for: $0, model: $1) },
@@ -120,6 +123,7 @@ final class MeetingChatViewModel {
             return
         }
         error = nil
+        replyWasStopped = false
         pendingForegroundResume = nil
         interruptedResume = nil
         stoppedRunCommittedEffects = false
@@ -271,6 +275,8 @@ final class MeetingChatViewModel {
         ))
         let request = currentRequest
         cancel()
+        // The system stopped it, not the person.
+        replyWasStopped = false
         pendingForegroundResume = request
     }
 
@@ -365,6 +371,7 @@ final class MeetingChatViewModel {
         pendingForegroundResume = nil
         guard let task else { return }
         phase = .cancelling
+        replyWasStopped = true
         // Queued input is cleared before the stop and handed back to the composer (NH08).
         guard let queue = inputQueue else { task.cancel(); return }
         Task { [weak self] in
@@ -387,6 +394,7 @@ final class MeetingChatViewModel {
         error = nil
         session = nil
         interruptedQuestionIDs = []
+        replyWasStopped = false
         interruptedResume = nil
         runProgress = AgentRunProgress()
         conversationID = UUID()
@@ -442,6 +450,7 @@ final class MeetingChatViewModel {
             } ?? (turns: restored.turns, interrupted: [])
             turns = recovered.turns.map(Turn.init)
             interruptedQuestionIDs = recovered.interrupted
+            replyWasStopped = false
             runProgress = AgentRunProgress()
             interruptedResume = modelContext.flatMap { context in
                 ChatRunRecovery.resumableInterruptedRun(in: recovered.turns, session: session, context: context)

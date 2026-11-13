@@ -24,3 +24,22 @@ enum ChatRunPhase: String, Sendable, Equatable {
         }
     }
 }
+
+extension ChatRunPhase {
+    /// What the running row says (NH08): the work in progress, a retry's wait with its delay when
+    /// known, and a stop that is still settling. In words, never only an indicator.
+    func statusText(retryDelaySeconds: Double?) -> String {
+        switch self {
+        case .cancelling: return NSLocalizedString("chat.step.cancelling", comment: "Stopping a reply")
+        case .compacting: return NSLocalizedString("chat.step.compacting", comment: "Condensing the conversation")
+        case .retryWaiting:
+            guard let retryDelaySeconds, retryDelaySeconds > 0 else {
+                return NSLocalizedString("chat.step.retrying", comment: "Retrying the request")
+            }
+            return String(format: NSLocalizedString("chat.step.retrying_in", comment: "Retrying in N seconds"),
+                          Int(retryDelaySeconds.rounded(.up)))
+        case .idle, .preparing, .streaming, .executingTools:
+            return NSLocalizedString("chat.step.running", comment: "Running")
+        }
+    }
+}

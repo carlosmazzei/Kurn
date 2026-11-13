@@ -1234,6 +1234,10 @@
 "chat.queue.edit" = "Tap to edit";
 "chat.queue.remove" = "Remove queued message";
 "chat.queue.save_failed" = "The message couldn’t be queued. It’s back in the message box.";
+"chat.step.compacting" = "Condensing the earlier conversation…";
+"chat.step.retrying" = "Retrying…";
+"chat.step.retrying_in" = "Retrying in %d s…";
+"chat.run.stopped" = "You stopped this reply.";
 
 // Native tool pipeline diagnostics.
 "chat.diagnostic.toolValidationFailed" = "Tool arguments rejected";

@@ -117,6 +117,8 @@ struct MeetingChatQueueTests {
         await vm.waitUntilSettled()
 
         #expect(vm.restoredDraft == "Also Tuesday")
+        #expect(vm.replyWasStopped)
+        #expect(vm.retryableQuestion == "When?")
         #expect(try queueRecord(vm, context).isEmpty)
         // With no run, nothing can be queued.
         #expect(await vm.queue("Late", as: .steering) == false)

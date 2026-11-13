@@ -1234,6 +1234,10 @@
 "chat.queue.edit" = "轻点以编辑";
 "chat.queue.remove" = "从队列中移除消息";
 "chat.queue.save_failed" = "无法将消息加入队列，它已回到输入框。";
+"chat.step.compacting" = "正在压缩之前的对话…";
+"chat.step.retrying" = "正在重试…";
+"chat.step.retrying_in" = "%d 秒后重试…";
+"chat.run.stopped" = "你已停止此回复。";
 
 // Native tool pipeline diagnostics.
 "chat.diagnostic.toolValidationFailed" = "工具参数被拒绝";

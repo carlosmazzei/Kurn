@@ -1234,6 +1234,10 @@
 "chat.queue.edit" = "Toque para editar";
 "chat.queue.remove" = "Remover mensagem da fila";
 "chat.queue.save_failed" = "Não foi possível colocar a mensagem na fila. Ela voltou para a caixa de mensagem.";
+"chat.step.compacting" = "Condensando a conversa anterior…";
+"chat.step.retrying" = "Tentando de novo…";
+"chat.step.retrying_in" = "Tentando de novo em %d s…";
+"chat.run.stopped" = "Você parou esta resposta.";
 
 // Native tool pipeline diagnostics.
 "chat.diagnostic.toolValidationFailed" = "Argumentos da ferramenta rejeitados";
