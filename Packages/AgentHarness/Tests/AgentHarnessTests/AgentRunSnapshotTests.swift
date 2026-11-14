@@ -15,10 +15,10 @@ import Testing
             AgentContentBlock(id: "c", content: .toolCall(call, complete: true))
         ])
         snapshot.apply(.messageAppended(.content(narrated)))
-        #expect(snapshot.exchanges.last?.text == "")
+        #expect(snapshot.exchanges.last?.text == "" && snapshot.text == "")
         #expect(snapshot.trace.steps.contains { $0.kind == .narration && $0.text == "I'll search." })
         snapshot.apply(.textDelta("Found it."))
-        #expect(snapshot.exchanges.last?.text == "Found it.")
+        #expect(snapshot.exchanges.last?.text == "Found it." && snapshot.text == "Found it.")
     }
 
     @Test func aSnapshotReducesTextTraceProgressToolsAndOutcome() {

@@ -56,6 +56,23 @@ import Testing
         #expect(trace.steps.filter { $0.kind == .thinking }.map(\.text) == ["Whole thought.", "Part one."])
     }
 
+    @Test func theFinishedMessageCanEmptyOrDropStreamedReasoning() throws {
+        var trace = AgentRunTrace()
+        trace.apply(.modelContent(.blockStarted(index: 0, block: thinking("t", "First guess"))))
+        trace.apply(.modelContent(.messageFinished(try assistant([thinking("t", "")]))))
+        // Emptied: the step stays, with no text to reveal.
+        #expect(trace.steps.map(\.kind) == [.thinking] && trace.steps[0].text == "")
+
+        trace.apply(.turnStarted(index: 1))
+        trace.apply(.modelContent(.blockStarted(index: 0, block: thinking("u", "Draft"))))
+        trace.apply(.modelContent(.blockStarted(index: 1, block: thinking("v", "Second draft"))))
+        let answer = try assistant([AgentContentBlock(id: "a", content: .text("Answer."))])
+        trace.apply(.modelContent(.messageFinished(answer)))
+        // Dropped: neither streamed draft remains.
+        #expect(trace.steps.filter { $0.kind == .thinking }.count == 1)
+        #expect(!trace.steps.contains { $0.text == "Draft" || $0.text == "Second draft" })
+    }
+
     @Test func narrationBesideToolCallsIsShownAndTheAnswerIsNot() throws {
         var trace = AgentRunTrace()
         let call = AgentToolCall(id: "c1", name: "search", arguments: .object([:]), rawArguments: "{}")

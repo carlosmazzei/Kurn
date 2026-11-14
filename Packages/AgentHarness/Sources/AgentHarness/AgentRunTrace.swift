@@ -141,15 +141,19 @@ public struct AgentRunTrace: Sendable, Equatable {
             steps[index].text = Self.bounded((steps[index].text ?? "") + delta)
         case .blockDelta, .blockUpdated: break
         case .messageFinished(let message):
-            // Streamed blocks are matched by ID, then in order, so a final message that renamed its
-            // blocks never shows the same reasoning twice.
-            var unmatched = thinkingSteps.sorted { $0.value < $1.value }.map(\.value)
+            // The finished message is authoritative: streamed blocks are matched by ID, then in
+            // order (a final message may rename them), take its text even when empty, and a streamed
+            // block it dropped is removed. Reasoning it sent whole is added.
+            let streamed = thinkingSteps.values.sorted()
+            var unmatched = streamed
+            var kept = Set<Int>()
             for block in message.blocks {
                 guard case .thinking(let text, _, _, _) = block.content else { continue }
-                let index = thinkingSteps[block.id] ?? unmatched.first
+                let index = thinkingSteps[block.id].flatMap { unmatched.contains($0) ? $0 : nil } ?? unmatched.first
                 if let index, steps.indices.contains(index) {
                     unmatched.removeAll { $0 == index }
-                    if let text, !text.isEmpty { steps[index].text = Self.bounded(text) }
+                    kept.insert(index)
+                    steps[index].text = Self.bounded(text ?? "")
                 } else {
                     var step = AgentRunStep(kind: .thinking, status: .finished)
                     step.text = Self.bounded(text ?? "")
@@ -157,6 +161,9 @@ public struct AgentRunTrace: Sendable, Equatable {
                 }
             }
             finishThinking()
+            for index in streamed.filter({ !kept.contains($0) }).sorted(by: >) where steps.indices.contains(index) {
+                steps.remove(at: index)
+            }
         case .failed:
             finishThinking()
         }

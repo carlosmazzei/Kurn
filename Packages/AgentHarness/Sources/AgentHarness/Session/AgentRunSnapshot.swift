@@ -1,7 +1,7 @@
 import Foundation
 
-/// What an observer shows of a run, reduced from its events (NH05): the streamed text (the final
-/// text once the run finishes), its trace, its phase projection, the tool calls finished so far
+/// What an observer shows of a run, reduced from its events (NH05): the streamed text of the turn
+/// being written (narration beside tool calls moves to the trace; the final text once the run finishes), its trace, its phase projection, the tool calls finished so far
 /// and its outcome. A presentation snapshot, never a canonical record: canonical writes go
 /// through the harness's awaited message and usage sinks, never through observation.
 public struct AgentRunSnapshot: Sendable, Equatable {
@@ -56,6 +56,7 @@ public struct AgentRunSnapshot: Sendable, Equatable {
             if message.toolCalls.isEmpty, !message.text.isEmpty, Self.answers(message.stopReason) {
                 exchanges[exchanges.count - 1].text = message.text
             } else if !message.toolCalls.isEmpty {
+                text = ""
                 exchanges[exchanges.count - 1].text = ""
             }
         case .toolFinished(let callID, let name, _, let isError):

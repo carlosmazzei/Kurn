@@ -78,7 +78,7 @@ private struct ChatThinkingRow: View {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkle")
                         .font(.caption)
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.textSecondary)
                         .symbolEffect(.pulse, isActive: isRunning && !reduceMotion)
                         .accessibilityHidden(true)
                     Text(label)
@@ -101,7 +101,7 @@ private struct ChatThinkingRow: View {
                 // While it streams, only the newest lines; expanded, all of it.
                 Text(text)
                     .font(Theme.footnote.italic())
-                    .foregroundStyle(Theme.textTertiary)
+                    .foregroundStyle(Theme.textSecondary)
                     .lineLimit(isRunning ? 4 : nil)
                     .truncationMode(.head)
                     .textSelection(.enabled)

@@ -21,7 +21,7 @@ struct ChatRunStatusLine: View {
         HStack(spacing: 6) {
             Image(systemName: "sparkle")
                 .font(.caption)
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(Theme.textSecondary)
                 .symbolEffect(.pulse, isActive: !reduceMotion)
                 .accessibilityHidden(true)
             Text(activity)
