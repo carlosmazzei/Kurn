@@ -1312,6 +1312,10 @@
 "chat.branch.position" = "%1$d de %2$d";
 "chat.branch.label_value" = "Etiqueta: %@";
 "chat.branch.fork" = "Bifurcar desde aquí";
+"chat.branch.regenerate" = "Regenerar respuesta";
+"chat.branch.edit" = "Editar pregunta";
+"chat.branch.editing" = "Editando pregunta";
+"chat.history.search" = "Buscar conversaciones";
 "chat.branch.label" = "Etiqueta";
 "chat.branch.label_placeholder" = "Etiqueta (vacía la quita)";
 "chat.branch.duplicate" = "Duplicar conversación";

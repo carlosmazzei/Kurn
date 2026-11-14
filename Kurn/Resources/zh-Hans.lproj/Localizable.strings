@@ -1312,6 +1312,10 @@
 "chat.branch.position" = "第 %1$d 个，共 %2$d 个";
 "chat.branch.label_value" = "标签：%@";
 "chat.branch.fork" = "从此处分叉";
+"chat.branch.regenerate" = "重新生成回答";
+"chat.branch.edit" = "编辑问题";
+"chat.branch.editing" = "正在编辑问题";
+"chat.history.search" = "搜索对话";
 "chat.branch.label" = "标签";
 "chat.branch.label_placeholder" = "标签（留空则移除）";
 "chat.branch.duplicate" = "复制对话";

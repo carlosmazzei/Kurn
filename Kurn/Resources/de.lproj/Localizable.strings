@@ -1312,6 +1312,10 @@
 "chat.branch.position" = "%1$d von %2$d";
 "chat.branch.label_value" = "Markierung: %@";
 "chat.branch.fork" = "Ab hier abzweigen";
+"chat.branch.regenerate" = "Antwort neu generieren";
+"chat.branch.edit" = "Frage bearbeiten";
+"chat.branch.editing" = "Frage wird bearbeitet";
+"chat.history.search" = "Unterhaltungen durchsuchen";
 "chat.branch.label" = "Markierung";
 "chat.branch.label_placeholder" = "Markierung (leer entfernt sie)";
 "chat.branch.duplicate" = "Unterhaltung duplizieren";

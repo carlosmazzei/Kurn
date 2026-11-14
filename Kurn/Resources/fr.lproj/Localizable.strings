@@ -1312,6 +1312,10 @@
 "chat.branch.position" = "%1$d sur %2$d";
 "chat.branch.label_value" = "Libellé : %@";
 "chat.branch.fork" = "Dupliquer à partir d’ici";
+"chat.branch.regenerate" = "Régénérer la réponse";
+"chat.branch.edit" = "Modifier la question";
+"chat.branch.editing" = "Modification de la question";
+"chat.history.search" = "Rechercher des conversations";
 "chat.branch.label" = "Libellé";
 "chat.branch.label_placeholder" = "Libellé (vide pour le retirer)";
 "chat.branch.duplicate" = "Dupliquer la conversation";

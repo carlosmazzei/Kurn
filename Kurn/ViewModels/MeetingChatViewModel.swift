@@ -112,6 +112,8 @@ final class MeetingChatViewModel {
     var replyWasStopped = false
     /// The saved conversation's tree as the chat shows it (NH09).
     var branches = ChatBranchPresentation()
+    /// The saved question being edited in the composer; sending asks it again in its place.
+    var editingQuestionID: UUID?
 
     /// Tests pass a scripted `AgentModel` through `agentModelFactory`.
     init(agentModelFactory: @escaping HarnessChatService.ModelFactory = {
@@ -415,6 +417,7 @@ final class MeetingChatViewModel {
     func reset() {
         // A draft that could not be saved stays in the composer of the new conversation.
         let kept = saveDraft() ? "" : draft
+        editingQuestionID = nil
         cancel()
         // Fences the cancelled run: it can no longer touch what is shown from here on.
         generation = UUID()
@@ -473,6 +476,7 @@ final class MeetingChatViewModel {
         // Text typed in a new conversation, or a draft that could not be saved, goes along.
         let saved = saveDraft()
         let carried = self.session == nil || !saved ? draft : ""
+        editingQuestionID = nil
         cancel()
         generation = UUID()
         do {
