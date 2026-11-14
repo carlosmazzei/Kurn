@@ -37,6 +37,9 @@ final class MeetingChatViewModel {
     private(set) var runProgress = AgentRunProgress()
     /// When the current run started, for the live status line's elapsed time; nil while idle.
     private(set) var runStartedAt: Date?
+    /// The context the provider last reported for this conversation, kept between runs (a new run
+    /// knows none until its first response) until the next report; nil after a reset or a load.
+    private(set) var lastContextTokens: Int?
     private(set) var scopeEditor = ChatSourceScopeEditor()
     var scope: ChatSourceScope { scopeEditor.scope }
     private(set) var artifacts: [ChatDocumentArtifact] = []
@@ -111,7 +114,11 @@ final class MeetingChatViewModel {
     var branches = ChatBranchPresentation()
 
     /// Tests pass a scripted `AgentModel` through `agentModelFactory`.
-    init(agentModelFactory: @escaping HarnessChatService.ModelFactory = { try ProviderFactory.agentModel(for: $0, model: $1) },
+    init(agentModelFactory: @escaping HarnessChatService.ModelFactory = {
+            provider, model in
+            try ProviderFactory.agentModel(for: provider, model: model,
+                                           reasoning: { ChatReasoningPreference.level(for: provider, model: model) })
+         },
          harnessService: HarnessChatService = HarnessChatService(),
          makeBackgroundWindow: @escaping @MainActor () -> any BackgroundExecutionWindow = { BackgroundActivity() }) {
         self.agentModelFactory = agentModelFactory
@@ -420,6 +427,7 @@ final class MeetingChatViewModel {
         replyWasStopped = false
         interruptedResume = nil
         runProgress = AgentRunProgress()
+        lastContextTokens = nil
         conversationID = UUID()
         artifacts = []
         workspace = ChatDocumentWorkspace()
@@ -484,6 +492,7 @@ final class MeetingChatViewModel {
             interruptedQuestionIDs = recovered.interrupted
             replyWasStopped = false
             runProgress = AgentRunProgress()
+            lastContextTokens = nil
             interruptedResume = modelContext.flatMap { context in
                 ChatRunRecovery.resumableInterruptedRun(in: recovered.turns, session: session, context: context)
             }.flatMap { runID in recovered.turns.last.map { InterruptedResume(question: $0.text, runID: runID) } }
@@ -571,6 +580,7 @@ final class MeetingChatViewModel {
                 if self.generation == generation {
                     runProgress = view.progress
                     phase = phase.following(runProgress)
+                    if let tokens = runProgress.contextTokens { lastContextTokens = tokens }
                 }
                 timeline = view.trace
                 turns[index].steps = timeline.steps

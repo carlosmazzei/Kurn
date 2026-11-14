@@ -179,6 +179,11 @@ the opaque replay metadata (Gemini thought signatures, response IDs), and droppi
 cannot accept only in the copy. A turn that disallows tools sends `tool_choice: none` (Gemini: mode
 `NONE`), and calls returned anyway are dropped.
 
+A host's `AgentReasoningLevel` (`requestProjection(reasoning:)`) is mapped per vendor: Responses
+`reasoning.effort` with `summary: auto`, Chat Completions `reasoning_effort`, Anthropic `thinking` and
+Gemini `thinkingConfig` (`includeThoughts`) with a token budget kept below the output limit. Summary
+requests never carry it.
+
 ## Diagnostics and privacy
 
 `AgentDiagnostic` carries only a fixed event and metric vocabulary, counts and opaque correlation IDs

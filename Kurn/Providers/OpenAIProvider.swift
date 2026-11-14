@@ -25,6 +25,8 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
     /// the model differs per vendor (OpenAI `whisper-1`, Groq `whisper-large-v3`).
     private let transcriptionModel: String
     private let largeTransferPolicy: LargeTransferPolicy
+    /// The chat's chosen reasoning level for agent turns (`ChatReasoningPreference`); nil keeps the default.
+    var reasoning: AgentReasoningLevel?
 
     init(
         provider: AIProvider = .openAI,
@@ -448,7 +450,8 @@ extension OpenAIProvider: AgentModel {
             let reasoningEffort = Self.agentReasoningEffort(provider: provider, model: chatModel)
             let official = usesResponses
             let format: AgentWireFormat = official ? .openAIResponses : .openAI
-            let projection = format.requestProjection(request, model: chatModel, reasoningEffort: reasoningEffort)
+            let projection = format.requestProjection(request, model: chatModel, reasoningEffort: reasoningEffort,
+                                                      reasoning: reasoning)
             if projection.adjustment.hasChanges { onEvent(.replayAdjusted(projection.adjustment)) }
             var httpRequest = try LLMHTTP.jsonRequest(provider: provider, path: official ? "responses" : "chat/completions",
                 timeout: LLMHTTP.chatTimeout, headers: ["Authorization": "Bearer \(apiKey)"], body: [:])

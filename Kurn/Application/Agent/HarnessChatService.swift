@@ -13,6 +13,11 @@ struct HarnessChatService {
     var prepareDocumentSession: (@MainActor @Sendable () throws -> Void)?
     var documentOrigin: ChatArtifactOrigin?
     var contextWindows: ModelContextWindowStore = .shared
+    /// The reasoning level the run's model is asked for, recorded with its capabilities; it is the
+    /// same decision the model factory makes (`ChatReasoningPreference`).
+    var reasoningLevel: @Sendable (AIProvider, String, ModelContextWindowStore) -> AgentReasoningLevel? = {
+        ChatReasoningPreference.level(for: $0, model: $1, store: $2)
+    }
     var refreshMetadata: @Sendable (AIProvider, String, ModelContextWindowStore) async throws -> AgentMetadataRefresh = { provider, model, store in
         try await ProviderModelMetadataService(windows: store).refresh(provider: provider, model: model)
     }
@@ -129,7 +134,8 @@ struct HarnessChatService {
         // What the model can do, recorded with the run (NH07, C03): the chat cannot work without tools.
         let capabilities = contextWindows.capabilities(
             for: provider, model: modelIdentifier, api: model.descriptor?.api ?? "unknown",
-            reasoningEffort: OpenAIProvider.agentReasoningEffort(provider: provider, model: modelIdentifier))
+            reasoningEffort: reasoningLevel(provider, modelIdentifier, contextWindows)?.rawValue
+                ?? OpenAIProvider.agentReasoningEffort(provider: provider, model: modelIdentifier))
         if capabilities.tools == .unsupported {
             throw AppError.apiError(statusCode: 0, message: NSLocalizedString("chat.model.tools_unsupported",
                                                                               comment: "Model cannot call tools"))
@@ -172,17 +178,38 @@ struct HarnessChatService {
     /// The chat's system prompt as sections: `instructions` never changes between runs, so it is
     /// a stable prefix; `documents` is the conversation's document index, the one section a
     /// document mutation changes (and the only one the next run records as a patch).
-    static func system(artifacts: [ChatDocumentArtifact]) throws -> AgentSystemPrompt {
+    static func system(artifacts: [ChatDocumentArtifact], now: Date = Date(), timeZone: TimeZone = .current,
+                       locale: Locale = .current) throws -> AgentSystemPrompt {
         let index = try JSONValue.array(artifacts.map {
             .object(["id": .string($0.id.uuidString), "title": .string($0.title), "version": .number(Double($0.version))])
         }).encodedString()
         return try AgentSystemPrompt(sections: [
             .init(name: "instructions", text: instructions),
+            // After the stable instructions, so a new day changes only this section.
+            .init(name: "user_context", text: userContext(now: now, timeZone: timeZone, locale: locale)),
             .init(name: "documents", text: """
                 Existing document metadata (use read_document to inspect contents):
                 \(index)
                 """)
         ])
+    }
+
+    /// Today's date, time zone and locale, so "yesterday" or "last week" resolve against the
+    /// person's calendar rather than a guess. Day precision: the section changes once a day.
+    static func userContext(now: Date, timeZone: TimeZone, locale: Locale) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        calendar.locale = Locale(identifier: "en_US_POSIX")
+        let day = calendar.dateComponents([.year, .month, .day, .weekday], from: now)
+        let weekday = calendar.weekdaySymbols[(day.weekday ?? 1) - 1]
+        let date = String(format: "%04d-%02d-%02d", day.year ?? 0, day.month ?? 0, day.day ?? 0)
+        let offset = timeZone.secondsFromGMT(for: now)
+        let utc = String(format: "UTC%@%02d:%02d", offset < 0 ? "-" : "+", abs(offset) / 3600, abs(offset) % 3600 / 60)
+        return """
+            User context: today is \(weekday), \(date) (time zone \(timeZone.identifier), \(utc); locale \(locale.identifier)).
+            Resolve relative dates such as "today", "last week" or "the last three meetings" against this date and
+            the meetings' own dates.
+            """
     }
 
     static let instructions = """
