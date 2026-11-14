@@ -21,9 +21,9 @@ struct HarnessPresentationState: Codable {
     static let type = "kurn.presentation-state.v1"
     let scope: ChatSourceScope?
     var artifactRevisionIDs: [String]
-    /// For each revision this state introduced, the revision of the same document it replaced
-    /// (the one the state shown before the write held). Undo follows it, wherever on the tree the
-    /// earlier state now sits. Absent from states written before it, and when nothing was replaced.
+    /// For each document revision this state shows, the revision it replaced on this branch: set
+    /// when a write introduces a newer version, carried forward by later states. Undo reads it from
+    /// the shown state. Absent from states written before it, and when nothing was replaced.
     var predecessors: [String: String]?
 
     init(scope: ChatSourceScope?, artifactRevisionIDs: [String], predecessors: [String: String]? = nil) {

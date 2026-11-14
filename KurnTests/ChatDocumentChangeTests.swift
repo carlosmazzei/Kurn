@@ -163,6 +163,38 @@ struct ChatDocumentChangeTests {
         #expect(vm.artifacts.first?.markdown == "A2")
     }
 
+    /// Two branches that reach the same document revision from different earlier versions each
+    /// undo to their own.
+    @Test func aRevisionTwoBranchesReachUndoesToEachBranchsOwnPredecessor() throws {
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let (session, document) = try savedConversation(meeting, in: context)
+        let store = SwiftDataAgentSessionStore(context: context)
+        func write(_ turns: [PersistedChatTurn], _ markdown: String) throws {
+            let shown = try session.harnessSnapshot()
+            let next = try ChatDocumentEdit.update(document.id, title: nil, markdown: markdown).applying(to: shown.artifacts)
+            try store.writePresentation(session, turns: turns, scope: shown.scope, artifacts: next.artifacts)
+        }
+        let earlier = try session.harnessSnapshot().turns
+        let question = turn(.user, "Rewrite it")
+        try store.writePresentation(session, turns: earlier + [question], scope: nil, artifacts: [document])
+        let entryID = try #require(ChatBranchPresentation(tree: store.tree(session)).entryIDs[question.id])
+        // Branch A: v2 "A", then v3 "Same".
+        let answerA = earlier + [question, turn(.assistant, "A")]
+        try write(answerA, "A")
+        try write(answerA, "Same")
+        let branchA = try #require(session.canonicalLeafID)
+        // Branch B, from version 1: v2 "B", then the same v3 "Same", which reuses A's revision.
+        try store.rewind(session, before: entryID, expectedRevision: session.canonicalRevision)
+        let answerB = earlier + [turn(.user, "Rewrite it"), turn(.assistant, "B")]
+        try write(answerB, "B")
+        try write(answerB, "Same")
+        #expect(try store.previousVersion(of: document.id, in: session)?.markdown == "B")
+        try store.navigate(session, to: branchA, expectedRevision: session.canonicalRevision)
+        #expect(try session.harnessSnapshot().artifacts.first?.markdown == "Same")
+        #expect(try store.previousVersion(of: document.id, in: session)?.markdown == "A")
+    }
+
     @Test func undoNeedsAnEarlierVersionAndTheCurrentRevision() throws {
         let context = ModelContext(TestModelContainer.make())
         let meeting = MeetingFixtures.transcribed("Planning", in: context)

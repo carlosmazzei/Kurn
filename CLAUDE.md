@@ -445,12 +445,13 @@ has no final text (the turn's text was narration beside the calls) and it is not
 `ChatChangeConfirmation`, a sheet (`ChatChangeConfirmationSheet`) showing the document, any new title and the
 replacement text, answered only by its own buttons; a stopped run answers no. "Change declined" ends the run
 with the question retryable. A document card offers Undo (`MeetingChatViewModel.undoLastChange`) while no
-reply runs: each presentation state records, for the revisions it introduced, the revision of the same document
-the shown state held (`HarnessPresentationState.predecessors`, absent when nothing was replaced and rebased with
-the revision IDs by copies and imports, which also copy the revisions it names), and
-`SwiftDataAgentSessionStore.undoLastChange` follows that link (`previousVersion(of:in:)`) wherever the state sits
-— a document effect rewrites its question as a sibling, so the earlier state is beside the shown path — never
-inferring it from another branch's version number, and saves the earlier revision again as a new version (`ChatDocumentEdit.restore`), so the change
+reply runs: each presentation state records, for every document revision it shows, the revision that one
+replaced on this branch (`HarnessPresentationState.predecessors`: set when a write introduces a newer version,
+carried forward by later states, absent when nothing was replaced, rebased with the revision IDs by copies and
+imports, which also copy the revisions it names). `SwiftDataAgentSessionStore.undoLastChange` reads the shown
+state's link (`previousVersion(of:in:)`), so a reused revision two branches reached from different versions
+still undoes to its own branch's, and the earlier revision is found even though a document effect rewrites its
+question as a sibling; it saves that revision again as a new version (`ChatDocumentEdit.restore`), so the change
 undone stays saved and can itself be restored.
 `AgentLimits.wrapUpOnLimit` runs one extra turn after a turn/tool-call limit with
 `NativeHarness.wrapUpInstruction` appended and `AgentTurnRequest.allowsToolCalls` false

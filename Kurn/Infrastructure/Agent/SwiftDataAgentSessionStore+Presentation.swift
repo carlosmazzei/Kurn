@@ -99,8 +99,10 @@ extension SwiftDataAgentSessionStore {
         try applyPresentation(target, rows: rows, revisions: revisionRows, leaf: stateEntry.id, cache: cache, effect: record, preserveUpdatedAt: preserveUpdatedAt)
     }
 
-    /// Which revision each newer document version replaces: the one the shown state (the last on
-    /// `path`) held for the same document, when it held an older version.
+    /// For each document this state shows, the revision its current one replaced on this branch:
+    /// for a newer version, the one the shown state (the last on `path`) held; for an unchanged one,
+    /// the link the shown state carried. Carrying it forward keeps it per branch even when two
+    /// branches reach the same reused revision from different predecessors.
     private static func predecessors(of revisionIDs: [String], artifacts: [ChatDocumentArtifact], replacing path: [AgentSessionEntry],
                                      in target: ChatSession) throws -> [String: String] {
         guard let shown = try path.last(where: { $0.kind == HarnessPresentationState.type }).flatMap(HarnessPresentationState.decoded) else {
@@ -108,11 +110,14 @@ extension SwiftDataAgentSessionStore {
         }
         let rows = Dictionary(target.harnessRevisions.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var result: [String: String] = [:]
-        for (artifact, id) in zip(artifacts, revisionIDs) where !shown.artifactRevisionIDs.contains(id) {
-            guard let previous = shown.artifactRevisionIDs.first(where: {
+        for (artifact, id) in zip(artifacts, revisionIDs) {
+            if shown.artifactRevisionIDs.contains(id) {
+                if let carried = shown.predecessors?[id] { result[id] = carried }
+            } else if let previous = shown.artifactRevisionIDs.first(where: {
                 rows[$0]?.artifactID == artifact.id && (rows[$0]?.version ?? .max) < artifact.version
-            }) else { continue }
-            result[id] = previous
+            }) {
+                result[id] = previous
+            }
         }
         return result
     }
