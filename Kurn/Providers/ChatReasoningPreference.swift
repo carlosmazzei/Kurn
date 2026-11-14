@@ -39,8 +39,11 @@ enum ChatReasoningPreference {
         }
     }
 
-    static func capabilities(provider: AIProvider, model: String, now: Date = Date()) -> AgentModelCapabilities {
-        ModelCapabilityCatalog.resolve(api: api(for: provider), model: model, now: now)
+    /// The catalog's facts, overridden by what the provider recently reported (Gemini's `thinking`,
+    /// for one) — the same snapshot the run records.
+    static func capabilities(provider: AIProvider, model: String,
+                             store: ModelContextWindowStore = .shared) -> AgentModelCapabilities {
+        store.capabilities(for: provider, model: model, api: api(for: provider), reasoningEffort: nil)
     }
 
     /// What a request carries: the chosen level when the model can take it, otherwise nil.
@@ -49,8 +52,10 @@ enum ChatReasoningPreference {
         return chosen
     }
 
-    /// The level for the stored choice and this provider and model.
-    static func level(for provider: AIProvider, model: String, defaults: UserDefaults = .standard) -> AgentReasoningLevel? {
-        level(stored(defaults), provider: provider, capabilities: capabilities(provider: provider, model: model))
+    /// The level for the stored choice and this provider and model. The model factory asks for it
+    /// per request, so it sees metadata the run refreshed before its first request.
+    static func level(for provider: AIProvider, model: String, defaults: UserDefaults = .standard,
+                      store: ModelContextWindowStore = .shared) -> AgentReasoningLevel? {
+        level(stored(defaults), provider: provider, capabilities: capabilities(provider: provider, model: model, store: store))
     }
 }

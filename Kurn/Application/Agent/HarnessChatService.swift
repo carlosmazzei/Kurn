@@ -15,7 +15,9 @@ struct HarnessChatService {
     var contextWindows: ModelContextWindowStore = .shared
     /// The reasoning level the run's model is asked for, recorded with its capabilities; it is the
     /// same decision the model factory makes (`ChatReasoningPreference`).
-    var reasoningLevel: @Sendable (AIProvider, String) -> AgentReasoningLevel? = { ChatReasoningPreference.level(for: $0, model: $1) }
+    var reasoningLevel: @Sendable (AIProvider, String, ModelContextWindowStore) -> AgentReasoningLevel? = {
+        ChatReasoningPreference.level(for: $0, model: $1, store: $2)
+    }
     var refreshMetadata: @Sendable (AIProvider, String, ModelContextWindowStore) async throws -> AgentMetadataRefresh = { provider, model, store in
         try await ProviderModelMetadataService(windows: store).refresh(provider: provider, model: model)
     }
@@ -132,7 +134,7 @@ struct HarnessChatService {
         // What the model can do, recorded with the run (NH07, C03): the chat cannot work without tools.
         let capabilities = contextWindows.capabilities(
             for: provider, model: modelIdentifier, api: model.descriptor?.api ?? "unknown",
-            reasoningEffort: reasoningLevel(provider, modelIdentifier)?.rawValue
+            reasoningEffort: reasoningLevel(provider, modelIdentifier, contextWindows)?.rawValue
                 ?? OpenAIProvider.agentReasoningEffort(provider: provider, model: modelIdentifier))
         if capabilities.tools == .unsupported {
             throw AppError.apiError(statusCode: 0, message: NSLocalizedString("chat.model.tools_unsupported",

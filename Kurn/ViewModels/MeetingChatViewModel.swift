@@ -115,7 +115,9 @@ final class MeetingChatViewModel {
 
     /// Tests pass a scripted `AgentModel` through `agentModelFactory`.
     init(agentModelFactory: @escaping HarnessChatService.ModelFactory = {
-            try ProviderFactory.agentModel(for: $0, model: $1, reasoning: ChatReasoningPreference.level(for: $0, model: $1))
+            provider, model in
+            try ProviderFactory.agentModel(for: provider, model: model,
+                                           reasoning: { ChatReasoningPreference.level(for: provider, model: model) })
          },
          harnessService: HarnessChatService = HarnessChatService(),
          makeBackgroundWindow: @escaping @MainActor () -> any BackgroundExecutionWindow = { BackgroundActivity() }) {
