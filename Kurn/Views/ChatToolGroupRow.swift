@@ -42,8 +42,7 @@ struct ChatToolGroupRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityHint(NSLocalizedString("chat.activity.group.hint", comment: "Shows each call of the group"))
-            if !expanded, let result = ChatActivityPresentation.groupResult(steps, meetingTitles: meetingTitles,
-                                                                           documentTitles: documentTitles) {
+            if !expanded, let result = collapsedResult() {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(verbatim: "⎿")
                         .foregroundStyle(Theme.textTertiary)
@@ -66,5 +65,10 @@ struct ChatToolGroupRow: View {
             }
         }
         .accessibilityIdentifier("chat.activity.tool_group")
+    }
+
+    private func collapsedResult() -> String? {
+        ChatActivityPresentation.groupResultLine(steps, failed: NSLocalizedString("chat.step.failed", comment: "Tool failed"),
+                                                 meetingTitles: meetingTitles, documentTitles: documentTitles)
     }
 }

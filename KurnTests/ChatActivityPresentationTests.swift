@@ -105,6 +105,15 @@ struct ChatActivityPresentationTests {
         #expect(ChatActivityPresentation.groupStatus([read(first), step(.tool, .failed)]) == .failed)
         #expect(ChatActivityPresentation.groupStatus([step(.tool, .failed), step(.tool, .running)]) == .running)
         #expect(ChatActivityPresentation.groupStatus(reads) == .finished)
+
+        // A failure is said in words on the collapsed line, not by colour alone.
+        let failing = [read(first), step(.tool, .failed) { $0.toolName = "read_transcript" }]
+        #expect(ChatActivityPresentation.groupResultLine(failing, failed: "Failed", meetingTitles: titles, documentTitles: [:])
+                == "Failed · Budget")
+        #expect(ChatActivityPresentation.groupResultLine(unknown.map { var s = $0; s.status = .failed; return s }, failed: "Failed",
+                                                         meetingTitles: [:], documentTitles: [:]) == "Failed")
+        #expect(ChatActivityPresentation.groupResultLine(reads, failed: "Failed", meetingTitles: titles, documentTitles: [:])
+                == "Budget, Kickoff, +1")
     }
 
     @Test func aFinishedRunFoldsIntoOneSummaryLine() {

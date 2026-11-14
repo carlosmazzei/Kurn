@@ -125,6 +125,15 @@ struct ChatActivityPresentation: Equatable {
         return names.count > 2 ? "\(shown), +\(names.count - 2)" : shown
     }
 
+    /// The group's collapsed `⎿` line: what it touched, with a failure said in words ahead of it,
+    /// never by colour alone.
+    static func groupResultLine(_ steps: [AgentRunStep], failed: String, meetingTitles: [UUID: String],
+                                documentTitles: [UUID: String]) -> String? {
+        let names = groupResult(steps, meetingTitles: meetingTitles, documentTitles: documentTitles)
+        guard groupStatus(steps) == .failed else { return names }
+        return names.map { "\(failed) · \($0)" } ?? failed
+    }
+
     /// A group is running while any call runs, failed when any failed, otherwise finished.
     static func groupStatus(_ steps: [AgentRunStep]) -> AgentRunStep.Status {
         if steps.contains(where: { $0.status == .running }) { return .running }
