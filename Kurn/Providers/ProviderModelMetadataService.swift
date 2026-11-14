@@ -13,7 +13,10 @@ struct ProviderModelMetadataService: Sendable {
         try Task.checkCancellation()
         let host = URLComponents(string: provider.baseURLString)?.host?.lowercased()
         guard !model.isEmpty, ![.appleOnDevice, .elevenLabs].contains(provider.kind) else { return .unsupported }
-        if !force && windows.hasFreshCompleteLimits(for: provider, model: model) { return .cacheFresh }
+        // Detail routes also report capabilities, so cached limits alone are not a fresh answer there.
+        let reportsCapabilities = [.anthropic, .googleGemini].contains(provider.kind)
+        if !force && windows.hasFreshCompleteLimits(for: provider, model: model)
+            && (!reportsCapabilities || windows.capabilitiesAreFresh(for: provider, model: model)) { return .cacheFresh }
         guard !(provider.kind == .openAICompatible && host == "api.openai.com") else { return .unsupported }
         let key = apiKey ?? KeychainManager.shared.value(for: provider.keychainAccount) ?? ""
         guard !key.isEmpty else { return .unavailable }

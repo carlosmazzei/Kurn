@@ -67,6 +67,21 @@ import Testing
             .canonicalModelID == nil)
     }
 
+    @Test func aPartialReportRenewsOnlyTheFactItCarries() {
+        let old = now.addingTimeInterval(-ModelContextWindows.metadataLifetime - 60)
+        let first = AgentReportedCapabilities(canonicalModelID: "gemini-2.5-pro", reasoning: true, fetchedAt: old)
+        let merged = first.merging(AgentReportedCapabilities(canonicalModelID: "gemini-2.5-pro", fetchedAt: now))
+        #expect(merged.reasoning == true && merged.reasoningFetchedAt == old)
+        #expect(merged.canonicalFetchedAt == now && merged.fetchedAt == now)
+        // The stale reasoning report no longer counts; the alias, renewed, still does.
+        let value = ModelCapabilityCatalog.resolve(api: "gemini", model: "alias", reported: merged, now: now)
+        #expect(value.canonicalModelID == "gemini-2.5-pro" && value.source == .catalog && value.reasoning == .supported)
+        let unsupported = AgentReportedCapabilities(canonicalModelID: "gemini-2.5-pro", reasoning: false, fetchedAt: old)
+            .merging(AgentReportedCapabilities(canonicalModelID: "gemini-2.5-pro", fetchedAt: now))
+        #expect(ModelCapabilityCatalog.resolve(api: "gemini", model: "alias", reported: unsupported, now: now).reasoning == .supported)
+        #expect(AgentReportedCapabilities(fetchedAt: now).canonicalFetchedAt == nil)
+    }
+
     @Test func aSnapshotFromALaterVersionStillReads() throws {
         let json = #"{"version":3,"api":"gemini","modelID":"m","tools":"partial","reasoning":"supported","promptCache":"tiered","future":1}"#
         let value = try JSONDecoder().decode(AgentModelCapabilities.self, from: Data(json.utf8))

@@ -71,19 +71,23 @@ final class ModelContextWindowStore: @unchecked Sendable {
     }
 
     /// Capability facts the provider's model metadata reported (an alias's canonical ID, Gemini's
-    /// `thinking`), kept apart from capacity under the same endpoint/model key. A newer report
-    /// replaces only the facts it carries.
+    /// `thinking`), kept apart from capacity under the same endpoint/model key. A report replaces only
+    /// the facts it carries, each keeping its own age; even an empty one records that the provider was
+    /// asked, so a fresh check is not repeated (`capabilitiesAreFresh`).
     func recordCapabilities(_ reported: AgentReportedCapabilities, provider: AIProvider, model: String) {
-        guard !model.isEmpty, !reported.isEmpty else { return }
+        guard !model.isEmpty else { return }
         lock.withLock {
             var all = storedCapabilities()
             let key = Self.entryKey(provider: provider, model: model)
-            let previous = all[key]
-            all[key] = AgentReportedCapabilities(canonicalModelID: reported.canonicalModelID ?? previous?.canonicalModelID,
-                                                 reasoning: reported.reasoning ?? previous?.reasoning,
-                                                 fetchedAt: reported.fetchedAt)
+            all[key] = all[key]?.merging(reported) ?? reported
             if let data = try? JSONEncoder().encode(all) { defaults.set(data, forKey: Self.capabilitiesKey) }
         }
+    }
+
+    /// Whether the provider was asked about this model's capabilities within the metadata lifetime.
+    func capabilitiesAreFresh(for provider: AIProvider, model: String) -> Bool {
+        guard let value = reportedCapabilities(for: provider, model: model) else { return false }
+        return ModelContextWindows.isFresh(value.fetchedAt, now: now())
     }
 
     func reportedCapabilities(for provider: AIProvider, model: String) -> AgentReportedCapabilities? {

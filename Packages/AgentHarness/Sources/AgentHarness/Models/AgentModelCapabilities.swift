@@ -79,19 +79,35 @@ public struct AgentModelCapabilities: Codable, Sendable, Equatable {
 }
 
 /// Capability facts the provider's own model metadata reported (today Gemini's `thinking`), and the
-/// canonical ID it resolved an alias to. Each is optional and independent; none is inferred.
+/// canonical ID it resolved an alias to. Each is optional and independent, with its own receipt time,
+/// so a later response that omits a fact neither erases it nor renews its age. `fetchedAt` is when the
+/// provider was last asked, whatever it reported. Nothing is inferred.
 public struct AgentReportedCapabilities: Codable, Sendable, Equatable {
     public let canonicalModelID: String?
     public let reasoning: Bool?
     public let fetchedAt: Date
+    public let canonicalFetchedAt: Date?
+    public let reasoningFetchedAt: Date?
 
-    public init(canonicalModelID: String? = nil, reasoning: Bool? = nil, fetchedAt: Date = Date()) {
+    public init(canonicalModelID: String? = nil, reasoning: Bool? = nil, fetchedAt: Date = Date(),
+                canonicalFetchedAt: Date? = nil, reasoningFetchedAt: Date? = nil) {
         self.canonicalModelID = canonicalModelID
         self.reasoning = reasoning
         self.fetchedAt = fetchedAt
+        self.canonicalFetchedAt = canonicalModelID == nil ? nil : canonicalFetchedAt ?? fetchedAt
+        self.reasoningFetchedAt = reasoning == nil ? nil : reasoningFetchedAt ?? fetchedAt
     }
 
     public var isEmpty: Bool { canonicalModelID == nil && reasoning == nil }
+
+    /// `next` replaces only the facts it carries; the rest keep their value and their own age.
+    public func merging(_ next: AgentReportedCapabilities) -> AgentReportedCapabilities {
+        AgentReportedCapabilities(
+            canonicalModelID: next.canonicalModelID ?? canonicalModelID, reasoning: next.reasoning ?? reasoning,
+            fetchedAt: max(fetchedAt, next.fetchedAt),
+            canonicalFetchedAt: next.canonicalModelID != nil ? next.canonicalFetchedAt : canonicalFetchedAt,
+            reasoningFetchedAt: next.reasoning != nil ? next.reasoningFetchedAt : reasoningFetchedAt)
+    }
 }
 
 /// Bundled capability facts, reviewed against the vendors' model documentation on 2026-11-14.
@@ -110,13 +126,18 @@ public enum ModelCapabilityCatalog {
     /// fact, but only while its metadata is fresh; `reasoningEffort` is what the adapter will send.
     public static func resolve(api: String, model: String, reported: AgentReportedCapabilities? = nil,
                                reasoningEffort: String? = nil, now: Date = Date()) -> AgentModelCapabilities {
-        let fresh = reported.flatMap { ModelContextWindows.isFresh($0.fetchedAt, now: now) ? $0 : nil }
-        let canonical = fresh?.canonicalModelID
+        // Each fact counts only while its own report is fresh.
+        let canonical = reported.flatMap { value in
+            value.canonicalFetchedAt.map { ModelContextWindows.isFresh($0, now: now) } == true ? value.canonicalModelID : nil
+        }
+        let reportedReasoning = reported.flatMap { value in
+            value.reasoningFetchedAt.map { ModelContextWindows.isFresh($0, now: now) } == true ? value.reasoning : nil
+        }
         // A qualified alias mapping lets the canonical model's facts apply to the alias.
         let match = facts(for: canonical ?? model) ?? (canonical == nil ? nil : facts(for: model))
         var reasoning = match?.facts.reasoning ?? .unknown
         var source = match?.source ?? .unknown
-        if let reported = fresh?.reasoning {
+        if let reported = reportedReasoning {
             reasoning = reported ? .supported : .unsupported
             source = .api
         }

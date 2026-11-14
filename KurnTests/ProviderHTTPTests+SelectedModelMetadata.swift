@@ -28,6 +28,25 @@ extension ProviderHTTPTests {
         #expect(!windows.resolution(for: .anthropic, model: "claude-alias", metadataRefresh: .fetched).isCached)
     }
 
+    @Test func cachedLimitsWithoutACapabilityCheckStillAskTheDetailRoute() async throws {
+        let suite = "ProviderHTTPTests.capabilityCheck.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let windows = ModelContextWindowStore(defaults: defaults)
+        windows.recordLimits(["claude-alias": AgentModelLimits(contextWindowTokens: 96_000, maxOutputTokens: 8_192)],
+                             provider: .anthropic)
+        #expect(windows.hasFreshCompleteLimits(for: .anthropic, model: "claude-alias"))
+        MockURLProtocol.enqueue([MockURLProtocol.json(["id": "claude-alias", "max_input_tokens": 96_000, "max_tokens": 8_192])])
+        let service = ProviderModelMetadataService(session: MockURLProtocol.session(), apiKey: "secret",
+                                                   windows: windows, coordinator: ProviderMetadataCoordinator())
+        #expect(try await service.refresh(provider: .anthropic, model: "claude-alias") == .fetched)
+        #expect(MockURLProtocol.capturedRequests.count == 1)
+        // No alias to report, but the check is recorded and not repeated while fresh.
+        #expect(windows.reportedCapabilities(for: .anthropic, model: "claude-alias")?.canonicalModelID == nil)
+        #expect(try await service.refresh(provider: .anthropic, model: "claude-alias") == .cacheFresh)
+        #expect(MockURLProtocol.capturedRequests.count == 1)
+    }
+
     @Test func selectedGoogleAliasPreservesVersionAndUsesHeaderAuthentication() async throws {
         let suite = "ProviderHTTPTests.selectedGoogle.\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: suite))

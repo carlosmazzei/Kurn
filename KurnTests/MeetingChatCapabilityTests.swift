@@ -72,13 +72,24 @@ struct MeetingChatCapabilityTests {
         let value = windows.capabilities(for: .google, model: "gemini-alias", api: "gemini", reasoningEffort: nil)
         #expect(value.canonicalModelID == "gemini-2.5-flash" && value.tools == .supported)
         #expect(value.reasoning == .unsupported && value.source == .api)
-        // An empty report is not stored, and another endpoint's model knows nothing.
+        // An empty report holds no fact but records that the provider was asked.
+        #expect(!windows.capabilitiesAreFresh(for: .google, model: "other"))
         windows.recordCapabilities(AgentReportedCapabilities(fetchedAt: now), provider: .google, model: "other")
-        #expect(windows.reportedCapabilities(for: .google, model: "other") == nil)
+        #expect(windows.reportedCapabilities(for: .google, model: "other")?.isEmpty == true)
+        #expect(windows.capabilitiesAreFresh(for: .google, model: "other"))
 
-        let later = ModelContextWindowStore(defaults: defaults, now: { now.addingTimeInterval(2 * ModelContextWindows.metadataLifetime) })
+        let lifetime = ModelContextWindows.metadataLifetime
+        let later = ModelContextWindowStore(defaults: defaults, now: { now.addingTimeInterval(2 * lifetime) })
         let expired = later.capabilities(for: .google, model: "gemini-alias", api: "gemini", reasoningEffort: nil)
         #expect(expired.canonicalModelID == nil && expired.tools == .unknown)
+        #expect(!later.capabilitiesAreFresh(for: .google, model: "gemini-alias"))
+
+        // A later report of one fact renews only that fact: the alias stays expired.
+        later.recordCapabilities(AgentReportedCapabilities(reasoning: true, fetchedAt: now.addingTimeInterval(2 * lifetime)),
+                                 provider: .google, model: "gemini-alias")
+        let partial = later.capabilities(for: .google, model: "gemini-alias", api: "gemini", reasoningEffort: nil)
+        #expect(partial.canonicalModelID == nil && partial.reasoning == .supported && partial.source == .api)
+        #expect(later.capabilitiesAreFresh(for: .google, model: "gemini-alias"))
     }
 
     @Test func capabilityLinesNameEveryFact() {
