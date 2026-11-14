@@ -390,12 +390,16 @@ sent with each segment, and `CorrectionFaithfulness` rejecting corrections
 that introduce unspoken words — move WER where the frequency-list corrector
 did not? Two dispatches with identical inputs, one per corrector, each with
 `correction: on`, so every configuration has an uncorrected row and a
-corrected twin scored on the same transcription.
+corrected twin. The twin is a separate matrix entry that transcribes the
+same input again (`PipelineEvaluationMatrix`), not a correction applied to
+the uncorrected row's transcript.
 
 **Why the cross-run comparison holds:** the uncorrected rows are identical to
 the hundredth in both runs (every language and corpus, all four
-configurations, WER and DER), so ASR, diarization and scoring were
-deterministic and the two runs differ only in the corrector. The corrected
+configurations, WER and DER). That is strong evidence, not proof at full
+precision, that ASR, diarization and scoring were deterministic, so the twin
+re-transcribed what its uncorrected row did and the two runs differ only in
+the corrector. The corrected
 rows are not deterministic — they depend on LLM replies, whose run-to-run
 spread was **not** measured here — so differences of ~0.5pp between the two
 correctors are within what a second dispatch could move.
