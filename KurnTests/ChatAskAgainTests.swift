@@ -58,11 +58,11 @@ struct ChatAskAgainTests {
         await vm.waitUntilSettled()
         let question = try #require(vm.turns.first)
         vm.beginEditing(question.id)
+        // A question that is not taken leaves the edit where it was, to try again.
+        #expect(!vm.askAgain(question.id, text: "  ", provider: .openAI, model: "gpt-4o"))
+        #expect(vm.editingQuestionID == question.id && vm.draft == "When?" && vm.turns.count == 2)
         vm.cancelEditing()
         #expect(vm.editingQuestionID == nil && vm.draft.isEmpty)
-        // Blank text asks nothing.
-        vm.askAgain(question.id, text: "  ", provider: .openAI, model: "gpt-4o")
-        #expect(vm.turns.count == 2)
     }
 
     @Test func aRewindChecksItsRevisionAndItsQuestion() throws {

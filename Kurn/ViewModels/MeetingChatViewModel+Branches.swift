@@ -58,20 +58,25 @@ extension MeetingChatViewModel {
     /// Asks the saved question `turnID` again in its place: the conversation goes back to just
     /// before it, with the sources and documents it was asked with, and `text` is sent as another
     /// version beside it ("‹ n of m ›"). The earlier version and everything after it stay on their
-    /// branch. Regenerating passes the question's own text; editing passes the new text.
-    func askAgain(_ turnID: UUID, text: String, provider: AIProvider, model: String) {
+    /// branch. Regenerating passes the question's own text; editing passes the new text. Returns
+    /// whether the question was taken; when it was not, an edit stays in the composer to try again.
+    @discardableResult
+    func askAgain(_ turnID: UUID, text: String, provider: AIProvider, model: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, canChangeBranch, let session = artifactSession, let context = session.modelContext,
-              let entryID = branches.entryIDs[turnID], turns.contains(where: { $0.id == turnID && $0.role == .user }) else { return }
-        editingQuestionID = nil
+              let entryID = branches.entryIDs[turnID], turns.contains(where: { $0.id == turnID && $0.role == .user }) else { return false }
         do {
             try SwiftDataAgentSessionStore(context: context).rewind(session, before: entryID, expectedRevision: session.canonicalRevision)
         } catch {
             branchFailed()
-            return
+            return false
         }
+        // Loading the rewound conversation resets per-answer choices; the next answer keeps them.
+        let compactFirst = compactsNextAnswer
         load(session: session)
+        compactsNextAnswer = compactFirst
         send(question: trimmed, provider: provider, model: model)
+        return true
     }
 
     /// Puts the saved question `turnID` in the composer to edit; sending it asks it again in its

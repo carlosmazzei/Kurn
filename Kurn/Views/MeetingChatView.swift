@@ -555,8 +555,13 @@ struct MeetingChatConversationView: View {
 
     private func send() {
         sentQuestion = true
-        sendQuestion(input)
-        input = ""
+        // A question being edited is asked again in its place; if that fails, the edit stays.
+        if let editing = vm.editingQuestionID {
+            if askAgain(editing, text: input) { input = "" }
+        } else {
+            sendQuestion(input)
+            input = ""
+        }
         dismissKeyboard()
     }
 
@@ -582,15 +587,14 @@ struct MeetingChatConversationView: View {
 
     private func sendQuestion(_ question: String) {
         guard canChat, sourceValidation == nil else { return }
-        // A question being edited is asked again in its place rather than appended.
-        if let editing = vm.editingQuestionID { return askAgain(editing, text: question) }
         let provider = settings.aiProvider
         vm.send(question: question, provider: provider, model: settings.summaryModel(for: provider))
     }
 
-    private func askAgain(_ turnID: UUID, text: String) {
-        guard canChat, sourceValidation == nil else { return }
+    @discardableResult
+    private func askAgain(_ turnID: UUID, text: String) -> Bool {
+        guard canChat, sourceValidation == nil else { return false }
         let provider = settings.aiProvider
-        vm.askAgain(turnID, text: text, provider: provider, model: settings.summaryModel(for: provider))
+        return vm.askAgain(turnID, text: text, provider: provider, model: settings.summaryModel(for: provider))
     }
 }
