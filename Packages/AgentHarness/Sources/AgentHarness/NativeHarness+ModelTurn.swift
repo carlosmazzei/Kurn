@@ -35,6 +35,7 @@ extension NativeHarness {
                     AgentTurnRequest(systemPrompt: settings.systemPrompt, messages: state.context,
                                      tools: settings.tools, maxOutputTokens: settings.maxOutputTokens,
                                      allowsToolCalls: settings.allowsToolCalls).identified(requestIdentity)
+                        .caching(key: promptCacheKey)
                 ) { stream.consume($0) }
                 response = try stream.complete(raw)
                 try Task.checkCancellation()

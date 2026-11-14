@@ -155,6 +155,14 @@ records the level sent in place of OpenAI's fixed default. The system prompt's `
 against the person's calendar; it changes once a day. Beside the chip, `ChatContextGauge` shows the context the
 provider last reported against the newest run's window (`MeetingChatViewModel.lastContextTokens`, kept between
 runs until the next report).
+Prompt caching is keyed by the conversation: `HarnessChatService` builds the harness with
+`NativeHarness.cachingPrompts(key:)` (the session ID), which puts `AgentTurnRequest.promptCacheKey` on every
+normal and wrap-up request, never on a summary. Anthropic then gets two `cache_control` breakpoints
+(`AgentWireFormat.markAnthropicCacheBreakpoints`): the end of the system prompt, which covers the tools and
+changes only when the prompt does, and the last cacheable block of the newest message, so each request in a
+tool loop reads the conversation before its new messages from the cache. OpenAI Responses gets
+`prompt_cache_key`; Chat Completions endpoints and Gemini (implicit caching) are left unchanged, and a request
+without a key is byte-for-byte what it was. Cache reads and writes are counted and priced as above.
 
 `ProviderModelMetadataService` refreshes the selected model in the settings picker
 and before an agent run. Anthropic/Gemini details resolve aliases and retain both

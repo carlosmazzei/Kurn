@@ -5,7 +5,7 @@ extension AgentWireFormat {
 
     /// `visibleReasoning` also asks for the reasoning summary the chat shows while the model thinks.
     func responsesBody(_ request: AgentTurnRequest, model: String, reasoningEffort: String?,
-                       visibleReasoning: Bool = false) -> JSONValue {
+                       visibleReasoning: Bool = false, promptCacheKey: String? = nil) -> JSONValue {
         var input: [JSONValue] = []
         for message in request.messages {
             switch message {
@@ -41,6 +41,8 @@ extension AgentWireFormat {
             })
             if !request.allowsToolCalls { body["tool_choice"] = .string("none") }
         }
+        // OpenAI routes requests with the same key to the same cache (its caching is automatic).
+        if let promptCacheKey { body["prompt_cache_key"] = .string(promptCacheKey) }
         if let reasoningEffort {
             var reasoning: [String: JSONValue] = ["effort": .string(reasoningEffort)]
             if visibleReasoning { reasoning["summary"] = .string("auto") }

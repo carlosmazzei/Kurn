@@ -17,20 +17,22 @@ public enum AgentWireFormat: Sendable, CaseIterable {
                                   openAITokenField: String = "max_completion_tokens",
                                   reasoningEffort: String? = nil,
                                   reasoning: AgentReasoningLevel? = nil) -> AgentWireRequestProjection {
-        let level = request.identity?.purpose == .summary ? nil : reasoning
+        let summary = request.identity?.purpose == .summary
+        let level = summary ? nil : reasoning
+        let cacheKey = summary ? nil : request.promptCacheKey
         var projection = AgentReplayProjection(format: self, model: model)
         let request = AgentTurnRequest(systemPrompt: request.systemPrompt, messages: projection.messages(request.messages),
             tools: request.tools, maxOutputTokens: request.maxOutputTokens, allowsToolCalls: request.allowsToolCalls)
         let body: JSONValue
         switch self {
-        case .anthropic: body = anthropicBody(request, model: model, reasoning: level)
+        case .anthropic: body = anthropicBody(request, model: model, reasoning: level, cached: cacheKey != nil)
         case .openAI:
             body = openAIBody(request, model: model, tokenField: openAITokenField,
                               reasoningEffort: level?.rawValue ?? reasoningEffort)
         case .gemini: body = geminiBody(request, model: model, reasoning: level)
         case .openAIResponses:
             body = responsesBody(request, model: model, reasoningEffort: level?.rawValue ?? reasoningEffort,
-                                 visibleReasoning: level != nil)
+                                 visibleReasoning: level != nil, promptCacheKey: cacheKey)
         }
         return AgentWireRequestProjection(body: body, adjustment: projection.adjustment)
     }
@@ -72,7 +74,8 @@ public enum AgentWireFormat: Sendable, CaseIterable {
         return .object(body)
     }
 
-    private func anthropicBody(_ request: AgentTurnRequest, model: String, reasoning: AgentReasoningLevel?) -> JSONValue {
+    private func anthropicBody(_ request: AgentTurnRequest, model: String, reasoning: AgentReasoningLevel?,
+                               cached: Bool) -> JSONValue {
         var messages: [JSONValue] = []
         for message in request.messages {
             switch message {
@@ -107,6 +110,7 @@ public enum AgentWireFormat: Sendable, CaseIterable {
         if let budget = reasoning?.thinkingBudget(maxOutputTokens: request.maxOutputTokens) {
             body["thinking"] = .object(["type": .string("enabled"), "budget_tokens": .number(Double(budget))])
         }
+        if cached { Self.markAnthropicCacheBreakpoints(&body) }
         return .object(body)
     }
 

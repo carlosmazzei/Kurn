@@ -957,7 +957,6 @@ keys in the Keychain and provider failures thrown as typed errors are deliberate
 | Area | Open item |
 | --- | --- |
 | Reasoning | The chat sends one level (low, medium, high) for every provider: per-model level sets (OpenAI `minimal`/`none`, Gemini 3 `thinkingLevel`), a level remembered per provider, and visible-reasoning qualification on real providers (Responses summaries can need organization verification) remain |
-| Prompt caching | Anthropic `cache_control` breakpoints on the stable system prompt and history prefix, and OpenAI `prompt_cache_key` from the session; cache reads and writes are already counted and priced |
 | Sessions | Search over conversation history; regenerate an answered question as a sibling branch; edit a question in place as a sibling branch (today edit means fork into a new conversation) |
 | Tools | Classify tools by effect (read, write, destructive), confirm destructive calls in a sheet, offer undo on write cards, and let a tool end the run (`terminate`) |
 | Input | Images in questions, resized per model limits before they enter history |
