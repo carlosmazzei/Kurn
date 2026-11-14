@@ -1,0 +1,220 @@
+{
+  "format": "kurn.model-catalog",
+  "schema": 1,
+  "version": "2026-11-14",
+  "models": {
+    "gemini-2.5-flash": {
+      "context": 1048576,
+      "maxOutput": 65536,
+      "limit": "input",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    },
+    "gemini-2.5-flash-lite": {
+      "context": 1048576,
+      "maxOutput": 65536,
+      "limit": "input",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    },
+    "gemini-2.5-pro": {
+      "context": 1048576,
+      "maxOutput": 65536,
+      "limit": "input",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    },
+    "gemini-3.6-flash": {
+      "context": 1048576,
+      "maxOutput": 65536,
+      "limit": "input",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    },
+    "gpt-4.1": {
+      "context": 1047576,
+      "maxOutput": 32768,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "unsupported",
+      "imageInput": "supported"
+    },
+    "gpt-4.1-mini": {
+      "context": 1047576,
+      "maxOutput": 32768,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "unsupported",
+      "imageInput": "supported"
+    },
+    "gpt-4.1-nano": {
+      "context": 1047576,
+      "maxOutput": 32768,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "unsupported",
+      "imageInput": "supported"
+    },
+    "gpt-4o": {
+      "tools": "supported",
+      "reasoning": "unsupported",
+      "imageInput": "supported",
+      "price": {
+        "input": 2.5,
+        "output": 10,
+        "cacheRead": 0.5
+      }
+    },
+    "gpt-4o-mini": {
+      "tools": "supported",
+      "reasoning": "unsupported",
+      "imageInput": "supported",
+      "price": {
+        "input": 0.15,
+        "output": 0.6,
+        "cacheRead": 0.5
+      }
+    },
+    "gpt-5": {
+      "context": 400000,
+      "maxOutput": 128000,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported",
+      "price": {
+        "input": 1.25,
+        "output": 10,
+        "cacheRead": 0.1
+      }
+    },
+    "gpt-5-mini": {
+      "context": 400000,
+      "maxOutput": 128000,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    },
+    "gpt-5-nano": {
+      "context": 400000,
+      "maxOutput": 128000,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    },
+    "gpt-5.1": {
+      "context": 400000,
+      "maxOutput": 128000,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    },
+    "gpt-5.2": {
+      "context": 400000,
+      "maxOutput": 128000,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    },
+    "gpt-5.4": {
+      "context": 1050000,
+      "maxOutput": 128000,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported",
+      "price": {
+        "input": 1.25,
+        "output": 10,
+        "cacheRead": 0.1
+      }
+    },
+    "gpt-5.4-mini": {
+      "context": 400000,
+      "maxOutput": 128000,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    },
+    "gpt-5.4-pro": {
+      "context": 1050000,
+      "maxOutput": 128000,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    },
+    "gpt-6-astra": {
+      "context": 1050000,
+      "maxOutput": 128000,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    },
+    "gpt-6-luna": {
+      "context": 1050000,
+      "maxOutput": 128000,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    },
+    "gpt-6-sol": {
+      "context": 1050000,
+      "maxOutput": 128000,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    },
+    "gpt-6.1-sol": {
+      "context": 1050000,
+      "maxOutput": 128000,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    },
+    "gpt-6.1-terra": {
+      "context": 1050000,
+      "maxOutput": 128000,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    },
+    "llama-3.3-70b-versatile": {
+      "context": 131072,
+      "maxOutput": 32768,
+      "limit": "combined",
+      "tools": "supported",
+      "reasoning": "unsupported",
+      "imageInput": "unsupported"
+    },
+    "o1-mini": {
+      "tools": "unsupported",
+      "reasoning": "supported",
+      "imageInput": "unsupported"
+    },
+    "o3": {
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    },
+    "o4-mini": {
+      "tools": "supported",
+      "reasoning": "supported",
+      "imageInput": "supported"
+    }
+  }
+}

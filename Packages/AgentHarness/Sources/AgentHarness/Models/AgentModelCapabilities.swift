@@ -146,16 +146,24 @@ public enum ModelCapabilityCatalog {
             tools: match?.facts.tools ?? .unknown, reasoning: reasoning, reasoningEffort: reasoningEffort,
             imageInput: match?.facts.imageInput ?? .unknown,
             promptCache: match == nil ? .unknown : promptCache(api: api, model: canonical ?? model),
-            source: source, catalogVersion: match == nil ? nil : version)
+            source: source, catalogVersion: match?.version)
     }
 
-    static func facts(for model: String) -> (facts: Facts, source: AgentModelCapabilities.Source)? {
+    /// The facts for `model` with where they came from. An installed remote catalog
+    /// (`ModelCatalogOverlay`) wins for each fact it states, over an exact entry or a family rule.
+    static func facts(for model: String) -> (facts: Facts, source: AgentModelCapabilities.Source, version: String)? {
         let name = model.split(separator: "/").last.map { $0.trimmingCharacters(in: .whitespaces).lowercased() } ?? ""
         guard !name.isEmpty else { return nil }
-        if let exact = exactEntry(name) { return (exact, .catalog) }
-        guard let family = families.filter({ name.hasPrefix($0.prefix) }).max(by: { $0.prefix.count < $1.prefix.count })
-        else { return nil }
-        return (family.facts, .family)
+        let bundled: (facts: Facts, source: AgentModelCapabilities.Source)? = exactEntry(name).map { ($0, .catalog) }
+            ?? families.filter({ name.hasPrefix($0.prefix) }).max(by: { $0.prefix.count < $1.prefix.count }).map { ($0.facts, .family) }
+        if let remote = ModelCatalogOverlay.entry(for: name),
+           remote.entry.tools != nil || remote.entry.reasoning != nil || remote.entry.imageInput != nil {
+            let facts = Facts(tools: remote.entry.tools ?? bundled?.facts.tools ?? .unknown,
+                              reasoning: remote.entry.reasoning ?? bundled?.facts.reasoning ?? .unknown,
+                              imageInput: remote.entry.imageInput ?? bundled?.facts.imageInput ?? .unknown)
+            return (facts, .catalog, remote.provenance)
+        }
+        return bundled.map { ($0.facts, $0.source, version) }
     }
 
     private static func exactEntry(_ name: String) -> Facts? {

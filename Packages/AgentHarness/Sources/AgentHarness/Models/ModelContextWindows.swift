@@ -33,7 +33,7 @@ public enum ModelContextWindows {
         if let tokens = knownWindow(forModel: model) {
             let limits = AgentModelLimits(contextWindowTokens: tokens, maxOutputTokens: output, limitKind: catalog?.limitKind ?? .combined)
             return AgentContextResolution(contextWindowTokens: tokens, source: .fixedTable, reason: reason,
-                                          modelLimits: limits, catalogVersion: ModelContextCatalog.version, resolvedAt: now,
+                                          modelLimits: limits, catalogVersion: catalog?.catalogVersion ?? ModelContextCatalog.version, resolvedAt: now,
                                           modelID: model).recordingMetadataRefresh(metadataRefresh)
         }
         let limits = AgentModelLimits(contextWindowTokens: nil, maxOutputTokens: outputFresh ? reported?.maxOutputTokens : nil)

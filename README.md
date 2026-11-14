@@ -348,7 +348,10 @@ Kurn is designed to avoid a backend service controlled by the app.
 - ASR, diarization, and live-preview model loading is local-only; missing or
   corrupt weights do not trigger a background download. Explicit model
   downloads and opted-in cloud features use the network; the default summary
-  provider is Apple's on-device model.
+  provider is Apple's on-device model. While a cloud provider is in use, the app
+  checks this repository's published model catalog (context windows,
+  capabilities, list prices) at most once a day, with a request that carries no
+  key or content.
 - Cloud provider calls go through a hardened HTTP boundary: request timeouts,
   bounded retries, HTTPS-only URL validation with redirect limits, and a
   per-provider circuit breaker that stops retrying a failing vendor.

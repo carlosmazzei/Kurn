@@ -45,10 +45,17 @@ struct AppEnvironment {
 @MainActor
 final class AppComposition {
     let settings: AppSettings
+    /// The remote model catalog: store-independent, applied from its saved copy at launch and
+    /// checked on activation while a cloud provider is in use.
+    let modelCatalog: ModelCatalogUpdater
     private var environment: AppEnvironment?
 
-    init(settings: AppSettings) {
+    init(settings: AppSettings, modelCatalog: ModelCatalogUpdater? = nil) {
         self.settings = settings
+        self.modelCatalog = modelCatalog ?? ModelCatalogUpdater(usesCloud: { [unowned settings] in
+            ModelCatalogUpdater.usesCloud(settings)
+        })
+        self.modelCatalog.loadStored()
     }
 
     /// The environment for `container`, built the first time it is asked for
