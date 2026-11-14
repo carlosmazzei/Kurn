@@ -53,7 +53,8 @@ struct ChatDocumentChangeTests {
         #expect(tools["create_document"]?.effect == .write)
         #expect(tools["append_to_document"]?.effect == .write)
         #expect(tools["update_document"]?.effect == .destructive)
-        #expect(tools.values.filter(\.requiresConfirmation).map(\.spec.name) == ["update_document"])
+        let confirmed = tools.values.filter { $0.requiresConfirmation }.map { $0.spec.name }
+        #expect(confirmed == ["update_document"])
     }
 
     @Test func aReplacementRunsOnlyAfterAYesAndCanBeUndone() async throws {

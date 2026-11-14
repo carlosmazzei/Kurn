@@ -47,7 +47,7 @@ import Testing
         }
         // Every call keeps a result: the declined one and the one never run.
         #expect(results.map(\.0) == ["1", "2"])
-        #expect(results.allSatisfy(\.1))
+        #expect(results.map(\.1) == [true, true])
         #expect(events.contains(.toolFinished(callID: "2", name: "note", summary: "Tool not executed: the run was ended.", isError: true)))
         let kinds = diagnostics.events.map(\.kind)
         #expect(kinds.contains(.runTerminated))
