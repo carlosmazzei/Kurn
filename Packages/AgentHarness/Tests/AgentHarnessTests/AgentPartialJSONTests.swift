@@ -7,7 +7,7 @@ import Testing
 
     @Test func aStringValueCutOffKeepsWhatArrived() {
         #expect(value(#"{"title":"Ata de reu"#) == .object(["title": .string("Ata de reu")]))
-        #expect(value(#"{"title":"Ata","markdown":"# Min"#) == .object(["title": .string("Ata"), "markdown": .string("# Min")]))
+        #expect(value(##"{"title":"Ata","markdown":"# Min"##) == .object(["title": .string("Ata"), "markdown": .string("# Min")]))
         #expect(value(#""abc"#) == .string("abc"))
     }
 
@@ -68,6 +68,29 @@ import Testing
         // Once the harness starts the call, the streaming row gives way to the real one.
         snapshot.apply(.toolStarted(callID: "c1", name: "create_document", arguments: .object([:])))
         #expect(snapshot.streamingToolCalls.isEmpty)
+    }
+
+    @Test func aFinishedCallReplacesWhatItsDeltasBuilt() throws {
+        var snapshot = AgentRunSnapshot()
+        // A call whose arguments arrive only in its `done` (no deltas), then a second still streaming.
+        let first = AgentToolCall(id: "c1", name: "search", arguments: .null, rawArguments: "")
+        snapshot.apply(.modelContent(.blockStarted(index: 0, block: AgentContentBlock(id: "b1", content: .toolCall(first, complete: false)))))
+        let stepID = try #require(snapshot.streamingToolCalls.first?.step.id)
+        let done = AgentToolCall(id: "c1", name: "search_meetings", arguments: .null, rawArguments: #"{"query":"budget"}"#)
+        snapshot.apply(.modelContent(.blockUpdated(AgentContentBlock(id: "b1", content: .toolCall(done, complete: true)))))
+        let second = AgentToolCall(id: "c2", name: "read_transcript", arguments: .null, rawArguments: #"{"meeting":"m"#)
+        snapshot.apply(.modelContent(.blockStarted(index: 1, block: AgentContentBlock(id: "b2", content: .toolCall(second, complete: false)))))
+        let calls = snapshot.streamingToolCalls
+        let names = calls.map { $0.name }
+        #expect(names == ["search_meetings", "read_transcript"])
+        #expect(calls.first?.arguments == .object(["query": .string("budget")]))
+        #expect(calls.first?.step.id == stepID)
+        #expect(calls.last?.arguments == .object(["meeting": .string("m")]))
+        // A whole call sent at once (no start) still shows; text updates do not.
+        let whole = AgentToolCall(id: "c3", name: "list_meetings", arguments: .null, rawArguments: "{}")
+        snapshot.apply(.modelContent(.blockUpdated(AgentContentBlock(id: "b3", content: .toolCall(whole, complete: true)))))
+        snapshot.apply(.modelContent(.blockUpdated(AgentContentBlock(id: "t", content: .text("Hi")))))
+        #expect(snapshot.streamingToolCalls.count == 3)
     }
 
     @Test func onlyTheFirstScalarsOfLongArgumentsAreParsed() {

@@ -46,6 +46,14 @@ public struct AgentRunSnapshot: Sendable, Equatable {
             arguments = AgentPartialJSON.parse(raw) ?? arguments
         }
 
+        fileprivate mutating func replace(name: String, arguments text: String) {
+            self.name = name
+            raw = ""
+            rawScalars = 0
+            arguments = nil
+            append(text)
+        }
+
         /// A running tool step for a timeline to show while the call is written.
         public var step: AgentRunStep {
             var step = AgentRunStep(id: stepID, kind: .tool, status: .running)
@@ -121,7 +129,18 @@ public struct AgentRunSnapshot: Sendable, Equatable {
             guard let index = streamingToolCalls.firstIndex(where: { $0.blockID == id }) else { return }
             streamingToolCalls[index].name += name ?? ""
             streamingToolCalls[index].append(arguments ?? "")
-        case .blockDelta, .blockUpdated:
+        case .blockUpdated(let block):
+            // A finished call (Responses' `done`) or a whole call sent at once replaces what the
+            // deltas built, keeping the step's identity.
+            guard case .toolCall(let call, _) = block.content else { return }
+            if let index = streamingToolCalls.firstIndex(where: { $0.blockID == block.id }) {
+                streamingToolCalls[index].replace(name: call.name, arguments: call.rawArguments)
+            } else {
+                var streaming = StreamingToolCall(blockID: block.id, name: call.name)
+                streaming.append(call.rawArguments)
+                streamingToolCalls.append(streaming)
+            }
+        case .blockDelta:
             break
         case .messageFinished, .failed:
             streamingToolCalls = []
