@@ -97,6 +97,10 @@ public struct AgentTurnRequest: Sendable, Equatable {
     public let serializedToolOmittedCharacters: Int
     public let fittedHistoryOmittedCharacters: Int
     public private(set) var identity: AgentRequestIdentity?
+    /// A stable key for the conversation, set when the host asks for prompt caching
+    /// (`NativeHarness.cachingPrompts(key:)`); the wire formats mark or name the cacheable prefix
+    /// with it. Nil leaves the request as it was.
+    public private(set) var promptCacheKey: String?
 
     public init(systemPrompt: String, messages: [AgentMessage], tools: [AgentToolSpec], maxOutputTokens: Int,
                 allowsToolCalls: Bool = true, contextOmittedCharacters: Int = 0,
@@ -115,6 +119,12 @@ public struct AgentTurnRequest: Sendable, Equatable {
     public func identified(_ identity: AgentRequestIdentity) -> Self {
         var copy = self
         copy.identity = identity
+        return copy
+    }
+
+    public func caching(key: String?) -> Self {
+        var copy = self
+        copy.promptCacheKey = key
         return copy
     }
 }

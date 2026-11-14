@@ -17,6 +17,7 @@ public struct NativeHarness: Sendable {
     var compactionCommit: @Sendable (AgentCompactionCheckpoint) async throws -> Void = { _ in }
     var inputQueue: AgentInputQueue?
     var systemPromptRefresh: (@Sendable () async -> String?)?
+    var promptCacheKey: String?
     var compactsFirst = false
     private let diagnosticSink: @Sendable (AgentDiagnostic) -> Void
 
@@ -103,6 +104,15 @@ public struct NativeHarness: Sendable {
     public func refreshingSystemPrompt(_ refresh: @escaping @Sendable () async -> String?) -> Self {
         var copy = self
         copy.systemPromptRefresh = refresh
+        return copy
+    }
+
+    /// Asks the vendor to cache the stable prefix of every normal and wrap-up request under `key`
+    /// (a conversation's identity): Anthropic gets `cache_control` breakpoints, OpenAI Responses a
+    /// `prompt_cache_key`. Summary requests are left out; their prefix is not reused.
+    public func cachingPrompts(key: String) -> Self {
+        var copy = self
+        copy.promptCacheKey = key
         return copy
     }
 

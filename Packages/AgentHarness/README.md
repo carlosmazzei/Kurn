@@ -184,6 +184,10 @@ A host's `AgentReasoningLevel` (`requestProjection(reasoning:)`) is mapped per v
 Gemini `thinkingConfig` (`includeThoughts`) with a token budget kept below the output limit. Summary
 requests never carry it.
 
+`NativeHarness.cachingPrompts(key:)` keys every normal and wrap-up request (`AgentTurnRequest.promptCacheKey`,
+never a summary): Anthropic gets `cache_control` breakpoints at the end of the system prompt and of the
+newest message, OpenAI Responses a `prompt_cache_key`; other formats, and unkeyed requests, are unchanged.
+
 ## Diagnostics and privacy
 
 `AgentDiagnostic` carries only a fixed event and metric vocabulary, counts and opaque correlation IDs
