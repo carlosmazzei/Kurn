@@ -1156,6 +1156,17 @@
 "chat.context.table" = "Tabela local";
 "chat.context.fallback" = "Fallback fixo";
 "chat.context.tokens" = "%ld tokens";
+"chat.activity.thinking" = "Pensando…";
+"chat.activity.reasoning" = "Raciocínio";
+"chat.activity.thought_for" = "Pensou por %d s";
+"chat.activity.preparing" = "Preparando…";
+"chat.activity.using_tools" = "Usando ferramentas…";
+"chat.activity.writing" = "Escrevendo…";
+"chat.activity.tokens" = "%@ tokens";
+"chat.activity.details" = "Detalhes";
+"chat.activity.narration" = "Observação";
+"chat.activity.reasoning.hint" = "Mostra ou oculta o raciocínio";
+"chat.activity.tool.hint" = "Mostra os argumentos e o resultado";
 "chat.context.catalog_version" = "Catálogo: %@";
 "chat.capability.canonical" = "Modelo resolvido: %@";
 "chat.capability.tools" = "Ferramentas: %@";

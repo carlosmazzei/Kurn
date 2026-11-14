@@ -1,7 +1,8 @@
 import Foundation
 
 public struct AgentRunStep: Codable, Sendable, Equatable, Identifiable {
-    public enum Kind: String, Codable, Sendable { case turn, tool, compaction, stop, context, diagnostic }
+    /// `thinking` is the model's visible reasoning, `narration` the text it wrote beside tool calls.
+    public enum Kind: String, Codable, Sendable { case turn, tool, compaction, stop, context, diagnostic, thinking, narration }
     public enum Status: String, Codable, Sendable { case running, finished, failed }
 
     public let id: UUID
@@ -18,6 +19,15 @@ public struct AgentRunStep: Codable, Sendable, Equatable, Identifiable {
     public var contextResolution: AgentContextResolution?
     public var diagnostic: AgentDiagnostic?
     public var toolProgress: AgentToolProgress?
+    /// The reasoning or narration text, bounded by `AgentRunTrace.maxStepTextScalars`.
+    public var text: String?
+    /// When a reasoning block started and ended, while the run was observed live; a restored run has none.
+    public var startedAt: Date?
+    public var finishedAt: Date?
+    public var duration: TimeInterval? {
+        guard let startedAt, let finishedAt else { return nil }
+        return max(0, finishedAt.timeIntervalSince(startedAt))
+    }
     public var argumentsSummary: String? { arguments.flatMap { try? $0.encodedString() } }
 
     public init(kind: Kind, status: Status = .running) {
@@ -28,11 +38,23 @@ public struct AgentRunStep: Codable, Sendable, Equatable, Identifiable {
 }
 
 public struct AgentRunTrace: Sendable, Equatable {
+    /// Reasoning and narration kept per step for display; the canonical messages keep it all.
+    public static let maxStepTextScalars = 8_000
+
     public private(set) var steps: [AgentRunStep] = []
     public private(set) var usage = AgentUsage()
     public private(set) var hasUsage = false
+    /// Running reasoning steps by the content block streaming into them.
+    private var thinkingSteps: [String: Int] = [:]
+    private let now: @Sendable () -> Date
 
-    public init() {}
+    public init(now: @escaping @Sendable () -> Date = { Date() }) {
+        self.now = now
+    }
+
+    public static func == (lhs: AgentRunTrace, rhs: AgentRunTrace) -> Bool {
+        lhs.steps == rhs.steps && lhs.usage == rhs.usage && lhs.hasUsage == rhs.hasUsage
+    }
 
     public mutating func apply(_ event: AgentEvent) {
         switch event {
@@ -40,7 +62,9 @@ public struct AgentRunTrace: Sendable, Equatable {
             steps = []
             usage = AgentUsage()
             hasUsage = false
+            thinkingSteps = [:]
         case .turnStarted(let index):
+            finishThinking()
             finishTurn()
             var step = AgentRunStep(kind: .turn)
             step.turnIndex = index
@@ -84,14 +108,85 @@ public struct AgentRunTrace: Sendable, Equatable {
             hasUsage = true
             self.usage = self.usage.adding(usage)
         case .runFinished(let outcome):
+            finishThinking()
             finishTurn()
             usage = outcome.totalUsage
             hasUsage = hasUsage || usage.inputTokens != 0 || usage.outputTokens != 0
             var step = AgentRunStep(kind: .stop, status: .finished)
             step.stopReason = outcome.stopReason
             steps.append(step)
-        case .textDelta, .modelContent, .messageAppended, .requestStarted, .invocationRegistered: break
+        case .modelContent(let content):
+            applyContent(content)
+        case .messageAppended(.content(let message)) where message.role == .assistant:
+            finishThinking()
+            appendNarration(of: message)
+        case .textDelta, .messageAppended, .requestStarted, .invocationRegistered: break
         }
+    }
+
+    /// Reasoning streams into its own step while its block is open; any other block, the finished
+    /// message or a failure closes it. The finished message's text replaces what streamed, and a
+    /// reasoning block that never streamed (a provider that sends it whole) is added from it.
+    private mutating func applyContent(_ content: AgentContentEvent) {
+        switch content {
+        case .blockStarted(_, let block):
+            guard case .thinking(let text, _, _, _) = block.content else { finishThinking(keepingBlocks: true); return }
+            var step = AgentRunStep(kind: .thinking)
+            step.text = Self.bounded(text ?? "")
+            step.startedAt = now()
+            steps.append(step)
+            thinkingSteps[block.id] = steps.count - 1
+        case .blockDelta(let id, .thinking(let delta)):
+            guard let index = thinkingSteps[id], steps.indices.contains(index) else { return }
+            steps[index].text = Self.bounded((steps[index].text ?? "") + delta)
+        case .blockDelta, .blockUpdated: break
+        case .messageFinished(let message):
+            // Streamed blocks are matched by ID, then in order, so a final message that renamed its
+            // blocks never shows the same reasoning twice.
+            var unmatched = thinkingSteps.sorted { $0.value < $1.value }.map(\.value)
+            for block in message.blocks {
+                guard case .thinking(let text, _, _, _) = block.content else { continue }
+                let index = thinkingSteps[block.id] ?? unmatched.first
+                if let index, steps.indices.contains(index) {
+                    unmatched.removeAll { $0 == index }
+                    if let text, !text.isEmpty { steps[index].text = Self.bounded(text) }
+                } else {
+                    var step = AgentRunStep(kind: .thinking, status: .finished)
+                    step.text = Self.bounded(text ?? "")
+                    steps.append(step)
+                }
+            }
+            finishThinking()
+        case .failed:
+            finishThinking()
+        }
+    }
+
+    /// Closes the open reasoning steps. Their blocks stay known until the message finishes, so its
+    /// final text still lands on the step that streamed it.
+    private mutating func finishThinking(keepingBlocks: Bool = false) {
+        let finished = now()
+        for index in thinkingSteps.values where steps.indices.contains(index) && steps[index].status == .running {
+            steps[index].status = .finished
+            steps[index].finishedAt = finished
+        }
+        if !keepingBlocks { thinkingSteps = [:] }
+    }
+
+    /// Text an assistant wrote in a turn that also calls tools is narration ("I'll search the
+    /// budget meetings"), shown in order with the calls; a reply without calls is the answer.
+    private mutating func appendNarration(of message: AgentContentMessage) {
+        let text = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.toolCalls.isEmpty, !text.isEmpty else { return }
+        var step = AgentRunStep(kind: .narration, status: .finished)
+        step.text = Self.bounded(text)
+        steps.append(step)
+    }
+
+    static func bounded(_ text: String) -> String {
+        let scalars = text.unicodeScalars
+        guard scalars.count > maxStepTextScalars else { return text }
+        return String(String.UnicodeScalarView(scalars.prefix(maxStepTextScalars))) + "…"
     }
 
     private mutating func finishTurn() {
@@ -121,6 +216,7 @@ extension AgentRunTrace {
                 // Zero-based, like the harness's own `turnStarted`.
                 trace.apply(.turnStarted(index: turn))
                 turn += 1
+                trace.restoreReasoning(of: message)
                 for call in message.toolCalls {
                     trace.apply(.toolStarted(callID: call.id, name: call.name, arguments: call.arguments))
                 }
@@ -151,6 +247,17 @@ extension AgentRunTrace {
         guard case .number(let number)? = value, number.isFinite, number >= 0, number <= Double(Int32.max),
               number.rounded() == number else { return nil }
         return Int(number)
+    }
+
+    /// The committed reasoning blocks and narration of a restored assistant message, untimed.
+    private mutating func restoreReasoning(of message: AgentContentMessage) {
+        for block in message.blocks {
+            guard case .thinking(let text, _, _, _) = block.content else { continue }
+            var step = AgentRunStep(kind: .thinking, status: .finished)
+            step.text = Self.bounded(text ?? "")
+            steps.append(step)
+        }
+        appendNarration(of: message)
     }
 
     private mutating func restoreResult(callID: String, name: String, isError: Bool) {

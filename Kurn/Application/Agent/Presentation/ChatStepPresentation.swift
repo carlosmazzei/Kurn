@@ -14,6 +14,16 @@ public struct ChatStepPresentation: Sendable, Equatable {
             parameter = String((step.turnIndex ?? 0) + 1)
             parameterKey = nil
             symbol = "sparkles"
+        case .thinking:
+            key = "chat.activity.reasoning"
+            parameter = nil
+            parameterKey = nil
+            symbol = "sparkle"
+        case .narration:
+            key = "chat.activity.narration"
+            parameter = nil
+            parameterKey = nil
+            symbol = "text.bubble"
         case .compaction:
             key = "chat.step.compaction"
             parameter = nil

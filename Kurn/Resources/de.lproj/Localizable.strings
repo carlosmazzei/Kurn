@@ -1156,6 +1156,17 @@
 "chat.context.table" = "Lokale Tabelle";
 "chat.context.fallback" = "Fester Ersatzwert";
 "chat.context.tokens" = "%ld Tokens";
+"chat.activity.thinking" = "Denkt nach…";
+"chat.activity.reasoning" = "Überlegung";
+"chat.activity.thought_for" = "Hat %d s nachgedacht";
+"chat.activity.preparing" = "Wird vorbereitet…";
+"chat.activity.using_tools" = "Verwendet Werkzeuge…";
+"chat.activity.writing" = "Schreibt…";
+"chat.activity.tokens" = "%@ Tokens";
+"chat.activity.details" = "Details";
+"chat.activity.narration" = "Notiz";
+"chat.activity.reasoning.hint" = "Blendet die Überlegung ein oder aus";
+"chat.activity.tool.hint" = "Zeigt die Argumente und das Ergebnis";
 "chat.context.catalog_version" = "Katalog: %@";
 "chat.capability.canonical" = "Aufgelöstes Modell: %@";
 "chat.capability.tools" = "Werkzeuge: %@";

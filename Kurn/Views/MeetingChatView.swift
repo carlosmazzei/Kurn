@@ -323,22 +323,12 @@ struct MeetingChatConversationView: View {
         vm.isResponding && turn.role == .assistant && turn.id == vm.turns.last?.id
     }
 
-    /// The running row shown while the agent works, with the turn's live usage once reported.
+    /// The live status line while the agent works (`ChatRunStatusLine`).
     private var respondingRow: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                ProgressView().accessibilityHidden(true)
-                Text(vm.phase.statusText(retryDelaySeconds: vm.runProgress.retryDelaySeconds))
-                    .font(.footnote).foregroundStyle(.secondary)
-                    .accessibilityIdentifier("chat.run_status")
-            }
-            if let turn = vm.turns.last, turn.role == .assistant, let usage = turn.usage {
-                Text(MeetingChatTurnView.usageCaptionText(usage: usage, costUSD: turn.costUSD, elapsedSeconds: nil))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("chat.live_usage")
-            }
-        }
+        ChatRunStatusLine(phase: vm.phase, retryDelaySeconds: vm.runProgress.retryDelaySeconds,
+                          steps: vm.turns.last?.steps ?? [],
+                          outputTokens: vm.turns.last.flatMap { $0.role == .assistant ? $0.usage?.completionTokens : nil },
+                          startedAt: vm.runStartedAt)
     }
 
     /// Shown under an unanswered question — cancelled mid-stream, or failed

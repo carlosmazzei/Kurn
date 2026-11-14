@@ -51,8 +51,12 @@ public struct AgentRunSnapshot: Sendable, Equatable {
             sawRequest = true
         case .messageAppended(.content(let message)) where message.role == .assistant:
             // A reply that calls no tool is the exchange's answer, replacing what streamed before it.
+            // Text beside tool calls is narration, which the trace shows as its own step, so the
+            // exchange's streamed text starts over for the next turn.
             if message.toolCalls.isEmpty, !message.text.isEmpty, Self.answers(message.stopReason) {
                 exchanges[exchanges.count - 1].text = message.text
+            } else if !message.toolCalls.isEmpty {
+                exchanges[exchanges.count - 1].text = ""
             }
         case .toolFinished(let callID, let name, _, let isError):
             finishedTools.append(FinishedTool(callID: callID, name: name, isError: isError))

@@ -1156,6 +1156,17 @@
 "chat.context.table" = "本地表";
 "chat.context.fallback" = "固定回退值";
 "chat.context.tokens" = "%ld 个令牌";
+"chat.activity.thinking" = "正在思考…";
+"chat.activity.reasoning" = "推理";
+"chat.activity.thought_for" = "思考了 %d 秒";
+"chat.activity.preparing" = "正在准备…";
+"chat.activity.using_tools" = "正在使用工具…";
+"chat.activity.writing" = "正在撰写…";
+"chat.activity.tokens" = "%@ 个 token";
+"chat.activity.details" = "详细信息";
+"chat.activity.narration" = "备注";
+"chat.activity.reasoning.hint" = "显示或隐藏推理过程";
+"chat.activity.tool.hint" = "显示参数和结果";
 "chat.context.catalog_version" = "目录：%@";
 "chat.capability.canonical" = "解析后的模型：%@";
 "chat.capability.tools" = "工具：%@";
