@@ -389,6 +389,16 @@ same place shows "‹ n of m ›"; navigating checks the revision, rebuilds the 
 saves atomically, and is offered only while no reply runs (`canChangeBranch`). Fork copies the path
 before a question into a new conversation and hands the question back to the composer (nothing before
 the first question means a new, unsaved conversation); "Duplicate conversation" copies the branch shown.
+"Regenerate answer" and "Edit question" ask a saved question again in its place, in the same conversation
+(`MeetingChatViewModel.askAgain`): `SwiftDataAgentSessionStore.rewind` adds a presentation state under the
+question's parent (the sources and documents saved with the question) and selects it, so the conversation
+shows just what came before; the question sent next is written beside the earlier one and reads as another
+version. Nothing is removed. Editing puts the question in the composer (`editingQuestionID`, with a cancel
+banner) until it is taken; a rewind that cannot be saved keeps the edit there. A conversation migrated from
+before the session log has one state for all its turns, so asking an older question again (like forking from
+it) starts with the sources and documents that state holds, not those of the moment it was first asked. The history sheet searches saved conversations (`ChatSessionSearch`): every query
+word must occur, ignoring case and accents, in the title or the turns of the branch each is open on, and a
+match in the turns shows an excerpt.
 A copy ends on the conversation's state at that point (the state saved right there, else the nearest
 before it), rebases its revision IDs and copies only the revisions it shows; the source keeps every
 branch. Labels and renames are metadata. Artifact revisions are per branch: the same version written with

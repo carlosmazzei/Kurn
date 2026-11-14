@@ -11,6 +11,10 @@ struct ChatTurnBranchActions {
     /// Whether later answers leave this exchange out, and the action that switches it.
     var isLeftOut = false
     var setLeftOut: (Bool) -> Void = { _ in }
+    /// Asks the question again in its place, as another version (`MeetingChatViewModel.askAgain`).
+    var regenerate: () -> Void = {}
+    /// Puts the question in the composer to edit and ask again in its place.
+    var edit: () -> Void = {}
 }
 
 /// "‹ 2 of 3 ›" under a question asked more than once in the same place: moves between its

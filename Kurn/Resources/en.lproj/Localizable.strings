@@ -1312,6 +1312,10 @@
 "chat.branch.position" = "%1$d of %2$d";
 "chat.branch.label_value" = "Label: %@";
 "chat.branch.fork" = "Fork from here";
+"chat.branch.regenerate" = "Regenerate answer";
+"chat.branch.edit" = "Edit question";
+"chat.branch.editing" = "Editing question";
+"chat.history.search" = "Search conversations";
 "chat.branch.label" = "Label";
 "chat.branch.label_placeholder" = "Label (empty removes it)";
 "chat.branch.duplicate" = "Duplicate conversation";

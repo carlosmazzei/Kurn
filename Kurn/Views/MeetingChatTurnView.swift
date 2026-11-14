@@ -99,6 +99,13 @@ struct MeetingChatTurnView: View {
     @ViewBuilder
     private var branchMenu: some View {
         if let branch, branch.isEnabled {
+            Button(action: branch.regenerate) {
+                Label(NSLocalizedString("chat.branch.regenerate", comment: "Ask this question again for another answer"),
+                      systemImage: "arrow.clockwise")
+            }
+            Button(action: branch.edit) {
+                Label(NSLocalizedString("chat.branch.edit", comment: "Edit this question and ask it again"), systemImage: "pencil")
+            }
             Button(action: branch.fork) {
                 Label(NSLocalizedString("chat.branch.fork", comment: "Fork from this question"), systemImage: "arrow.triangle.branch")
             }

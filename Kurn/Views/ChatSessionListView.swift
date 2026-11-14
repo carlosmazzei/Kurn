@@ -27,6 +27,11 @@ struct ChatSessionListView: View {
     /// The conversation being renamed and the title being typed (NH09).
     @State private var renaming: ChatSession?
     @State private var newTitle = ""
+    @State private var query = ""
+
+    private var results: [(session: ChatSession, match: ChatSessionSearch.Match)] {
+        ChatSessionSearch.results(sessions, query: query)
+    }
 
     init(
         sessions: [ChatSession],
@@ -51,15 +56,19 @@ struct ChatSessionListView: View {
                         systemImage: "clock.arrow.circlepath",
                         description: Text(NSLocalizedString("chat.history.empty.subtitle", comment: "No saved conversations subtitle"))
                     )
+                } else if results.isEmpty {
+                    ContentUnavailableView.search(text: query)
                 } else {
                     List {
-                        ForEach(sessions) { session in
-                            row(for: session)
+                        ForEach(results, id: \.session.id) { result in
+                            row(for: result.session, excerpt: result.match.excerpt)
                         }
                         .onDelete(perform: delete)
                     }
                 }
             }
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: NSLocalizedString("chat.history.search", comment: "Search conversations"))
             // Typing a title needs a text field, which only the system alert offers.
             .alert(NSLocalizedString("chat.history.rename", comment: "Rename conversation"),
                    isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
@@ -80,7 +89,7 @@ struct ChatSessionListView: View {
         }
     }
 
-    private func row(for session: ChatSession) -> some View {
+    private func row(for session: ChatSession, excerpt: String?) -> some View {
         Button {
             onSelect(session)
             dismiss()
@@ -91,6 +100,12 @@ struct ChatSessionListView: View {
                         .font(Theme.subheadline)
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
+                    if let excerpt {
+                        Text(excerpt)
+                            .font(Theme.caption)
+                            .foregroundStyle(Theme.textSecondary)
+                            .lineLimit(2)
+                    }
                     Text(session.updatedAt.formatted(date: .abbreviated, time: .shortened))
                         .font(Theme.caption2)
                         .foregroundStyle(Theme.textTertiary)
@@ -117,8 +132,10 @@ struct ChatSessionListView: View {
 
     /// Hands each deletion to `onDelete` for the actual SwiftData delete +
     /// save, then removes from this view's snapshot only the rows it deleted.
+    /// The offsets are positions in the filtered results.
     private func delete(at offsets: IndexSet) {
-        let deleted = IndexSet(offsets.filter { onDelete(sessions[$0]) })
-        sessions.remove(atOffsets: deleted)
+        let shown = results.map(\.session)
+        let deleted = Set(offsets.map { shown[$0] }.filter { onDelete($0) }.map(\.id))
+        sessions.removeAll { deleted.contains($0.id) }
     }
 }
