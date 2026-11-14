@@ -132,6 +132,15 @@ limits (bounded by routed OpenRouter limits when supplied). Anthropic and Gemini
 list pagination is bounded and rejects missing/repeated cursors. The bundled
 `ModelContextCatalog` supplies exact, reviewed current model capacities, including
 GPT-6.1 Terra's 1,050,000 tokens, ahead of conservative legacy-family defaults.
+`AgentModelCapabilities` (AgentHarness, version 1) is the run's capability snapshot: tools,
+reasoning plus the effort the adapter sends, image input and the vendor's prompt caching, each
+`supported`/`unsupported`/`unknown`. `ModelCapabilityCatalog` has exact reviewed entries and a Claude
+3+ family rule; any other name stays unknown rather than inheriting a similar model's facts. Fresh
+provider metadata (`ModelContextWindowStore.recordCapabilities`, from the Anthropic/Gemini detail
+requests) overrides what it reports and qualifies an alias with its canonical ID. `HarnessChatService`
+resolves it before the run, refuses a model known to lack tools (`chat.model.tools_unsupported`) and
+records it in the context resolution and the run-start entry (`AgentRunBranch.capabilities`); the
+context step lists it. `OpenAIProvider.agentReasoningEffort` is the single source of the effort sent.
 
 `ProviderModelMetadataService` refreshes the selected model in the settings picker
 and before an agent run. Anthropic/Gemini details resolve aliases and retain both

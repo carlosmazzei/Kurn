@@ -42,6 +42,9 @@ struct ProviderModelMetadataService: Sendable {
                 guard !result.id.isEmpty else { return .notReported }
                 value = result.limits
                 windows.recordLimits([result.id: value], provider: provider)
+                // An alias the provider resolved qualifies the run's capability snapshot (C04).
+                windows.recordCapabilities(AgentReportedCapabilities(canonicalModelID: result.id == model ? nil : result.id),
+                                           provider: provider, model: model)
             case .googleGemini:
                 let request = try detailRequest(provider: provider, model: model, key: key)
                 let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
@@ -49,6 +52,10 @@ struct ProviderModelMetadataService: Sendable {
                 guard !result.requestID.isEmpty, result.supportedGenerationMethods.contains("generateContent") else { return .notReported }
                 value = result.limits
                 windows.recordLimits([result.requestID: value], provider: provider)
+                let requested = model.hasPrefix("models/") ? String(model.dropFirst(7)) : model
+                windows.recordCapabilities(AgentReportedCapabilities(
+                    canonicalModelID: result.requestID == requested ? nil : result.requestID, reasoning: result.thinking),
+                    provider: provider, model: model)
             case .openAICompatible where host == "api.groq.com":
                 let request = try detailRequest(provider: provider, model: model, key: key)
                 let (data, _) = try await LLMHTTP.sendValidated(request, session: session)

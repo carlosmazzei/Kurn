@@ -53,7 +53,7 @@ durable, append-only session log.
 | Directory | Contents |
 | --- | --- |
 | `Sources/AgentHarness/` (root) | Messages and blocks (`AgentContentMessage`, `AgentToolResultMessage`, `AgentMessage`), the loop (`NativeHarness` and its `+ModelTurn`, `+Tools`, `+ContextWindow` extensions), `AgentTypes` (requests, responses, events, limits, outcomes), stream reduction (`AgentTurnStream`, `AgentMessageReducer`), budgets (`AgentOutputBudget`, `AgentBudgetPlanner`, `AgentRunState`), context (`AgentContextCompactor`, `AgentContextResolution`, `AgentContextOverflow`, `TokenEstimate`), retries (`AgentRetryPolicy`), traces and diagnostics (`AgentRunTrace`, `AgentDiagnostic`), paging (`AgentTextPage`) and `JSONValue`. |
-| `Models/` | Model capacity: the reviewed `ModelContextCatalog` and the `ModelContextWindows` resolver. |
+| `Models/` | Model capacity and capabilities: the reviewed `ModelContextCatalog`, the `ModelContextWindows` resolver, and the versioned `AgentModelCapabilities` snapshot resolved by `ModelCapabilityCatalog`. |
 | `Tools/` | Tool schemas and argument validation, the execution pipeline, execution context. |
 | `Session/` | Run ownership and the durable log: `AgentSession`, entries and the entry graph, run branches, compaction checkpoints, context edits, system prompts and tool loadouts, input queues, progress and snapshots, the session tree, the archive, recovery records. |
 | `Wire/` | Request builders and SSE accumulators for Anthropic Messages, OpenAI Responses, OpenAI Chat Completions and Gemini, plus the replay projection that copies canonical messages into a vendor request. |

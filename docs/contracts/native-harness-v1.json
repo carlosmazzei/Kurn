@@ -139,15 +139,36 @@
       "sourceDocument": "01-nucleo.md",
       "disposition": "required",
       "increment": "NH07",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContractFixtureTests.swift",
           "symbol": "savedTraceRetainsIdentityCapacityAndLegacyDateUnits"
         }
       ],
-      "targetEvidence": [],
-      "note": "Open (NH07): a versioned per-model capability snapshot (tools, reasoning, images, cache) recorded with the run; today only context/output capacity is resolved and recorded."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentModelCapabilitiesTests.swift",
+          "symbol": "anExactCatalogEntryGivesEveryFactAndTheVendorsCaching"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentModelCapabilitiesTests.swift",
+          "symbol": "theRunStartRecordsTheSnapshot"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentModelCapabilitiesTests.swift",
+          "symbol": "aSnapshotFromALaterVersionStillReads"
+        },
+        {
+          "path": "KurnTests/MeetingChatCapabilityTests.swift",
+          "symbol": "aRunRecordsTheSnapshotInItsStepsAndItsBranch"
+        },
+        {
+          "path": "KurnTests/MeetingChatCapabilityTests.swift",
+          "symbol": "aModelWithoutToolsIsRefusedBeforeAnyRequest"
+        }
+      ],
+      "note": "NH07: a versioned per-model capability snapshot (tools, reasoning and the effort sent, image input, prompt caching, alias) from the bundled catalog and fresh provider metadata, recorded in the run's context resolution and its run-start entry; a model known to lack tools is refused before any request."
     },
     {
       "id": "C04",
@@ -178,9 +199,17 @@
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeIdentityTests.swift",
           "symbol": "failedMessagesAndTheirResultsStayOutOfReplay"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentModelCapabilitiesTests.swift",
+          "symbol": "freshProviderFactsOverrideTheCatalogAndQualifyAnAlias"
+        },
+        {
+          "path": "KurnTests/ProviderHTTPTests+SelectedModelMetadata.swift",
+          "symbol": "selectedAnthropicAliasUsesDetailAndCachesTheCanonicalModel"
         }
       ],
-      "note": "All four wire adapters accept native blocks and own preparation terminals. Open: per-model capability flags, alias qualification and authenticated live-provider qualification."
+      "note": "All four wire adapters accept native blocks and own preparation terminals. Per-model capability flags and alias qualification (the provider's canonical ID, kept while its metadata is fresh) are recorded in the run's capability snapshot. Open: authenticated live-provider qualification, which needs real credentials and cannot run in CI; signed reasoning still replays only to the identical requested model."
     },
     {
       "id": "C05",

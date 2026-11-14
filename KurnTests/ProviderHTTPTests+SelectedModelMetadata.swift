@@ -16,6 +16,8 @@ extension ProviderHTTPTests {
         #expect(try await service.refresh(provider: .anthropic, model: "claude-alias") == .fetched)
         #expect(windows.limits(for: .anthropic, model: "claude-alias")?.contextWindowTokens == 96_000)
         #expect(windows.limits(for: .anthropic, model: "claude-canonical")?.maxOutputTokens == 8_192)
+        // The resolved alias qualifies the run's capability snapshot (C04).
+        #expect(windows.reportedCapabilities(for: .anthropic, model: "claude-alias")?.canonicalModelID == "claude-canonical")
         let request = try #require(MockURLProtocol.lastRequest)
         #expect(request.url?.path == "/v1/models/claude-alias")
         #expect(request.value(forHTTPHeaderField: "x-api-key") == "secret")
@@ -32,11 +34,13 @@ extension ProviderHTTPTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         let windows = ModelContextWindowStore(defaults: defaults)
         MockURLProtocol.enqueue([MockURLProtocol.json(["name": "models/gemini-test-002", "inputTokenLimit": 128_000,
-            "outputTokenLimit": 8_192, "supportedGenerationMethods": ["generateContent"]])])
+            "outputTokenLimit": 8_192, "supportedGenerationMethods": ["generateContent"], "thinking": true])])
         let service = ProviderModelMetadataService(session: MockURLProtocol.session(), apiKey: "secret", windows: windows)
         #expect(try await service.refresh(provider: .google, model: "models/gemini-alias") == .fetched)
         #expect(windows.limits(for: .google, model: "models/gemini-alias")?.contextWindowTokens == 128_000)
         #expect(windows.limits(for: .google, model: "gemini-test-002")?.maxOutputTokens == 8_192)
+        let reported = windows.reportedCapabilities(for: .google, model: "models/gemini-alias")
+        #expect(reported?.canonicalModelID == "gemini-test-002" && reported?.reasoning == true)
         #expect(MockURLProtocol.lastRequest?.url?.path == "/v1beta/models/gemini-alias")
         #expect(MockURLProtocol.lastRequest?.url?.query == nil)
         #expect(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "x-goog-api-key") == "secret")

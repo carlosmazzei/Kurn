@@ -126,7 +126,16 @@ struct HarnessChatService {
             })
         try Task.checkCancellation()
         let refresh = try await refreshMetadata(provider, modelIdentifier, contextWindows)
+        // What the model can do, recorded with the run (NH07, C03): the chat cannot work without tools.
+        let capabilities = contextWindows.capabilities(
+            for: provider, model: modelIdentifier, api: model.descriptor?.api ?? "unknown",
+            reasoningEffort: OpenAIProvider.agentReasoningEffort(provider: provider, model: modelIdentifier))
+        if capabilities.tools == .unsupported {
+            throw AppError.apiError(statusCode: 0, message: NSLocalizedString("chat.model.tools_unsupported",
+                                                                              comment: "Model cannot call tools"))
+        }
         let resolution = contextWindows.resolution(for: provider, model: modelIdentifier, metadataRefresh: refresh)
+            .recordingCapabilities(capabilities)
         HarnessDiagnostics.record(resolution)
         let plannedLimits: AgentLimits
         if let limits { plannedLimits = limits }

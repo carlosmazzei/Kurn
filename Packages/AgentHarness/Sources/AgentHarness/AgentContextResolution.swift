@@ -21,6 +21,8 @@ public struct AgentContextResolution: Codable, Sendable, Equatable, Identifiable
     public let catalogVersion: String?
     public let reason: Reason
     public private(set) var metadataRefresh: AgentMetadataRefresh?
+    /// The model's capability snapshot (NH07, C03), when the host resolved one. Older traces have none.
+    public private(set) var capabilities: AgentModelCapabilities?
 
     public init(contextWindowTokens: Int, source: Source, reason: Reason, modelLimits: AgentModelLimits? = nil,
                 catalogVersion: String? = nil, resolvedAt: Date = Date(), id: UUID = UUID(), modelID: String = "") {
@@ -36,6 +38,13 @@ public struct AgentContextResolution: Codable, Sendable, Equatable, Identifiable
         self.catalogVersion = catalogVersion
         self.reason = reason
         self.metadataRefresh = nil
+        self.capabilities = nil
+    }
+
+    public func recordingCapabilities(_ capabilities: AgentModelCapabilities?) -> Self {
+        var result = self
+        result.capabilities = capabilities
+        return result
     }
 
     public func recordingMetadataRefresh(_ status: AgentMetadataRefresh?) -> Self {

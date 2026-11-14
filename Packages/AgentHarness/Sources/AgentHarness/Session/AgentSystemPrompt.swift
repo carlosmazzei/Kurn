@@ -104,6 +104,9 @@ extension AgentRunBranch {
     /// The tool loadout the run recorded, if any.
     public var toolLoadout: AgentToolLoadout? { Self.decode(AgentToolLoadout.self, startFields["tools"]) }
 
+    /// The model capability snapshot the run started with (NH07), if it recorded one.
+    public var capabilities: AgentModelCapabilities? { Self.decode(AgentModelCapabilities.self, startFields["capabilities"]) }
+
     /// Each run's system prompt in order, folding every recorded patch onto the one before.
     public static func systemPrompts(of runs: [AgentRunBranch]) -> [AgentSystemPrompt?] {
         var previous: AgentSystemPrompt?
