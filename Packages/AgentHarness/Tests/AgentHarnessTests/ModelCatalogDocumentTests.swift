@@ -65,7 +65,7 @@ struct ModelCatalogDocumentTests {
         defer { ModelCatalogOverlay.install(nil) }
         let document = try ModelCatalogDocument.decode(Self.json(models: #"""
             "kurn-test-window":{"context":300000,"maxOutput":9000,"tools":"supported","reasoning":"unsupported"},
-            "kurn-test-output-only":{"maxOutput":4000},"claude-kurn-test":{"reasoning":"supported"}
+            "kurn-test-output-only":{"maxOutput":4000},"claude-opus-kurn-test":{"reasoning":"supported"}
             """#))
         #expect(ModelCatalogOverlay.install(document))
 
@@ -81,7 +81,7 @@ struct ModelCatalogDocumentTests {
         #expect(capabilities.tools == .supported && capabilities.reasoning == .unsupported && capabilities.imageInput == .unknown)
         #expect(capabilities.source == .catalog && capabilities.catalogVersion == document.provenance)
         // A fact the document leaves out keeps the family rule's.
-        let family = ModelCapabilityCatalog.resolve(api: "anthropic", model: "claude-kurn-test")
+        let family = ModelCapabilityCatalog.resolve(api: "anthropic", model: "claude-opus-kurn-test")
         #expect(family.reasoning == .supported && family.tools == .supported && family.imageInput == .supported)
 
         // Models it does not list are untouched.
