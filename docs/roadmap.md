@@ -952,14 +952,13 @@ accepted limitations and the device checks are recorded.
 
 A review against the Swift harness spec (pi-derived: LLM layer, loop, sessions, iOS integration)
 found these open items beyond the contract table above. Persistence in SwiftData, user-supplied
-keys in the Keychain and provider failures thrown as typed errors are deliberate departures, not gaps.
+keys in the Keychain, provider failures thrown as typed errors and questions without images are deliberate
+departures, not gaps.
 
 | Area | Open item |
 | --- | --- |
 | Reasoning | The chat sends one level (low, medium, high) for every provider: per-model level sets (OpenAI `minimal`/`none`, Gemini 3 `thinkingLevel`), a level remembered per provider, and visible-reasoning qualification on real providers (Responses summaries can need organization verification) remain |
-| Input | Images in questions, resized per model limits before they enter history |
 | Model catalog | A remotely updatable catalog (capacity, capabilities, prices) instead of one compiled into the app |
-| Streaming | Partial tool-call arguments shown while they stream (incremental JSON) |
 | Qualification | A live-provider smoke test behind an environment variable; measure first-token latency, opening a 1,000-entry session and Swift 6 strict-concurrency warnings |
 
 ### Local suspension, recovery and resource limits

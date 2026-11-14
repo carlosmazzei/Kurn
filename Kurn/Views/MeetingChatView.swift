@@ -211,7 +211,8 @@ struct MeetingChatConversationView: View {
                                             meetingTitles: Dictionary(uniqueKeysWithValues: sourceMeetings.map { ($0.id, $0.title) }),
                                             documentTitles: Dictionary(uniqueKeysWithValues: vm.artifacts.map { ($0.id, $0.title) }),
                                             artifacts: vm.artifacts, artifactSession: vm.artifactSession,
-                                            onJumpToTime: onJumpToTime, branch: branchActions(for: turn), undoAction: vm.undoAction)
+                                            onJumpToTime: onJumpToTime, branch: branchActions(for: turn), undoAction: vm.undoAction,
+                                            writingSteps: isStreaming(turn) ? vm.writingSteps : [])
                             .id(turn.id)
                     }
                     if let usage = vm.branches.usageSummary, !vm.isResponding {

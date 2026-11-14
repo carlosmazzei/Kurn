@@ -31,7 +31,11 @@ public struct AgentRunStep: Codable, Sendable, Equatable, Identifiable {
     public var argumentsSummary: String? { arguments.flatMap { try? $0.encodedString() } }
 
     public init(kind: Kind, status: Status = .running) {
-        id = UUID()
+        self.init(id: UUID(), kind: kind, status: status)
+    }
+
+    init(id: UUID, kind: Kind, status: Status) {
+        self.id = id
         self.kind = kind
         self.status = status
     }
