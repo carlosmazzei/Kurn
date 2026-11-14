@@ -23,7 +23,7 @@ public struct AgentToolInvocation: Codable, Sendable, Equatable {
 }
 
 public enum AgentToolBlockReason: String, Codable, Sendable {
-    case outputLimit, toolsDisabled, turnLimit, toolCallLimit, costLimit
+    case outputLimit, toolsDisabled, turnLimit, toolCallLimit, costLimit, terminated
     case invalidArguments, unknownTool, unsupportedNamespace, confirmationDeclined, interruptedResponse, policyDenied
 }
 

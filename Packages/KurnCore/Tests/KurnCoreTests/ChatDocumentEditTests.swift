@@ -25,4 +25,19 @@ import Testing
         let maximum = ChatDocumentArtifact(id: original.id, title: "Report", markdown: "Text", version: Int.max)
         #expect(throws: (any Error).self) { try ChatDocumentEdit.append(maximum.id, markdown: "Next").applying(to: [maximum]) }
     }
+
+    @Test func restoreBringsBackAnEarlierVersionAsANewOne() throws {
+        let first = try ChatDocumentEdit.create(title: "Report", markdown: "Initial").applying(to: [])
+        let second = try ChatDocumentEdit.update(first.artifact.id, title: "Revised", markdown: "Replacement").applying(to: first.artifacts)
+        let restored = try ChatDocumentEdit.restore(first.artifact).applying(to: second.artifacts)
+        #expect(restored.artifact == ChatDocumentArtifact(id: first.artifact.id, title: "Report", markdown: "Initial", version: 3))
+        #expect(restored.artifacts == [restored.artifact])
+        // Undoing the undo brings the replacement back, again as a newer version.
+        let redone = try ChatDocumentEdit.restore(second.artifact).applying(to: restored.artifacts)
+        #expect(redone.artifact.markdown == "Replacement" && redone.artifact.version == 4)
+        #expect(throws: (any Error).self) { try ChatDocumentEdit.restore(second.artifact).applying(to: second.artifacts) }
+        #expect(throws: (any Error).self) {
+            try ChatDocumentEdit.restore(ChatDocumentArtifact(title: "Other", markdown: "Text")).applying(to: second.artifacts)
+        }
+    }
 }

@@ -21,6 +21,8 @@ extension NativeHarness {
                 let work = try prepare(call, requestID: requestID, stop: &stop, state: &state, events: events, trace: trace)
                 let result = try await perform(work, pipeline: pipeline)
                 try await append(result, work: work, state: &state, events: events, trace: trace)
+                // The batch's later calls still get a (skipped) result each, so every call keeps one.
+                if result.terminatesRun, stop == nil { stop = terminate(work, trace: trace) }
             }
             return stop
         }
@@ -39,7 +41,9 @@ extension NativeHarness {
             var failure: Error?
             for (index, result) in results {
                 switch result {
-                case .success(let result): try await append(result, work: work[index], state: &state, events: events, trace: trace)
+                case .success(let result):
+                    try await append(result, work: work[index], state: &state, events: events, trace: trace)
+                    if result.terminatesRun, stop == nil { stop = terminate(work[index], trace: trace) }
                 case .failure(let error): failure = failure ?? error
                 }
             }
@@ -81,16 +85,22 @@ extension NativeHarness {
                     !state.extendBudget(.toolCallLimit, limits: limits, trace: trace) { stop = .toolCallLimit }
         }
         if let stop {
-            recordLimit(stop, state: &state, trace: trace)
+            if stop != .terminated { recordLimit(stop, state: &state, trace: trace) }
             trace.record(.toolSkipped, metrics: [.callOrdinal: state.requestedCalls], reason: stop, invocation: invocation)
         } else { state.toolCalls += 1 }
         events.yield(.toolStarted(callID: call.id, name: call.name, arguments: call.arguments))
         return Work(normalized: normalized, invocation: invocation, ordinal: state.requestedCalls, blocked: stop)
     }
 
+    private func terminate(_ work: Work, trace: AgentTraceEmitter) -> AgentRunStopReason {
+        trace.record(.runTerminated, metrics: [.callOrdinal: work.ordinal], invocation: work.invocation)
+        return .terminated
+    }
+
     private func perform(_ work: Work, pipeline: AgentToolPipeline) async throws -> AgentToolExecution {
         if let stop = work.blocked {
-            let result = AgentToolExecution.failure("Tool not executed: \(stop.rawValue) reached.", AgentToolBlockReason(rawValue: stop.rawValue))
+            let text = stop == .terminated ? "Tool not executed: the run was ended." : "Tool not executed: \(stop.rawValue) reached."
+            let result = AgentToolExecution.failure(text, AgentToolBlockReason(rawValue: stop.rawValue))
             pipeline.trace.record(.toolFinished, metrics: [.isError: 1], invocation: work.invocation)
             pipeline.events.yield(.toolFinished(callID: work.normalized.call.id, name: work.normalized.call.name,
                 summary: result.output.summary, isError: true))

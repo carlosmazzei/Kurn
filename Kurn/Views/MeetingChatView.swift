@@ -103,6 +103,7 @@ struct MeetingChatConversationView: View {
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { composerHeight = $0 }
         }
         .errorAlert($vm.error)
+        .chatChangeConfirmation(vm.changeConfirmation)
         // Typing a label needs a text field, which only the system alert offers.
         .alert(NSLocalizedString("chat.branch.label", comment: "Label this question"),
                isPresented: Binding(get: { labelTarget != nil }, set: { if !$0 { labelTarget = nil } })) {
@@ -210,7 +211,7 @@ struct MeetingChatConversationView: View {
                                             meetingTitles: Dictionary(uniqueKeysWithValues: sourceMeetings.map { ($0.id, $0.title) }),
                                             documentTitles: Dictionary(uniqueKeysWithValues: vm.artifacts.map { ($0.id, $0.title) }),
                                             artifacts: vm.artifacts, artifactSession: vm.artifactSession,
-                                            onJumpToTime: onJumpToTime, branch: branchActions(for: turn))
+                                            onJumpToTime: onJumpToTime, branch: branchActions(for: turn), undoAction: vm.undoAction)
                             .id(turn.id)
                     }
                     if let usage = vm.branches.usageSummary, !vm.isResponding {

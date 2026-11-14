@@ -434,6 +434,25 @@ include a message again (`restoredMessageIDs`), so what is left out is the net o
 "Leave out of later answers" / "Include in later answers" (`MeetingChatViewModel.setLeftOut`,
 `SwiftDataAgentSessionStore.editContext`): the edit names the question and its answer turn, the whole
 exchange stops being replayed (run or plain text alike), and the question is marked as left out.
+Tools declare an effect (`AgentTool.Effect`: `read`, `write`, `destructive`); a destructive tool asks the
+harness's `confirm` closure before it runs unless its owner sets `requiresConfirmation: false`. A declined
+confirmation, or a tool result with `AgentToolOutput.terminatesRun` (pi's `terminate`, encoded only when set
+so older outputs keep their bytes), ends the run after its batch as `AgentRunStopReason.terminated`: the
+batch's remaining calls get skipped results, no further request is sent, nothing is wrapped up, the outcome
+has no final text (the turn's text was narration beside the calls) and it is not recorded as a limit (`runTerminated` diagnostic). In the chat, `read_document` is a read,
+`create_document`/`append_to_document` are writes and `update_document`, which replaces a body, is destructive
+(`ChatDocumentTools.effect(of:)`): `HarnessChatService.confirmChange` (default no) is the view model's
+`ChatChangeConfirmation`, a sheet (`ChatChangeConfirmationSheet`) showing the document, any new title and the
+replacement text, answered only by its own buttons; a stopped run answers no. "Change declined" ends the run
+with the question retryable. A document card offers Undo (`MeetingChatViewModel.undoLastChange`) while no
+reply runs: each presentation state records, for every document revision it shows, the revision that one
+replaced on this branch (`HarnessPresentationState.predecessors`: set when a write introduces a newer version,
+carried forward by later states, absent when nothing was replaced, rebased with the revision IDs by copies and
+imports, which also copy the revisions it names). `SwiftDataAgentSessionStore.undoLastChange` reads the shown
+state's link (`previousVersion(of:in:)`), so a reused revision two branches reached from different versions
+still undoes to its own branch's, and the earlier revision is found even though a document effect rewrites its
+question as a sibling; it saves that revision again as a new version (`ChatDocumentEdit.restore`), so the change
+undone stays saved and can itself be restored.
 `AgentLimits.wrapUpOnLimit` runs one extra turn after a turn/tool-call limit with
 `NativeHarness.wrapUpInstruction` appended and `AgentTurnRequest.allowsToolCalls` false
 (tools stay declared; the wire formats send `tool_choice: none` / Gemini mode `NONE`, and

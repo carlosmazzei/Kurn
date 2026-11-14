@@ -89,7 +89,8 @@ extension SwiftDataAgentSessionStore {
             leaf = state.id
         }
         _ = try AgentEntryGraph(sessionID: newID, entries: entries, leafID: leaf)
-        let referenced = Set(entries.flatMap(Self.revisionIDs))
+        // A copy keeps the revisions its states show and those they replaced, so Undo works in it.
+        let referenced = Set(entries.flatMap { Self.revisionIDs($0) + Self.predecessorIDs($0) })
         let revisions = source.harnessRevisions.filter { referenced.contains(Self.rebased($0.id, from: source, to: target)) }
         context.insert(target)
         do {
@@ -129,6 +130,10 @@ extension SwiftDataAgentSessionStore {
         guard case .custom(HarnessPresentationState.type, let data) = entry.payload else { return entry }
         var state = try JSONDecoder().decode(HarnessPresentationState.self, from: JSONEncoder().encode(data))
         state.artifactRevisionIDs = state.artifactRevisionIDs.map { rebased($0, from: source, to: target) }
+        state.predecessors = state.predecessors.map { links in
+            Dictionary(links.map { (rebased($0.key, from: source, to: target), rebased($0.value, from: source, to: target)) },
+                       uniquingKeysWith: { first, _ in first })
+        }
         return try AgentSessionEntry(sessionID: entry.sessionID, id: entry.id, parentID: entry.parentID, ordinal: entry.ordinal,
             createdAt: entry.createdAt, payload: .custom(type: HarnessPresentationState.type, data: HarnessPresentationCodec.json(state)),
             metadata: entry.metadata)
@@ -138,6 +143,11 @@ extension SwiftDataAgentSessionStore {
         let prefix = source + ":"
         guard revisionID.hasPrefix(prefix) else { return revisionID }
         return target + ":" + revisionID.dropFirst(prefix.count)
+    }
+
+    static func predecessorIDs(_ entry: AgentSessionEntry) -> [String] {
+        guard let links = (try? HarnessPresentationState.decoded(entry))?.predecessors else { return [] }
+        return Array(links.values)
     }
 
     static func revisionIDs(_ entry: AgentSessionEntry) -> [String] {

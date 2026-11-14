@@ -19,6 +19,7 @@ public struct AgentDiagnostic: Codable, Sendable, Equatable {
         case systemPromptRefreshed
         case outputBudgetAdjusted, replayPrepared
         case toolValidationFailed, toolPolicyDenied, toolProgress, toolAborted, toolRegistryRejected
+        case runTerminated
     }
     public enum Metric: String, Codable, Sendable, CodingKeyRepresentable {
         case contextTokens, thresholdTokens, retainedTokens, afterTokens, forced

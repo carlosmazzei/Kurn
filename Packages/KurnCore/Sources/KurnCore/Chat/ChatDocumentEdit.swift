@@ -5,6 +5,9 @@ public enum ChatDocumentEdit: Sendable {
     case create(title: String, markdown: String)
     case update(UUID, title: String?, markdown: String)
     case append(UUID, markdown: String)
+    /// Undo: the document becomes an earlier version's title and body again, as a new version.
+    /// Versions only grow, so the version undone stays saved and can itself be restored.
+    case restore(ChatDocumentArtifact)
 
     public func applying(to artifacts: [ChatDocumentArtifact]) throws -> (artifact: ChatDocumentArtifact, artifacts: [ChatDocumentArtifact]) {
         _ = try ChatDocumentWorkspace(artifacts: artifacts)
@@ -20,6 +23,10 @@ public enum ChatDocumentEdit: Sendable {
             // A whitespace-only append is invalid even if the existing body is valid.
             _ = try ChatDocumentWorkspace(artifacts: [ChatDocumentArtifact(title: current.title, markdown: markdown)])
             artifact = ChatDocumentArtifact(id: id, title: current.title, markdown: current.markdown + "\n\n" + markdown, version: current.version + 1)
+        case .restore(let earlier):
+            let current = try current(earlier.id, in: artifacts)
+            guard earlier.version < current.version else { throw ChatDocumentError("Not an earlier version.") }
+            artifact = ChatDocumentArtifact(id: earlier.id, title: earlier.title, markdown: earlier.markdown, version: current.version + 1)
         }
         let result = (artifacts.filter { $0.id != artifact.id } + [artifact]).sorted { $0.id.uuidString < $1.id.uuidString }
         _ = try ChatDocumentWorkspace(artifacts: result)

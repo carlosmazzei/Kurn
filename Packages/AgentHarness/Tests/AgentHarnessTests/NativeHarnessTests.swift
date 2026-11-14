@@ -106,7 +106,9 @@ func agentOutcome(_ events: [AgentEvent]) throws -> AgentRunOutcome {
         let events = try await agentEvents(NativeHarness(model: model),
                                            tools: [agentTool(confirm: kind == "decline", fails: kind == "throw")])
         let outcome = try agentOutcome(events)
-        #expect(outcome.finalText == "Recovered")
+        // A declined confirmation ends the run instead of asking the model to work around it.
+        #expect(outcome.finalText == (kind == "decline" ? "" : "Recovered"))
+        #expect(outcome.stopReason == (kind == "decline" ? .terminated : .completed))
         guard case .toolResult(_, _, let content, let isError) = outcome.messages[2].legacyProjection else {
             Issue.record("Missing tool result")
             return

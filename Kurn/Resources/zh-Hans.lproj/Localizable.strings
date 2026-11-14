@@ -1084,6 +1084,14 @@
 "chat.step.stop.costLimit" = "已达到预估费用上限";
 "chat.step.stop.outputLimit" = "回答因输出上限而截断";
 "chat.step.stop.unknown" = "已停止";
+"chat.step.stop.terminated" = "更改被拒绝";
+"chat.confirm.replace.title" = "替换“%@”？";
+"chat.confirm.replace.message" = "代理想用下面的版本替换此文档的文本。当前版本会保留，文档卡片可以撤销这次更改。";
+"chat.confirm.replace.new_title" = "新标题：%@";
+"chat.confirm.replace.allow" = "替换";
+"chat.confirm.replace.deny" = "不替换";
+"chat.artifact.undo" = "撤销";
+"chat.artifact.undo.unavailable" = "此文档没有可恢复的早期版本。";
 "chat.step.tool" = "正在使用工具 %@";
 "chat.step.query" = "查询";
 "chat.step.meeting" = "会议";

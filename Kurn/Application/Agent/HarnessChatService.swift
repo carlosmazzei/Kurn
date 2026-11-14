@@ -18,6 +18,9 @@ struct HarnessChatService {
     var reasoningLevel: @Sendable (AIProvider, String, ModelContextWindowStore) -> AgentReasoningLevel? = {
         ChatReasoningPreference.level(for: $0, model: $1, store: $2)
     }
+    /// Asked before a destructive tool call runs (replacing a document's body); a no ends the run.
+    /// Without a person to ask, nothing destructive runs.
+    var confirmChange: @Sendable (AgentToolCall) async -> Bool = { _ in false }
     var refreshMetadata: @Sendable (AIProvider, String, ModelContextWindowStore) async throws -> AgentMetadataRefresh = { provider, model, store in
         try await ProviderModelMetadataService(windows: store).refresh(provider: provider, model: model)
     }
@@ -152,7 +155,7 @@ struct HarnessChatService {
                                     contextPolicy: AgentContextPolicy(contextWindow: resolution.contextWindowTokens,
                                                                       summaryPrompts: ChatCompactionPrompts.profile,
                                                                       maxOutputTokens: resolution.maxOutputTokens),
-                                    retryPolicy: .standard,
+                                    retryPolicy: .standard, confirm: confirmChange,
                                     diagnosticSink: { HarnessDiagnostics.record($0) })
             // A document tool changes the index the prompt lists; the next request sees it (C12).
             .refreshingSystemPrompt { try? await Self.system(artifacts: workspace.snapshot()).text }

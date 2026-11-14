@@ -182,38 +182,76 @@ public struct AgentToolOutput: Codable, Sendable, Equatable {
     public let metrics: [AgentDiagnostic.Metric: Int]
     public let details: JSONValue?
     public let structuredContent: JSONValue?
+    /// The run ends after this call's batch, with no further model request (pi's `terminate`).
+    /// Calls of the batch not yet executed get a skipped result; the run stops as `.terminated`.
+    public let terminatesRun: Bool
 
     public init(content: String, summary: String, isError: Bool = false, metrics: [AgentDiagnostic.Metric: Int] = [:],
-                details: JSONValue? = nil, structuredContent: JSONValue? = nil) {
+                details: JSONValue? = nil, structuredContent: JSONValue? = nil, terminatesRun: Bool = false) {
         self.content = content
         self.summary = summary
         self.isError = isError
         self.metrics = metrics
         self.details = details
         self.structuredContent = structuredContent
+        self.terminatesRun = terminatesRun
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case content, summary, isError, metrics, details, structuredContent, terminatesRun
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        content = try container.decode(String.self, forKey: .content)
+        summary = try container.decode(String.self, forKey: .summary)
+        isError = try container.decode(Bool.self, forKey: .isError)
+        metrics = try container.decode([AgentDiagnostic.Metric: Int].self, forKey: .metrics)
+        details = try container.decodeIfPresent(JSONValue.self, forKey: .details)
+        structuredContent = try container.decodeIfPresent(JSONValue.self, forKey: .structuredContent)
+        terminatesRun = try container.decodeIfPresent(Bool.self, forKey: .terminatesRun) ?? false
+    }
+
+    /// Outputs written before `terminatesRun` keep their exact bytes: the key is written only when set.
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(content, forKey: .content)
+        try container.encode(summary, forKey: .summary)
+        try container.encode(isError, forKey: .isError)
+        try container.encode(metrics, forKey: .metrics)
+        try container.encodeIfPresent(details, forKey: .details)
+        try container.encodeIfPresent(structuredContent, forKey: .structuredContent)
+        if terminatesRun { try container.encode(true, forKey: .terminatesRun) }
     }
 }
 
 public struct AgentTool: Sendable {
     public enum Scheduling: Sendable { case sequential, parallelRead }
+    /// What a call can change: nothing (`read`), something a later call or the user can take back
+    /// (`write`), or something it replaces or removes (`destructive`). A destructive tool asks for
+    /// confirmation unless its owner says otherwise.
+    public enum Effect: String, Codable, Sendable, CaseIterable { case read, write, destructive }
     public let spec: AgentToolSpec
+    public let effect: Effect
     public let requiresConfirmation: Bool
     public let execute: @Sendable (JSONValue) async throws -> AgentToolOutput
     public let executeWithContext: @Sendable (JSONValue, AgentToolExecutionContext) async throws -> AgentToolOutput
     public let scheduling: Scheduling
 
-    public init(spec: AgentToolSpec, requiresConfirmation: Bool = false, scheduling: Scheduling = .sequential,
+    public init(spec: AgentToolSpec, effect: Effect = .read, requiresConfirmation: Bool? = nil, scheduling: Scheduling = .sequential,
                 execute: @escaping @Sendable (JSONValue) async throws -> AgentToolOutput) {
         self.spec = spec
-        self.requiresConfirmation = requiresConfirmation
+        self.effect = effect
+        self.requiresConfirmation = requiresConfirmation ?? (effect == .destructive)
         self.execute = execute
         executeWithContext = { arguments, _ in try await execute(arguments) }
         self.scheduling = scheduling
     }
 
-    public init(spec: AgentToolSpec, requiresConfirmation: Bool = false, scheduling: Scheduling = .sequential,
+    public init(spec: AgentToolSpec, effect: Effect = .read, requiresConfirmation: Bool? = nil, scheduling: Scheduling = .sequential,
                 executeWithContext: @escaping @Sendable (JSONValue, AgentToolExecutionContext) async throws -> AgentToolOutput) {
-        self.spec = spec; self.requiresConfirmation = requiresConfirmation; self.scheduling = scheduling
+        self.spec = spec; self.effect = effect; self.scheduling = scheduling
+        self.requiresConfirmation = requiresConfirmation ?? (effect == .destructive)
         self.executeWithContext = executeWithContext
         execute = { arguments in
             let invocation = try AgentToolInvocation(id: UUID().uuidString, requestID: UUID().uuidString,
@@ -246,6 +284,9 @@ public struct AgentLimits: Sendable, Equatable {
 
 public enum AgentRunStopReason: String, Codable, Sendable {
     case completed, turnLimit, toolCallLimit, costLimit, outputLimit
+    /// A tool ended the run (`AgentToolOutput.terminatesRun`), or the person declined a call
+    /// that needed confirmation. Not a limit: nothing is wrapped up.
+    case terminated
 }
 
 public struct AgentRunOutcome: Sendable, Equatable {

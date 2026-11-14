@@ -107,7 +107,8 @@ private struct DocumentReply {
     func schemasAndMalformedArguments(name: String) async throws {
         let workspace = ChatDocumentWorkspace()
         let tool = try #require(ChatDocumentTools.make(workspace: workspace).first { $0.spec.name == name })
-        #expect(!tool.requiresConfirmation)
+        // Only replacing a body asks the person first.
+        #expect(tool.requiresConfirmation == (name == "update_document"))
         #expect(tool.spec.description.contains("do not paste the document"))
         #expect(tool.spec.description.contains("document, report or minutes"))
         guard case .object(let schema) = tool.spec.inputSchema else { Issue.record("Missing schema"); return }
@@ -227,7 +228,9 @@ private struct DocumentReply {
                      agentCall("3", name: "append_to_document", raw: "{\"document_id\":\"\(id)\",\"markdown\":\"Section\"}"),
                      agentCall("4", name: "read_document", raw: "{\"document_id\":\"\(id)\"}")]
         let model = ScriptedAgentModel([AgentTurnResponse(text: "", toolCalls: calls), AgentTurnResponse(text: "Documents are ready.")])
-        let outcome = try agentOutcome(await agentEvents(NativeHarness(model: model), tools: ChatDocumentTools.make(workspace: workspace)))
+        // Replacing a body is destructive: the person allows it here.
+        let harness = NativeHarness(model: model, confirm: { $0.name == "update_document" })
+        let outcome = try agentOutcome(await agentEvents(harness, tools: ChatDocumentTools.make(workspace: workspace)))
         #expect(outcome.stopReason == .completed)
         #expect(outcome.finalText == "Documents are ready.")
         let snapshot = await workspace.snapshot()
