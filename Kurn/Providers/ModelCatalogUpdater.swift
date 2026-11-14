@@ -19,10 +19,10 @@ import Foundation
 @MainActor
 final class ModelCatalogUpdater {
     /// Served from the repository's default branch; the file is reviewed like any other change.
-    static let sourceURL = URL(string: "https://raw.githubusercontent.com/carlosmazzei/Kurn/main/catalog/model-catalog-v1.json")!
-    static let checkInterval: TimeInterval = 24 * 60 * 60
-    static let lastCheckKey = "modelCatalog.lastCheckedAt"
-    static let fileName = "model-catalog-v1.json"
+    nonisolated static let sourceURL = URL(string: "https://raw.githubusercontent.com/carlosmazzei/Kurn/main/catalog/model-catalog-v1.json")!
+    nonisolated static let checkInterval: TimeInterval = 24 * 60 * 60
+    nonisolated static let lastCheckKey = "modelCatalog.lastCheckedAt"
+    nonisolated static let fileName = "model-catalog-v1.json"
 
     enum Outcome: String, Equatable {
         case noCloudProvider, notDue, busy, applied, unchanged, rejected, failed
