@@ -5,6 +5,7 @@ import Testing
 
 /// The chat prompt's user context (today's date, time zone, locale) and the reasoning level a
 /// request carries for a provider and model.
+@MainActor
 struct ChatPromptContextTests {
     private let now = Date(timeIntervalSince1970: 1_794_700_800) // 2026-11-15T00:00:00Z
 
