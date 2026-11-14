@@ -3,6 +3,24 @@ import Testing
 @testable import AgentHarness
 
 @Suite struct AgentRunSnapshotTests {
+    /// Narration beside tool calls moves into the trace, so the streamed reply shows only the turn
+    /// still being written.
+    @Test func narrationLeavesTheStreamedReply() throws {
+        var snapshot = AgentRunSnapshot()
+        snapshot.apply(.runStarted)
+        snapshot.apply(.textDelta("I'll search."))
+        let call = AgentToolCall(id: "c1", name: "search", arguments: .object([:]), rawArguments: "{}")
+        let narrated = try AgentContentMessage(id: "m1", timestampMilliseconds: 1, role: .assistant, blocks: [
+            AgentContentBlock(id: "n", content: .text("I'll search.")),
+            AgentContentBlock(id: "c", content: .toolCall(call, complete: true))
+        ])
+        snapshot.apply(.messageAppended(.content(narrated)))
+        #expect(snapshot.exchanges.last?.text == "" && snapshot.text == "")
+        #expect(snapshot.trace.steps.contains { $0.kind == .narration && $0.text == "I'll search." })
+        snapshot.apply(.textDelta("Found it."))
+        #expect(snapshot.exchanges.last?.text == "Found it." && snapshot.text == "Found it.")
+    }
+
     @Test func aSnapshotReducesTextTraceProgressToolsAndOutcome() {
         var snapshot = AgentRunSnapshot()
         snapshot.apply(.runStarted)

@@ -15,6 +15,8 @@ struct FluidAudioDiarizationRuntimeTests {
             #expect(config.segmentation.batchSize == batch.rawValue)
             #expect(config.clustering.numSpeakers == 3)
             #expect(config.exposeChunkEmbeddings)
+            #expect(config.postProcessing.exclusiveSegments)
+            #expect(config.postProcessing.minGapDurationSeconds == defaults.postProcessing.minGapDurationSeconds)
             #expect(config.segmentation.windowDurationSeconds == defaults.segmentation.windowDurationSeconds)
             #expect(config.segmentation.stepRatio == defaults.segmentation.stepRatio)
             #expect(config.embedding.batchSize == defaults.embedding.batchSize)
@@ -25,6 +27,8 @@ struct FluidAudioDiarizationRuntimeTests {
         #expect(automatic.clustering.numSpeakers == nil)
         #expect(automatic.segmentation.batchSize == 32)
         #expect(automatic.exposeChunkEmbeddings)
+        // Pinned regardless of the library default, which 0.18.2 changed to overlapping turns.
+        #expect(automatic.postProcessing.exclusiveSegments)
     }
 }
 #endif

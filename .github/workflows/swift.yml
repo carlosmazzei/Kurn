@@ -2,7 +2,9 @@ name: iOS CI
 
 on:
   push:
-    branches: [ "main" ]
+    # The integration branch gets a run of its own after every merge so Codecov has a base
+    # report to compare its PRs against (without one, every PR comment shows "?").
+    branches: [ "main", "feature/native-harness" ]
     tags: [ "v*.*.*" ]
   pull_request:
     branches: [ "main", "feature/native-harness", "devin/*-agent-chat-*" ]
@@ -473,7 +475,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@7f797815d8adceb1c412e7abefdd1ab4abc47a5f # v1.335.0
+        uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
         with:
           ruby-version: '3.3'
           bundler-cache: true
@@ -503,7 +505,7 @@ jobs:
         run: xcodebuild -version
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@7f797815d8adceb1c412e7abefdd1ab4abc47a5f # v1.335.0
+        uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
         with:
           ruby-version: '3.3'
           bundler-cache: true
@@ -558,7 +560,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@7f797815d8adceb1c412e7abefdd1ab4abc47a5f # v1.335.0
+        uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
         with:
           ruby-version: '3.3'
           bundler-cache: true

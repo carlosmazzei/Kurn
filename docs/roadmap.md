@@ -948,6 +948,26 @@ queues itself. A23 and A24 stay conditional: they apply only if result-replaceme
 policies are ever exposed. The local profile is complete when this table is empty apart from
 accepted limitations and the device checks are recorded.
 
+### Gaps against the Swift agent-harness spec (review of 2026-11-14)
+
+A review against the Swift harness spec (pi-derived: LLM layer, loop, sessions, iOS integration)
+found these open items beyond the contract table above. Persistence in SwiftData, user-supplied
+keys in the Keychain and provider failures thrown as typed errors are deliberate departures, not gaps.
+
+| Area | Open item |
+| --- | --- |
+| Chat UI | Show the run as a chronological activity transcript, Claude Code-style: reasoning (collapsible, timed), the model's narration between tool calls, each tool call with its result line, and a live status line with phase, elapsed time and tokens |
+| Reasoning | A reasoning-level setting mapped per vendor (Anthropic extended thinking budget, OpenAI `reasoning.effort` plus `summary`, Gemini `thinkingConfig` with `includeThoughts`), offering only the levels the model's capability snapshot supports; today only GPT-5 gets a fixed low effort and no vendor is asked for visible reasoning |
+| Prompt | A `user_context` section with today's date, locale and time zone, so relative dates resolve correctly |
+| Prompt caching | Anthropic `cache_control` breakpoints on the stable system prompt and history prefix, and OpenAI `prompt_cache_key` from the session; cache reads and writes are already counted and priced |
+| Sessions | Search over conversation history; regenerate an answered question as a sibling branch; edit a question in place as a sibling branch (today edit means fork into a new conversation) |
+| Context | Show the context in use against the model's window (`AgentRunProgress.contextTokens` is computed but not displayed) |
+| Tools | Classify tools by effect (read, write, destructive), confirm destructive calls in a sheet, offer undo on write cards, and let a tool end the run (`terminate`) |
+| Input | Images in questions, resized per model limits before they enter history |
+| Model catalog | A remotely updatable catalog (capacity, capabilities, prices) instead of one compiled into the app |
+| Streaming | Partial tool-call arguments shown while they stream (incremental JSON) |
+| Qualification | A live-provider smoke test behind an environment variable; measure first-token latency, opening a 1,000-entry session and Swift 6 strict-concurrency warnings |
+
 ### Local suspension, recovery and resource limits
 
 Run interactive agent work in foreground. At background transition, persist

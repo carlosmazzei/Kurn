@@ -35,6 +35,8 @@ final class MeetingChatViewModel {
     private(set) var phase: ChatRunPhase = .idle
     /// The current run's turn, request and tool calls (NH05 phase/identity projection).
     private(set) var runProgress = AgentRunProgress()
+    /// When the current run started, for the live status line's elapsed time; nil while idle.
+    private(set) var runStartedAt: Date?
     private(set) var scopeEditor = ChatSourceScopeEditor()
     var scope: ChatSourceScope { scopeEditor.scope }
     private(set) var artifacts: [ChatDocumentArtifact] = []
@@ -187,6 +189,7 @@ final class MeetingChatViewModel {
         // `runID` correlates the `ReliabilityEvent` this turn produces; a parameter (defaulted) so
         // a test can pick its own events out of the process-global log.
         let startedAt = Date()
+        runStartedAt = startedAt
 
         task = Task { [weak self] in
             guard let self else { return }
@@ -244,6 +247,7 @@ final class MeetingChatViewModel {
         currentRequest = nil
         isResponding = false
         phase = .idle
+        runStartedAt = nil
         backgroundWindow?.end()
         backgroundWindow = nil
         markRunRecord(.ended)

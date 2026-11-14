@@ -146,7 +146,7 @@ flowchart TB
 | `AgentSystemPrompt`, `AgentSystemPatch`, `AgentToolLoadout` | The system prompt as ordered sections, recorded in full for the first run and as a patch afterwards, with each run's declared tools |
 | `AgentCompactionCheckpoint`, `AgentContextEdit` | Durable summaries, and edits that change only what later runs replay |
 | `AgentInputQueue` | Steering and follow-up FIFO queues, saved before acknowledgement |
-| `AgentRunProgress`, `AgentRunSnapshot(s)`, `AgentRunTrace` | Presentation projections of a run's events (phase, streamed text, steps, usage), never part of persistence ordering |
+| `AgentRunProgress`, `AgentRunSnapshot(s)`, `AgentRunTrace` | Presentation projections of a run's events (phase, streamed text, steps — tools, reasoning timed while live, narration beside tool calls — and usage), never part of persistence ordering |
 | `AgentSessionTree` | Alternatives at a message, navigation that only moves the leaf, fork/clone copies, detached labels, usage per branch or per session |
 | `AgentSessionArchive`, `AgentJSONLLines` | Native versioned JSON Lines interchange (`kurn.agent-session` v1), LF-only framing, limits and graph validation |
 | `AgentRecoveryRecord` | Host recovery metadata (`run`, `queue`, `draft`, `effect`); data only, never a scheduler |
