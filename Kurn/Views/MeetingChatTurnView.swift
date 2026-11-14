@@ -1,3 +1,4 @@
+import AgentHarness
 import Foundation
 import KurnCore
 import SwiftUI
@@ -14,6 +15,8 @@ struct MeetingChatTurnView: View {
     var branch: ChatTurnBranchActions?
     /// The undo action of a document card, nil when its latest change cannot be undone.
     var undoAction: ((ChatDocumentArtifact) -> (() -> Void)?)?
+    /// Tool calls still being written, shown after the live reply's steps.
+    var writingSteps: [AgentRunStep] = []
 
     var body: some View {
         switch turn.role {
@@ -53,7 +56,7 @@ struct MeetingChatTurnView: View {
             }
         case .assistant, .system:
             VStack(alignment: .leading, spacing: 8) {
-                ChatStepTimelineView(steps: turn.steps, isRunning: isStreaming,
+                ChatStepTimelineView(steps: isStreaming ? turn.steps + writingSteps : turn.steps, isRunning: isStreaming,
                                      meetingTitles: meetingTitles, documentTitles: documentTitles)
                 if !turn.text.isEmpty {
                     HStack(alignment: .lastTextBaseline, spacing: 4) {

@@ -21,6 +21,48 @@ public struct AgentRunSnapshot: Sendable, Equatable {
         public fileprivate(set) var text = ""
     }
 
+    /// A tool call the model is still writing (its arguments arrive in pieces): what has arrived
+    /// so far, for display. It leaves the snapshot once the turn's message is final.
+    public struct StreamingToolCall: Sendable, Equatable {
+        public static let maxParsedScalars = 8_000
+        public let blockID: String
+        /// The identity its step keeps while the call is written, so a view can follow it.
+        public let stepID = UUID()
+        public fileprivate(set) var name: String
+        /// The arguments so far, best effort (`AgentPartialJSON`) from their first
+        /// `maxParsedScalars` scalars: what a title or a query needs, not a whole document.
+        public fileprivate(set) var arguments: JSONValue?
+        fileprivate var raw = ""
+        fileprivate var rawScalars = 0
+
+        fileprivate init(blockID: String, name: String) { self.blockID = blockID; self.name = name }
+
+        fileprivate mutating func append(_ text: String) {
+            guard rawScalars < Self.maxParsedScalars, !text.isEmpty else { return }
+            let room = Self.maxParsedScalars - rawScalars
+            let piece = String(String.UnicodeScalarView(text.unicodeScalars.prefix(room)))
+            raw += piece
+            rawScalars += piece.unicodeScalars.count
+            arguments = AgentPartialJSON.parse(raw) ?? arguments
+        }
+
+        fileprivate mutating func replace(name: String, arguments text: String) {
+            self.name = name
+            raw = ""
+            rawScalars = 0
+            arguments = nil
+            append(text)
+        }
+
+        /// A running tool step for a timeline to show while the call is written.
+        public var step: AgentRunStep {
+            var step = AgentRunStep(id: stepID, kind: .tool, status: .running)
+            step.toolName = name
+            step.arguments = arguments
+            return step
+        }
+    }
+
     /// How many events this snapshot reflects.
     public private(set) var eventCount = 0
     public private(set) var text = ""
@@ -29,6 +71,8 @@ public struct AgentRunSnapshot: Sendable, Equatable {
     /// Bounded by the run's tool-call limit, so an observer can find what finished since the
     /// snapshot it last saw by count.
     public private(set) var finishedTools: [FinishedTool] = []
+    /// Tool calls of the turn being streamed, in the order they started.
+    public private(set) var streamingToolCalls: [StreamingToolCall] = []
     public private(set) var outcome: AgentRunOutcome?
     /// The run's exchanges in order; more than one once it took in queued input.
     public private(set) var exchanges = [Exchange(inputID: nil, input: nil)]
@@ -59,13 +103,47 @@ public struct AgentRunSnapshot: Sendable, Equatable {
                 text = ""
                 exchanges[exchanges.count - 1].text = ""
             }
+        case .modelContent(let content):
+            applyStreaming(content)
+        case .toolStarted, .requestStarted, .turnStarted:
+            streamingToolCalls = []
         case .toolFinished(let callID, let name, _, let isError):
             finishedTools.append(FinishedTool(callID: callID, name: name, isError: isError))
         case .runFinished(let finished):
+            streamingToolCalls = []
             text = finished.finalText
             outcome = finished
             if exchanges.count > 1 { exchanges[exchanges.count - 1].text = finished.finalText }
         default: break
+        }
+    }
+
+    private mutating func applyStreaming(_ content: AgentContentEvent) {
+        switch content {
+        case .blockStarted(_, let block):
+            guard case .toolCall(let call, _) = block.content else { return }
+            var streaming = StreamingToolCall(blockID: block.id, name: call.name)
+            streaming.append(call.rawArguments)
+            streamingToolCalls.append(streaming)
+        case .blockDelta(let id, .toolCall(_, let name, let arguments)):
+            guard let index = streamingToolCalls.firstIndex(where: { $0.blockID == id }) else { return }
+            streamingToolCalls[index].name += name ?? ""
+            streamingToolCalls[index].append(arguments ?? "")
+        case .blockUpdated(let block):
+            // A finished call (Responses' `done`) or a whole call sent at once replaces what the
+            // deltas built, keeping the step's identity.
+            guard case .toolCall(let call, _) = block.content else { return }
+            if let index = streamingToolCalls.firstIndex(where: { $0.blockID == block.id }) {
+                streamingToolCalls[index].replace(name: call.name, arguments: call.rawArguments)
+            } else {
+                var streaming = StreamingToolCall(blockID: block.id, name: call.name)
+                streaming.append(call.rawArguments)
+                streamingToolCalls.append(streaming)
+            }
+        case .blockDelta:
+            break
+        case .messageFinished, .failed:
+            streamingToolCalls = []
         }
     }
 

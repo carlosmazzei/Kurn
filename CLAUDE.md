@@ -453,6 +453,14 @@ state's link (`previousVersion(of:in:)`), so a reused revision two branches reac
 still undoes to its own branch's, and the earlier revision is found even though a document effect rewrites its
 question as a sibling; it saves that revision again as a new version (`ChatDocumentEdit.restore`), so the change
 undone stays saved and can itself be restored.
+A tool call is shown while the model writes it (`AgentRunSnapshot.streamingToolCalls`): its arguments, which
+the Anthropic, Responses and Chat Completions streams send in pieces, are read best effort by
+`AgentPartialJSON` (the longest prefix ending on a whole value, open containers closed, a string value cut
+off kept as far as it got, a key without a value, an unfinished number or literal and a half escape left
+out) from their first 8,000 scalars, so a title or a query appears before the call ends. Each becomes a
+running tool step with a stable identity; the chat shows them after the live reply's steps
+(`MeetingChatViewModel.writingSteps`) until the call starts, the message ends or the run settles. Display
+only: the call that runs is always the complete arguments, validated as usual.
 `AgentLimits.wrapUpOnLimit` runs one extra turn after a turn/tool-call limit with
 `NativeHarness.wrapUpInstruction` appended and `AgentTurnRequest.allowsToolCalls` false
 (tools stay declared; the wire formats send `tool_choice: none` / Gemini mode `NONE`, and

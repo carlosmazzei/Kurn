@@ -35,6 +35,8 @@ final class MeetingChatViewModel {
     private(set) var phase: ChatRunPhase = .idle
     /// The current run's turn, request and tool calls (NH05 phase/identity projection).
     private(set) var runProgress = AgentRunProgress()
+    /// Tool calls the model is still writing, as running steps for the live reply; empty otherwise.
+    private(set) var writingSteps: [AgentRunStep] = []
     /// When the current run started, for the live status line's elapsed time; nil while idle.
     private(set) var runStartedAt: Date?
     /// The context the provider last reported for this conversation, kept between runs (a new run
@@ -258,6 +260,7 @@ final class MeetingChatViewModel {
         currentRequest = nil
         isResponding = false
         phase = .idle
+        writingSteps = []
         runStartedAt = nil
         backgroundWindow?.end()
         backgroundWindow = nil
@@ -597,6 +600,7 @@ final class MeetingChatViewModel {
                 }
                 timeline = view.trace
                 turns[index].steps = timeline.steps
+                if self.generation == generation { writingSteps = view.streamingToolCalls.map(\.step) }
                 turns[index].usage = timeline.hasUsage
                     ? TokenUsage(promptTokens: timeline.usage.inputTokens, completionTokens: timeline.usage.outputTokens) : nil
                 turns[index].costUSD = timeline.hasUsage ? ModelPricing.estimatedCostUSD(model: model, usage: timeline.usage) : nil
