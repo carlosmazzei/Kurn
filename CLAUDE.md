@@ -445,10 +445,12 @@ has no final text (the turn's text was narration beside the calls) and it is not
 `ChatChangeConfirmation`, a sheet (`ChatChangeConfirmationSheet`) showing the document, any new title and the
 replacement text, answered only by its own buttons; a stopped run answers no. "Change declined" ends the run
 with the question retryable. A document card offers Undo (`MeetingChatViewModel.undoLastChange`) while no
-reply runs: `SwiftDataAgentSessionStore.undoLastChange` finds version − 1 (`previousVersion(of:in:)`; every
-change adds one) in the whole tree, since a document effect rewrites its question as a sibling and leaves the
-earlier state beside the shown path, preferring the revision closest to the branch shown, and saves it again
-as a new version (`ChatDocumentEdit.restore`), so the change
+reply runs: each presentation state records, for the revisions it introduced, the revision of the same document
+the shown state held (`HarnessPresentationState.predecessors`, absent when nothing was replaced and rebased with
+the revision IDs by copies and imports, which also copy the revisions it names), and
+`SwiftDataAgentSessionStore.undoLastChange` follows that link (`previousVersion(of:in:)`) wherever the state sits
+— a document effect rewrites its question as a sibling, so the earlier state is beside the shown path — never
+inferring it from another branch's version number, and saves the earlier revision again as a new version (`ChatDocumentEdit.restore`), so the change
 undone stays saved and can itself be restored.
 `AgentLimits.wrapUpOnLimit` runs one extra turn after a turn/tool-call limit with
 `NativeHarness.wrapUpInstruction` appended and `AgentTurnRequest.allowsToolCalls` false

@@ -21,6 +21,21 @@ struct HarnessPresentationState: Codable {
     static let type = "kurn.presentation-state.v1"
     let scope: ChatSourceScope?
     var artifactRevisionIDs: [String]
+    /// For each revision this state introduced, the revision of the same document it replaced
+    /// (the one the state shown before the write held). Undo follows it, wherever on the tree the
+    /// earlier state now sits. Absent from states written before it, and when nothing was replaced.
+    var predecessors: [String: String]?
+
+    init(scope: ChatSourceScope?, artifactRevisionIDs: [String], predecessors: [String: String]? = nil) {
+        self.scope = scope
+        self.artifactRevisionIDs = artifactRevisionIDs
+        self.predecessors = predecessors?.isEmpty == false ? predecessors : nil
+    }
+
+    static func decoded(_ entry: AgentSessionEntry) throws -> HarnessPresentationState? {
+        guard case .custom(Self.type, let data) = entry.payload else { return nil }
+        return try JSONDecoder().decode(HarnessPresentationState.self, from: JSONEncoder().encode(data))
+    }
 }
 
 enum HarnessPresentationCodec {

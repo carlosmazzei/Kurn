@@ -70,7 +70,8 @@ extension SwiftDataAgentSessionStore {
             prefix += 1
         }
         let (revisionRows, revisionIDs) = try planRevisions(target, artifacts: artifacts)
-        let state = HarnessPresentationState(scope: scope, artifactRevisionIDs: revisionIDs)
+        let state = HarnessPresentationState(scope: scope, artifactRevisionIDs: revisionIDs,
+            predecessors: try Self.predecessors(of: revisionIDs, artifacts: artifacts, replacing: path, in: target))
         let stateJSON = try HarnessPresentationCodec.json(state)
         if effect == nil, !migrating, prefix == messages.count, prefix == proposed.count,
            path.last?.payload == .custom(type: HarnessPresentationState.type, data: stateJSON) { return }
@@ -96,6 +97,24 @@ extension SwiftDataAgentSessionStore {
         let record = try effect.map { HarnessSessionRecord(session: target, recordID: $0.id, kindRaw: $0.kind.rawValue,
             payloadData: try HarnessPresentationCodec.encode($0)) }
         try applyPresentation(target, rows: rows, revisions: revisionRows, leaf: stateEntry.id, cache: cache, effect: record, preserveUpdatedAt: preserveUpdatedAt)
+    }
+
+    /// Which revision each newer document version replaces: the one the shown state (the last on
+    /// `path`) held for the same document, when it held an older version.
+    private static func predecessors(of revisionIDs: [String], artifacts: [ChatDocumentArtifact], replacing path: [AgentSessionEntry],
+                                     in target: ChatSession) throws -> [String: String] {
+        guard let shown = try path.last(where: { $0.kind == HarnessPresentationState.type }).flatMap(HarnessPresentationState.decoded) else {
+            return [:]
+        }
+        let rows = Dictionary(target.harnessRevisions.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var result: [String: String] = [:]
+        for (artifact, id) in zip(artifacts, revisionIDs) where !shown.artifactRevisionIDs.contains(id) {
+            guard let previous = shown.artifactRevisionIDs.first(where: {
+                rows[$0]?.artifactID == artifact.id && (rows[$0]?.version ?? .max) < artifact.version
+            }) else { continue }
+            result[id] = previous
+        }
+        return result
     }
 
     /// The revision rows to add and the revision ID of each artifact. A revision is immutable and

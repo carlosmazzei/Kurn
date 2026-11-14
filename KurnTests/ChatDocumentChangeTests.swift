@@ -125,6 +125,44 @@ struct ChatDocumentChangeTests {
         #expect(vm.artifacts == [document])
     }
 
+    /// Undo follows the revision a change replaced, not a version number another branch also wrote.
+    @Test func undoAfterAnotherBranchRestoresThisBranchsEarlierVersion() async throws {
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let (session, document) = try savedConversation(meeting, in: context)
+        let models = ModelQueue([
+            ChatAgentModel([AgentTurnResponse(text: "", toolCalls: [try replace(document, with: "A2")]),
+                            AgentTurnResponse(text: "", toolCalls: [try replace(document, with: "A3")]),
+                            AgentTurnResponse(text: "A done.")]),
+            ChatAgentModel([AgentTurnResponse(text: "", toolCalls: [try replace(document, with: "B")]),
+                            AgentTurnResponse(text: "B done.")])
+        ])
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in models.next() })
+        vm.configure(meeting: meeting, modelContext: context)
+        vm.load(session: session)
+        vm.send(question: "Rewrite it", provider: .openAI, model: "gpt-4o")
+        for _ in 0..<2 {
+            await waitUntil { vm.changeConfirmation.pending != nil }
+            vm.changeConfirmation.answer(true)
+        }
+        await vm.waitUntilSettled()
+        #expect(vm.artifacts.first?.markdown == "A3")
+        let asked = try #require(vm.turns.last { $0.role == .user })
+        vm.askAgain(asked.id, text: asked.text, provider: .openAI, model: "gpt-4o")
+        await waitUntil { vm.changeConfirmation.pending != nil }
+        vm.changeConfirmation.answer(true)
+        await vm.waitUntilSettled()
+        #expect(vm.artifacts.first?.markdown == "B")
+        // Back to answer A: undo gives back A's version 2, not B's.
+        let regenerated = try #require(vm.turns.last { $0.role == .user })
+        vm.showVersion(of: regenerated.id, offset: -1)
+        let shown = try #require(vm.artifacts.first)
+        #expect(shown.markdown == "A3")
+        vm.undoLastChange(of: shown)
+        #expect(vm.error == nil)
+        #expect(vm.artifacts.first?.markdown == "A2")
+    }
+
     @Test func undoNeedsAnEarlierVersionAndTheCurrentRevision() throws {
         let context = ModelContext(TestModelContainer.make())
         let meeting = MeetingFixtures.transcribed("Planning", in: context)
@@ -191,5 +229,16 @@ struct ChatDocumentChangeTests {
         cancelled.cancel()
         #expect(await cancelled.value == false)
         await waitUntil { gate.pending == nil }
+    }
+}
+
+/// Hands the view model one scripted model per run.
+private final class ModelQueue: @unchecked Sendable {
+    private let lock = NSLock()
+    private var models: [ChatAgentModel]
+    init(_ models: [ChatAgentModel]) { self.models = models }
+    func next() -> ChatAgentModel? {
+        lock.lock(); defer { lock.unlock() }
+        return models.isEmpty ? nil : models.removeFirst()
     }
 }

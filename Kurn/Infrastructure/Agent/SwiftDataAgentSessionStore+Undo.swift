@@ -8,34 +8,28 @@ import SwiftData
 /// and can itself be restored.
 @MainActor
 extension SwiftDataAgentSessionStore {
-    /// The version `artifactID` had before the one shown: every change adds one to the version, so
-    /// it is version − 1. When branches wrote that version differently, the revision closest to the
-    /// branch shown wins (the deepest common ancestor, then the newest). The tree is searched, not
-    /// only the shown path: a document change rewrites the question it belongs to as a sibling, so
-    /// the state that held the earlier version can sit beside the path rather than on it.
+    /// The version `artifactID` had before the one shown: the revision the shown one replaced, as
+    /// the state that introduced it recorded (`HarnessPresentationState.predecessors`). The link is
+    /// followed wherever that state sits on the tree (a document change rewrites its question as a
+    /// sibling, so the earlier state is beside the shown path), and never guessed from another
+    /// branch. Nil when nothing recorded it: a document never changed, or one changed before the
+    /// link was kept.
     func previousVersion(of artifactID: UUID, in target: ChatSession) throws -> ChatDocumentArtifact? {
-        guard let current = try Self.projection(target).artifacts.first(where: { $0.id == artifactID }),
-              current.version > 1 else { return nil }
-        let candidates = Dictionary(target.harnessRevisions
-            .filter { $0.artifactID == artifactID && $0.version == current.version - 1 }.map { ($0.id, $0) },
-            uniquingKeysWith: { first, _ in first })
-        guard !candidates.isEmpty else { return nil }
         let snapshot = try snapshot(target)
         let tree = try AgentSessionTree(snapshot)
-        let depth = Dictionary(uniqueKeysWithValues: tree.activePath.enumerated().map { ($1.id, $0) })
-        var best: (depth: Int, ordinal: Int, row: HarnessArtifactRevision)?
-        for entry in snapshot.entries where entry.kind == HarnessPresentationState.type {
-            guard case .custom(_, let json) = entry.payload else { continue }
-            let state = try JSONDecoder().decode(HarnessPresentationState.self, from: JSONEncoder().encode(json))
-            guard let row = state.artifactRevisionIDs.lazy.compactMap({ candidates[$0] }).first else { continue }
-            let shared = tree.path(to: entry.id).compactMap { depth[$0.id] }.max() ?? -1
-            if best.map({ (shared, entry.ordinal) > ($0.depth, $0.ordinal) }) ?? true {
-                best = (shared, entry.ordinal, row)
-            }
+        guard let shown = try tree.activePath.last(where: { $0.kind == HarnessPresentationState.type })
+            .flatMap(HarnessPresentationState.decoded) else { return nil }
+        let rows = Dictionary(target.harnessRevisions.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        guard let currentID = shown.artifactRevisionIDs.first(where: { rows[$0]?.artifactID == artifactID }) else { return nil }
+        var previousID: String?
+        for entry in snapshot.entries.sorted(by: { $0.ordinal < $1.ordinal }) {
+            if let link = try HarnessPresentationState.decoded(entry)?.predecessors?[currentID] { previousID = link }
         }
-        guard let row = best?.row ?? candidates.values.first else { return nil }
+        guard let previousID, let row = rows[previousID] else { return nil }
         let artifact = try HarnessPresentationCodec.decode(ChatDocumentArtifact.self, from: row.payloadData)
-        guard artifact.id == artifactID, artifact.version == row.version else { throw AgentSessionStoreError.corruptPayload }
+        guard artifact.id == artifactID, artifact.version == row.version, row.artifactID == artifactID else {
+            throw AgentSessionStoreError.corruptPayload
+        }
         return artifact
     }
 
