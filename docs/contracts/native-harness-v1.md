@@ -1,6 +1,6 @@
 # Native harness contract v1
 
-Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04); session ownership implemented (NH05); projection and persistent compaction implemented (NH06, except branch summaries); usage, cost, retries and credentials implemented (NH07, except a capability snapshot); queued input implemented (NH08, except a session-retained owner, model changes at request boundaries and `waitingForUser`); session tree implemented (NH09, except branch summaries); native archive, export and import implemented (NH10, except the pi JSONL v3 subset and device qualification)**. NH01 froze the NH00
+Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04); session ownership implemented (NH05); projection and persistent compaction implemented (NH06, except branch summaries); usage, cost, retries, credentials and the model capability snapshot implemented (NH07, except authenticated live-provider qualification); queued input implemented (NH08, except a session-retained owner, model changes at request boundaries and `waitingForUser`); session tree implemented (NH09, except branch summaries); native archive, export and import implemented (NH10, except the pi JSONL v3 subset and device qualification)**. NH01 froze the NH00
 compatibility baseline. NH02 now produces native v1 assistant blocks at the provider
 boundary and consumes them in the harness. Indexed session storage and lazy legacy conversion are active; detailed runtime
 message persistence barriers (NH05) and canonical tool-history replay (NH06) are active; complete pi compatibility is not claimed.
@@ -242,7 +242,7 @@ without touching canonical IDs. Invalid/incomplete arguments become `{}` only in
 paired with their error result. Unsupported images/thinking use explicit omission markers;
 signed thinking and Gemini signatures are replayed only to the compatible API/model. Aliases
 without a qualified identity mapping remain conservative. No new image picker or model-level
-image/thinking capability claim is introduced; provider capability qualification is NH07.
+image/thinking capability claim is introduced; the per-model capability snapshot is NH07.
 
 `replayPrepared` persists numeric omission/normalization/sanitization counts. Request completion
 adds native/thinking block counts, invalid/incomplete call counts and a normalized stop code
@@ -494,8 +494,17 @@ priced, and `maxCostUSD` counts as reached when it cannot be verified. The sessi
 requests (`AgentRetryPolicy`): only `AgentTransientError`s before visible text, as new requests with
 their own identities, with bounded and cancellable backoff that honours `Retry-After` when carried; the
 agent transport keeps its own retries off. Credentials are resolved per request (`AgentPerRequestModel`).
-Open: a capability snapshot per model, transport `Retry-After`, cache-rate pricing and usage
-deduplication by request identity.
+Each run records what its model can do (`AgentModelCapabilities`, version 1): tool calling, reasoning
+and the effort the adapter sends, image input and the vendor's prompt caching, each `supported`,
+`unsupported` or `unknown`. `ModelCapabilityCatalog` supplies exact reviewed entries (a dated snapshot
+inherits its model's) and a Claude family rule; any other name stays unknown. Fresh provider metadata
+overrides what it reports (Gemini's `thinking`) and qualifies an alias with the canonical ID the provider
+resolved it to, whose catalog facts then apply. The snapshot travels in the run's context resolution (its
+context step) and in its `agent.run-start.v1` entry (`capabilities`, read back by
+`AgentRunBranch.capabilities`); older traces have none, and a later version's unknown values read as
+`unknown`. The chat refuses a model known to lack tools before any request. Open: authenticated
+live-provider qualification, which needs real credentials; signed reasoning still replays only to the
+identical requested model.
 
 ## Queued input and execution UI — NH08
 

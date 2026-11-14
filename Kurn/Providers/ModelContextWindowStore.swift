@@ -70,6 +70,43 @@ final class ModelContextWindowStore: @unchecked Sendable {
         }
     }
 
+    /// Capability facts the provider's model metadata reported (an alias's canonical ID, Gemini's
+    /// `thinking`), kept apart from capacity under the same endpoint/model key. A report replaces only
+    /// the facts it carries, each keeping its own age; even an empty one records that the provider was
+    /// asked, so a fresh check is not repeated (`capabilitiesAreFresh`).
+    func recordCapabilities(_ reported: AgentReportedCapabilities, provider: AIProvider, model: String) {
+        guard !model.isEmpty else { return }
+        lock.withLock {
+            var all = storedCapabilities()
+            let key = Self.entryKey(provider: provider, model: model)
+            all[key] = all[key]?.merging(reported) ?? reported
+            if let data = try? JSONEncoder().encode(all) { defaults.set(data, forKey: Self.capabilitiesKey) }
+        }
+    }
+
+    /// Whether the provider was asked about this model's capabilities within the metadata lifetime.
+    func capabilitiesAreFresh(for provider: AIProvider, model: String) -> Bool {
+        guard let value = reportedCapabilities(for: provider, model: model) else { return false }
+        return ModelContextWindows.isFresh(value.fetchedAt, now: now())
+    }
+
+    func reportedCapabilities(for provider: AIProvider, model: String) -> AgentReportedCapabilities? {
+        lock.withLock { storedCapabilities()[Self.entryKey(provider: provider, model: model)] }
+    }
+
+    /// The run's capability snapshot (NH07): the catalog's facts, overridden by fresh provider reports.
+    func capabilities(for provider: AIProvider, model: String, api: String, reasoningEffort: String?) -> AgentModelCapabilities {
+        ModelCapabilityCatalog.resolve(api: api, model: model, reported: reportedCapabilities(for: provider, model: model),
+                                       reasoningEffort: reasoningEffort, now: now())
+    }
+
+    private static let capabilitiesKey = "modelCapabilityFacts.v1"
+
+    private func storedCapabilities() -> [String: AgentReportedCapabilities] {
+        guard let data = defaults.data(forKey: Self.capabilitiesKey) else { return [:] }
+        return (try? JSONDecoder().decode([String: AgentReportedCapabilities].self, from: data)) ?? [:]
+    }
+
     private func stored() -> [String: AgentModelLimits] {
         guard let data = defaults.data(forKey: Self.key) else { return [:] }
         return (try? JSONDecoder().decode([String: AgentModelLimits].self, from: data)) ?? [:]

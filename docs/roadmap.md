@@ -929,13 +929,13 @@ export through the share sheet. Still open:
 
 ### Remaining native-harness work (audit after NH10)
 
-NH00–NH10 are merged into `feature/native-harness`. Of the contract's 97 items, 56 are verified, 28 are
-excluded by the local profile, 11 are partial, 2 are conditional and none is pending
+NH00–NH10 are merged into `feature/native-harness`. Of the contract's 97 items, 57 are verified, 28 are
+excluded by the local profile, 10 are partial, 2 are conditional and none is pending
 (`docs/contracts/native-harness-v1.json`, checked by `Tools/check_native_harness_contracts.py`). Everything still open, grouped by where it lands, with the contract items it closes:
 
 | Area | Open item | Contract |
 | --- | --- | --- |
-| Capabilities | A versioned per-model capability snapshot (tools, reasoning, images, cache) recorded with the run, and alias/authenticated provider qualification | C03, C04 |
+| Capabilities | Authenticated live-provider qualification (needs real credentials; the capability snapshot and alias qualification are done) | C04 |
 | Usage and cost | Provider-reported cost where a vendor reports one (cache-aware pricing and per-request usage are done) | C17 follow-up |
 | Compaction | Branch summaries; checkpoint anchoring for plain (identity-less) history | C10, C13 |
 | Run ownership | One owner retained per session across runs; model/provider changes at request boundaries; a `waitingForUser` phase once a tool asks for confirmation | C24 |

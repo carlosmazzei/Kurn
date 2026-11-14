@@ -187,6 +187,9 @@ public actor AgentSession {
                 })
                 var fields = fields
                 fields["tools"] = try Self.json(AgentToolLoadout(names: tools, previous: earlier.last?.toolLoadout?.names))
+                if let capabilities = request.contextResolution?.capabilities {
+                    fields["capabilities"] = try Self.json(capabilities)
+                }
                 if let system = request.system {
                     if let previous = AgentRunBranch.systemPrompts(of: earlier).compactMap({ $0 }).last {
                         fields["systemPatch"] = try Self.json(previous.patch(to: system))

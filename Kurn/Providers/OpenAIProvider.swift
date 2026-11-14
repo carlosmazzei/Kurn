@@ -432,6 +432,12 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
 // MARK: - Response shapes
 
 extension OpenAIProvider: AgentModel {
+    /// The reasoning effort agent requests send: low for official OpenAI GPT-5 models, none otherwise.
+    /// The run's capability snapshot records the same value (`HarnessChatService`).
+    static func agentReasoningEffort(provider: AIProvider, model: String) -> String? {
+        provider.id == AIProvider.openAI.id && model.lowercased().hasPrefix("gpt-5") ? "low" : nil
+    }
+
     var descriptor: AgentModelDescriptor? { AgentModelDescriptor(api: usesResponses ? "openAIResponses" : "openAI", model: chatModel) }
     func streamTurn(
         _ request: AgentTurnRequest,
@@ -439,7 +445,7 @@ extension OpenAIProvider: AgentModel {
     ) async throws -> AgentTurnResponse {
         try await AgentModelBoundary.perform(onEvent: onEvent, classifyFailure: { LLMHTTP.agentStreamFailure($0) }, prepare: {
             try LLMHTTP.requireAPIKey(apiKey, provider: provider)
-            let reasoningEffort = provider.id == AIProvider.openAI.id && chatModel.lowercased().hasPrefix("gpt-5") ? "low" : nil
+            let reasoningEffort = Self.agentReasoningEffort(provider: provider, model: chatModel)
             let official = usesResponses
             let format: AgentWireFormat = official ? .openAIResponses : .openAI
             let projection = format.requestProjection(request, model: chatModel, reasoningEffort: reasoningEffort)

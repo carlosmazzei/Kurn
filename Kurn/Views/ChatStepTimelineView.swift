@@ -112,6 +112,11 @@ private struct ChatStepRow: View {
             if let version = resolution.catalogVersion {
                 Text(String(format: NSLocalizedString("chat.context.catalog_version", comment: "Catalog version"), version))
             }
+            if let capabilities = resolution.capabilities {
+                ForEach(ChatContextPresentation.capabilityLines(capabilities) {
+                    NSLocalizedString($0, comment: "Model capability")
+                }, id: \.self) { Text($0) }
+            }
         }
         .font(.caption)
         .textSelection(.enabled)

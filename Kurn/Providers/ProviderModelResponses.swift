@@ -80,8 +80,10 @@ struct GoogleModelListResponse: ProviderModelPage {
         let name: String
         let supportedGenerationMethods: [String]
         let limits: AgentModelLimits
+        /// Whether the model supports thinking, when the listing says so.
+        let thinking: Bool?
         var requestID: String { name.hasPrefix("models/") ? String(name.dropFirst(7)) : name }
-        enum CodingKeys: String, CodingKey { case name, supportedGenerationMethods, inputTokenLimit, outputTokenLimit }
+        enum CodingKeys: String, CodingKey { case name, supportedGenerationMethods, inputTokenLimit, outputTokenLimit, thinking }
 
         init(from decoder: Decoder) throws {
             let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -89,6 +91,7 @@ struct GoogleModelListResponse: ProviderModelPage {
             supportedGenerationMethods = try values.decode([String].self, forKey: .supportedGenerationMethods)
             limits = AgentModelLimits(contextWindowTokens: values.positiveInt(.inputTokenLimit),
                                       maxOutputTokens: values.positiveInt(.outputTokenLimit), limitKind: .input)
+            thinking = try? values.decodeIfPresent(Bool.self, forKey: .thinking)
         }
     }
     let models: [Model]
