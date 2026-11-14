@@ -6,23 +6,31 @@ public enum AgentWireFormat: Sendable, CaseIterable {
     /// Gemini streams through its URL route, not a `stream` body field.
     public func requestBody(_ request: AgentTurnRequest, model: String,
                             openAITokenField: String = "max_completion_tokens",
-                            reasoningEffort: String? = nil) -> JSONValue {
-        requestProjection(request, model: model, openAITokenField: openAITokenField, reasoningEffort: reasoningEffort).body
+                            reasoningEffort: String? = nil, reasoning: AgentReasoningLevel? = nil) -> JSONValue {
+        requestProjection(request, model: model, openAITokenField: openAITokenField, reasoningEffort: reasoningEffort,
+                          reasoning: reasoning).body
     }
 
+    /// `reasoning` is the host's chosen level, mapped per vendor; it takes the place of
+    /// `reasoningEffort` (OpenAI's fixed default) and is left out of summary requests.
     public func requestProjection(_ request: AgentTurnRequest, model: String,
                                   openAITokenField: String = "max_completion_tokens",
-                                  reasoningEffort: String? = nil) -> AgentWireRequestProjection {
+                                  reasoningEffort: String? = nil,
+                                  reasoning: AgentReasoningLevel? = nil) -> AgentWireRequestProjection {
+        let level = request.identity?.purpose == .summary ? nil : reasoning
         var projection = AgentReplayProjection(format: self, model: model)
         let request = AgentTurnRequest(systemPrompt: request.systemPrompt, messages: projection.messages(request.messages),
             tools: request.tools, maxOutputTokens: request.maxOutputTokens, allowsToolCalls: request.allowsToolCalls)
         let body: JSONValue
         switch self {
-        case .anthropic: body = anthropicBody(request, model: model)
+        case .anthropic: body = anthropicBody(request, model: model, reasoning: level)
         case .openAI:
-            body = openAIBody(request, model: model, tokenField: openAITokenField, reasoningEffort: reasoningEffort)
-        case .gemini: body = geminiBody(request, model: model)
-        case .openAIResponses: body = responsesBody(request, model: model, reasoningEffort: reasoningEffort)
+            body = openAIBody(request, model: model, tokenField: openAITokenField,
+                              reasoningEffort: level?.rawValue ?? reasoningEffort)
+        case .gemini: body = geminiBody(request, model: model, reasoning: level)
+        case .openAIResponses:
+            body = responsesBody(request, model: model, reasoningEffort: level?.rawValue ?? reasoningEffort,
+                                 visibleReasoning: level != nil)
         }
         return AgentWireRequestProjection(body: body, adjustment: projection.adjustment)
     }
@@ -64,7 +72,7 @@ public enum AgentWireFormat: Sendable, CaseIterable {
         return .object(body)
     }
 
-    private func anthropicBody(_ request: AgentTurnRequest, model: String) -> JSONValue {
+    private func anthropicBody(_ request: AgentTurnRequest, model: String, reasoning: AgentReasoningLevel?) -> JSONValue {
         var messages: [JSONValue] = []
         for message in request.messages {
             switch message {
@@ -96,10 +104,13 @@ public enum AgentWireFormat: Sendable, CaseIterable {
             })
             if !request.allowsToolCalls { body["tool_choice"] = .object(["type": .string("none")]) }
         }
+        if let budget = reasoning?.thinkingBudget(maxOutputTokens: request.maxOutputTokens) {
+            body["thinking"] = .object(["type": .string("enabled"), "budget_tokens": .number(Double(budget))])
+        }
         return .object(body)
     }
 
-    private func geminiBody(_ request: AgentTurnRequest, model: String) -> JSONValue {
+    private func geminiBody(_ request: AgentTurnRequest, model: String, reasoning: AgentReasoningLevel?) -> JSONValue {
         var contents: [JSONValue] = []
         var callsByID: [String: AgentToolCall] = [:]
         for message in request.messages {
@@ -134,10 +145,14 @@ public enum AgentWireFormat: Sendable, CaseIterable {
                 append(role: "user", parts: [.object(["functionResponse": .object(response)])], to: &contents, field: "parts")
             }
         }
+        var generationConfig: [String: JSONValue] = ["maxOutputTokens": .number(Double(request.maxOutputTokens))]
+        if let budget = reasoning?.thinkingBudget(maxOutputTokens: request.maxOutputTokens) {
+            generationConfig["thinkingConfig"] = .object(["includeThoughts": .bool(true), "thinkingBudget": .number(Double(budget))])
+        }
         var body: [String: JSONValue] = [
             "systemInstruction": .object(["parts": .array([.object(["text": .string(request.systemPrompt)])])]),
             "contents": .array(contents),
-            "generationConfig": .object(["maxOutputTokens": .number(Double(request.maxOutputTokens))])
+            "generationConfig": .object(generationConfig)
         ]
         if !request.tools.isEmpty {
             body["tools"] = .array([.object(["functionDeclarations": .array(request.tools.map {

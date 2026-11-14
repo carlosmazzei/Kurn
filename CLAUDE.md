@@ -141,6 +141,20 @@ requests) overrides what it reports and qualifies an alias with its canonical ID
 resolves it before the run, refuses a model known to lack tools (`chat.model.tools_unsupported`) and
 records it in the context resolution and the run-start entry (`AgentRunBranch.capabilities`); the
 context step lists it. `OpenAIProvider.agentReasoningEffort` is the single source of the effort sent.
+The chat's reasoning level (`AppSettings.chatReasoningLevel`, nil = the vendor's default) is chosen with the
+model in the composer's model chip (`ChatModelChip`/`ChatModelSheet`, `ChatModelPickerViewModel`; the chat
+shares its model with summaries). AgentHarness's `AgentReasoningLevel` maps it per vendor in
+`AgentWireFormat.requestProjection(reasoning:)`: Responses `reasoning.effort` plus `summary: auto` (visible
+reasoning), Chat Completions `reasoning_effort`, Anthropic `thinking` and Gemini `thinkingConfig` with
+`includeThoughts`, both with a token budget kept below the output limit (at least 1,024, else none). Summary
+requests never carry it. `ChatReasoningPreference` decides whether a request carries it: never for a model the
+capability catalog says cannot reason, and on a compatible endpoint only for one it says can;
+`ProviderFactory.agentModel(reasoning:)` sets it on the vendor client, and the run's capability snapshot
+records the level sent in place of OpenAI's fixed default. The system prompt's `user_context` section (between
+`instructions` and `documents`) gives today's date, weekday, time zone and locale, so relative dates resolve
+against the person's calendar; it changes once a day. Beside the chip, `ChatContextGauge` shows the context the
+provider last reported against the newest run's window (`MeetingChatViewModel.lastContextTokens`, kept between
+runs until the next report).
 
 `ProviderModelMetadataService` refreshes the selected model in the settings picker
 and before an agent run. Anthropic/Gemini details resolve aliases and retain both

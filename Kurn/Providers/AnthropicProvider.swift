@@ -13,6 +13,8 @@ import KurnCore
 
 struct AnthropicProvider: LLMProvider {
     let provider: AIProvider
+    /// The chat's chosen reasoning level for agent turns (`ChatReasoningPreference`); nil keeps the default.
+    var reasoning: AgentReasoningLevel?
 
     private let apiKey: String
     private let session: URLSession
@@ -179,7 +181,7 @@ extension AnthropicProvider: AgentModel {
         try await AgentModelBoundary.perform(onEvent: onEvent, classifyFailure: { LLMHTTP.agentStreamFailure($0) }, prepare: {
             try LLMHTTP.requireAPIKey(apiKey, provider: provider)
             var httpRequest = try makeRequest(timeout: LLMHTTP.chatTimeout, body: [:])
-            let projection = AgentWireFormat.anthropic.requestProjection(request, model: model)
+            let projection = AgentWireFormat.anthropic.requestProjection(request, model: model, reasoning: reasoning)
             if projection.adjustment.hasChanges { onEvent(.replayAdjusted(projection.adjustment)) }
             httpRequest.httpBody = Data(try projection.body.encodedString().utf8)
             return httpRequest

@@ -4,6 +4,9 @@ import KurnCore
 
 /// Stateless helpers of `MeetingChatViewModel`, kept apart from its run and persistence state.
 extension MeetingChatViewModel {
+    /// The context in use against the model's window, once a response reported it.
+    var contextGauge: ChatContextGauge? { ChatContextGauge(usedTokens: lastContextTokens, steps: turns.map(\.steps)) }
+
     /// Prior turns as plain user/assistant text: the history for a question no recorded run can
     /// replay canonically (`ChatReplayHistory`).
     static func buildHistory(from prior: [Turn]) -> [ChatMessage] {

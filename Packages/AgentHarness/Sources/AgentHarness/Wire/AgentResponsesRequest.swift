@@ -3,7 +3,9 @@ import Foundation
 extension AgentWireFormat {
     public static let responsesMinimumOutputTokens = 16
 
-    func responsesBody(_ request: AgentTurnRequest, model: String, reasoningEffort: String?) -> JSONValue {
+    /// `visibleReasoning` also asks for the reasoning summary the chat shows while the model thinks.
+    func responsesBody(_ request: AgentTurnRequest, model: String, reasoningEffort: String?,
+                       visibleReasoning: Bool = false) -> JSONValue {
         var input: [JSONValue] = []
         for message in request.messages {
             switch message {
@@ -39,7 +41,11 @@ extension AgentWireFormat {
             })
             if !request.allowsToolCalls { body["tool_choice"] = .string("none") }
         }
-        if let reasoningEffort { body["reasoning"] = .object(["effort": .string(reasoningEffort)]) }
+        if let reasoningEffort {
+            var reasoning: [String: JSONValue] = ["effort": .string(reasoningEffort)]
+            if visibleReasoning { reasoning["summary"] = .string("auto") }
+            body["reasoning"] = .object(reasoning)
+        }
         return .object(body)
     }
 }

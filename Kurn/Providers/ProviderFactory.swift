@@ -22,7 +22,9 @@ enum ProviderFactory {
     static let liveLLM: LLMResolver = { try summaryProvider(for: $0, model: $1) }
 
     /// Nil means callers should keep using the existing chat pipeline.
-    static func agentModel(for provider: AIProvider, model: String) throws -> (any AgentModel)? {
+    /// `reasoning` is the chat's level for this provider and model (`ChatReasoningPreference`).
+    static func agentModel(for provider: AIProvider, model: String,
+                           reasoning: AgentReasoningLevel? = nil) throws -> (any AgentModel)? {
         guard provider.kind.supportsAgentChat,
               try summaryProvider(for: provider, model: model) is any AgentModel else { return nil }
         // Credentials are resolved for every request, compaction included (NH07).
@@ -30,7 +32,17 @@ enum ProviderFactory {
             guard let client = try summaryProvider(for: provider, model: model) as? any AgentModel else {
                 throw AppError.noAPIKey(provider: provider.displayName)
             }
-            return client
+            return applying(reasoning, to: client)
+        }
+    }
+
+    /// The client with the chat's reasoning level set; a client that cannot take one is unchanged.
+    static func applying(_ reasoning: AgentReasoningLevel?, to client: any AgentModel) -> any AgentModel {
+        switch client {
+        case var openAI as OpenAIProvider: openAI.reasoning = reasoning; return openAI
+        case var anthropic as AnthropicProvider: anthropic.reasoning = reasoning; return anthropic
+        case var google as GoogleProvider: google.reasoning = reasoning; return google
+        default: return client
         }
     }
 

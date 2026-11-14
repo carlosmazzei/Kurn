@@ -440,25 +440,10 @@ struct MeetingChatConversationView: View {
         input = input.isEmpty ? draft : input + "\n\n" + draft
     }
 
-    /// Which model answers — the summary provider's model, since chat shares
-    /// it (see `sendQuestion`). Informational; the choice lives in Settings.
+    /// Which model answers and how hard it reasons, with the context in use; tapping it opens the
+    /// choice (`ChatModelChip`).
     private var modelChip: some View {
-        let provider = settings.aiProvider
-        let model = provider.kind == .appleOnDevice
-            ? NSLocalizedString("settings.on_device_model_name", comment: "Apple Intelligence")
-            : settings.summaryModel(for: provider)
-        return Text(model)
-            .font(.footnote)
-            .lineLimit(1)
-            .truncationMode(.middle)
-            .foregroundStyle(Theme.textSecondary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(Theme.fill, in: Capsule())
-            .accessibilityLabel(String(
-                format: NSLocalizedString("chat.model_chip", comment: "Model in use"),
-                model
-            ))
+        ChatModelChip(settings: settings, gauge: vm.contextGauge, isEnabled: usesHarness && !vm.isResponding)
     }
 
     @ViewBuilder

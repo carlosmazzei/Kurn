@@ -7,6 +7,7 @@
 //  belong in this file.
 //
 
+import AgentHarness
 import Foundation
 import KurnCore
 import Observation
@@ -404,6 +405,9 @@ final class AppSettings {
         }
     }
 
+    /// The chat's reasoning level (`ChatReasoningPreference`); nil is the vendor's default.
+    var chatReasoningLevel: AgentReasoningLevel? { didSet { defaults.set(chatReasoningLevel?.rawValue, forKey: Keys.chatReasoningLevel) } }
+
     /// Per-provider chosen transcription (Whisper) model (rawValue → model id).
     var transcriptionModels: [String: String] {
         didSet {
@@ -548,6 +552,7 @@ final class AppSettings {
         logLevel = resolvedLogLevel
         AppLog.minimumLevel = resolvedLogLevel
         summaryModels = defaults.decoded([String: String].self, forKey: Keys.summaryModels) ?? [:]
+        chatReasoningLevel = ChatReasoningPreference.stored(defaults)
         transcriptionModels = defaults.decoded([String: String].self, forKey: Keys.transcriptionModels) ?? [:]
         usageStats = defaults.decoded(UsageStats.self, forKey: Keys.usageStats) ?? UsageStats()
         readAloud = defaults.decoded(ReadAloudPreferences.self, forKey: Keys.readAloud) ?? ReadAloudPreferences()

@@ -15,6 +15,8 @@ extension AppSettings {
         static let audioQuality = "settings.audioQuality"
         static let alwaysUseBuiltInMic = "settings.alwaysUseBuiltInMic"
         static let summaryModels = "settings.summaryModels"
+        /// The chat's reasoning level (`ChatReasoningPreference`); absent means the vendor's default.
+        static let chatReasoningLevel = "settings.chatReasoningLevel"
         static let summaryTemplates = "settings.summaryTemplates"
         static let lastSummaryTemplate = "settings.lastSummaryTemplate"
         static let liveTranscriptionEnabled = "settings.liveTranscriptionEnabled"
