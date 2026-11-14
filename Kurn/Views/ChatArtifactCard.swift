@@ -63,11 +63,24 @@ struct ChatArtifactCard: View {
                 }
                 .navigationTitle(artifact.title)
                 .navigationBarTitleDisplayMode(.inline)
-                .safeAreaInset(edge: .bottom) { actions.padding().background(.bar) }
+                .background(Theme.background.ignoresSafeArea())
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button(NSLocalizedString("common.done", comment: "Done")) { showingPreview = false }
                             .accessibilityIdentifier("chat.artifact.preview.done")
+                    }
+                    // The document's actions sit in the system toolbar, as on every other screen,
+                    // not in a panel laid over the text.
+                    ToolbarItemGroup(placement: .bottomBar) {
+                        exportMenu
+                        copyButton
+                    }
+                    ToolbarSpacer(.flexible, placement: .bottomBar)
+                    ToolbarItem(placement: .bottomBar) {
+                        saveButton
+                            .labelStyle(.titleAndIcon)
+                            .buttonStyle(.glassProminent)
+                            .tint(Theme.accent)
                     }
                 }
             }
@@ -82,34 +95,47 @@ struct ChatArtifactCard: View {
 
     private var actions: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Button {
-                do { _ = try ChatArtifactStore(context: context).save(artifactID: artifact.id, session: session) }
-                catch { self.error = (error as? AppError) ?? .persistenceFailed(error.localizedDescription) }
-            } label: {
-                Label(NSLocalizedString(action.rawValue, comment: "Save artifact"),
-                      systemImage: action == .saved ? "checkmark.circle" : "square.and.arrow.down")
-            }
-            .disabled(action == .saved)
-            .accessibilityIdentifier("chat.artifact.save.\(artifact.id.uuidString)")
+            saveButton
             HStack(spacing: 20) {
-                Menu {
-                    ForEach(DocumentExport.formats, id: \.self) { format in
-                        Button(format.title) {
-                            do { shareItem = ShareItem(urls: [try DocumentExport.file(title: artifact.title, markdown: artifact.markdown, format: format)]) }
-                            catch { self.error = .persistenceFailed(error.localizedDescription) }
-                        }
-                    }
-                } label: {
-                    Label(NSLocalizedString("chat.artifact.export", comment: "Export"), systemImage: "square.and.arrow.up")
-                }
-                .accessibilityIdentifier("chat.artifact.export.\(artifact.id.uuidString)")
-                Button { UIPasteboard.general.string = artifact.markdown } label: {
-                    Label(NSLocalizedString("chat.artifact.copy", comment: "Copy Markdown"), systemImage: "doc.on.doc")
-                }
-                .accessibilityIdentifier("chat.artifact.copy.\(artifact.id.uuidString)")
+                exportMenu
+                copyButton
             }
         }
         .font(.subheadline)
         .buttonStyle(.borderless)
+    }
+
+    private var saveButton: some View {
+        Button {
+            do { _ = try ChatArtifactStore(context: context).save(artifactID: artifact.id, session: session) }
+            catch { self.error = (error as? AppError) ?? .persistenceFailed(error.localizedDescription) }
+        } label: {
+            Label(NSLocalizedString(action.rawValue, comment: "Save artifact"),
+                  systemImage: action == .saved ? "checkmark.circle" : "square.and.arrow.down")
+        }
+        .disabled(action == .saved)
+        .accessibilityIdentifier("chat.artifact.save.\(artifact.id.uuidString)")
+    }
+
+    private var exportMenu: some View {
+        Menu {
+            ForEach(DocumentExport.formats, id: \.self) { format in
+                Button(format.title) {
+                    do { shareItem = ShareItem(urls: [try DocumentExport.file(title: artifact.title, markdown: artifact.markdown, format: format)]) }
+                    catch { self.error = .persistenceFailed(error.localizedDescription) }
+                }
+            }
+        } label: {
+            Label(NSLocalizedString("chat.artifact.export", comment: "Export"), systemImage: "square.and.arrow.up")
+        }
+        .accessibilityIdentifier("chat.artifact.export.\(artifact.id.uuidString)")
+    }
+
+    private var copyButton: some View {
+        // Meeting-derived text goes to the clipboard only through MeetingPasteboard (local, expiring).
+        Button { MeetingPasteboard.copy(artifact.markdown) } label: {
+            Label(NSLocalizedString("chat.artifact.copy", comment: "Copy Markdown"), systemImage: "doc.on.doc")
+        }
+        .accessibilityIdentifier("chat.artifact.copy.\(artifact.id.uuidString)")
     }
 }
