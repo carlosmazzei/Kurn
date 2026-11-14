@@ -314,7 +314,12 @@ struct MeetingChatConversationView: View {
                                          labelTarget = turn.id
                                      },
                                      isLeftOut: vm.branches.leftOut.contains(turn.id),
-                                     setLeftOut: { vm.setLeftOut($0, question: turn.id) })
+                                     setLeftOut: { vm.setLeftOut($0, question: turn.id) },
+                                     regenerate: { askAgain(turn.id, text: turn.text) },
+                                     edit: {
+                                         vm.beginEditing(turn.id)
+                                         inputFocused = true
+                                     })
     }
 
     /// Whether `turn` is the reply currently streaming in, so its bubble gets
@@ -380,6 +385,7 @@ struct MeetingChatConversationView: View {
     private var composer: some View {
         VStack(alignment: .leading, spacing: 12) {
             if usesHarness, let sourceValidation { ChatSourceValidationView(validation: sourceValidation) }
+            if vm.editingQuestionID != nil { editingBanner }
             if !vm.queued.isEmpty {
                 ChatQueuedInputView(queued: vm.queued,
                                     edit: { item in Task { await vm.editQueued(item) } },
@@ -409,6 +415,19 @@ struct MeetingChatConversationView: View {
         .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).stroke(Theme.separator, lineWidth: 1))
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
+    }
+
+    /// Shown while a saved question is being edited: sending asks it again in its place.
+    private var editingBanner: some View {
+        HStack(spacing: 8) {
+            Label(NSLocalizedString("chat.branch.editing", comment: "Editing a question"), systemImage: "pencil")
+                .font(.footnote)
+                .foregroundStyle(Theme.textSecondary)
+            Spacer(minLength: 0)
+            Button(NSLocalizedString("common.cancel", comment: "Cancel")) { vm.cancelEditing() }
+                .font(.footnote)
+                .accessibilityIdentifier("chat.edit.cancel")
+        }
     }
 
     /// While a reply runs, a typed message can steer it after its current step, or wait until
@@ -563,7 +582,15 @@ struct MeetingChatConversationView: View {
 
     private func sendQuestion(_ question: String) {
         guard canChat, sourceValidation == nil else { return }
+        // A question being edited is asked again in its place rather than appended.
+        if let editing = vm.editingQuestionID { return askAgain(editing, text: question) }
         let provider = settings.aiProvider
         vm.send(question: question, provider: provider, model: settings.summaryModel(for: provider))
+    }
+
+    private func askAgain(_ turnID: UUID, text: String) {
+        guard canChat, sourceValidation == nil else { return }
+        let provider = settings.aiProvider
+        vm.askAgain(turnID, text: text, provider: provider, model: settings.summaryModel(for: provider))
     }
 }

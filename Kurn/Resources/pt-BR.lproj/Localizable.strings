@@ -1312,6 +1312,10 @@
 "chat.branch.position" = "%1$d de %2$d";
 "chat.branch.label_value" = "Rótulo: %@";
 "chat.branch.fork" = "Criar conversa a partir daqui";
+"chat.branch.regenerate" = "Regenerar resposta";
+"chat.branch.edit" = "Editar pergunta";
+"chat.branch.editing" = "Editando pergunta";
+"chat.history.search" = "Buscar conversas";
 "chat.branch.label" = "Rótulo";
 "chat.branch.label_placeholder" = "Rótulo (vazio remove)";
 "chat.branch.duplicate" = "Duplicar conversa";
