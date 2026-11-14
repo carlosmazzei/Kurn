@@ -13,7 +13,8 @@ struct ChatSessionScaleTests {
     static let exchanges = 500
 
     @Test func aConversationOfAThousandEntriesOpens() throws {
-        let context = ModelContext(TestModelContainer.make())
+        let container = TestModelContainer.make()
+        let context = ModelContext(container)
         let meeting = MeetingFixtures.transcribed("Planning", in: context)
         let session = ChatSession(meeting: meeting, title: "Long")
         context.insert(session)
@@ -32,9 +33,22 @@ struct ChatSessionScaleTests {
         let projection = try clock.measure { projected = try SwiftDataAgentSessionStore.projection(session).turns.count }
         #expect(projected == Self.exchanges * 2)
 
+        // Opening reads the conversation back through a context that has never seen it, as a
+        // relaunch would: the fetch is part of the time.
+        try context.save()
+        let sessionID = session.id
+        let reader = ModelContext(container)
         let vm = MeetingChatViewModel(agentModelFactory: { _, _ in nil })
-        vm.configure(meeting: meeting, modelContext: context)
-        let open = clock.measure { vm.load(session: session) }
+        var opened: ChatSession?
+        let open = try clock.measure {
+            let fetched = try reader.fetch(FetchDescriptor<ChatSession>(predicate: #Predicate { $0.id == sessionID })).first
+            opened = fetched
+            if let fetched, let owner = fetched.meeting {
+                vm.configure(meeting: owner, modelContext: reader)
+                vm.load(session: fetched)
+            }
+        }
+        #expect(opened != nil && opened !== session)
         #expect(vm.turns.count == Self.exchanges * 2)
         #expect(vm.turns.last?.text == "Answer \(Self.exchanges - 1) [0:\(String(format: "%02d", (Self.exchanges - 1) % 60))]")
         print("[session-scale] entries=\(session.harnessEntries.count) write_ms=\(LiveProviderSmokeTests.milliseconds(write))"

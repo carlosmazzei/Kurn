@@ -3,7 +3,7 @@ name: Live provider smoke
 # Qualification of the agent chat against real providers, on demand only: it spends API credit, so
 # it never runs on a push or a pull request. One agent run per vendor whose key secret is set
 # (OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY), through the app's own clients and the
-# harness, with a tool round trip; the time to the first streamed content and to the end are
+# harness, with a tool round trip; the time to the first streamed block, to the first reply text and to the end are
 # reported as `[live-smoke]` lines. The same job opens a conversation of a thousand saved entries
 # (`[session-scale]`) and counts the build's Swift concurrency warnings. No line carries a prompt,
 # an answer, a key or tool arguments.

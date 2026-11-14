@@ -6,7 +6,7 @@ import Testing
 /// Qualification against the real providers: one agent run per vendor whose key is set, through the
 /// app's own clients and the harness, with a tool round trip. Skipped unless `KURN_LIVE_SMOKE=1`
 /// (the `Live provider smoke` workflow sets it, with the keys from repository secrets), so CI never
-/// calls a provider. It records how long the first streamed content took and the whole run took, in
+/// calls a provider. It records how long the first streamed block, the first reply text and the whole run took, in
 /// `[live-smoke]` lines that carry no content: no prompt, answer, key or argument.
 @MainActor
 struct LiveProviderSmokeTests {
@@ -65,14 +65,20 @@ struct LiveProviderSmokeTests {
         let harness = NativeHarness(model: Self.client(target, key: key, model: model), limits: AgentLimits(maxTurns: 4, maxToolCalls: 4))
         let clock = ContinuousClock()
         let started = clock.now
+        // First content is the first streamed block of any kind (reasoning or a tool call
+        // included), the latency a person sees something move; first text is the first visible
+        // reply text, which a tool-calling first turn can put much later.
         var firstContent: Duration?
+        var firstText: Duration?
         var toolCalls = 0
         var outcome: AgentRunOutcome?
         for try await event in harness.run(systemPrompt: "You are a calculator. Always use the add tool to add numbers.",
                                            history: [], prompt: "What is 17 plus 25? Use the tool, then reply with the number only.",
                                            tools: [Self.addTool], maxOutputTokens: 1_024) {
             switch event {
-            case .textDelta(let text) where !text.isEmpty: firstContent = firstContent ?? started.duration(to: clock.now)
+            case .textDelta(let text) where !text.isEmpty:
+                firstContent = firstContent ?? started.duration(to: clock.now)
+                firstText = firstText ?? started.duration(to: clock.now)
             case .modelContent: firstContent = firstContent ?? started.duration(to: clock.now)
             case .toolFinished(_, _, _, let isError): toolCalls += 1; #expect(!isError)
             case .runFinished(let finished): outcome = finished
@@ -83,6 +89,7 @@ struct LiveProviderSmokeTests {
         let finished = try #require(outcome)
         print("[live-smoke] provider=\(target.name) model=\(model)"
               + " first_content_ms=\(firstContent.map(Self.milliseconds).map(String.init) ?? "none")"
+              + " first_text_ms=\(firstText.map(Self.milliseconds).map(String.init) ?? "none")"
               + " total_ms=\(Self.milliseconds(total)) tool_calls=\(toolCalls) stop=\(finished.stopReason.rawValue)"
               + " input_tokens=\(finished.totalUsage.inputTokens) output_tokens=\(finished.totalUsage.outputTokens)"
               + " cache_read_tokens=\(finished.totalUsage.cacheReadTokens.map(String.init) ?? "unreported")")

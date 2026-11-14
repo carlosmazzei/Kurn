@@ -730,9 +730,10 @@ To verify a change through CI:
 secrets: one agent run per vendor whose key is set, through the app's own clients and `NativeHarness`, with a
 tool whose answer carries an offset the model cannot guess, so a pass proves the tool round trip. Models come
 from the workflow's inputs or the providers' defaults. It prints `[live-smoke]` lines (time to the first
-streamed content and to the end, tool calls, stop reason, tokens) and runs `ChatSessionScaleTests`, which
-opens a conversation of a thousand saved entries (`[session-scale]`: write, projection and open times; that
-suite also runs in every CI). The same job counts the build's Swift concurrency warnings (the app and the
+streamed block of any kind, to the first visible reply text and to the end, tool calls, stop reason, tokens) and
+runs `ChatSessionScaleTests`, which opens a conversation of a thousand saved entries (`[session-scale]`: write,
+projection and open times, the open read through a context that has never seen it; that suite also runs in
+every CI). The same job counts the build's Swift concurrency warnings (the app and the
 packages build in the Swift 6 language mode, where a visible data race is an error). No line carries a
 prompt, an answer, a key or tool arguments, and no threshold is invented for the times: they are compared
 between runs, like the pipeline evaluation.
