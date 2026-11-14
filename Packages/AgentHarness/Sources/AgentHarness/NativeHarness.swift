@@ -269,7 +269,13 @@ public struct NativeHarness: Sendable {
                 break
             }
             let stop = try await execute(calls, requestID: response.message?.identity?.requestID, tools: tools, state: &state, events: events, trace: trace)
-            if let stop { reason = stop; break }
+            if let stop {
+                reason = stop
+                // Ending at tool calls leaves no answer: the turn's text is narration beside them,
+                // which the trace keeps as its own step.
+                if stop == .terminated { state.finalText = "" }
+                break
+            }
             if let refreshed = await systemPromptRefresh?(), refreshed != settings.systemPrompt {
                 settings.systemPrompt = refreshed
                 trace.record(.systemPromptRefreshed)

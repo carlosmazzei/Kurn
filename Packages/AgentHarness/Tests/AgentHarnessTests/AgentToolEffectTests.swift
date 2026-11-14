@@ -40,6 +40,7 @@ import Testing
         let events = try await agentEvents(harness, tools: [tool("replace", effect: .destructive), tool("note", effect: .write)])
         let outcome = try agentOutcome(events)
         #expect(outcome.stopReason == .terminated)
+        #expect(outcome.finalText.isEmpty)
         #expect(await model.requests.count == 1)
         let results = outcome.messages.compactMap { message -> (String, Bool)? in
             if case .toolResult(let id, _, _, let isError) = message.legacyProjection { return (id, isError) }
@@ -60,7 +61,8 @@ import Testing
         let harness = NativeHarness(model: model, limits: AgentLimits(wrapUpOnLimit: true))
         let outcome = try agentOutcome(try await agentEvents(harness, tools: [tool("finish", effect: .read, terminates: true)]))
         #expect(outcome.stopReason == .terminated)
-        #expect(outcome.finalText == "Done here")
+        // The turn's text was narration beside the call, not an answer.
+        #expect(outcome.finalText.isEmpty)
         #expect(await model.requests.count == 1)
     }
 

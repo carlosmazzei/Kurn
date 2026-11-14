@@ -96,8 +96,10 @@ struct ChatDocumentChangeTests {
     }
 
     @Test func aNoEndsTheRunWithTheDocumentUnchanged() async throws {
-        let (vm, model, document) = try conversation { [AgentTurnResponse(text: "", toolCalls: [try replace($0, with: "Revised")]),
-                                                          AgentTurnResponse(text: "Never")] }
+        // The call comes with narration, which is not an answer to the question.
+        let (vm, model, document) = try conversation { [
+            AgentTurnResponse(text: "Replacing the document.", toolCalls: [try replace($0, with: "Revised")]),
+            AgentTurnResponse(text: "Never")] }
         vm.send(question: "Rewrite it", provider: .openAI, model: "gpt-4o")
         await waitUntil { vm.changeConfirmation.pending != nil }
         vm.changeConfirmation.answer(false)
@@ -107,6 +109,9 @@ struct ChatDocumentChangeTests {
         #expect(vm.artifacts == [document])
         let stop = vm.turns.flatMap(\.steps).last { $0.kind == .stop }
         #expect(stop?.stopReason == .terminated)
+        // The question stays unanswered, to ask again.
+        #expect(vm.turns.last?.role == .user)
+        #expect(vm.retryableQuestion != nil)
     }
 
     @Test func stoppingTheRunAnswersNo() async throws {

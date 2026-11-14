@@ -438,15 +438,17 @@ Tools declare an effect (`AgentTool.Effect`: `read`, `write`, `destructive`); a 
 harness's `confirm` closure before it runs unless its owner sets `requiresConfirmation: false`. A declined
 confirmation, or a tool result with `AgentToolOutput.terminatesRun` (pi's `terminate`, encoded only when set
 so older outputs keep their bytes), ends the run after its batch as `AgentRunStopReason.terminated`: the
-batch's remaining calls get skipped results, no further request is sent, nothing is wrapped up and it is not
-recorded as a limit (`runTerminated` diagnostic). In the chat, `read_document` is a read,
+batch's remaining calls get skipped results, no further request is sent, nothing is wrapped up, the outcome
+has no final text (the turn's text was narration beside the calls) and it is not recorded as a limit (`runTerminated` diagnostic). In the chat, `read_document` is a read,
 `create_document`/`append_to_document` are writes and `update_document`, which replaces a body, is destructive
 (`ChatDocumentTools.effect(of:)`): `HarnessChatService.confirmChange` (default no) is the view model's
 `ChatChangeConfirmation`, a sheet (`ChatChangeConfirmationSheet`) showing the document, any new title and the
 replacement text, answered only by its own buttons; a stopped run answers no. "Change declined" ends the run
 with the question retryable. A document card offers Undo (`MeetingChatViewModel.undoLastChange`) while no
-reply runs: `SwiftDataAgentSessionStore.undoLastChange` finds the newest earlier version on the branch shown
-(`previousVersion(of:in:)`) and saves it again as a new version (`ChatDocumentEdit.restore`), so the change
+reply runs: `SwiftDataAgentSessionStore.undoLastChange` finds version − 1 (`previousVersion(of:in:)`; every
+change adds one) in the whole tree, since a document effect rewrites its question as a sibling and leaves the
+earlier state beside the shown path, preferring the revision closest to the branch shown, and saves it again
+as a new version (`ChatDocumentEdit.restore`), so the change
 undone stays saved and can itself be restored.
 `AgentLimits.wrapUpOnLimit` runs one extra turn after a turn/tool-call limit with
 `NativeHarness.wrapUpInstruction` appended and `AgentTurnRequest.allowsToolCalls` false
