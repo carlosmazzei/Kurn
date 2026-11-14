@@ -97,6 +97,8 @@ struct ChatStepTimelineView: View {
                 .foregroundStyle(Theme.textTertiary)
                 .frame(minHeight: 44, alignment: .leading)
         }
+        // A disclosure label takes the app's tint; technical detail stays neutral.
+        .tint(Theme.textTertiary)
     }
 }
 
@@ -343,6 +345,7 @@ private struct ChatStepRow: View {
             .foregroundStyle(.secondary)
             .frame(minHeight: 44, alignment: .leading)
         }
+        .tint(Theme.textSecondary)
         .accessibilityIdentifier("chat.step.\(step.id.uuidString)")
     }
 
