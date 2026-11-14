@@ -11,12 +11,15 @@ struct ChatActivityPresentation: Equatable {
         case thinking(id: UUID, text: String, seconds: Int?, isRunning: Bool)
         case narration(id: UUID, text: String)
         case tool(id: UUID, step: AgentRunStep, result: String?)
+        /// Consecutive calls of the same tool, shown as one line ("Read 3 transcripts").
+        case toolGroup(id: UUID, name: String, steps: [AgentRunStep])
         /// A context compaction or a limit the run reached, in its place in the sequence.
         case notice(id: UUID, step: AgentRunStep)
 
         var id: UUID {
             switch self {
-            case .thinking(let id, _, _, _), .narration(let id, _), .tool(let id, _, _), .notice(let id, _): id
+            case .thinking(let id, _, _, _), .narration(let id, _), .tool(let id, _, _), .toolGroup(let id, _, _),
+                 .notice(let id, _): id
             }
         }
     }
@@ -39,7 +42,16 @@ struct ChatActivityPresentation: Equatable {
             case .narration:
                 if let text = step.text, !text.isEmpty { entries.append(.narration(id: step.id, text: text)) }
             case .tool:
-                entries.append(.tool(id: step.id, step: step, result: Self.resultLine(step.outputSummary)))
+                // Successive calls of one tool fold into a group, as Claude Code shows "Read 3 files".
+                let name = step.toolName ?? ""
+                switch entries.last {
+                case .tool(let id, let previous, _)? where previous.toolName == step.toolName:
+                    entries[entries.count - 1] = .toolGroup(id: id, name: name, steps: [previous, step])
+                case .toolGroup(let id, let groupName, let grouped)? where groupName == name:
+                    entries[entries.count - 1] = .toolGroup(id: id, name: name, steps: grouped + [step])
+                default:
+                    entries.append(.tool(id: step.id, step: step, result: Self.resultLine(step.outputSummary)))
+                }
             case .compaction:
                 entries.append(.notice(id: step.id, step: step))
             case .diagnostic where step.diagnostic?.kind == .limitReached:
@@ -57,6 +69,68 @@ struct ChatActivityPresentation: Equatable {
     }
 
     var isEmpty: Bool { entries.isEmpty && details.isEmpty }
+
+    /// Tool calls in all entries, grouped or not.
+    var actionCount: Int {
+        entries.reduce(0) { count, entry in
+            switch entry {
+            case .tool: count + 1
+            case .toolGroup(_, _, let steps): count + steps.count
+            default: count
+            }
+        }
+    }
+
+    /// The one line a finished run folds into, e.g. "Thought for 12 s · 6 actions"; nil when it
+    /// neither reasoned nor called a tool.
+    func summary(localize: (String) -> String) -> String? {
+        var parts: [String] = []
+        var thoughts = 0
+        var seconds: Int?
+        for case .thinking(_, _, let timed, _) in entries {
+            thoughts += 1
+            if let timed { seconds = (seconds ?? 0) + timed }
+        }
+        if thoughts > 0 {
+            parts.append(seconds.map { String(format: localize("chat.activity.thought_for"), $0) }
+                         ?? localize("chat.activity.reasoning"))
+        }
+        if actionCount == 1 { parts.append(localize("chat.activity.actions.one")) }
+        if actionCount > 1 { parts.append(String(format: localize("chat.activity.actions.count"), actionCount)) }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Tools whose groups have their own wording; any other tool uses the generic count.
+    static let groupedTools: Set<String> = ["search", "read_transcript", "read_summary", "read_wiki", "read_attachment",
+                                            "read_document", "list_sources"]
+
+    static func groupTitle(name: String, count: Int, localize: (String) -> String) -> String {
+        let key = groupedTools.contains(name) ? "chat.activity.group.\(name)" : "chat.activity.group.other"
+        return String(format: localize(key), count)
+    }
+
+    /// What a group touched, compact: the first two meetings, queries or documents and how many
+    /// more ("Budget review, Kickoff, +2"); nil when the calls name nothing.
+    static func groupResult(_ steps: [AgentRunStep], meetingTitles: [UUID: String], documentTitles: [UUID: String]) -> String? {
+        var names: [String] = []
+        for step in steps {
+            let presentation = ChatStepPresentation(step: step, meetingTitles: meetingTitles, documentTitles: documentTitles)
+            // An unknown tool's parameter is its own name, which the group title already says.
+            guard presentation.parameterKey != "chat.step.tool.unknown", let name = presentation.parameter,
+                  !names.contains(name) else { continue }
+            names.append(name)
+        }
+        guard !names.isEmpty else { return nil }
+        let shown = names.prefix(2).joined(separator: ", ")
+        return names.count > 2 ? "\(shown), +\(names.count - 2)" : shown
+    }
+
+    /// A group is running while any call runs, failed when any failed, otherwise finished.
+    static func groupStatus(_ steps: [AgentRunStep]) -> AgentRunStep.Status {
+        if steps.contains(where: { $0.status == .running }) { return .running }
+        if steps.contains(where: { $0.status == .failed }) { return .failed }
+        return .finished
+    }
 
     /// The first non-empty line of a tool's output summary, bounded.
     static func resultLine(_ summary: String?) -> String? {

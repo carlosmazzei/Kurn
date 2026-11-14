@@ -2,55 +2,100 @@ import AgentHarness
 import KurnCore
 import SwiftUI
 
-/// A run as it happened, Claude Code-style: the model's reasoning (one tappable line, its text
-/// streaming beneath it while it thinks), its narration, and each tool call with a `⎿` result
-/// line. Everything stays visible once the reply is done; only the technical details (context
-/// resolution and diagnostics) fold away. The ordering and wording live in
-/// `ChatActivityPresentation`.
+/// A run as it happened, Claude Code-style: the model's reasoning (one tappable line, its newest
+/// lines streaming beneath it while it thinks), its narration, and each tool call with a `⎿`
+/// result line, successive calls of one tool folded into one line. Once the reply is done the
+/// whole activity folds into one summary line ("Thought for 12 s · 6 actions") that expands on
+/// tap. The ordering and wording live in `ChatActivityPresentation`.
 struct ChatStepTimelineView: View {
     let steps: [AgentRunStep]
     let isRunning: Bool
     let meetingTitles: [UUID: String]
     let documentTitles: [UUID: String]
     @State private var showsDetails = false
+    @State private var expanded = false
 
     var body: some View {
         let activity = ChatActivityPresentation(steps: steps)
         if !activity.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(activity.entries) { entry in
-                    switch entry {
-                    case .thinking(_, let text, let seconds, let running):
-                        ChatThinkingRow(text: text, seconds: seconds, isRunning: running)
-                    case .narration(_, let text):
-                        ChatNarrationRow(text: text)
-                    case .tool(_, let step, let result):
-                        ChatToolRow(step: step, result: result, meetingTitles: meetingTitles, documentTitles: documentTitles)
-                    case .notice(_, let step):
-                        ChatNoticeRow(step: step, meetingTitles: meetingTitles, documentTitles: documentTitles)
-                    }
-                }
-                if !isRunning {
-                    DisclosureGroup(isExpanded: $showsDetails) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            if !steps.contains(where: { $0.contextResolution != nil }) {
-                                Text(NSLocalizedString("chat.context.unknown", comment: "Legacy context origin"))
-                                    .font(.caption)
-                            }
-                            ForEach(activity.details) { step in
-                                ChatStepRow(step: step, meetingTitles: meetingTitles, documentTitles: documentTitles)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    } label: {
-                        Text(NSLocalizedString("chat.activity.details", comment: "Technical details of a reply"))
-                            .font(Theme.caption)
-                            .foregroundStyle(Theme.textTertiary)
-                            .frame(minHeight: 44, alignment: .leading)
+                if isRunning {
+                    entries(activity)
+                } else {
+                    // A finished reply folds its whole activity into one line, as Claude Code does.
+                    summaryButton(activity)
+                    if expanded || activity.summary(localize: localize) == nil {
+                        entries(activity)
+                        details(activity)
                     }
                 }
             }
             .accessibilityIdentifier("chat.steps")
+        }
+    }
+
+    private func localize(_ key: String) -> String { NSLocalizedString(key, comment: "Agent activity") }
+
+    @ViewBuilder
+    private func summaryButton(_ activity: ChatActivityPresentation) -> some View {
+        if let summary = activity.summary(localize: localize) {
+            Button {
+                expanded.toggle()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkle")
+                        .font(.caption)
+                        .accessibilityHidden(true)
+                    Text(summary)
+                        .font(Theme.footnote)
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.textTertiary)
+                        .accessibilityHidden(true)
+                }
+                .foregroundStyle(Theme.textSecondary)
+                .frame(minHeight: 32, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(localize("chat.activity.summary.hint"))
+            .accessibilityIdentifier("chat.activity.summary")
+        }
+    }
+
+    private func entries(_ activity: ChatActivityPresentation) -> some View {
+        ForEach(activity.entries) { entry in
+            switch entry {
+            case .thinking(_, let text, let seconds, let running):
+                ChatThinkingRow(text: text, seconds: seconds, isRunning: running)
+            case .narration(_, let text):
+                ChatNarrationRow(text: text)
+            case .tool(_, let step, let result):
+                ChatToolRow(step: step, result: result, meetingTitles: meetingTitles, documentTitles: documentTitles)
+            case .toolGroup(_, let name, let grouped):
+                ChatToolGroupRow(name: name, steps: grouped, meetingTitles: meetingTitles, documentTitles: documentTitles)
+            case .notice(_, let step):
+                ChatNoticeRow(step: step, meetingTitles: meetingTitles, documentTitles: documentTitles)
+            }
+        }
+    }
+
+    private func details(_ activity: ChatActivityPresentation) -> some View {
+        DisclosureGroup(isExpanded: $showsDetails) {
+            VStack(alignment: .leading, spacing: 12) {
+                if !steps.contains(where: { $0.contextResolution != nil }) {
+                    Text(NSLocalizedString("chat.context.unknown", comment: "Legacy context origin"))
+                        .font(.caption)
+                }
+                ForEach(activity.details) { step in
+                    ChatStepRow(step: step, meetingTitles: meetingTitles, documentTitles: documentTitles)
+                }
+            }
+            .padding(.vertical, 4)
+        } label: {
+            Text(NSLocalizedString("chat.activity.details", comment: "Technical details of a reply"))
+                .font(Theme.caption)
+                .foregroundStyle(Theme.textTertiary)
+                .frame(minHeight: 44, alignment: .leading)
         }
     }
 }
@@ -102,7 +147,7 @@ private struct ChatThinkingRow: View {
                 Text(text)
                     .font(Theme.footnote.italic())
                     .foregroundStyle(Theme.textSecondary)
-                    .lineLimit(isRunning ? 4 : nil)
+                    .lineLimit(isRunning ? 2 : nil)
                     .truncationMode(.head)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
@@ -138,7 +183,7 @@ private struct ChatNarrationRow: View {
 
 /// A tool call: a status dot and its title, then a `⎿` line with its result. Tapping shows the
 /// arguments and the full result.
-private struct ChatToolRow: View {
+struct ChatToolRow: View {
     let step: AgentRunStep
     let result: String?
     let meetingTitles: [UUID: String]
@@ -149,8 +194,10 @@ private struct ChatToolRow: View {
         ChatStepPresentation(step: step, meetingTitles: meetingTitles, documentTitles: documentTitles)
     }
 
-    private var dotColor: Color {
-        switch step.status {
+    private var dotColor: Color { ChatToolRow.dotColor(step.status) }
+
+    static func dotColor(_ status: AgentRunStep.Status) -> Color {
+        switch status {
         case .running: Theme.info
         case .finished: Theme.success
         case .failed: Color(uiColor: .systemRed)
