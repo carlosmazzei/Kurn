@@ -84,9 +84,10 @@ struct OfflineAudioEngineTests {
                 return try await group.reduce(into: [AVAudioFramePosition]()) { $0.append($1) }
             }
 
-            let everyRenderCoversTheClip = frames.allSatisfy { $0 >= 15_000 }
+            // The fixture is 16 kHz and the output keeps that rate, so a whole 1 s clip is exactly 16,000 frames.
+            let everyRenderCoversTheClip = frames.allSatisfy { $0 == 16_000 }
             #expect(frames.count == renders)
-            #expect(everyRenderCoversTheClip, "every render covers the 1 s clip: \(frames)")
+            #expect(everyRenderCoversTheClip, "every render covers the whole 1 s clip: \(frames)")
         }
     }
 }
