@@ -958,7 +958,6 @@ departures, not gaps.
 | Area | Open item |
 | --- | --- |
 | Reasoning | The chat sends one level (low, medium, high) for every provider: per-model level sets (OpenAI `minimal`/`none`, Gemini 3 `thinkingLevel`), a level remembered per provider, and visible-reasoning qualification on real providers (Responses summaries can need organization verification) remain |
-| Model catalog | A remotely updatable catalog (capacity, capabilities, prices) instead of one compiled into the app |
 | Qualification | Set the `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/`GEMINI_API_KEY` secrets, dispatch `Live provider smoke` and record its first measurements (first content, a 1,000-entry session, concurrency warnings) |
 
 ### Local suspension, recovery and resource limits

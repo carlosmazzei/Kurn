@@ -164,6 +164,22 @@ tool loop reads the conversation before its new messages from the cache. OpenAI 
 `prompt_cache_key`; Chat Completions endpoints and Gemini (implicit caching) are left unchanged, and a request
 without a key is byte-for-byte what it was. Cache reads and writes are counted and priced as above.
 
+The bundled catalogs can be corrected between releases by a remote one (`catalog/model-catalog-v1.json`,
+format `kurn.model-catalog` schema 1, served from the default branch's raw URL; `catalog/README.md`).
+AgentHarness's `ModelCatalogDocument` reads it strictly — one format and schema, at most 256 KiB and 2,000
+models, IDs of lowercase letters, digits and `._:-`, windows of 1,024–20M tokens, an output limit within its
+window, known capability values, prices of 0–10,000 USD per million tokens and cache multipliers of 0–10 —
+and refuses the whole document on any break. `ModelCatalogOverlay` applies one over the bundled catalogs per
+fact it states (`ModelContextCatalog.entry`, `ModelCapabilityCatalog.facts`, the app's `ModelPricing` by exact
+ID before its prefix table), never one older than the bundled versions or than the one applied, nor dated more
+than two days ahead; a run that used its facts records `remote-<version>` as its `catalogVersion`. The app's
+`ModelCatalogUpdater` (built by `AppComposition`) applies the saved copy at launch and checks on activation,
+only while the selected summary/chat provider is a cloud vendor with a key, at most once a day (a failed or
+refused check waits too), with a header-less GET through `LLMHTTP.sendValidated` (15 s, response bounded by
+the document limit); it saves a document only once it has been applied. `ModelCatalogDocumentTests` checks
+that the published file agrees with the bundled facts it repeats. It changes estimates only, never an endpoint
+or what is sent.
+
 `ProviderModelMetadataService` refreshes the selected model in the settings picker
 and before an agent run. Anthropic/Gemini details resolve aliases and retain both
 the requested and canonical IDs; Groq details include completion limits (vendor/model

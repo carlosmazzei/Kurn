@@ -22,7 +22,8 @@ public enum ModelContextWindows {
         let contextFresh = reported.map { isFresh($0.contextTimestamp, now: now) } ?? false
         let outputFresh = reported.map { isFresh($0.outputTimestamp, now: now) } ?? false
         let catalog = ModelContextCatalog.entry(for: model)
-        let output = outputFresh ? reported?.maxOutputTokens ?? catalog?.maxOutputTokens : catalog?.maxOutputTokens
+        let catalogOutput = catalog?.maxOutputTokens ?? ModelContextCatalog.maxOutputTokens(for: model)
+        let output = outputFresh ? reported?.maxOutputTokens ?? catalogOutput : catalogOutput
         if contextFresh, let reported, let tokens = reported.contextWindowTokens {
             let limits = AgentModelLimits(contextWindowTokens: tokens, maxOutputTokens: output,
                                           limitKind: reported.limitKind, fetchedAt: reported.contextTimestamp)
@@ -33,10 +34,10 @@ public enum ModelContextWindows {
         if let tokens = knownWindow(forModel: model) {
             let limits = AgentModelLimits(contextWindowTokens: tokens, maxOutputTokens: output, limitKind: catalog?.limitKind ?? .combined)
             return AgentContextResolution(contextWindowTokens: tokens, source: .fixedTable, reason: reason,
-                                          modelLimits: limits, catalogVersion: ModelContextCatalog.version, resolvedAt: now,
+                                          modelLimits: limits, catalogVersion: catalog?.catalogVersion ?? ModelContextCatalog.version, resolvedAt: now,
                                           modelID: model).recordingMetadataRefresh(metadataRefresh)
         }
-        let limits = AgentModelLimits(contextWindowTokens: nil, maxOutputTokens: outputFresh ? reported?.maxOutputTokens : nil)
+        let limits = AgentModelLimits(contextWindowTokens: nil, maxOutputTokens: output)
         return AgentContextResolution(contextWindowTokens: unknownWindow, source: .fixedFallback,
                                       reason: reported != nil && !contextFresh ? .expiredMetadata : .unknownModel,
                                       modelLimits: limits, resolvedAt: now, modelID: model).recordingMetadataRefresh(metadataRefresh)

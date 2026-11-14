@@ -51,6 +51,20 @@ enum ModelPricing {
         ("llama", Rate(input: 0.59e-6, output: 0.79e-6))
     ]
 
+    /// The rate for `model`: an installed remote catalog's exact entry (`ModelCatalogOverlay`), which
+    /// carries reviewed list prices between releases, else the longest matching prefix above.
+    private static func rate(for model: String) -> Rate? {
+        if let price = ModelCatalogOverlay.entry(for: model)?.entry.pricing {
+            return Rate(input: price.inputPerMillion / 1_000_000, output: price.outputPerMillion / 1_000_000,
+                        cacheRead: price.cacheRead, cacheWrite: price.cacheWrite)
+        }
+        let lowerModel = model.lowercased()
+        return rates
+            .filter({ lowerModel.hasPrefix($0.prefix) })
+            .max(by: { $0.prefix.count < $1.prefix.count })?
+            .rate
+    }
+
     /// Estimated USD cost of `usage` under `model`, or `nil` when the model
     /// isn't recognized.
     static func estimatedCostUSD(model: String, usage: TokenUsage) -> Double? {
@@ -61,12 +75,7 @@ enum ModelPricing {
     /// provider's prompt cache at the cache's own rate, the rest of the input and the output at the
     /// model's. Cached counts are part of `inputTokens`, never added to it.
     static func estimatedCostUSD(model: String, usage: AgentUsage) -> Double? {
-        let lowerModel = model.lowercased()
-        guard let rate = rates
-            .filter({ lowerModel.hasPrefix($0.prefix) })
-            .max(by: { $0.prefix.count < $1.prefix.count })?
-            .rate
-        else { return nil }
+        guard let rate = rate(for: model) else { return nil }
         let read = min(usage.cacheReadTokens ?? 0, usage.inputTokens)
         let written = min(usage.cacheWriteTokens ?? 0, usage.inputTokens - read)
         let uncached = usage.inputTokens - read - written

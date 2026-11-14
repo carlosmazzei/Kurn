@@ -270,6 +270,9 @@ struct KurnApp: App {
         if phase == .active {
             // A chat reply the background wind-down stopped resumes once (NH05).
             Task { await environment.chatConversations.resumeAfterForeground() }
+            // Reviewed model capacities and prices published between releases; daily at most,
+            // and only while a cloud provider is in use.
+            Task { await composition.modelCatalog.refreshIfDue() }
             // Reattach any orphaned recording (and end stuck Live
             // Activities) without waiting for the next cold launch. No-op
             // while a recorder session is live.

@@ -8,12 +8,35 @@ public enum ModelContextCatalog {
 
     public struct Entry: Sendable, Equatable {
         public let tokens: Int
-        public let maxOutputTokens: Int
+        /// Nil when no catalog states it: a window alone says nothing about how much a model writes.
+        public let maxOutputTokens: Int?
         public let limitKind: AgentContextResolution.LimitKind
         public let reference: String
+        /// The catalog the facts came from: this one's `version`, or a remote document's provenance.
+        public var catalogVersion: String = ModelContextCatalog.version
     }
 
+    /// The facts for `model`: the bundled entry, with whatever an installed remote catalog
+    /// (`ModelCatalogOverlay`) states for it taking precedence field by field.
     public static func entry(for model: String) -> Entry? {
+        let bundled = bundledEntry(for: model)
+        guard let match = ModelCatalogOverlay.entry(for: model) else { return bundled }
+        let remote = match.entry, provenance = match.provenance
+        guard remote.contextTokens != nil || remote.maxOutputTokens != nil || remote.limitKind != nil else { return bundled }
+        guard let tokens = remote.contextTokens ?? bundled?.tokens else { return bundled }
+        let output = (remote.maxOutputTokens ?? bundled?.maxOutputTokens).map { min($0, tokens) }
+        return Entry(tokens: tokens, maxOutputTokens: output,
+                     limitKind: remote.limitKind ?? bundled?.limitKind ?? .combined,
+                     reference: bundled?.reference ?? provenance, catalogVersion: provenance)
+    }
+
+    /// The output limit the catalogs state for `model`, whether or not they also know its window
+    /// (a family-table or provider-reported window still takes a published output limit).
+    public static func maxOutputTokens(for model: String) -> Int? {
+        ModelCatalogOverlay.entry(for: model)?.entry.maxOutputTokens ?? bundledEntry(for: model)?.maxOutputTokens
+    }
+
+    static func bundledEntry(for model: String) -> Entry? {
         let name = model.split(separator: "/").last.map(String.init)?.lowercased() ?? ""
         if let entry = entries[name] { return entry }
         // Only a documented date-shaped snapshot suffix may inherit an exact model's facts.
