@@ -1861,7 +1861,7 @@ unavailable there), so `TranscriptionScheduler.pipelineUsesCoreML` covers it too
 
 #### FluidAudio on-device models and download consent
 
-FluidAudio is pinned to 0.18.0. Its `Diarizer`, `NemoTextProcessing` and `TTS`
+FluidAudio is pinned to 0.18.2. Its `Diarizer`, `NemoTextProcessing` and `TTS`
 traits are selected explicitly on the Xcode package reference, matching the
 upstream defaults. Without explicit selection Xcode can compile 0.18 without
 its diarization API, leaving `OfflineDiarizerManager` and related types missing.
