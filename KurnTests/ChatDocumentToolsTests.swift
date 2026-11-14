@@ -107,7 +107,8 @@ private struct DocumentReply {
     func schemasAndMalformedArguments(name: String) async throws {
         let workspace = ChatDocumentWorkspace()
         let tool = try #require(ChatDocumentTools.make(workspace: workspace).first { $0.spec.name == name })
-        #expect(!tool.requiresConfirmation)
+        // Only replacing a body asks the person first.
+        #expect(tool.requiresConfirmation == (name == "update_document"))
         #expect(tool.spec.description.contains("do not paste the document"))
         #expect(tool.spec.description.contains("document, report or minutes"))
         guard case .object(let schema) = tool.spec.inputSchema else { Issue.record("Missing schema"); return }
