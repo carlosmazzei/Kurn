@@ -59,4 +59,34 @@ struct OfflineAudioEngineTests {
             #expect(actual == expected)
         }
     }
+
+    /// Many renders at once, as the suites produce on a busy runner. Before engines entered manual
+    /// rendering ahead of any node access, each one wired a device `AURemoteIO` unit, and enough of
+    /// them overlapping aborted the test host ("AURemoteIO: RPC timeout. Apparently deadlocked").
+    /// Each render must complete with the whole clip rendered.
+    @Test func manyParallelRendersAllComplete() async throws {
+        try await tempFileTestLock.run {
+            let url = try AudioFixtures.wav(segments: [(440, 1.0)])
+            defer { try? FileManager.default.removeItem(at: url) }
+            let renders = 32
+
+            let frames = try await withThrowingTaskGroup(of: AVAudioFramePosition.self) { group in
+                for _ in 0..<renders {
+                    group.addTask {
+                        guard let format = OfflineAudioRenderer.monoFormat(sampleRate: 16_000) else {
+                            throw AppError.audioError("no mono format")
+                        }
+                        let renderer = OfflineAudioRenderer(outputFormat: format, failure: .audioError("offline render failed"),
+                                                            logLabel: "test.parallel")
+                        return try await renderer.render(url: url) { _ in }
+                    }
+                }
+                return try await group.reduce(into: [AVAudioFramePosition]()) { $0.append($1) }
+            }
+
+            let everyRenderCoversTheClip = frames.allSatisfy { $0 >= 15_000 }
+            #expect(frames.count == renders)
+            #expect(everyRenderCoversTheClip, "every render covers the 1 s clip: \(frames)")
+        }
+    }
 }
