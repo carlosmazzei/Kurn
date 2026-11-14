@@ -1084,6 +1084,14 @@
 "chat.step.stop.costLimit" = "Geschätztes Kostenlimit erreicht";
 "chat.step.stop.outputLimit" = "Antwort durch das Ausgabelimit abgeschnitten";
 "chat.step.stop.unknown" = "Gestoppt";
+"chat.step.stop.terminated" = "Änderung abgelehnt";
+"chat.confirm.replace.title" = "„%@“ ersetzen?";
+"chat.confirm.replace.message" = "Der Agent möchte den Text dieses Dokuments durch die Fassung unten ersetzen. Die aktuelle Fassung bleibt gespeichert, und die Dokumentkarte kann die Änderung rückgängig machen.";
+"chat.confirm.replace.new_title" = "Neuer Titel: %@";
+"chat.confirm.replace.allow" = "Ersetzen";
+"chat.confirm.replace.deny" = "Nicht ersetzen";
+"chat.artifact.undo" = "Rückgängig";
+"chat.artifact.undo.unavailable" = "Es gibt keine frühere Fassung dieses Dokuments, zu der zurückgekehrt werden kann.";
 "chat.step.tool" = "Werkzeug %@ wird verwendet";
 "chat.step.query" = "Suchanfrage";
 "chat.step.meeting" = "Besprechung";

@@ -4,6 +4,9 @@ struct AgentToolExecution: Sendable {
     let output: AgentToolOutput
     let reason: AgentToolBlockReason?
     var isError: Bool { output.isError || reason != nil }
+    /// A declined confirmation ends the run, as a tool asking to stop would: the person said no, so the
+    /// model is not asked to try something else in their place (as Claude Code stops on a rejection).
+    var terminatesRun: Bool { output.terminatesRun || reason == .confirmationDeclined }
     static func failure(_ text: String, _ reason: AgentToolBlockReason? = nil) -> Self {
         Self(output: AgentToolOutput(content: text, summary: text, isError: true), reason: reason)
     }

@@ -7,16 +7,19 @@ struct ChatArtifactCard: View {
     let reference: ChatArtifactReference
     let artifact: ChatDocumentArtifact
     let session: ChatSession
+    /// Restores the version before the document's latest change; nil hides the action.
+    var undo: (() -> Void)?
     @Environment(\.modelContext) private var context
     @Query private var documents: [GeneratedDocument]
     @State private var showingPreview = false
     @State private var shareItem: ShareItem?
     @State private var error: AppError?
 
-    init(reference: ChatArtifactReference, artifact: ChatDocumentArtifact, session: ChatSession) {
+    init(reference: ChatArtifactReference, artifact: ChatDocumentArtifact, session: ChatSession, undo: (() -> Void)? = nil) {
         self.reference = reference
         self.artifact = artifact
         self.session = session
+        self.undo = undo
         let sessionID = session.id
         let artifactID = artifact.id
         _documents = Query(filter: #Predicate<GeneratedDocument> {
@@ -99,6 +102,13 @@ struct ChatArtifactCard: View {
             HStack(spacing: 20) {
                 exportMenu
                 copyButton
+                if let undo {
+                    Button(action: undo) {
+                        Label(NSLocalizedString("chat.artifact.undo", comment: "Undo the document's last change"),
+                              systemImage: "arrow.uturn.backward")
+                    }
+                    .accessibilityIdentifier("chat.artifact.undo.\(artifact.id.uuidString)")
+                }
             }
         }
         .font(.subheadline)

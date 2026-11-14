@@ -40,7 +40,7 @@ The host supplies:
 | Seam | Protocol / type | Responsibility |
 | --- | --- | --- |
 | Model | `AgentModel` | Send one `AgentTurnRequest`, report `AgentModelEvent`s as they stream, return an `AgentTurnResponse`. Usually built from `Wire/` request builders and accumulators over the host's transport. `AgentPerRequestModel` rebuilds the client for every request, so credentials are resolved per request. |
-| Tools | `AgentTool`, `AgentToolSchema`, `AgentToolPolicy` | JSON schema, argument validation, optional confirmation policy, execution through `AgentToolExecutionContext`. Tool failures become error results, not thrown errors. |
+| Tools | `AgentTool`, `AgentToolSchema`, `AgentToolPolicy` | JSON schema, argument validation, an effect (`read`, `write`, `destructive`; destructive asks for confirmation unless told otherwise), execution through `AgentToolExecutionContext`. Tool failures become error results, not thrown errors. |
 | Store | `AgentSessionStore` | `load(sessionID:)` and an atomic, revision-checked `commit(_:)` of an append group. A conflict throws `AgentSessionStoreError.conflict`. |
 | Errors | `AgentTransientError`, `AgentContextOverflowError` | Classify the host's own errors as retryable or as a context overflow. |
 | Policy | `AgentLimits`, `AgentContextPolicy`, `AgentRetryPolicy`, `AgentCompactionPrompts`, a cost estimator | Turn/tool/cost ceilings, the model's window and reserve, retry backoff, summary prompts, pricing. |
@@ -74,7 +74,9 @@ it, or it fails.
 4. **Tools.** Every call of a turn is registered with its own invocation identity, validated,
    optionally confirmed, executed and answered with a result message, before the next request.
 5. **Stop.** A reply with no tool call ends the run. Turn, tool-call and cost limits end it with an
-   explicit `AgentRunStopReason`; `wrapUpOnLimit` first asks for one tool-less answer.
+   explicit `AgentRunStopReason`; `wrapUpOnLimit` first asks for one tool-less answer. A tool ends
+   it with `.terminated` by returning `terminatesRun` (pi's `terminate`), and so does a declined
+   confirmation: the rest of that batch gets skipped results and no further request is sent.
 
 Recovery inside a run:
 

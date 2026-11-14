@@ -6,7 +6,8 @@ public enum ChatDocumentTools {
     public typealias Mutation = @Sendable (String, JSONValue, AgentToolExecutionContext) async throws -> AgentToolOutput
     public static func make(workspace: ChatDocumentWorkspace, mutation: Mutation? = nil) -> [AgentTool] {
         ["create_document", "update_document", "append_to_document", "read_document"].map { name in
-            AgentTool(spec: spec(name), scheduling: name == "read_document" ? .parallelRead : .sequential, executeWithContext: { arguments, context in
+            AgentTool(spec: spec(name), effect: effect(of: name),
+                      scheduling: name == "read_document" ? .parallelRead : .sequential, executeWithContext: { arguments, context in
                 do {
                     try Task.checkCancellation()
                     let params = try Parameters(arguments, name: name)
@@ -19,6 +20,17 @@ public enum ChatDocumentTools {
                                            summary: "Document unavailable or invalid arguments", isError: true)
                 }
             })
+        }
+    }
+
+    /// Reading changes nothing; creating and appending add to what is there; replacing a body
+    /// discards the text it had, so it asks the person first (its earlier version stays saved
+    /// and the document card can restore it).
+    static func effect(of name: String) -> AgentTool.Effect {
+        switch name {
+        case "read_document": .read
+        case "update_document": .destructive
+        default: .write
         }
     }
 

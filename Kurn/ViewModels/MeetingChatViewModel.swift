@@ -44,6 +44,8 @@ final class MeetingChatViewModel {
     var scope: ChatSourceScope { scopeEditor.scope }
     private(set) var artifacts: [ChatDocumentArtifact] = []
     @ObservationIgnored private var workspace = ChatDocumentWorkspace()
+    /// The destructive change the current run waits on the person for (`ChatChangeConfirmation`).
+    let changeConfirmation = ChatChangeConfirmation()
     @ObservationIgnored private var generation = UUID()
     @ObservationIgnored private var conversationID = UUID()
     @ObservationIgnored private var retryArtifacts: [ChatArtifactReference] = []
@@ -469,6 +471,12 @@ final class MeetingChatViewModel {
             .sorted { $0.updatedAt > $1.updatedAt }
     }
 
+    /// Documents saved outside a run (an undo): shown, and what the next run starts from.
+    func adoptDocuments(_ values: [ChatDocumentArtifact]) throws {
+        workspace = try ChatDocumentWorkspace(artifacts: values)
+        artifacts = values
+    }
+
     /// Loads a previously saved conversation for display and continuation.
     func load(session: ChatSession) {
         guard session.meeting?.id == meeting?.id else { return }
@@ -545,6 +553,7 @@ final class MeetingChatViewModel {
         service.conversationID = conversationID
         service.documentOrigin = origin
         let acceptedTurns = turns
+        service.confirmChange = { [weak self] call in await self?.confirmChange(call) ?? false }
         service.prepareDocumentSession = { [weak self] in
             guard let self, self.generation == generation else { throw CancellationError() }
             try self.persistOrThrow(turns: acceptedTurns)

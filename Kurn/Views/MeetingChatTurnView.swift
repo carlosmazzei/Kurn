@@ -12,6 +12,8 @@ struct MeetingChatTurnView: View {
     var artifactSession: ChatSession?
     var onJumpToTime: ((TimeInterval) -> Void)?
     var branch: ChatTurnBranchActions?
+    /// The undo action of a document card, nil when its latest change cannot be undone.
+    var undoAction: ((ChatDocumentArtifact) -> (() -> Void)?)?
 
     var body: some View {
         switch turn.role {
@@ -138,7 +140,8 @@ struct MeetingChatTurnView: View {
             }
             ForEach(turn.artifacts) { reference in
                 if let artifact = ChatArtifactPresentation.latest(reference, in: artifacts), let artifactSession {
-                    ChatArtifactCard(reference: reference, artifact: artifact, session: artifactSession)
+                    ChatArtifactCard(reference: reference, artifact: artifact, session: artifactSession,
+                                     undo: undoAction?(artifact))
                 }
             }
         }

@@ -1084,6 +1084,14 @@
 "chat.step.stop.costLimit" = "Limite de coût estimé atteinte";
 "chat.step.stop.outputLimit" = "Réponse tronquée par la limite de sortie";
 "chat.step.stop.unknown" = "Arrêté";
+"chat.step.stop.terminated" = "Modification refusée";
+"chat.confirm.replace.title" = "Remplacer « %@ » ?";
+"chat.confirm.replace.message" = "L’agent veut remplacer le texte de ce document par la version ci-dessous. La version actuelle reste enregistrée et la carte du document peut annuler la modification.";
+"chat.confirm.replace.new_title" = "Nouveau titre : %@";
+"chat.confirm.replace.allow" = "Remplacer";
+"chat.confirm.replace.deny" = "Ne pas remplacer";
+"chat.artifact.undo" = "Annuler";
+"chat.artifact.undo.unavailable" = "Ce document n’a pas de version antérieure à restaurer.";
 "chat.step.tool" = "Utilisation de l’outil %@";
 "chat.step.query" = "requête";
 "chat.step.meeting" = "réunion";

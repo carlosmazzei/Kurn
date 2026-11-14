@@ -277,7 +277,7 @@ public struct NativeHarness: Sendable {
             // Steering enters after the whole tool batch, before the next request.
             _ = try await injectQueued(.steering, state: &state, events: events, trace: trace)
         }
-        if reason != .completed { recordLimit(reason, state: &state, trace: trace) }
+        if reason != .completed, reason != .terminated { recordLimit(reason, state: &state, trace: trace) }
         try Task.checkCancellation()
         if limits.wrapUpOnLimit, reason == .turnLimit || reason == .toolCallLimit,
            case .toolResult? = state.context.last?.legacyProjection, !costLimitReached(state),
