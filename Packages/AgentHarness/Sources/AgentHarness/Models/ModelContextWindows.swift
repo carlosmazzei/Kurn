@@ -22,7 +22,8 @@ public enum ModelContextWindows {
         let contextFresh = reported.map { isFresh($0.contextTimestamp, now: now) } ?? false
         let outputFresh = reported.map { isFresh($0.outputTimestamp, now: now) } ?? false
         let catalog = ModelContextCatalog.entry(for: model)
-        let output = outputFresh ? reported?.maxOutputTokens ?? catalog?.maxOutputTokens : catalog?.maxOutputTokens
+        let catalogOutput = catalog?.maxOutputTokens ?? ModelContextCatalog.maxOutputTokens(for: model)
+        let output = outputFresh ? reported?.maxOutputTokens ?? catalogOutput : catalogOutput
         if contextFresh, let reported, let tokens = reported.contextWindowTokens {
             let limits = AgentModelLimits(contextWindowTokens: tokens, maxOutputTokens: output,
                                           limitKind: reported.limitKind, fetchedAt: reported.contextTimestamp)
@@ -36,7 +37,7 @@ public enum ModelContextWindows {
                                           modelLimits: limits, catalogVersion: catalog?.catalogVersion ?? ModelContextCatalog.version, resolvedAt: now,
                                           modelID: model).recordingMetadataRefresh(metadataRefresh)
         }
-        let limits = AgentModelLimits(contextWindowTokens: nil, maxOutputTokens: outputFresh ? reported?.maxOutputTokens : nil)
+        let limits = AgentModelLimits(contextWindowTokens: nil, maxOutputTokens: output)
         return AgentContextResolution(contextWindowTokens: unknownWindow, source: .fixedFallback,
                                       reason: reported != nil && !contextFresh ? .expiredMetadata : .unknownModel,
                                       modelLimits: limits, resolvedAt: now, modelID: model).recordingMetadataRefresh(metadataRefresh)

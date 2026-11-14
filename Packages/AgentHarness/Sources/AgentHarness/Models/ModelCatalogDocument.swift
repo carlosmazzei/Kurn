@@ -45,7 +45,7 @@ public struct ModelCatalogDocument: Sendable, Equatable {
 
     /// The day the facts were reviewed (`yyyy-MM-dd`); later documents supersede earlier ones.
     public let version: String
-    /// Keyed by lowercased model ID, without a vendor prefix.
+    /// Keyed by lowercase model ID (an uppercase one is refused), without a vendor prefix.
     public let models: [String: Entry]
 
     /// The version recorded as a run's `catalogVersion` when one of these facts was used.
@@ -65,9 +65,8 @@ public struct ModelCatalogDocument: Sendable, Equatable {
         guard isVersion(wire.version) else { throw ValidationError.invalidVersion }
         guard wire.models.count <= maxModels else { throw ValidationError.tooManyModels }
         var models: [String: Entry] = [:]
-        for (rawID, value) in wire.models {
-            let id = rawID.lowercased()
-            guard isModelID(id), models[id] == nil else { throw ValidationError.invalidModelID(rawID) }
+        for (id, value) in wire.models {
+            guard isModelID(id) else { throw ValidationError.invalidModelID(id) }
             models[id] = try value.entry(model: id)
         }
         return ModelCatalogDocument(version: wire.version, models: models)
