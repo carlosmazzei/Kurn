@@ -2783,8 +2783,8 @@ hold for every phase; code comments cite this section.
   `KnowledgeJob.idempotencyKey` and `KnowledgeRevision.number` are unique, and a
   revision is the projection outbox while `projectionPending`. A meeting without a
   `SourceContextLink` is in context `unknown`, so the V6 → V7 stage is lightweight and
-  writes nothing. `LibraryEraser` deletes all ten. Nothing writes them yet: the single
-  writer is K1.5.
+  writes nothing. `LibraryEraser` deletes all ten. `KnowledgeStore` (K1.5) is
+  their canonical writer; scheduling and the application wiring remain K1.6.
 - **Transcript revisions and anchors (K1.3).** KurnCore's
   `KnowledgeTranscriptSnapshot` freezes transcript array order and UUID anchors
   (lowercase strings), and produces versioned, length-prefixed UTF-8 canonical
@@ -2799,8 +2799,9 @@ hold for every phase; code comments cite this section.
   `Transcript.knowledgeRevision()` decodes authoritative bytes directly and
   rejects corruption rather than fingerprinting the presentation getter's empty
   fallback. There is no transcript history or new persisted field/migration.
-  K1.5 must recapture the revision at commit and maintain stored evidence
-  availability; this step provides the snapshot/resolution boundary only.
+  `KnowledgeStore` recaptures the revision at commit and marks replaced
+  evidence unavailable when its source revision is gone. Readers must still
+  resolve against the current fingerprint: an edit may precede recompilation.
 - **Extraction contract (K1.4).** KurnCore's `KnowledgeExtraction.decode`
   validates the complete version-1 Codable document before it can leave a pass:
   known fields/vocabularies only, local unique references, predicate/object rules,
@@ -2829,7 +2830,45 @@ hold for every phase; code comments cite this section.
   constructing prompts and before each provider call, including repairs; output
   records source fingerprint, strategy, examined anchors and targeted pass count.
   This does not enable cloud processing, write canonical rows, or establish
-  semantic extraction accuracy: K0.4 benchmarking and K1.5 commit checks remain.
+  semantic extraction accuracy: K0.4 benchmarking and K1.6 scheduling remain.
+- **Canonical writer and projection outbox (K1.5).** `KnowledgeStore` is a
+  `@ModelActor` over the existing protected container. The host must own one
+  writer per container and create it off-main when wiring the K1.6 queue; UI
+  continues to read through its own context. Only Sendable source snapshots,
+  encoded extraction documents and receipts cross its boundary. Each operation
+  opens a fresh context, avoiding cached source bytes across commits.
+  A source token covers the meeting's complete, UUID-ordered recording set
+  (including missing transcripts), transcript identities/fingerprints, recording
+  dates and capture state, meeting metadata and the persisted context. Missing,
+  corrupt, unready or ambiguously contextualized sources fail closed. Compilation
+  must cover every nonempty transcript; each pass is decoded and evidence-checked
+  again against persisted source order. Local refs remain separate per pass and
+  recording; entity allocation is conservative until K1.7, with no auto-linking
+  of people or shared names.
+  A live authorization callback is awaited immediately before the synchronous
+  transaction; persisted context classification cannot lower the host's source
+  classification, and a named context policy must be present. Source, policy
+  revision and canonical revision are rechecked before mutation. The canonical
+  graph, succeeded job, retained attribution/ref-map provenance, coverage and
+  `KnowledgeRevision.projectionPending` outbox are saved together; failures roll
+  back all rows and retractions. The injected `beforeSave` seam proves rollback.
+  KurnCore's `KnowledgeCompilationIdentity` encodes an unambiguous, reversible
+  job key over scope, meeting ID, meeting source fingerprint, extractor version
+  and extraction schema version (independent of SwiftData's schema version).
+  Completed retries return the original receipt even after another canonical
+  commit or writer recreation. Changed source or policy is never a replay;
+  a completed key under an earlier policy revision is refused and requires an
+  explicit rebuild/generation change. Cancelled jobs cannot be committed.
+  Recompilation retracts previous machine assertions in its own scope, retaining
+  history and human-confirmed assertions whose evidence still resolves. Evidence
+  from changed/removed recordings is marked unavailable across scopes and
+  unsupported assertions are invalidated. Relations and events remain historical
+  records tied to their assertion/revision; readers must filter through them.
+  The latest pending projection is durable across reopening. Acknowledging N
+  clears pending revisions through N only if N is still current, so a stale
+  worker cannot erase newer work. K2 must publish projections in that same
+  transaction before acknowledgement; this step does not publish pages/indexes.
+  No schema migration or cloud processing is enabled by this boundary.
 - **Public material is synthetic.** The golden set
   (`Packages/KurnCore/Tests/KurnCoreTests/Fixtures/knowledge/`, format
   `kurn.knowledge-fixture` v1) holds fictional meetings in Portuguese and
