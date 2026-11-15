@@ -16,6 +16,7 @@ struct KnowledgeQueuedWork: Codable, Sendable, Equatable {
     let explicitlyRequested: Bool
     /// Distinguishes a rebuilt output from the matching article that predated it.
     let priorArticleVersion: String?
+    let generation: String
 
     // swiftlint:disable:next function_parameter_count
     static func article(meetingID: UUID, generator: String, provider: AIProvider, model: String,
@@ -27,12 +28,12 @@ struct KnowledgeQueuedWork: Codable, Sendable, Equatable {
         let digest = SHA256.hash(data: try encoder.encode(fields)).map { String(format: "%02x", $0) }.joined()
         return Self(key: "knowledge.article.v1:\(digest)\(force ? ":\(UUID().uuidString)" : "")", kind: .meetingArticle,
             meetingID: meetingID, pipelineVersion: generator, provider: provider, model: model,
-            sourceFingerprint: fingerprint, force: force, explicitlyRequested: explicit, priorArticleVersion: priorArticleVersion)
+            sourceFingerprint: fingerprint, force: force, explicitlyRequested: explicit, priorArticleVersion: priorArticleVersion, generation: generation)
     }
 
     func regenerated() -> Self {
         Self(key: key + ":\(UUID().uuidString)", kind: kind, meetingID: meetingID, pipelineVersion: pipelineVersion,
-            provider: provider, model: model, sourceFingerprint: sourceFingerprint, force: force, explicitlyRequested: explicitlyRequested, priorArticleVersion: priorArticleVersion)
+            provider: provider, model: model, sourceFingerprint: sourceFingerprint, force: force, explicitlyRequested: explicitlyRequested, priorArticleVersion: priorArticleVersion, generation: generation)
     }
 }
 
