@@ -1,3 +1,4 @@
+import AgentHarness
 import Foundation
 import KurnCore
 import Testing
@@ -198,4 +199,61 @@ struct KnowledgeExtractionServiceTests {
         }
         #expect(llm.chatCalls.isEmpty)
     }
+
+    @Test func outputCoverageBudgetSplitsManyShortSegmentsBeforeEgress() async throws {
+        let source = segments(count: 2_000, text: "Yes.")
+        let llm = ScriptedLLMProvider(chat: { call, _ in
+            let reply = try Self.emptyReply(ids: Self.inputIDs(call))
+            guard TokenEstimate.tokens(in: reply) <= call.options.maxOutputTokens else { throw AppError.generationTruncated }
+            return reply
+        })
+        let result = try await KnowledgeExtractionService().extract(segments: source, language: "en", context: context,
+            llm: llm, budget: ContextBudget(inputTokens: 100_000, mapBlockTokens: 75_000), authorization: { Self.allowed() })
+        #expect(result.strategy == .blocks)
+        #expect(result.passes.count > 1)
+        #expect(result.examinedSegmentIDs.count == 2_000)
+        for call in llm.chatCalls {
+            let reply = try Self.emptyReply(ids: Self.inputIDs(call))
+            #expect(TokenEstimate.tokens(in: reply) < call.options.maxOutputTokens / 2)
+        }
+    }
+
+    @Test func targetedRoundCanUseTheFullInputAllowance() async throws {
+        let source = segments(count: 1, text: String(repeating: "word ", count: 500))
+        let llm = ScriptedLLMProvider(chat: { call, index in
+            try Self.emptyReply(ids: index == 0 ? [] : Self.inputIDs(call))
+        })
+        let result = try await KnowledgeExtractionService().extract(segments: source, language: "en", context: context,
+            llm: llm, budget: ContextBudget(inputTokens: 1_000, mapBlockTokens: 100), authorization: { Self.allowed() })
+        #expect(result.targetedPassCount == 1)
+        #expect(llm.chatCalls.count == 2)
+        #expect(llm.chatCalls[0].messages == llm.chatCalls[1].messages)
+    }
+
+    @Test func truncatedOutputGetsOneSplitAndRecordsTheActualStrategy() async throws {
+        let source = segments(count: 4)
+        let llm = ScriptedLLMProvider(chat: { call, index in
+            if index == 0 { throw AppError.generationTruncated }
+            return try Self.emptyReply(ids: Self.inputIDs(call))
+        })
+        let result = try await KnowledgeExtractionService().extract(segments: source, language: "en", context: context,
+            llm: llm, budget: budget, authorization: { Self.allowed() })
+        #expect(llm.chatCalls.count == 3)
+        #expect(result.strategy == .blocks)
+        #expect(result.passes.count == 2)
+        #expect(result.examinedSegmentIDs.count == 4)
+        #expect(try Self.inputIDs(llm.chatCalls[1]).count == 2)
+    }
+
+    @Test func truncationRecoveryNeverRecursivelySplitsOrRetriesOneSegment() async {
+        for count in [1, 4] {
+            let llm = ScriptedLLMProvider(chat: { _, _ in throw AppError.generationTruncated })
+            await #expect(throws: AppError.self) {
+                try await KnowledgeExtractionService().extract(segments: segments(count: count), language: "en", context: context,
+                    llm: llm, budget: budget, authorization: { Self.allowed() })
+            }
+            #expect(llm.chatCalls.count == (count == 1 ? 1 : 2))
+        }
+    }
+
 }

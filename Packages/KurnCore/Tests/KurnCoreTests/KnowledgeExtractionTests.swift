@@ -25,9 +25,9 @@ struct KnowledgeExtractionTests {
 
     private func changingAssertion(_ change: (inout [String: Any]) -> Void) -> [String: Any] {
         var root = wire()
-        var assertions = root["assertions"] as! [[String: Any]]
-        change(&assertions[0])
-        root["assertions"] = assertions
+        var assertion = (root["assertions"] as? [[String: Any]])?.first ?? [:]
+        change(&assertion)
+        root["assertions"] = [assertion]
         return root
     }
 
@@ -158,10 +158,27 @@ struct KnowledgeExtractionTests {
         for change in [["kind": "merged"], ["kind": "assigned"], ["entity": "missing"],
                        ["assertion": "missing"], ["kind": "reopened"], ["occurredAt": "yesterday"]] {
             var invalid = wire()
-            var events = invalid["events"] as! [[String: Any]]
-            events[0].merge(change) { _, new in new }
-            invalid["events"] = events
+            var event: [String: Any] = ["ref": "v1", "entity": "e1", "assertion": "a1", "kind": "statusChanged"]
+            event.merge(change) { _, new in new }
+            invalid["events"] = [event]
             #expect(throws: KnowledgeExtractionError.self) { try decode(invalid) }
         }
     }
+
+    @Test func supersededEventBelongsToTheOldEntityNotItsReplacement() throws {
+        var document = changingAssertion {
+            $0["predicate"] = "supersedes"
+            $0["object"] = "e2"
+            $0.removeValue(forKey: "value")
+        }
+        var entities = try #require(document["entities"] as? [[String: Any]])
+        entities.append(["ref": "e2", "kind": "project", "name": "Example old project", "aliases": []])
+        document["entities"] = entities
+        document["events"] = [["ref": "v1", "entity": "e2", "assertion": "a1", "kind": "superseded"]]
+        let valid = try decode(document)
+        #expect(valid.events[0].entity == "e2")
+        document["events"] = [["ref": "v1", "entity": "e1", "assertion": "a1", "kind": "superseded"]]
+        #expect(throws: KnowledgeExtractionError.unknownReference) { try decode(document) }
+    }
+
 }

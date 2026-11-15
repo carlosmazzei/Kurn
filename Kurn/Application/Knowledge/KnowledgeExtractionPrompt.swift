@@ -31,7 +31,8 @@ enum KnowledgeExtractionPrompt {
     attributedToSegmentID must be in the cited evidence: the host resolves its speaker, not you.
     authorityStatus may only be attributed, unverified or disputed; no machine output confirms an assertion.
     Arrays may be empty. examinedSegmentIDs must include every supplied segment you inspected even if nothing was extracted.
-    Only cite supplied segments. Events reference an assertion about their entity; do not emit merge/context-link operations.
+    Only cite supplied segments. Events reference a supporting assertion. For A supersedes B, a superseded event belongs to B (the object);
+    other events belong to the assertion subject. Do not emit merge/context-link operations.
     """
 
     static var vocabulary: String {
