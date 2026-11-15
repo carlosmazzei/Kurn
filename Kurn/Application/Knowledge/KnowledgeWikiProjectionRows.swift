@@ -36,7 +36,8 @@ enum KnowledgeWikiProjectionRows {
         let context = ModelContext(container)
         context.autosaveEnabled = false
         do {
-            return try context.transaction {
+            var published: KnowledgeWikiProjection?
+            try context.transaction {
                 let sources = try KnowledgeWikiSourceRows.sources(meetingIDs: Set(expected.sources.map(\.meetingID)),
                     scope: expected.scope, auth: auth, in: context)
                 let current = try KnowledgeWikiSourceRows.snapshot(sources: sources, in: context)
@@ -55,12 +56,14 @@ enum KnowledgeWikiProjectionRows {
                 job.checkpointData = bytes
                 job.stateRaw = KnowledgeJobState.succeeded.rawValue
                 job.updatedAt = Date()
-                try acknowledgeCovered(sources: sources, in: context)
+                try KnowledgeWikiOutboxRows.acknowledgeCovered(sources: sources, in: context)
                 try Task.checkCancellation()
                 try beforeSave()
                 try context.save()
-                return result
+                published = result
             }
+            guard let published else { throw KnowledgeWikiStoreError.invalidCanonical }
+            return published
         } catch {
             context.rollback()
             throw error
@@ -82,38 +85,4 @@ enum KnowledgeWikiProjectionRows {
         return stored
     }
 
-    /// A scoped publication cannot acknowledge another source/scope's work.
-    /// Human redirect revisions are covered only when their audited source set
-    /// is fully selected; unrecognized dependencies stay pending.
-    private static func acknowledgeCovered(sources: [KnowledgeStoreSnapshot], in context: ModelContext) throws {
-        guard let source = sources.first else { return }
-        let selected = Set(sources.map(\.meetingID))
-        let revisions = try context.fetch(FetchDescriptor<KnowledgeRevision>(predicate: #Predicate { $0.projectionPending }))
-        for revision in revisions where revision.policyRevisionKey == source.policyRevisionKey {
-            if let jobID = revision.jobID {
-                guard let job = try context.fetch(FetchDescriptor<KnowledgeJob>(predicate: #Predicate { $0.id == jobID })).first,
-                      job.kindRaw == KnowledgeJobKind.extraction.rawValue, job.stateRaw == KnowledgeJobState.succeeded.rawValue,
-                      let identity = KnowledgeCompilationIdentity(idempotencyKey: job.idempotencyKey),
-                      identity.scope == source.scope, selected.contains(identity.meetingID),
-                      let origin = sources.first(where: { $0.meetingID == identity.meetingID }) else { continue }
-                _ = try KnowledgeEntityOriginRows.entityIDs(job, source: origin, historicalPolicies: false, in: context)
-                revision.projectionPending = false
-            } else if try coversHumanRevision(revision.id, sources: sources, in: context) {
-                revision.projectionPending = false
-            }
-        }
-    }
-
-    private static func coversHumanRevision(_ id: UUID, sources: [KnowledgeStoreSnapshot], in context: ModelContext) throws -> Bool {
-        let kind = KnowledgeReviewItemKind.mergeCandidate.rawValue
-        let resolved = KnowledgeReviewItemState.resolved.rawValue
-        let reviews = try context.fetch(FetchDescriptor<KnowledgeReview>(predicate: #Predicate { $0.kindRaw == kind && $0.stateRaw == resolved }))
-        for row in reviews {
-            let payload = try KnowledgeEntityResolutionRows.reviewPayload(row)
-            guard let merge = payload.merge, merge.applied.revisionID == id || merge.undone?.revisionID == id else { continue }
-            _ = try KnowledgeEntityMergeRows.checkedAudit(row, payload: payload, in: context)
-            return merge.scope == sources.first?.scope && Set(merge.sources.map(\.meetingID)).isSubset(of: Set(sources.map(\.meetingID)))
-        }
-        return false
-    }
 }

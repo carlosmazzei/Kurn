@@ -316,5 +316,32 @@ struct KnowledgeWikiProjectionTests {
         #expect(projected.pages[0].markdown.contains("The dependency remains uncertain"))
         #expect(try await read(f) == projected)
     }
+
+    @Test func oldPolicyOutboxWaitsForNewerCompilationsOfEveryCoveredSource() async throws {
+        var f = try fixture(count: 2)
+        try await compile(f, meetingID: f.meetings[0].id)
+        try await compile(f, meetingID: f.meetings[1].id)
+        let old = try await snapshot(f)
+        let first = try #require(old.wiki.facts.first)
+        let auth = KnowledgeEntityResolutionAuthorization(extraction: f.auth.extraction, meetingIDs: f.ids)
+        let token = try await f.store.entityMutationSnapshot(meetingIDs: f.ids, scope: "workspace", authorization: { auth })
+        _ = try await f.store.mergeEntities(.init(operationID: UUID(), sourceID: first.subjectID,
+            targetID: try #require(first.objectID), snapshot: token), authorization: { auth })
+        f.auth.policies[0].revision += 1
+        _ = try await publish(f)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<KnowledgeRevision>()).filter(\.projectionPending).count == 3)
+        try await compile(f, meetingID: f.meetings[0].id, scope: "other", version: "new-policy")
+        _ = try await publish(f)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<KnowledgeRevision>()).filter(\.projectionPending).count == 4)
+        try await compile(f, meetingID: f.meetings[0].id, version: "new-policy")
+        _ = try await publish(f)
+        let pending = try ModelContext(f.container).fetch(FetchDescriptor<KnowledgeRevision>()).filter(\.projectionPending)
+        #expect(pending.count == 3) // Source two, the merge, and the other scope.
+        try await compile(f, meetingID: f.meetings[1].id, version: "new-policy")
+        _ = try await publish(f)
+        let remaining = try ModelContext(f.container).fetch(FetchDescriptor<KnowledgeRevision>()).filter(\.projectionPending)
+        #expect(remaining.map(\.number) == [4]) // Unselected scope remains pending.
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeRevision>()) == 6)
+    }
 }
 }

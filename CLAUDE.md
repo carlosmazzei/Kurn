@@ -3058,7 +3058,10 @@ atomically saves a versioned checksummed projection in a succeeded `.projection`
 job's `checkpointData` in the existing protected store. Its stable key covers
 scope and selected source IDs. Only revisions whose complete source/scope
 dependencies are covered are acknowledged; unrelated and unrecognized work
-stays pending. Human merge/undo coverage is checked against its retained audit.
+stays pending. Old-policy work is retired only when a newer succeeded
+compilation in the same scope/current policy covers every affected source and
+its current fingerprint; no historical canonical rows are deleted. Human
+merge/undo coverage is checked against its retained audit.
 Invalid output or save failure preserves the previous valid pages and outbox;
 unreadable/future payloads are never overwritten. Reads recheck authorization,
 policy, source tokens, canonical revision and canonical content before returning
