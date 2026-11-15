@@ -2,12 +2,13 @@ name: iOS CI
 
 on:
   push:
-    # main gets a run of its own after every merge so Codecov has a base report to compare
-    # its PRs against (without one, every PR comment shows "?").
-    branches: [ "main" ]
+    # main and the Knowledge Engine integration branch get a run of their own after every
+    # merge so Codecov has a base report to compare their PRs against (without one, every PR
+    # comment shows "?"). Drop the integration branch from both lists when it lands on main.
+    branches: [ "main", "feature/knowledge-engine" ]
     tags: [ "v*.*.*" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "feature/knowledge-engine" ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ startsWith(github.ref, 'refs/tags/v') && 'release' || github.ref }}
