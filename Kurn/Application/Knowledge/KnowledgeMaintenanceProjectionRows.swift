@@ -10,13 +10,13 @@ enum KnowledgeMaintenanceProjectionRows {
         guard let row = try context.fetch(FetchDescriptor<KnowledgeJob>(predicate: #Predicate { $0.idempotencyKey == key })).first else { return }
         do {
             let stored = try KnowledgeWikiProjectionRows.envelope(row)
+            guard stored.pages.compactMap(\.narrative).allSatisfy({ $0.version == 1 }) else {
+                throw KnowledgeMaintenanceError.unsupportedArtifact
+            }
             guard stored.sources == KnowledgeEntityResolutionRows.tokens(sources), stored.policyRevisionKey == first.policyRevisionKey,
                   stored.snapshot.revision == input.revision else {
                 input.projection = .stale
                 return // No old-policy or excluded-source identifiers/counts.
-            }
-            guard stored.pages.compactMap(\.narrative).allSatisfy({ $0.version == 1 }) else {
-                throw KnowledgeMaintenanceError.unsupportedArtifact
             }
             guard let wiki else { input.projection = .unreadable; return }
             let expected = try KnowledgeWikiProjector.project(wiki)
