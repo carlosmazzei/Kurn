@@ -84,6 +84,7 @@ enum KnowledgeStoreError: String, Error, Sendable {
 /// the V7 canonical rows have no dedicated attribution/ref-map fields.
 struct KnowledgeCommitProvenance: Codable {
     var recordings: [Recording]
+    var resolutionSummary: KnowledgeEntityResolutionSummary?
     struct Recording: Codable {
         let recordingID: UUID
         let transcriptFingerprint: String

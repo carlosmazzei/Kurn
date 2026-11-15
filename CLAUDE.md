@@ -2849,8 +2849,8 @@ hold for every phase; code comments cite this section.
   corrupt, unready or ambiguously contextualized sources fail closed. Compilation
   must cover every nonempty transcript; each pass is decoded and evidence-checked
   again against persisted source order. Local refs remain separate per pass and
-  recording; entity allocation is conservative until K1.7, with no auto-linking
-  of people or shared names.
+  recording. K1.7 emits lexical review candidates while retaining distinct IDs;
+  neither people nor shared names are auto-linked.
   A live authorization callback is awaited immediately before the synchronous
   transaction; persisted context classification cannot lower the host's source
   classification, and a named context policy must be present. Source, policy
@@ -2951,6 +2951,42 @@ hold for every phase; code comments cite this section.
   introduced by this integration. Genuine producer failures emit content-free
   `knowledge_compilation` reliability events with operation ID, elapsed time and
   fixed error code; expected deferrals/obsolete intents are not failures.
+- **Review-only entity resolution and reversible redirects (K1.7).**
+  KurnCore's `KnowledgeEntityResolver` normalizes case/diacritics and whitespace,
+  preserves punctuation for exact matching, and records exact-name, alias and
+  token-Jaccard features. Different kinds and generic shared words alone are
+  excluded. Ties sort by UUID. The external specification's numeric weights
+  were unavailable; `experimental-v1` is an explicit, configurable STARTING
+  profile, not a reproduction of those numbers or a calibrated probability:
+  0.60 exact name + 0.15 alias + 0.25 token similarity, minimum 0.15, top five.
+  Every match requires human review, including every person/homonym. No threshold
+  or flag enables automatic linking before the K0.4 holdout gate is met.
+  Canonical commit retains separate UUIDs and stages `mergeCandidate` reviews in
+  the same graph/provenance transaction. Candidate origins are restricted to the
+  already-authorized meeting, compilation scope and current policy revision.
+  Up to 128 historical jobs, 1,024 entities and 128 suggestions are considered;
+  truncation and the profile are retained in optional provenance metadata.
+  Cross-meeting reads require the host's explicit authorized meeting-ID set
+  (up to 16), never just a scope label. Each current source/context passes live
+  local policy before origin-bound provenance, names or aliases are returned.
+  Unauthorized redirect targets are omitted, with incomplete resolution marked;
+  alias unions are scoped views, never destructive writes to the target row.
+  `KnowledgeStore.mergeEntities` / `undoEntityMerge` are host-only seams for an
+  explicit human decision, not model tools. They check fresh source/policy and
+  canonical revision, kind, visible state, all affected inbound origins, cycles
+  and depth. Redirects are not path-compressed. Assertions, relations, events,
+  evidence and original names/aliases are never reassigned or rewritten.
+  The edge, versioned/checksummed review audit, candidate state and a new
+  projection-outbox revision commit atomically. Operation UUIDs are idempotent;
+  undo records its own receipt and reopens its candidate. An undone operation
+  cannot accidentally reapply itself. Undo may prove historical origins under
+  CURRENT live policy without exposing old-policy names as fresh candidates.
+  Unknown/corrupt audit data is refused without overwriting its bytes. The
+  extraction pipeline is `knowledge-extractor-v2`; queued older versions are
+  discarded rather than relabelled as current work. Existing provenance remains
+  readable; no schema migration, navigation or cloud activation is introduced.
+  Review UI, broader authorized candidate browsing and holdout calibration stay
+  in K2.6/K0.4; numeric/semantic matching accuracy has not been established.
 - **Public material is synthetic.** The golden set
   (`Packages/KurnCore/Tests/KurnCoreTests/Fixtures/knowledge/`, format
   `kurn.knowledge-fixture` v1) holds fictional meetings in Portuguese and

@@ -14,21 +14,13 @@ extension KnowledgeStoreRows {
         extractorVersion: String, at now: Date, in context: ModelContext
     ) throws -> KnowledgeCommitProvenance {
         var provenance = KnowledgeCommitProvenance(recordings: [])
+        var allocator = try KnowledgeEntityAllocator(snapshot: snapshot, context: context)
         for item in recordings {
             var passes: [KnowledgeCommitProvenance.Pass] = []
             for document in item.documents {
-                // No automatic linking (especially people). K1.7 will replace
-                // this conservative allocation with reviewed entity resolution.
-                let entities = Dictionary(uniqueKeysWithValues: document.entities.map { ($0.ref, UUID()) })
+                let entities = try allocator.allocate(document.entities, at: now)
                 let assertions = Dictionary(uniqueKeysWithValues: document.assertions.map { ($0.ref, UUID()) })
                 let events = Dictionary(uniqueKeysWithValues: document.events.map { ($0.ref, UUID()) })
-                for entity in document.entities {
-                    guard let id = entities[entity.ref] else { throw KnowledgeStoreError.invalidCompilation }
-                    let name = entity.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let normalized = name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
-                    context.insert(KnowledgeEntity(id: id, kind: entity.kind, canonicalName: name, normalizedName: normalized,
-                        aliasesData: try authoritativeData(entity.aliases), createdAt: now))
-                }
                 var attribution: [String: String] = [:]
                 let validator = KnowledgeEvidenceValidator(segments: try KnowledgeTranscriptSnapshot(
                     segments: item.source.segments, language: item.source.language).sourceSegments)
@@ -71,6 +63,7 @@ extension KnowledgeStoreRows {
                 transcriptFingerprint: item.compilation.transcriptFingerprint, strategy: item.compilation.strategy,
                 targetedPassCount: item.compilation.targetedPassCount, passes: passes))
         }
+        provenance.resolutionSummary = allocator.summary
         return provenance
     }
 }

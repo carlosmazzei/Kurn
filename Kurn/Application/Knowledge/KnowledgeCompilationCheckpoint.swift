@@ -2,7 +2,7 @@ import Foundation
 import KurnCore
 
 struct KnowledgeCompilationWork: Codable, Sendable, Equatable {
-    static let extractorVersion = "knowledge-extractor-v1"
+    static let extractorVersion = "knowledge-extractor-v2"
     let scope: String
     let policyRevisionKey: String
     let timeZone: String
