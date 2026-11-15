@@ -20,14 +20,38 @@ struct KnowledgeEntityResolutionSnapshot: Sendable {
     let entities: [KnowledgeEntityResolutionValue]
     let redirects: [UUID: KnowledgeEntityRedirect]
     let isTruncated: Bool
+    var mutation: KnowledgeEntityMutationSnapshot {
+        KnowledgeEntityMutationSnapshot(scope: scope, revision: revision, policyRevisionKey: policyRevisionKey, sources: sources)
+    }
+}
+
+/// A write proof has no names/candidate page, and remains available even when
+/// bounded discovery omits old entities. Live authorization is still mandatory.
+struct KnowledgeEntityMutationSnapshot: Sendable {
+    let scope: String
+    let revision: Int
+    let policyRevisionKey: String
+    let sources: [KnowledgeEntityResolutionSnapshot.Source]
 }
 
 struct KnowledgeEntityMergeRequest: Sendable {
     let operationID: UUID
     let sourceID: UUID
     let targetID: UUID
-    let snapshot: KnowledgeEntityResolutionSnapshot
+    let snapshot: KnowledgeEntityMutationSnapshot
     var candidateReviewID: UUID?
+
+    init(operationID: UUID, sourceID: UUID, targetID: UUID, snapshot: KnowledgeEntityMutationSnapshot, candidateReviewID: UUID? = nil) {
+        self.operationID = operationID
+        self.sourceID = sourceID
+        self.targetID = targetID
+        self.snapshot = snapshot
+        self.candidateReviewID = candidateReviewID
+    }
+
+    init(operationID: UUID, sourceID: UUID, targetID: UUID, snapshot: KnowledgeEntityResolutionSnapshot, candidateReviewID: UUID? = nil) {
+        self.init(operationID: operationID, sourceID: sourceID, targetID: targetID, snapshot: snapshot.mutation, candidateReviewID: candidateReviewID)
+    }
 }
 
 struct KnowledgeEntityMergeReceipt: Codable, Equatable, Sendable {
@@ -66,6 +90,7 @@ struct KnowledgeEntityReviewPayload: Codable {
         let policyRevisionKey: String
         let requestedTargetID: UUID
         let candidateReviewID: UUID?
+        let origins: [KnowledgeEntityOrigin]
         let applied: KnowledgeEntityMergeReceipt
         var undone: KnowledgeEntityMergeReceipt?
         var undoPolicyRevisionKey: String?
@@ -82,4 +107,10 @@ enum KnowledgeEntityStoreError: String, Error {
     case alreadyMerged = "entity_already_merged"
     case mergeChanged = "entity_merge_changed"
     case operationUndone = "entity_operation_undone"
+}
+
+struct KnowledgeEntityOrigin: Codable, Equatable, Sendable {
+    let entityID: UUID
+    let meetingID: UUID
+    let jobID: UUID
 }
