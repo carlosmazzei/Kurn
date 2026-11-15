@@ -35,7 +35,7 @@ extension KnowledgeStoreRows {
                         guard rows.count == 1, let revision = rows.first else { throw KnowledgeStoreError.invalidJob }
                         guard revision.policyRevisionKey == current.policyRevisionKey else { throw KnowledgeStoreError.policyChanged }
                         try validateStoredProvenance(existing)
-                        guard try isLatestCompilation(identity: identity, number: revision.number, in: context) else {
+                        guard try canReplay(identity: identity, revision: revision, in: context) else {
                             throw KnowledgeStoreError.obsoleteJob
                         }
                         committed = receipt(revision, replay: true)
@@ -102,12 +102,21 @@ extension KnowledgeStoreRows {
             assertionCount: revision.assertionCount, projectionPending: revision.projectionPending, isReplay: replay)
     }
 
-    private static func isLatestCompilation(identity: KnowledgeCompilationIdentity, number: Int, in context: ModelContext) throws -> Bool {
+    private static func canReplay(identity: KnowledgeCompilationIdentity, revision: KnowledgeRevision, in context: ModelContext) throws -> Bool {
         let meetingID = identity.meetingID
         let jobs = try context.fetch(FetchDescriptor<KnowledgeJob>(predicate: #Predicate { $0.meetingID == meetingID }))
         let ids = Set(jobs.filter { KnowledgeCompilationIdentity(idempotencyKey: $0.idempotencyKey)?.scope == identity.scope }.map(\.id))
+        let number = revision.number
         let later = try context.fetch(FetchDescriptor<KnowledgeRevision>(predicate: #Predicate { $0.number > number }))
-        return !later.contains { $0.jobID.map(ids.contains) ?? false }
+        guard !later.contains(where: { $0.jobID.map(ids.contains) ?? false }) else { return false }
+        // A compilation in ANOTHER scope may also invalidate this source's
+        // old evidence. Latest-in-scope alone cannot make that job current.
+        let revisionID = revision.id
+        let assertions = try context.fetch(FetchDescriptor<KnowledgeAssertion>(predicate: #Predicate { $0.revisionID == revisionID }))
+        guard assertions.count == revision.assertionCount, assertions.allSatisfy({ $0.retractedAt == nil }) else { return false }
+        let evidence = try context.fetch(FetchDescriptor<KnowledgeEvidence>(predicate: #Predicate { $0.meetingID == meetingID }))
+        let supported = Set(evidence.filter(\.isAvailable).map(\.assertionID))
+        return Set(assertions.map(\.id)).isSubset(of: supported)
     }
 
     private static func validateStoredProvenance(_ job: KnowledgeJob) throws {

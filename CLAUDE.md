@@ -2860,7 +2860,9 @@ hold for every phase; code comments cite this section.
   Completed retries return the original receipt even after an unrelated
   canonical commit or writer recreation. A later compilation in the same scope
   makes the earlier job obsolete: restoring A after A → B cannot replay retracted
-  A as current knowledge; it fails explicitly and requires a new generation. Changed source or policy is never a replay;
+  A as current knowledge; it fails explicitly and requires a new generation.
+  Replay also requires the original assertions to remain unretracted and
+  supported, covering invalidation caused by a compilation in another scope. Changed source or policy is never a replay;
   a completed key under an earlier policy revision is refused and requires an
   explicit rebuild/generation change. Cancelled jobs cannot be committed.
   Recompilation retracts previous machine assertions in its own scope, retaining
