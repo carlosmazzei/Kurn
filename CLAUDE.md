@@ -2820,8 +2820,12 @@ hold for every phase; code comments cite this section.
   the other half. Both initial and targeted input use the full allowance when
   possible. Provider-reported output truncation permits one split of a pass
   into two smaller passes, never recursive, within the same 64-pass ceiling.
-  Oversized individual segments fail
-  explicitly. One targeted round requests unexamined anchors; a remaining gap
+  The effective output allowance follows the provider: Apple extraction reserves
+  from its 1,024-token ceiling, including coverage planning and repair/split calls.
+  Structured calls ask the Apple adapter to reject unfinished JSON as truncation,
+  enabling the bounded split rather than repeating an oversized repair; balanced
+  schema errors still use the normal single repair. Prose calls are unaffected.
+  Oversized individual segments fail explicitly. One targeted round requests unexamined anchors; a remaining gap
   fails the run. At most 64 extraction passes, each with one fresh repair on a
   schema/validation error (never on transport failure); repair sends only the
   original input and a fixed diagnostic, never echoes the bad reply. Validation
@@ -2944,7 +2948,9 @@ hold for every phase; code comments cite this section.
   cannot mark extraction successful, and operational erasure retains succeeded
   canonical provenance. Completed submissions validate replay/current support
   before the terminal shortcut. No schema migration or cloud activation is
-  introduced by this integration.
+  introduced by this integration. Genuine producer failures emit content-free
+  `knowledge_compilation` reliability events with operation ID, elapsed time and
+  fixed error code; expected deferrals/obsolete intents are not failures.
 - **Public material is synthetic.** The golden set
   (`Packages/KurnCore/Tests/KurnCoreTests/Fixtures/knowledge/`, format
   `kurn.knowledge-fixture` v1) holds fictional meetings in Portuguese and

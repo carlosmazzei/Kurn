@@ -254,5 +254,32 @@ struct KnowledgeCompilationQueueTests {
         let pending = try await store.queuedJobs(kinds: ["extraction"])
         #expect(pending.first?.envelope?.progress == bytes)
     }
+    @Test func realFailuresEmitContentFreeReliabilityEventsWhileDeferralsDoNot() async throws {
+        let capture = CompilationReliabilityCapture()
+        ReliabilityLog.handler = { capture.record($0) }
+        defer { ReliabilityLog.handler = nil }
+        let provider = Provider(failAt: 1)
+        let f = try fixture(provider: provider)
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id) == .failed)
+        let event = try #require(capture.events.first { $0.operation == "knowledge_compilation" && $0.outcome == .failed })
+        #expect(event.code == "knowledge_work_failed")
+        #expect(event.elapsedSeconds != nil)
+        #expect(!event.operationID.value.isEmpty)
+        let encoded = String(decoding: try JSONEncoder().encode(event), as: UTF8.self)
+        #expect(!encoded.contains("Example"))
+        f.settings.knowledgeEnabled = false
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id) == .deferred)
+        #expect(capture.events.filter { $0.outcome == .failed }.count == 1)
+    }
+
 }
+}
+
+/// ReliabilityLog invokes a Sendable handler; the serial test reads only
+/// through the same lock, so no event/content capture crosses unsafely.
+private final class CompilationReliabilityCapture: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [ReliabilityEvent] = []
+    func record(_ event: ReliabilityEvent) { lock.withLock { values.append(event) } }
+    var events: [ReliabilityEvent] { lock.withLock { values } }
 }
