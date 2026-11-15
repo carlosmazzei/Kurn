@@ -99,6 +99,7 @@ final class KnowledgeCompilationCoordinator {
         try Task.checkCancellation()
         guard jobQueue.mayPublish(handle), let intent = handle.work.compilation else { throw CancellationError() }
         let auth = try hostAuthorization(provider: handle.work.provider, model: handle.work.model)
+        guard handle.work.pipelineVersion == KnowledgeCompilationWork.extractorVersion else { throw KnowledgeWorkObsolete.pipelineChanged }
         let store = await jobQueue.writer()
         let current = try await store.snapshot(meetingID: handle.work.meetingID, scope: intent.scope,
             provider: handle.work.provider, authorization: { auth })

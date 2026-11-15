@@ -272,6 +272,27 @@ struct KnowledgeCompilationQueueTests {
         #expect(capture.events.filter { $0.outcome == .failed }.count == 1)
     }
 
+    @Test func oldPipelineIntentIsNotRelabeledAsTheCurrentExtractor() async throws {
+        let provider = Provider()
+        let f = try fixture(provider: provider, foreground: false)
+        let auth = f.policy.authorization
+        let store = await f.queue.writer()
+        let token = try await store.snapshot(meetingID: f.meeting.id, scope: "workspace", provider: .appleOnDevice, authorization: { auth })
+        let current = try KnowledgeQueuedWork.extraction(snapshot: token, provider: .appleOnDevice, model: f.settings.summaryModel(for: .appleOnDevice))
+        let identity = try KnowledgeCompilationIdentity(scope: "workspace", meetingID: f.meeting.id,
+            transcriptFingerprint: token.transcriptFingerprint, extractorVersion: "knowledge-extractor-v1", generation: current.generation)
+        let old = KnowledgeQueuedWork(key: try identity.idempotencyKey(), kind: .extraction, meetingID: current.meetingID,
+            pipelineVersion: identity.extractorVersion, provider: current.provider, model: current.model, sourceFingerprint: current.sourceFingerprint,
+            force: false, explicitlyRequested: false, priorArticleVersion: nil, generation: current.generation, compilation: current.compilation)
+        let row = try await store.enqueue(old, explicitRetry: false, restartCompleted: false)
+        f.queue.setForeground(true)
+        await f.queue.waitUntilIdle()
+        #expect(try await store.jobState(id: row.id) == .cancelled)
+        #expect(await provider.calls == 0)
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id) == .completed)
+        #expect(await provider.calls == 1)
+    }
+
 }
 }
 

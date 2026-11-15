@@ -100,4 +100,4 @@ struct KnowledgeJobDeferred: Error {
     let reason: Reason
 }
 
-enum KnowledgeWorkObsolete: String, Error { case sourceChanged = "source_changed", providerChanged = "provider_changed", sourceDeleted = "source_deleted", policyChanged = "policy_changed" }
+enum KnowledgeWorkObsolete: String, Error { case sourceChanged = "source_changed", providerChanged = "provider_changed", sourceDeleted = "source_deleted", policyChanged = "policy_changed", pipelineChanged = "pipeline_changed" }
