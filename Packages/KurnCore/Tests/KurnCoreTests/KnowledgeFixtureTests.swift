@@ -77,6 +77,8 @@ struct KnowledgeFixture: Decodable {
     }
 
     struct Forbidden: Decodable {
+        /// The segments that would tempt a wrong extraction into this assertion.
+        let segmentIDs: [String]
         let subject: String
         let predicate: String
         let object: String?
@@ -98,6 +100,8 @@ struct KnowledgeFixture: Decodable {
     let language: String
     let summary: String
     let covers: [String]
+    /// For each hard case the fixture covers, the segments that exhibit it.
+    let caseSegments: [String: [String]]
     let sources: [Source]
     let expected: Expected
 }
@@ -275,8 +279,13 @@ struct KnowledgeFixtureTests {
         for fixture in try Self.loadAll() {
             let entities = Dictionary(uniqueKeysWithValues: fixture.expected.entities.map { ($0.ref, $0) })
             let sources = Set(fixture.sources.map(\.id))
+            let segmentsBySource = Dictionary(uniqueKeysWithValues: fixture.sources.map { ($0.id, Set($0.segments.map(\.id))) })
+            let allSegments = segmentsBySource.values.reduce(into: Set<String>()) { $0.formUnion($1) }
             for forbidden in fixture.expected.mustNotAssert {
                 #expect(entities[forbidden.subject] != nil, "\(fixture.id): unknown subject in mustNotAssert")
+                let scope = forbidden.source.flatMap { segmentsBySource[$0] } ?? allSegments
+                #expect(!forbidden.segmentIDs.isEmpty && Set(forbidden.segmentIDs).isSubset(of: scope),
+                        "\(fixture.id): a refusal names the segments that tempt it")
                 #expect(KnowledgeFixtureVocabulary.predicates.contains(forbidden.predicate))
                 if let object = forbidden.object { #expect(entities[object] != nil) }
                 if let source = forbidden.source { #expect(sources.contains(source)) }
@@ -286,6 +295,48 @@ struct KnowledgeFixtureTests {
                 #expect(pair.count == 2 && pair[0] != pair[1], "\(fixture.id): a separation names two entities")
                 let kinds = pair.compactMap { entities[$0]?.kind }
                 #expect(kinds.count == 2 && kinds[0] == kinds[1], "\(fixture.id): a separation pairs same-kind entities")
+            }
+        }
+    }
+
+    /// Every claimed hard case names the segments that exhibit it, and each of
+    /// those segments is something the expectations actually rely on — cited as
+    /// evidence or named by a refusal — so deleting or rewriting the segment
+    /// that makes a case hard fails the suite instead of leaving a claim behind.
+    @Test func claimedHardCasesPointAtSegmentsTheExpectationsUse() throws {
+        for fixture in try Self.loadAll() {
+            #expect(Set(fixture.caseSegments.keys) == Set(fixture.covers), "\(fixture.id): caseSegments must map every covered case")
+            let segments = Set(fixture.sources.flatMap { $0.segments.map(\.id) })
+            let cited = Set(fixture.expected.assertions.flatMap { $0.evidence.flatMap(\.segmentIDs) })
+            let refused = Set(fixture.expected.mustNotAssert.flatMap(\.segmentIDs))
+            for (hardCase, ids) in fixture.caseSegments {
+                #expect(!ids.isEmpty, "\(fixture.id)/\(hardCase): no segment named")
+                for id in ids {
+                    #expect(segments.contains(id), "\(fixture.id)/\(hardCase): unknown segment \(id)")
+                    #expect(cited.contains(id) || refused.contains(id), "\(fixture.id)/\(hardCase): \(id) is used by no expectation")
+                }
+            }
+            // Cases whose whole point is that a tempting segment yields nothing true
+            // must have a refusal naming that segment.
+            for hardCase in ["irony", "promptInjection", "wrongSpeaker", "provisionalDecision", "forecastNotDecision"] {
+                for id in fixture.caseSegments[hardCase] ?? [] {
+                    #expect(refused.contains(id), "\(fixture.id)/\(hardCase): \(id) needs a refusal")
+                }
+            }
+            // Relative dates resolve to a date value or a coarser-than-day validity.
+            if let ids = fixture.caseSegments["relativeDate"] {
+                let resolved = fixture.expected.assertions.contains { assertion in
+                    assertion.evidence.contains { !Set($0.segmentIDs).isDisjoint(with: ids) }
+                        && (assertion.value?.type == "date" || assertion.precision == "month")
+                }
+                #expect(resolved, "\(fixture.id): a relative date must resolve to a date or a month")
+            }
+            // Reopening is an explicit status change cited from the reopening segment.
+            if let ids = fixture.caseSegments["reopen"] {
+                let reopened = fixture.expected.assertions.contains { assertion in
+                    assertion.value?.value == "reopened" && assertion.evidence.contains { !Set($0.segmentIDs).isDisjoint(with: ids) }
+                }
+                #expect(reopened, "\(fixture.id): reopening must be an asserted status change")
             }
         }
     }

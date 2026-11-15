@@ -5,6 +5,7 @@
   "language": "pt-BR",
   "summary": "Synthetic. A proposal becomes a decision, meets a risk and a blocker, is revised and then superseded; one meeting is imported weeks after it happened.",
   "covers": ["provisionalDecision", "units", "relativeDate", "lateArrival", "supersede"],
+  "caseSegments": {"provisionalDecision": ["s2", "s3"], "units": ["s1"], "relativeDate": ["s5"], "lateArrival": ["s7"], "supersede": ["s9"]},
   "sources": [
     {
       "id": "m1", "context": "internalMeeting", "organization": null,
@@ -91,8 +92,8 @@
        "evidence": [{"source": "m6", "segmentIDs": ["s10"], "quote": "A automação está pronta, falta só a liberação."}]}
     ],
     "mustNotAssert": [
-      {"subject": "e2", "predicate": "hasStatus", "value": "approved", "source": "m1", "reason": "Only a proposal; the decision is deferred to the next meeting."},
-      {"subject": "e1", "predicate": "hasStatus", "value": "completed", "reason": "Ready but not released is not completed."}
+      {"segmentIDs": ["s2", "s3"], "subject": "e2", "predicate": "hasStatus", "value": "approved", "source": "m1", "reason": "Only a proposal; the decision is deferred to the next meeting."},
+      {"segmentIDs": ["s10"], "subject": "e1", "predicate": "hasStatus", "value": "completed", "reason": "Ready but not released is not completed."}
     ],
     "mustNotMerge": []
   }

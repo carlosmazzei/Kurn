@@ -5,6 +5,7 @@
   "language": "en",
   "summary": "Synthetic. An analyst forecast at a conference, a vendor claim at a briefing and an internal pilot decision share one topic; nobody says the earlier contacts motivated the pilot.",
   "covers": ["externalContexts", "forecastNotDecision", "units"],
+  "caseSegments": {"externalContexts": ["s1", "s2"], "forecastNotDecision": ["s1"], "units": ["s2"]},
   "sources": [
     {
       "id": "m1", "context": "conferenceSession", "organization": "Example Analyst Firm",
@@ -55,9 +56,9 @@
        "evidence": [{"source": "m3", "segmentIDs": ["s4"], "quote": "The operational cost is still not validated"}]}
     ],
     "mustNotAssert": [
-      {"subject": "e4", "predicate": "inspiredBy", "reason": "Nobody said the forecast or the briefing motivated the pilot; only a thematic link exists."},
-      {"subject": "e1", "predicate": "hasStatus", "value": "approved", "source": "m1", "reason": "An analyst forecast is not a decision."},
-      {"subject": "e4", "predicate": "adoptedIn", "reason": "A pilot was approved; nothing was adopted."}
+      {"segmentIDs": ["s3"], "subject": "e4", "predicate": "inspiredBy", "reason": "Nobody said the forecast or the briefing motivated the pilot; only a thematic link exists."},
+      {"segmentIDs": ["s1"], "subject": "e1", "predicate": "hasStatus", "value": "approved", "source": "m1", "reason": "An analyst forecast is not a decision."},
+      {"segmentIDs": ["s3"], "subject": "e4", "predicate": "adoptedIn", "reason": "A pilot was approved; nothing was adopted."}
     ],
     "mustNotMerge": [["e2", "e3"]]
   }

@@ -2748,7 +2748,12 @@ hold for every phase; code comments cite this section.
   set claims (negation, irony, homonyms, wrong speaker, provisional decisions,
   relative dates, late arrival, reopening, supersession, units, corrected
   transcripts, prompt injection, external contexts, forecasts that are not
-  decisions) is structurally present. Fixtures, screenshots, issues and
+  decisions) is structurally present: every case names the segments that
+  exhibit it (`caseSegments`), each of those is cited as evidence or named by a
+  refusal (a refusal must name it for irony, injection, wrong speaker,
+  provisional decisions and forecasts), relative dates resolve to a date or a
+  month, and a reopening is an asserted status change — so removing the
+  segment that makes a case hard fails the suite. Fixtures, screenshots, issues and
   commits never name a real organization or use real meeting content.
 
 Where the checkout makes the specification bend:

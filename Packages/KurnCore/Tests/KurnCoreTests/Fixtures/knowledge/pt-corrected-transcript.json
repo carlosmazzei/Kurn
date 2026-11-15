@@ -5,6 +5,7 @@
   "language": "pt-BR",
   "summary": "Synthetic. A misheard amount is corrected in a later transcript revision; only the corrected revision may be cited.",
   "covers": ["correctedTranscript", "units", "relativeDate"],
+  "caseSegments": {"correctedTranscript": ["s1"], "units": ["s1"], "relativeDate": ["s2"]},
   "sources": [
     {
       "id": "m1", "context": "internalMeeting", "organization": null,
@@ -31,7 +32,7 @@
        "evidence": [{"source": "m1", "segmentIDs": ["s2"], "quote": "O prazo continua em dezembro."}]}
     ],
     "mustNotAssert": [
-      {"subject": "e1", "predicate": "reportsMetric", "value": "200000", "reason": "The amount comes from a superseded transcript revision."}
+      {"segmentIDs": ["s1"], "subject": "e1", "predicate": "reportsMetric", "value": "200000", "reason": "The amount comes from a superseded transcript revision."}
     ],
     "mustNotMerge": []
   }

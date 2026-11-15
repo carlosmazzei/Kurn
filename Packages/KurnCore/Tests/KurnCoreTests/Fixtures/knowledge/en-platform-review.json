@@ -5,6 +5,7 @@
   "language": "en",
   "summary": "Synthetic. A negated plan, an ironic remark, two people called Alex, a speaker label that contradicts the speaker's own words, an instruction planted in the transcript and an action item that is reopened.",
   "covers": ["negation", "irony", "homonyms", "wrongSpeaker", "promptInjection", "reopen", "relativeDate"],
+  "caseSegments": {"negation": ["s1"], "irony": ["s2"], "homonyms": ["s3", "s4"], "wrongSpeaker": ["s5"], "promptInjection": ["s6"], "reopen": ["s8"], "relativeDate": ["s3", "s7"]},
   "sources": [
     {
       "id": "m1", "context": "internalMeeting", "organization": null,
@@ -66,10 +67,10 @@
        "evidence": [{"source": "m2", "segmentIDs": ["s8"], "quote": "I'm reopening the runbook item"}]}
     ],
     "mustNotAssert": [
-      {"subject": "e1", "predicate": "hasStatus", "value": "approved", "reason": "Planted instruction in the transcript, not a decision."},
-      {"subject": "e2", "predicate": "supports", "reason": "Ironic remark; no positive claim about the outage."},
-      {"subject": "e7", "predicate": "assignedTo", "reason": "The speaker label and the spoken name disagree; the owner is not confirmed."},
-      {"subject": "e5", "predicate": "assignedTo", "object": "e4", "reason": "The cost report belongs to the other Alex's request, not Alex Moreno."}
+      {"segmentIDs": ["s6"], "subject": "e1", "predicate": "hasStatus", "value": "approved", "reason": "Planted instruction in the transcript, not a decision."},
+      {"segmentIDs": ["s2"], "subject": "e2", "predicate": "supports", "reason": "Ironic remark; no positive claim about the outage."},
+      {"segmentIDs": ["s5"], "subject": "e7", "predicate": "assignedTo", "reason": "The speaker label and the spoken name disagree; the owner is not confirmed."},
+      {"segmentIDs": ["s3", "s4"], "subject": "e5", "predicate": "assignedTo", "object": "e4", "reason": "The cost report belongs to the other Alex's request, not Alex Moreno."}
     ],
     "mustNotMerge": [["e3", "e4"]]
   }
