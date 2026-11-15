@@ -1,0 +1,125 @@
+import Foundation
+import KurnCore
+import SwiftData
+
+extension KnowledgeStoreRows {
+    // swiftlint:disable:next function_parameter_count
+    static func commit(
+        _ request: KnowledgeCommitRequest, auth: KnowledgeExtractionAuthorization,
+        container: ModelContainer, beforeSave: @Sendable () throws -> Void
+    ) throws -> KnowledgeCommitReceipt {
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        do {
+            var committed: KnowledgeCommitReceipt?
+            try context.transaction {
+                let current = try KnowledgeStoreRows.readSnapshot(meetingID: request.snapshot.meetingID, scope: request.snapshot.scope, auth: auth, in: context)
+                try KnowledgeStoreRows.authorize(auth, source: current, provider: request.provider)
+                guard current.policyRevisionKey == request.snapshot.policyRevisionKey else { throw KnowledgeStoreError.policyChanged }
+                guard current.transcriptFingerprint == request.snapshot.transcriptFingerprint else { throw KnowledgeStoreError.sourceChanged }
+                let identity = try KnowledgeCompilationIdentity(scope: current.scope, meetingID: current.meetingID,
+                    transcriptFingerprint: current.transcriptFingerprint, extractorVersion: request.extractorVersion, schemaVersion: request.schemaVersion)
+                guard request.schemaVersion == 1 else { throw KnowledgeStoreError.invalidCompilation }
+                let key = try identity.idempotencyKey()
+                var jobs = FetchDescriptor<KnowledgeJob>(predicate: #Predicate { $0.idempotencyKey == key })
+                jobs.fetchLimit = 1
+                let existing = try context.fetch(jobs).first
+                if let existing {
+                    guard existing.kindRaw == KnowledgeJobKind.extraction.rawValue, existing.meetingID == current.meetingID,
+                          existing.pipelineVersion == request.extractorVersion,
+                          KnowledgeJobState(rawValue: existing.stateRaw) != nil else { throw KnowledgeStoreError.invalidJob }
+                    if existing.stateRaw == KnowledgeJobState.cancelled.rawValue { throw KnowledgeStoreError.cancelledJob }
+                    if existing.stateRaw == KnowledgeJobState.succeeded.rawValue {
+                        let jobID = existing.id
+                        let rows = try context.fetch(FetchDescriptor<KnowledgeRevision>(predicate: #Predicate { $0.jobID == jobID }))
+                        guard rows.count == 1, let revision = rows.first else { throw KnowledgeStoreError.invalidJob }
+                        guard revision.policyRevisionKey == current.policyRevisionKey else { throw KnowledgeStoreError.policyChanged }
+                        try validateStoredProvenance(existing)
+                        guard try isLatestCompilation(identity: identity, number: revision.number, in: context) else {
+                            throw KnowledgeStoreError.obsoleteJob
+                        }
+                        committed = receipt(revision, replay: true)
+                        return
+                    }
+                }
+                guard current.canonicalRevision == request.snapshot.canonicalRevision else { throw KnowledgeStoreError.staleRevision }
+                let validated = try KnowledgeStoreRows.validate(request.compilations, against: current)
+                let now = Date()
+                let job = existing ?? KnowledgeJob(idempotencyKey: key, kind: .extraction,
+                    meetingID: current.meetingID, pipelineVersion: request.extractorVersion, createdAt: now)
+                if existing == nil { context.insert(job) }
+                let revision = KnowledgeRevision(number: current.canonicalRevision + 1, jobID: job.id,
+                    policyRevisionKey: current.policyRevisionKey, assertionCount: validated.reduce(0) { count, item in
+                        count + item.documents.reduce(0) { $0 + $1.assertions.count }
+                    }, createdAt: now)
+                context.insert(revision)
+                try KnowledgeStoreRows.retirePrevious(identity: identity, current: current, at: now, in: context)
+                let provenance = try KnowledgeStoreRows.insert(validated, snapshot: current, revisionID: revision.id,
+                    extractorVersion: request.extractorVersion, at: now, in: context)
+                guard let provenanceData = JSONStorage.encodeAuthoritative(provenance),
+                      let coverageData = JSONStorage.encodeAuthoritative(validated.map { item in
+                    KnowledgeCommitProvenance.Coverage(recordingID: item.source.id,
+                        examinedSegmentIDs: item.source.segments.map { $0.id.uuidString.lowercased() })
+                }) else { throw KnowledgeStoreError.invalidCompilation }
+                job.checkpointData = provenanceData
+                job.coverageData = coverageData
+                job.strategyRaw = validated.contains { $0.compilation.strategy == "blocks" } ? "blocks" : "fullContext"
+                job.stateRaw = KnowledgeJobState.succeeded.rawValue
+                job.attempts = max(1, job.attempts)
+                job.lastErrorCode = nil
+                job.updatedAt = now
+                try Task.checkCancellation()
+                try beforeSave()
+                try context.save()
+                committed = receipt(revision, replay: false)
+            }
+            guard let committed else { throw KnowledgeStoreError.invalidCompilation }
+            return committed
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
+
+    static func acknowledgeProjection(upTo number: Int, container: ModelContainer) throws {
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        do {
+            try context.transaction {
+                guard try KnowledgeStoreRows.latestRevision(in: context) == number else { throw KnowledgeStoreError.staleRevision }
+                let rows = try context.fetch(FetchDescriptor<KnowledgeRevision>(predicate: #Predicate { $0.projectionPending && $0.number <= number }))
+                for revision in rows { revision.projectionPending = false }
+                try context.save()
+            }
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
+
+    static func receipt(_ revision: KnowledgeRevision, replay: Bool) -> KnowledgeCommitReceipt {
+        KnowledgeCommitReceipt(revisionID: revision.id, number: revision.number, jobID: revision.jobID,
+            assertionCount: revision.assertionCount, projectionPending: revision.projectionPending, isReplay: replay)
+    }
+
+    private static func isLatestCompilation(identity: KnowledgeCompilationIdentity, number: Int, in context: ModelContext) throws -> Bool {
+        let meetingID = identity.meetingID
+        let jobs = try context.fetch(FetchDescriptor<KnowledgeJob>(predicate: #Predicate { $0.meetingID == meetingID }))
+        let ids = Set(jobs.filter { KnowledgeCompilationIdentity(idempotencyKey: $0.idempotencyKey)?.scope == identity.scope }.map(\.id))
+        let later = try context.fetch(FetchDescriptor<KnowledgeRevision>(predicate: #Predicate { $0.number > number }))
+        return !later.contains { $0.jobID.map(ids.contains) ?? false }
+    }
+
+    private static func validateStoredProvenance(_ job: KnowledgeJob) throws {
+        try requireReadable(JSONStorage.decodeAuthoritative(KnowledgeCommitProvenance.self, from: job.checkpointData ?? Data()))
+        try requireReadable(JSONStorage.decodeAuthoritative([KnowledgeCommitProvenance.Coverage].self, from: job.coverageData ?? Data()))
+    }
+
+    private static func requireReadable<Value>(_ outcome: JSONDecodeOutcome<Value>) throws {
+        switch outcome {
+        case .value: return
+        case .unsupportedVersion: throw KnowledgeStoreError.unsupportedProvenanceVersion
+        case .corrupted, .empty: throw KnowledgeStoreError.corruptedProvenance
+        }
+    }
+}
