@@ -73,7 +73,8 @@ enum KnowledgeQueueRows {
             }))
             for candidate in candidates where ["pending", "running", "deferred"].contains(candidate.stateRaw) {
                 let old = try envelope(candidate).work
-                if old.force == requested.force, old.provider == requested.provider, old.model == requested.model,
+                if old.force == requested.force, old.generation == requested.generation,
+                   old.provider == requested.provider, old.model == requested.model,
                    old.pipelineVersion == requested.pipelineVersion, old.sourceFingerprint == requested.sourceFingerprint,
                    old.explicitlyRequested == requested.explicitlyRequested {
                     requested = old

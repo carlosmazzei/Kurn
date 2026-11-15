@@ -123,7 +123,7 @@ struct KnowledgeWikiQueueTests {
             wikiService: WikiService(summaryService: SummaryService(resolveProvider: { _, _ in llm })), isProviderUsable: { _ in true }, jobQueue: queue)
         let meeting = MeetingFixtures.transcribed("Example rebuild recovery", in: context)
         #expect(await wiki.generate(meeting) == .generated)
-        meeting.wikiArticle?.updatedAt = Date(timeIntervalSince1970: 1)
+        meeting.wikiArticle?.updatedAt = Date(timeIntervalSince1970: 4_000_000_000)
         try context.save()
         queue.setForeground(false)
         #expect(await wiki.generate(meeting, force: true) == .skipped)

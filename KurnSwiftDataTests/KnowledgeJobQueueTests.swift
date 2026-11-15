@@ -288,5 +288,18 @@ struct KnowledgeJobQueueTests {
         #expect(try read.fetchCount(FetchDescriptor<KnowledgeJob>()) == 1)
     }
 
+    @Test func newClearGenerationDoesNotCoalesceWithWorkAwaitingErasure() async throws {
+        let container = try container()
+        let store = KnowledgeStore(modelContainer: container)
+        let meetingID = UUID()
+        func request(generation: String) throws -> KnowledgeQueuedWork {
+            try KnowledgeQueuedWork.article(meetingID: meetingID, generator: "wiki-v1", provider: .openAI,
+                model: "model", fingerprint: "source", force: false, generation: generation)
+        }
+        let old = try await store.enqueue(request(generation: "old"), explicitRetry: false, restartCompleted: true)
+        let next = try await store.enqueue(request(generation: "new"), explicitRetry: false, restartCompleted: true)
+        #expect(old.id != next.id)
+    }
+
 }
 }
