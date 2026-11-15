@@ -171,6 +171,9 @@ flowchart LR
 
 - **Templates** shape each summary. A meeting accumulates summaries rather than holding one.
 - **The wiki** reuses the summary service's notes stage.
+  It is planned to become the episodic layer of the Knowledge Engine (canonical
+  assertions → global wiki, timeline and graph projections); see `docs/roadmap.md`,
+  "Knowledge Engine — wiki refactor".
 - **Documents** are artifacts the chat agent writes (flow 3) and the user saves into the library.
 
 See `CLAUDE.md`: "Providers", "Derived artifacts: wiki and documents", "Export formats".

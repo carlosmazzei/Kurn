@@ -55,6 +55,7 @@ extension AppSettings {
         static let usageStats = "settings.usageStats"
         static let semanticSearchEnabled = "settings.semanticSearchEnabled"
         static let wikiEnabled = "settings.wikiEnabled"
+        static let knowledgeEnabled = "settings.knowledgeEnabled"
         static let correctionEnabled = "settings.correctionEnabled"
         static let aiTitleCloudEnabled = "settings.aiTitleCloudEnabled"
         static let templatesSyncEnabled = "settings.templatesSyncEnabled"

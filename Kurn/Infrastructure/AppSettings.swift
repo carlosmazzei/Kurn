@@ -27,7 +27,7 @@ final class AppSettings {
     /// `CloudKeyValueStore` instead.
     static let cloudTemplatesKey = "cloud.summaryTemplates"
 
-    private let defaults: UserDefaults
+    let defaults: UserDefaults
     let cloudStore: CloudKeyValueStore
 
     /// The provider API keys, observable for the UI. Every key write goes

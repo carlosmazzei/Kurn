@@ -62,6 +62,102 @@ accepted limitations and the device checks are recorded.
 The remote model catalog (`catalog/model-catalog-v1.json`) is read from the default branch, so it takes
 effect only once this work reaches `main`; until then the check gets a 404 and the bundled catalogs apply.
 
+## Knowledge Engine — wiki refactor (K-track)
+
+The per-meeting wiki (`WikiArticle`, `WikiService`, `WikiCoordinator`,
+`MeetingWikiView`, Settings → Wiki, the agent's `read_wiki`) is a flat,
+regenerate-on-change Markdown note per meeting, reachable only from a meeting's
+overflow menu. This track refactors it into a **Knowledge Engine**: a canonical
+layer of attributed, evidence-backed, bitemporal assertions and events compiled
+from transcripts, with a global wiki, a timeline and a temporal graph as
+projections of that one layer, and the agent chat able to query it. The source
+is the external *Kurn Knowledge Engine* specification v1.3 (with its v1.1
+normative extension, §20), handed over on 2026-11-14 and kept outside the
+repository on purpose — the spec itself says not to add a permanent plan
+document. This section is the plan; each item moves to `CLAUDE.md`/`README.md`
+when it ships, as for every other track.
+
+**Principles carried over from the spec, and how they map onto the filter.** A
+meeting is a source, not the unit of knowledge; the unit is an assertion with an
+attribution, a modality, evidence and a validity interval. Wiki and graph are
+derived from the same canonical revision and never written by independent
+pipelines (spec ADR-001). Nothing is committed without validated evidence. The
+feature is off on a fresh install and needs its own consent, separate from
+`wikiEnabled` (I1, spec ADR-008); canonical records, projections, indexes and
+caches all live in the protected store (I2); extraction quality is measured
+against a golden set before any claim or auto-merge (I3); the harness stays
+read-only (spec ADR-007). The private-corporate boundary of §20.5 — default-deny
+egress, policy as the intersection of workspace/source/context/operation,
+derivatives inheriting the strictest policy of their evidence, no generic share
+sheet — is a hard requirement, not a later hardening step.
+
+**Public material stays synthetic.** Fixtures, screenshots, issues, commit
+messages and these docs use fictional organizations and scenarios only (spec
+§20); real names may live in a private store, never in the repository or CI.
+
+The architectural decisions — the spec's ADRs and the places where the
+checkout makes it bend — are recorded in `CLAUDE.md`, "Knowledge Engine
+decisions", together with what K0 has already landed (the flag, the processing
+policy, the golden fixtures).
+
+### What happens to the existing wiki
+
+The spec keeps the per-meeting article as the **episodic layer** — a source-level
+condensation that can orient extraction, never evidence. So the refactor keeps
+`WikiArticle` and its consent, and changes its surroundings:
+
+- **Visible, not in the overflow.** `MeetingWikiView` is split into a content
+  view and its sheet wrapper; the content renders inside the new Knowledge mode
+  of `MeetingDetailView` (spec §11.2). View/Generate/Regenerate leave the
+  overflow except as shortcuts.
+- **One job model.** `WikiCoordinator`'s generate/backfill/bulk logic moves
+  under the knowledge job queue (`KnowledgeJob`, same states, checkpoint and
+  retry rules), so meeting wiki, extraction and projection share scheduling,
+  cancellation, the resource scheduler and the circuit breaker instead of three
+  ad hoc loops. The `wiki-vN` generator tag becomes the job's pipeline version.
+- **Hints, not evidence.** The compiler may read the article and the latest
+  summary as orientation; every assertion still cites transcript segments, and
+  validation rejects a citation that only exists in generated text.
+- **`read_wiki` stays** and gains siblings (below); old turns and scopes that
+  name it keep decoding.
+
+### Phases
+
+Small PRs, each behind the disabled-by-default `knowledgeEnabled` flag, each
+with its tests, migration where needed, and the docs move on ship (spec §16).
+They land as PRs into the integration branch `feature/knowledge-engine` (CI runs
+on every PR whatever its base, and on pushes to that branch for a coverage base,
+`.github/workflows/swift.yml`), which reaches `main` through one PR; that PR drops
+the branch from the workflow's push list again.
+The spec's three stop-for-review gates are kept: **before changing navigation
+globally, before enabling any cloud processing, before migrating data.**
+
+| Phase | PRs (one line each) | Gate before the next phase |
+| --- | --- | --- |
+| **K0 · Groundwork** (K0.1–K0.3 done) | K0.4 baseline: variant A (current hybrid search) and variant B (plain incremental LLM wiki: Markdown pages + index + log, ingest/query/lint) scored on the golden fixtures, with a scorer for the fixture format (assertion precision/recall, refusals honoured, quotes resolvable). K0.5 navigation prototype of the five-mode meeting detail and the Meetings / Knowledge / Ask root, screenshots only | CI green; consent, provenance and schema reviewed; **review gate on navigation** |
+| **K1 · Canonical layer** | K1.1 KurnCore `KnowledgeTypes` (kinds, predicates registry with domain/range/cardinality, modality, polarity, review state, typed values, temporal precision, claim kind, authority status, context kind) and `EvidenceValidator`. K1.2 `KurnSchemaV7`: `KnowledgeEntity`, `KnowledgeAssertion`, `KnowledgeEvidence`, `KnowledgeEvent`, `KnowledgeRelation`, `KnowledgeJob`, `KnowledgeRevision`, `KnowledgeReview`, `KnowledgeContext`, `SourceContextLink`; legacy meetings get context `unknown`; migration tests. K1.3 transcript revision fingerprint and segment anchors. K1.4 extraction contract: strict Codable schema, one bounded repair, full-context-first strategy through `ContextBudget`, coverage check (start/middle/end + targeted passes), scripted-provider tests including malformed JSON and injection. K1.5 `KnowledgeStore` single writer: atomic commit + projection outbox, revision token re-checked at commit, idempotent job key (`scope + meetingID + transcriptFingerprint + extractorVersion + schemaVersion`). K1.6 job queue on `ResourceScheduler`, paused while recording, foreground-resumed, BGTask as opportunity only; `WikiCoordinator` folded in. K1.7 entity resolution with the spec's experimental weights, people never auto-linked, reversible redirect merges | Idempotent re-runs; zero invalid citations accepted; no call without consent and policy; **review gate on data migration** |
+| **K2 · First user value** | K2.1 Global wiki projection: deterministic template from structured sections, optional LLM narrative validated against cited assertion IDs, never replacing a valid page with an invalid one. K2.2 lint (broken links, orphans, stale revisions, duplicate candidates, coverage) and the maintenance schema. K2.3 meeting detail Knowledge mode + contributions + header line. K2.4 Knowledge Home, entity page (Overview/Sources), evidence detail → transcript/audio. K2.5 local search over aliases/pages and typed documents in the hybrid index. K2.6 Review inbox (ambiguous identity, conflicts, invalid citations, uncertain dates, merges) with undo. K2.7 Settings → Knowledge (enable, automatic compile, provider, scope/exclusions, explicit backfill with cost estimate, pause, rebuild projections, delete knowledge), coverage screen. K2.8 deletion: tombstone, cancel jobs, remove evidence, invalidate unsupported assertions, recompute pages, purge index entries; crash-resumable; wired into `LibraryEraser` | Meeting → topic → evidence navigable; reads work offline; deletion verified to leave nothing exclusive behind |
+| **K3 · Time** | K3.1 KurnCore `TemporalReducer`: `state(entity, validAt, knownAt)`, half-open intervals, precision-aware possible/definite, stable ordering, conflicts surfaced, no "last meeting wins". K3.2 decision/action/risk state machines as event projections. K3.3 Timeline view (event vs recorded date, unknown-date section, filters, context lanes on iPad). K3.4 compare dates. K3.5 late-arrival recomputation of the affected interval | Bitemporal snapshots exact on fixtures, including the spec §6 example and §16.1 step 7 |
+| **K4 · Graph** | K4.1 `GraphQueryService`: bounded BFS (default depth 1, 40 nodes, 80 edges), truncation flag + frontier, revision-keyed cache, acyclicity check on `supersedes`. K4.2 KurnCore `GraphLayout`, deterministic by ID and seed, cached positions. K4.3 Graph Explorer on `Canvas` with hit-testing overlay, modes Relationships/Evolution/Compare/Context lanes, list alternative for VoiceOver, inferred edges off by default | Graph ↔ wiki keeps selection; spec performance targets met on a physical device; accessibility audit added |
+| **K5 · Ask over knowledge** | K5.1 tools `search_knowledge`, `resolve_entity`, `get_entity`, `get_wiki_page`, `get_timeline`, `get_graph`, `compare_state`, `get_evidence`, `get_coverage`, `list_open_actions`, `list_contexts`, `get_context`, `trace_influence` — read-only, host-authorized, compact text, citations resolved by the host. K5.2 wiki-first query policy with transcript fallback for gaps. K5.3 `ChatSourceScope` gains knowledge parts; Ask from an entity pre-fills its scope. K5.4 benchmark variants C–F against A/B | Measured gain over the baseline on the holdout; historical answers correct; no excluded source leaks through results, snippets, counts or errors |
+| **K6 · Hardening and release** | K6.1 egress audit (zero unauthorized egress in tests, including caches, embeddings and counts). K6.2 authorized internal export bundle, off by default. K6.3 performance on 100/1k-meeting fixtures (spec §14 targets are goals, not measurements). K6.4 localization, release checklist items, the knowledge components and their egress boundary added to `SECURITY_MODEL.md`, docs moved into `CLAUDE.md`/`README.md` | CI green, privacy audit, physical-device checks, coverage floors held |
+
+The first phase a user sees is **K2**; the graph waits behind the timeline on
+purpose (spec ADR-006). The spec's numeric targets — decision precision ≥ 90%,
+recall ≥ 80%, auto-merge precision ≥ 98%, 100% resolvable citations, zero
+cross-scope leaks, the p95 latencies — are proposals to calibrate, not results;
+auto-merge does not ship until its target is met on the holdout.
+
+### Open questions (none blocks K0)
+
+Retention of corrected transcript revisions and its storage cost; the
+five-mode segmented control at compact width and large Dynamic Type (fallback:
+an Insights mode holding Summary | Wiki | Contributions); whether Documents
+keeps its own root destination; which remote provider, if any, a corporate
+policy authorizes; whether a `@ModelActor` writer on the shared container
+contends with the main context under a long backfill; the maximum store growth
+acceptable on device.
+
 ## Product capabilities
 
 ### Adopt
@@ -477,15 +573,18 @@ stay on device and leave only through an explicit share.
 
 ## Suggested sequence
 
-1. **F2 · Meeting glossary.** Its WER effect is measurable, and the pure half
+1. **K0–K2 · Knowledge Engine, up to the first user-visible phase.** The
+   wiki refactor above; K0 needs no data migration and K1 stops for review
+   before one. F2 can run in parallel — they share no code.
+2. **F2 · Meeting glossary.** Its WER effect is measurable, and the pure half
    is verifiable on Linux.
-2. **F4 · Calendar context.** Feeds F2 real names and supplies the candidate
+3. **F4 · Calendar context.** Feeds F2 real names and supplies the candidate
    names cross-meeting voice matching lacks.
-3. **F5 · Reminders and F6 · Import.** Independent of each other and of the
+4. **F5 · Reminders and F6 · Import.** Independent of each other and of the
    rest; slot them in as room appears. F6 widens the capture surface, so it
    lands with the same fault-injection discipline as capture itself.
-4. **D4's per-file measurement**, on its own clock — it is a dispatch, not code.
-5. **Reassess F7–F10.** F7 after the on-device availability number exists.
+5. **D4's per-file measurement**, on its own clock — it is a dispatch, not code.
+6. **Reassess F7–F10.** F7 after the on-device availability number exists.
 
 The follow-ups above are picked up opportunistically, ahead of any feature that
 widens the surface they concern.
