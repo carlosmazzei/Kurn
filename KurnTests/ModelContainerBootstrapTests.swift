@@ -115,7 +115,17 @@ struct KurnModelGraphTests {
             ObjectIdentifier(MeetingAttachment.self),
             ObjectIdentifier(HarnessSessionEntry.self),
             ObjectIdentifier(HarnessArtifactRevision.self),
-            ObjectIdentifier(HarnessSessionRecord.self)
+            ObjectIdentifier(HarnessSessionRecord.self),
+            ObjectIdentifier(KnowledgeEntity.self),
+            ObjectIdentifier(KnowledgeAssertion.self),
+            ObjectIdentifier(KnowledgeEvidence.self),
+            ObjectIdentifier(KnowledgeEvent.self),
+            ObjectIdentifier(KnowledgeRelation.self),
+            ObjectIdentifier(KnowledgeJob.self),
+            ObjectIdentifier(KnowledgeRevision.self),
+            ObjectIdentifier(KnowledgeReview.self),
+            ObjectIdentifier(KnowledgeContext.self),
+            ObjectIdentifier(SourceContextLink.self)
         ]))
     }
 

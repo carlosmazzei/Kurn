@@ -63,6 +63,12 @@ enum KnowledgeTestRows {
         return assertion
     }
 
+    /// How many rows of `type` `insertOneOfEach` writes: two entities (an
+    /// assertion needs a subject and an object), one of everything else.
+    static func insertedCount(of type: any PersistentModel.Type) -> Int {
+        ObjectIdentifier(type) == ObjectIdentifier(KnowledgeEntity.self) ? 2 : 1
+    }
+
     static func count(_ type: any PersistentModel.Type, in context: ModelContext) throws -> Int {
         try countRows(of: type, in: context)
     }
