@@ -2627,8 +2627,12 @@ framework (`NLContextualEmbedding`, multilingual, loaded once via the
   V5 (1.4.0) adds optional session scope/artifacts and generated-document artifact
   provenance, with V4 frozen in `KurnSchemaV4Models.swift` and
   `KurnSchemaV4LibraryModels.swift`. `SchemaV4MigrationTests` writes every V4 entity
-  and verifies migration and persisted harness state. The next model change means:
-  edit the live class, add a new schema listing live classes, freeze V5, add the stage, and bump
+  and verifies migration and persisted harness state. V6 (1.5.0) adds the canonical
+  harness session storage and V7 (1.6.0) the Knowledge Engine's canonical layer, with V6
+  frozen in `KurnSchemaV6Models.swift`, `KurnSchemaV6LibraryModels.swift` and
+  `KurnSchemaV6HarnessModels.swift`; `SchemaV6MigrationTests` writes every V6 entity to
+  disk and opens it through the plan. The next model change means: edit the live class,
+  add a new schema listing live classes, freeze V7, add the stage, and bump
   `KurnModelGraph.currentSchemaVersion` (which backup metadata records). When
   `wikiEnabled` is on, the agent can also read the condensed per-meeting articles
   (`read_wiki`) — see "Derived artifacts" below.
@@ -2764,6 +2768,23 @@ hold for every phase; code comments cite this section.
   inside a cited segment (it may cross a pause between them, never sit in one)
   — and returns a fixed `KnowledgeEvidenceRejection`.
   Quote hashing needs CryptoKit and is the app's job.
+- **The canonical store (K1.2, `KurnSchemaV7`).** Ten models in
+  `Models/KnowledgeCanonicalModels.swift` (`KnowledgeEntity`, `KnowledgeAssertion`,
+  `KnowledgeEvidence`, `KnowledgeEvent`, `KnowledgeRelation`) and
+  `Models/KnowledgeOperationalModels.swift` (`KnowledgeJob`, `KnowledgeRevision`,
+  `KnowledgeReview`, `KnowledgeContext`, `SourceContextLink`). They relate by persisted
+  UUIDs, never by a relationship to `Meeting` or to each other, and store every closed
+  vocabulary as its KurnCore raw value (`KnowledgeStoreVocabulary.swift` adds the job,
+  review-item and event vocabularies). An assertion keeps valid time as stated
+  (`validFromText`/`validToText` at their precision, half-open) apart from transaction
+  time (`recordedAt`, `retractedAt`) and records the predicate registry version it was
+  checked under; a merged entity is a redirect (`mergedIntoID`); evidence carries the
+  transcript fingerprint it cites and `isAvailable` for when that revision is gone.
+  `KnowledgeJob.idempotencyKey` and `KnowledgeRevision.number` are unique, and a
+  revision is the projection outbox while `projectionPending`. A meeting without a
+  `SourceContextLink` is in context `unknown`, so the V6 → V7 stage is lightweight and
+  writes nothing. `LibraryEraser` deletes all ten. Nothing writes them yet: the single
+  writer is K1.5.
 - **Public material is synthetic.** The golden set
   (`Packages/KurnCore/Tests/KurnCoreTests/Fixtures/knowledge/`, format
   `kurn.knowledge-fixture` v1) holds fictional meetings in Portuguese and
@@ -2795,7 +2816,7 @@ Where the checkout makes the specification bend:
 | Full-context-first extraction for meetings up to 2–3 h | `ContextBudget` already fits a whole transcript per model window, with `SummaryService`'s map/reduce as the overflow path; the on-device model's window is far too small for a full transcript | Reuse `ContextBudget` for the full-vs-blocks decision; the on-device model may run only the blocks strategy, and only once the K1 evaluation shows it meets the gates. No silent truncation: the strategy and coverage are recorded on the job |
 | `transcriptRevisionID`, evidence pointing at a transcript revision | `Transcript` has no revision identity and keeps no history; `TranscriptSegment.id` is a UUID that a re-transcription regenerates | K1 adds a revision fingerprint (SHA-256 over the canonical segment encoding, as `WikiCoordinator.contentHash` does today) and segment IDs as evidence anchors. With no retained history, evidence from a superseded revision is marked unavailable (spec §12.1 permits this) rather than pretending to be verifiable |
 | Single writer `ModelActor` for commits | Coordinators are `@MainActor` over the app's main `ModelContext`; services run off-main on value types | ADR: a `KnowledgeStore` `@ModelActor` on the same container for canonical commits and the projection outbox, with Sendable DTOs at its boundary; UI reads stay on the main context. Measure main-thread fetch cost before adding any second store |
-| New models alongside existing ones | `KurnSchemaV6` (1.5.0, the harness session storage) lists the live classes; V5 is frozen in `KurnSchemaV5Models.swift` | K1 is `KurnSchemaV7` (1.6.0): freeze V6, add the knowledge models additively, a lightweight stage, `SchemaV6MigrationTests` writing every V6 entity, and bump `KurnModelGraph.currentSchemaVersion` |
+| New models alongside existing ones | `KurnSchemaV6` (1.5.0, the harness session storage) listed the live classes | Done in K1.2: `KurnSchemaV7` (1.6.0) freezes V6, adds the ten knowledge models additively through a lightweight stage, and `SchemaV6MigrationTests` writes every V6 entity |
 | Graph as SwiftData relations | `Meeting` cascades its derived artifacts; there is no shared-entity model yet | Entities, assertions and evidence relate by persisted UUIDs, never by `@Relationship` to `Meeting` (no blind cascade across shared entities, spec §13). Deletion is explicit through a `KnowledgeDeletionCoordinator` called by `MeetingLibrary.deleteMeetings`, recording deletion and `LibraryEraser` |
 | Typed `AppRoute` and `kurn://entity/…` deep links | The app deliberately declares no URL scheme (any app could open one, see "Cross-device control") | Typed in-process routes only; Markdown links in generated pages resolve through a router that accepts `entity:`/`evidence:` IDs and nothing else, consistent with `MarkdownPresentation` disabling links. No registered URL scheme |
 | Embeddings and hybrid retrieval | `SemanticSearchService.hybridSearch` (on-device `NLContextualEmbedding` + BM25 + RRF) over `SemanticChunk` | Extend the same index with typed documents (page, assertion, event, alias) carrying `modelIdentifier`; no cloud embeddings, so no extra consent for indexing |
