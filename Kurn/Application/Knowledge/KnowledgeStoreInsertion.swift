@@ -3,6 +3,11 @@ import KurnCore
 import SwiftData
 
 extension KnowledgeStoreRows {
+    static func authoritativeData<Value: Encodable>(_ value: Value) throws -> Data {
+        guard let data = JSONStorage.encodeAuthoritative(value) else { throw KnowledgeStoreError.invalidCompilation }
+        return data
+    }
+
     // swiftlint:disable:next function_parameter_count
     static func insert(
         _ recordings: [ValidatedRecording], snapshot: KnowledgeStoreSnapshot, revisionID: UUID,
@@ -22,7 +27,7 @@ extension KnowledgeStoreRows {
                     let name = entity.name.trimmingCharacters(in: .whitespacesAndNewlines)
                     let normalized = name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
                     context.insert(KnowledgeEntity(id: id, kind: entity.kind, canonicalName: name, normalizedName: normalized,
-                        aliasesData: try JSONEncoder().encode(entity.aliases), createdAt: now))
+                        aliasesData: try authoritativeData(entity.aliases), createdAt: now))
                 }
                 var attribution: [String: String] = [:]
                 let validator = KnowledgeEvidenceValidator(segments: try KnowledgeTranscriptSnapshot(
@@ -32,7 +37,7 @@ extension KnowledgeStoreRows {
                         throw KnowledgeStoreError.invalidCompilation
                     }
                     let objectID = assertion.object.flatMap { entities[$0] }
-                    let value = try assertion.value.map { try JSONEncoder().encode($0) }
+                    let value = try assertion.value.map { try authoritativeData($0) }
                     context.insert(KnowledgeAssertion(id: id, subjectEntityID: subjectID, predicate: assertion.predicate,
                         objectEntityID: objectID, valueData: value, modality: assertion.modality, polarity: assertion.polarity,
                         claimKind: assertion.claimKind, authorityStatus: assertion.authorityStatus, confidenceBand: assertion.confidence,
@@ -43,7 +48,7 @@ extension KnowledgeStoreRows {
                         let checked = try validator.validate(citation.claim).get()
                         context.insert(KnowledgeEvidence(assertionID: id, meetingID: snapshot.meetingID, recordingID: item.source.id,
                             transcriptFingerprint: item.compilation.transcriptFingerprint,
-                            segmentIDsData: try JSONEncoder().encode(checked.segmentIDs), quote: citation.quote,
+                            segmentIDsData: try authoritativeData(checked.segmentIDs), quote: citation.quote,
                             quoteHash: digest(Data(checked.normalizedQuote.utf8)), startMs: checked.startMs, endMs: checked.endMs, createdAt: now))
                     }
                     if let objectID {

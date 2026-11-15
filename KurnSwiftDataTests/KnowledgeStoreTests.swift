@@ -102,6 +102,7 @@ struct KnowledgeStoreTests {
         let job = try #require(context.fetch(FetchDescriptor<KnowledgeJob>()).first)
         #expect(assertion.revisionID == receipt.revisionID)
         #expect(evidence.assertionID == assertion.id)
+        #expect(try #require(JSONStorage.decodeAuthoritative([String].self, from: evidence.segmentIDsData).decodedValue).count == 1)
         #expect(evidence.recordingID == token.recordings[0].id)
         #expect(evidence.quoteHash == KnowledgeStoreRows.digest(Data(evidence.quote.utf8)))
         #expect(relation.assertionID == assertion.id)
@@ -121,7 +122,7 @@ struct KnowledgeStoreTests {
         let assertion = try #require(context.fetch(FetchDescriptor<KnowledgeAssertion>()).first)
         #expect(assertion.validFromText == "2026-11")
         #expect(assertion.validFromPrecisionRaw == "month")
-        let value = try JSONDecoder().decode(KnowledgeTypedValue.self, from: #require(assertion.valueData))
+        let value = try #require(JSONStorage.decodeAuthoritative(KnowledgeTypedValue.self, from: #require(assertion.valueData)).decodedValue)
         #expect(value == .enumeration("open"))
         #expect(try context.fetchCount(FetchDescriptor<KnowledgeRelation>()) == 0)
         let event = try #require(context.fetch(FetchDescriptor<KnowledgeEvent>()).first)
@@ -435,6 +436,13 @@ struct KnowledgeStoreTests {
                 #expect((isCoverage ? preserved.coverageData : preserved.checkpointData) == unreadable)
                 #expect(try read.fetchCount(FetchDescriptor<KnowledgeRevision>()) == 1)
             }
+        }
+    }
+
+
+    @Test func authoritativeSerializationFailureIsExplicit() {
+        #expect(throws: KnowledgeStoreError.invalidCompilation) {
+            try KnowledgeStoreRows.authoritativeData(Double.nan)
         }
     }
 
