@@ -2785,6 +2785,17 @@ hold for every phase; code comments cite this section.
   `SourceContextLink` is in context `unknown`, so the V6 → V7 stage is lightweight and
   writes nothing. `LibraryEraser` deletes all ten. Nothing writes them yet: the single
   writer is K1.5.
+- **Transcript revisions and anchors (K1.3).** KurnCore's `KnowledgeTranscriptRevision`
+  lays every transcribed recording on the meeting timeline (`Meeting.knowledgeTranscriptRevision()`
+  passes them in `recordedAt` order with `startOffset(of:)`, so an untranscribed recording
+  still takes its time) and gives each segment a positional anchor, `s1`, `s2`, …, which is
+  what extraction cites and `validator` checks. `location(of:)` maps an anchor back to its
+  recording and stored segment. The revision's fingerprint (`fingerprint`, app-side: lowercase
+  hex SHA-256 of `canonicalEncoding`) covers order, recording, millisecond times, speaker and
+  text — length-prefixed, versioned by `encodingVersion` — and not segment IDs or
+  confidence, so a re-transcription of the same words keeps it and any edit changes it. An
+  anchor means something only with its fingerprint: evidence stores both, and evidence whose
+  fingerprint no longer matches the meeting is unavailable, never re-pointed.
 - **Public material is synthetic.** The golden set
   (`Packages/KurnCore/Tests/KurnCoreTests/Fixtures/knowledge/`, format
   `kurn.knowledge-fixture` v1) holds fictional meetings in Portuguese and
@@ -2814,7 +2825,7 @@ Where the checkout makes the specification bend:
 | Harness limits of 8 tool calls / 2 hops / 12k context tokens | `AgentBudgetPlanner` sizes 10–48 turns and 20–192 calls from the workload; the context window is resolved per model | Keep the planner; the 2-hop / 20-evidence / 40-node bounds become per-tool argument limits, not run limits |
 | A local planner + synthesis call when the provider has no tool calling | Chat requires an `AgentModel`; Apple's on-device model shows `ChatArtifactProviderNotice` | Ask stays agent-only. What must work without a provider is *reading*: Knowledge Home, pages, timeline, graph and lexical/semantic search, all offline |
 | Full-context-first extraction for meetings up to 2–3 h | `ContextBudget` already fits a whole transcript per model window, with `SummaryService`'s map/reduce as the overflow path; the on-device model's window is far too small for a full transcript | Reuse `ContextBudget` for the full-vs-blocks decision; the on-device model may run only the blocks strategy, and only once the K1 evaluation shows it meets the gates. No silent truncation: the strategy and coverage are recorded on the job |
-| `transcriptRevisionID`, evidence pointing at a transcript revision | `Transcript` has no revision identity and keeps no history; `TranscriptSegment.id` is a UUID that a re-transcription regenerates | K1 adds a revision fingerprint (SHA-256 over the canonical segment encoding, as `WikiCoordinator.contentHash` does today) and segment IDs as evidence anchors. With no retained history, evidence from a superseded revision is marked unavailable (spec §12.1 permits this) rather than pretending to be verifiable |
+| `transcriptRevisionID`, evidence pointing at a transcript revision | `Transcript` has no revision identity and keeps no history; `TranscriptSegment.id` is a UUID that a re-transcription regenerates | Done in K1.3: a revision fingerprint (SHA-256 over a canonical, length-prefixed segment encoding) and positional anchors (`s1`, …) on the meeting timeline. With no retained history, evidence from a superseded revision is marked unavailable (spec §12.1 permits this) rather than pretending to be verifiable |
 | Single writer `ModelActor` for commits | Coordinators are `@MainActor` over the app's main `ModelContext`; services run off-main on value types | ADR: a `KnowledgeStore` `@ModelActor` on the same container for canonical commits and the projection outbox, with Sendable DTOs at its boundary; UI reads stay on the main context. Measure main-thread fetch cost before adding any second store |
 | New models alongside existing ones | `KurnSchemaV6` (1.5.0, the harness session storage) listed the live classes | Done in K1.2: `KurnSchemaV7` (1.6.0) freezes V6, adds the ten knowledge models additively through a lightweight stage, and `SchemaV6MigrationTests` writes every V6 entity |
 | Graph as SwiftData relations | `Meeting` cascades its derived artifacts; there is no shared-entity model yet | Entities, assertions and evidence relate by persisted UUIDs, never by `@Relationship` to `Meeting` (no blind cascade across shared entities, spec §13). Deletion is explicit through a `KnowledgeDeletionCoordinator` called by `MeetingLibrary.deleteMeetings`, recording deletion and `LibraryEraser` |
