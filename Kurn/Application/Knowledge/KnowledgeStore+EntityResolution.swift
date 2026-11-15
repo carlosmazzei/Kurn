@@ -10,6 +10,13 @@ extension KnowledgeStore {
         return try KnowledgeEntityResolutionRows.read(meetingIDs: meetingIDs, scope: scope, auth: auth, container: modelContainer)
     }
 
+    func entityMutationSnapshot(meetingIDs: Set<UUID>, scope: String,
+                                authorization: @Sendable () async -> KnowledgeEntityResolutionAuthorization) async throws -> KnowledgeEntityMutationSnapshot {
+        let auth = await authorization()
+        try Task.checkCancellation()
+        return try KnowledgeEntityResolutionRows.readMutation(meetingIDs: meetingIDs, scope: scope, auth: auth, container: modelContainer)
+    }
+
     /// Host-only mutation seam for an explicit human decision. Never registered
     /// as a model tool, and never invoked by the extraction model's JSON.
     func mergeEntities(_ request: KnowledgeEntityMergeRequest,
@@ -22,7 +29,7 @@ extension KnowledgeStore {
         }
     }
 
-    func undoEntityMerge(operationID: UUID, snapshot: KnowledgeEntityResolutionSnapshot,
+    func undoEntityMerge(operationID: UUID, snapshot: KnowledgeEntityMutationSnapshot,
                          authorization: @Sendable () async -> KnowledgeEntityResolutionAuthorization,
                          beforeSave: @Sendable () throws -> Void = {}) async throws -> KnowledgeEntityMergeReceipt {
         let auth = await authorization()
@@ -31,9 +38,25 @@ extension KnowledgeStore {
             try KnowledgeEntityMergeRows.undo(operationID: operationID, snapshot: snapshot, auth: auth, container: modelContainer, beforeSave: beforeSave)
         }
     }
+    func undoEntityMerge(operationID: UUID, snapshot: KnowledgeEntityResolutionSnapshot,
+                         authorization: @Sendable () async -> KnowledgeEntityResolutionAuthorization,
+                         beforeSave: @Sendable () throws -> Void = {}) async throws -> KnowledgeEntityMergeReceipt {
+        try await undoEntityMerge(operationID: operationID, snapshot: snapshot.mutation, authorization: authorization, beforeSave: beforeSave)
+    }
+
 }
 
 extension KnowledgeEntityResolutionRows {
+    static func readMutation(meetingIDs: Set<UUID>, scope: String, auth: KnowledgeEntityResolutionAuthorization,
+                             container: ModelContainer) throws -> KnowledgeEntityMutationSnapshot {
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let current = try sources(meetingIDs: meetingIDs, scope: scope, auth: auth, in: context)
+        guard let first = current.first else { throw KnowledgeEntityStoreError.scopeDenied }
+        return KnowledgeEntityMutationSnapshot(scope: scope, revision: try KnowledgeStoreRows.latestRevision(in: context),
+            policyRevisionKey: first.policyRevisionKey, sources: tokens(current))
+    }
+
     static func read(meetingIDs: Set<UUID>, scope: String, auth: KnowledgeEntityResolutionAuthorization,
                      container: ModelContainer) throws -> KnowledgeEntityResolutionSnapshot {
         let context = ModelContext(container)

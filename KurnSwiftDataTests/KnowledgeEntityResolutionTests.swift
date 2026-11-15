@@ -323,6 +323,71 @@ struct KnowledgeEntityResolutionTests {
         #expect(capture.events.filter { $0.outcome == .failed }.count == 1)
     }
 
+    /// Synthetic later compilations with valid, empty ref maps make discovery
+    /// forget the old page without deleting any authoritative origin proof.
+    private func padDiscovery(_ f: Fixture, oldJobs: Int, extraEntities: Int) throws {
+        let context = ModelContext(f.container)
+        context.autosaveEnabled = false
+        let original = f.requests[0].snapshot
+        let source = try #require(original.recordings.first)
+        let fingerprint = try #require(source.fingerprint)
+        let startingRevision = try KnowledgeStoreRows.latestRevision(in: context)
+        for index in 0..<max(1, oldJobs) {
+            let version = "padding-\(index)"
+            let identity = try KnowledgeCompilationIdentity(scope: "workspace", meetingID: f.meetings[0].id,
+                transcriptFingerprint: original.transcriptFingerprint, extractorVersion: version)
+            let job = KnowledgeJob(idempotencyKey: try identity.idempotencyKey(), kind: .extraction, meetingID: f.meetings[0].id,
+                pipelineVersion: version, createdAt: Date().addingTimeInterval(Double(index + 1)))
+            var entityIDs: [String: UUID] = [:]
+            if index == 0 {
+                for value in 1...max(1, extraEntities) where extraEntities > 0 {
+                    // UUID() produces v4 identities; these v0 fixtures sort
+                    // before every possible allocated v4 identity.
+                    let id = try #require(UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", value)))
+                    context.insert(KnowledgeEntity(id: id, kind: .project, canonicalName: "Example Padding \(value)",
+                        normalizedName: "example padding \(value)", aliasesData: try KnowledgeStoreRows.authoritativeData([String]())))
+                    entityIDs["e\(value)"] = id
+                }
+            }
+            let pass = KnowledgeCommitProvenance.Pass(entityIDs: entityIDs, assertionIDs: [:], eventIDs: [:], attributionAnchors: [:])
+            let provenance = KnowledgeCommitProvenance(recordings: [.init(recordingID: source.id, transcriptFingerprint: fingerprint,
+                strategy: "fullContext", targetedPassCount: 0, passes: [pass])])
+            job.checkpointData = try KnowledgeStoreRows.authoritativeData(provenance)
+            job.coverageData = try KnowledgeStoreRows.authoritativeData([KnowledgeCommitProvenance.Coverage(recordingID: source.id,
+                examinedSegmentIDs: source.segments.map { $0.id.uuidString.lowercased() })])
+            job.stateRaw = "succeeded"
+            context.insert(job)
+            context.insert(KnowledgeRevision(number: startingRevision + index + 1, jobID: job.id,
+                policyRevisionKey: original.policyRevisionKey, assertionCount: 0))
+        }
+        try context.save()
+    }
+
+    @Test func mutationProofsAndUndoRemainAvailableBeyondBothDiscoveryCaps() async throws {
+        for history in [true, false] {
+            let f = try await fixture(names: ["Example Original", "Example Target"])
+            let ids = try entityIDs(f)
+            let access = authorization(f)
+            let original = KnowledgeEntityMergeRequest(operationID: UUID(), sourceID: ids[0], targetID: ids[1], snapshot: try await snapshot(f))
+            let applied = try await f.store.mergeEntities(original, authorization: { access })
+            try padDiscovery(f, oldJobs: history ? 129 : 1, extraEntities: history ? 0 : 1_026)
+            let discovery = try await snapshot(f)
+            #expect(discovery.isTruncated)
+            #expect(!discovery.entities.contains { $0.id == ids[0] })
+            #expect(try await f.store.mergeEntities(original, authorization: { access }) == applied)
+            let writeProof = try await f.store.entityMutationSnapshot(meetingIDs: access.meetingIDs, scope: "workspace", authorization: { access })
+            _ = try await f.store.undoEntityMerge(operationID: original.operationID, snapshot: writeProof, authorization: { access })
+            let after = ModelContext(f.container)
+            #expect(try after.fetch(FetchDescriptor<KnowledgeEntity>()).first { $0.id == ids[0] }?.mergedIntoID == nil)
+            let fresh = try await f.store.entityMutationSnapshot(meetingIDs: access.meetingIDs, scope: "workspace", authorization: { access })
+            // A fresh explicit decision also proves exact origins by paging,
+            // rather than requiring the old entities to be in a candidate page.
+            let again = KnowledgeEntityMergeRequest(operationID: UUID(), sourceID: ids[0], targetID: ids[1], snapshot: fresh)
+            _ = try await f.store.mergeEntities(again, authorization: { access })
+            #expect(try ModelContext(f.container).fetch(FetchDescriptor<KnowledgeEntity>()).first { $0.id == ids[0] }?.mergedIntoID == ids[1])
+        }
+    }
+
 }
 }
 

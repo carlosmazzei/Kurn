@@ -105,21 +105,8 @@ enum KnowledgeEntityResolutionRows {
             let jobs = try context.fetch(descriptor)
             result.truncated = result.truncated || jobs.count > historyLimit
             for job in jobs.prefix(historyLimit) {
-                guard let identity = KnowledgeCompilationIdentity(idempotencyKey: job.idempotencyKey) else {
-                    throw KnowledgeEntityStoreError.unsupportedPayload
-                }
-                guard identity.scope == source.scope else { continue }
-                guard identity.meetingID == source.meetingID, identity.extractorVersion == job.pipelineVersion else {
-                    throw KnowledgeEntityStoreError.unreadablePayload
-                }
-                guard identity.schemaVersion == 1 else { throw KnowledgeEntityStoreError.unsupportedPayload }
-                let jobID = job.id
-                let revisions = try context.fetch(FetchDescriptor<KnowledgeRevision>(predicate: #Predicate { $0.jobID == jobID }))
-                guard revisions.count == 1, let revision = revisions.first else { throw KnowledgeEntityStoreError.unreadablePayload }
-                guard includeHistoricalPolicies || revision.policyRevisionKey == source.policyRevisionKey else { continue }
-                let provenance = try decode(KnowledgeCommitProvenance.self, job.checkpointData ?? Data())
-                for recording in provenance.recordings {
-                    for pass in recording.passes { ids.formUnion(pass.entityIDs.values) }
+                if let bound = try KnowledgeEntityOriginRows.entityIDs(job, source: source, historicalPolicies: includeHistoricalPolicies, in: context) {
+                    ids.formUnion(bound)
                 }
             }
         }
@@ -144,7 +131,7 @@ enum KnowledgeEntityResolutionRows {
         sources.map { .init(meetingID: $0.meetingID, fingerprint: $0.transcriptFingerprint) }
     }
 
-    static func refreshed(_ expected: KnowledgeEntityResolutionSnapshot, auth: KnowledgeEntityResolutionAuthorization,
+    static func refreshed(_ expected: KnowledgeEntityMutationSnapshot, auth: KnowledgeEntityResolutionAuthorization,
                           in context: ModelContext) throws -> [KnowledgeStoreSnapshot] {
         let current = try sources(meetingIDs: Set(expected.sources.map(\.meetingID)), scope: expected.scope, auth: auth, in: context)
         guard tokens(current) == expected.sources,

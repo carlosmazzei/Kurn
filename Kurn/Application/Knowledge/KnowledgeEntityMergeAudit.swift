@@ -13,6 +13,11 @@ extension KnowledgeEntityMergeRows {
               ids.count == 2, Set(ids) == Set([applied.sourceID, applied.targetID]),
               !audit.scope.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !audit.sources.isEmpty,
               Set(audit.sources.map(\.meetingID)).count == audit.sources.count else { throw KnowledgeEntityStoreError.invalidReview }
+        let bound = Set(audit.origins.map(\.entityID))
+        guard bound.count == audit.origins.count, bound.count <= 1_088, bound.isSuperset(of: [applied.sourceID, applied.targetID, audit.requestedTargetID]),
+              Set(audit.origins.map(\.meetingID)).isSubset(of: Set(audit.sources.map(\.meetingID))) else {
+            throw KnowledgeEntityStoreError.invalidReview
+        }
         try checkRevision(applied, policyKey: audit.policyRevisionKey, in: context)
         if let undone = audit.undone {
             guard undone.operationID == applied.operationID, undone.sourceID == applied.sourceID, undone.targetID == applied.targetID,

@@ -13,8 +13,6 @@ enum KnowledgeEntityMergeRows {
             var result: KnowledgeEntityMergeReceipt?
             try context.transaction {
                 let sources = try KnowledgeEntityResolutionRows.refreshed(request.snapshot, auth: auth, in: context)
-                let pool = try KnowledgeEntityResolutionRows.pool(sources: sources, in: context)
-                guard pool.rows[request.sourceID] != nil, pool.rows[request.targetID] != nil else { throw KnowledgeEntityStoreError.scopeDenied }
                 let operationID = request.operationID
                 if let existing = try context.fetch(FetchDescriptor<KnowledgeReview>(predicate: #Predicate { $0.id == operationID })).first {
                     let payload = try KnowledgeEntityResolutionRows.reviewPayload(existing)
@@ -23,21 +21,30 @@ enum KnowledgeEntityMergeRows {
                           audit.applied.sourceID == request.sourceID, audit.requestedTargetID == request.targetID,
                           audit.candidateReviewID == request.candidateReviewID else { throw KnowledgeEntityStoreError.invalidReview }
                     guard audit.undone == nil else { throw KnowledgeEntityStoreError.operationUndone }
-                    guard pool.rows[audit.applied.sourceID]?.mergedIntoID == audit.applied.targetID,
-                          pool.rows[audit.applied.targetID] != nil, pool.rows[audit.requestedTargetID] != nil else { throw KnowledgeEntityStoreError.mergeChanged }
+                    try KnowledgeEntityOriginRows.verify(audit.origins, sources: sources, in: context)
+                    let source = try KnowledgeEntityOriginRows.entity(audit.applied.sourceID, in: context)
+                    guard source.mergedIntoID == audit.applied.targetID else { throw KnowledgeEntityStoreError.mergeChanged }
                     result = audit.applied
                     return
                 }
                 guard try KnowledgeStoreRows.latestRevision(in: context) == request.snapshot.revision else { throw KnowledgeEntityStoreError.staleSnapshot }
-                guard let source = pool.rows[request.sourceID], let selectedTarget = pool.rows[request.targetID] else { throw KnowledgeEntityStoreError.scopeDenied }
+                let initial = try KnowledgeEntityOriginRows.prove([request.sourceID, request.targetID], sources: sources, in: context)
+                let source = try KnowledgeEntityOriginRows.entity(request.sourceID, in: context)
+                let selectedTarget = try KnowledgeEntityOriginRows.entity(request.targetID, in: context)
                 try requireVisible(source)
                 try requireVisible(selectedTarget)
                 guard source.mergedIntoID == nil else { throw KnowledgeEntityStoreError.alreadyMerged }
+                var rows = try KnowledgeEntityOriginRows.targetPath(request.targetID, in: context)
+                let members = try incomingGroup(source.id, in: context)
+                let required = members.union(rows.keys)
+                let extra = try KnowledgeEntityOriginRows.prove(required.subtracting(initial.map(\.entityID)), sources: sources, in: context)
+                let origins = initial + extra
+                for id in members { rows[id] = try KnowledgeEntityOriginRows.entity(id, in: context) }
+                let pool = KnowledgeEntityResolutionRows.Pool(rows: rows)
                 let targetID = try KnowledgeEntityRedirectGraph.resolve(request.targetID, nodes: pool.redirects())
                 guard source.id != targetID else { throw KnowledgeEntityResolutionError.redirectCycle }
                 guard let target = pool.rows[targetID], source.kindRaw == target.kindRaw else { throw KnowledgeEntityResolutionError.kindMismatch }
                 try requireVisible(target)
-                let members = try incomingGroup(source.id, allowed: Set(pool.rows.keys), in: context)
                 var graph = try pool.redirects()
                 guard let kind = KnowledgeEntityKind(rawValue: source.kindRaw) else { throw KnowledgeEntityStoreError.unreadablePayload }
                 graph[source.id] = KnowledgeEntityRedirect(id: source.id, kind: kind, targetID: targetID)
@@ -50,7 +57,7 @@ enum KnowledgeEntityMergeRows {
                 source.updatedAt = now
                 let audit = KnowledgeEntityReviewPayload.Merge(scope: request.snapshot.scope, sources: request.snapshot.sources,
                     policyRevisionKey: request.snapshot.policyRevisionKey, requestedTargetID: request.targetID,
-                    candidateReviewID: request.candidateReviewID, applied: receipt)
+                    candidateReviewID: request.candidateReviewID, origins: origins, applied: receipt)
                 let row = KnowledgeReview(id: operationID, kind: .mergeCandidate,
                     subjectIDsData: try KnowledgeStoreRows.authoritativeData([source.id, targetID]),
                     payloadData: try KnowledgeStoreRows.authoritativeData(KnowledgeEntityReviewPayload(merge: audit)), createdAt: now)
@@ -74,7 +81,7 @@ enum KnowledgeEntityMergeRows {
         } catch { context.rollback(); throw error }
     }
 
-    static func undo(operationID: UUID, snapshot: KnowledgeEntityResolutionSnapshot, auth: KnowledgeEntityResolutionAuthorization,
+    static func undo(operationID: UUID, snapshot: KnowledgeEntityMutationSnapshot, auth: KnowledgeEntityResolutionAuthorization,
                      container: ModelContainer, beforeSave: @Sendable () throws -> Void) throws -> KnowledgeEntityMergeReceipt {
         let context = ModelContext(container)
         context.autosaveEnabled = false
@@ -82,20 +89,22 @@ enum KnowledgeEntityMergeRows {
             var result: KnowledgeEntityMergeReceipt?
             try context.transaction {
                 let sources = try KnowledgeEntityResolutionRows.refreshed(snapshot, auth: auth, in: context)
-                let pool = try KnowledgeEntityResolutionRows.pool(sources: sources, includeHistoricalPolicies: true, in: context)
                 guard let row = try context.fetch(FetchDescriptor<KnowledgeReview>(predicate: #Predicate { $0.id == operationID })).first else {
                     throw KnowledgeEntityStoreError.invalidReview
                 }
                 var payload = try KnowledgeEntityResolutionRows.reviewPayload(row)
                 guard var audit = try checkedAudit(row, payload: payload, in: context), audit.scope == snapshot.scope,
-                      Set(audit.sources.map(\.meetingID)).isSubset(of: Set(snapshot.sources.map(\.meetingID))) else {
+                      Set(audit.origins.map(\.meetingID)).isSubset(of: Set(snapshot.sources.map(\.meetingID))) else {
                     throw KnowledgeEntityStoreError.scopeDenied
                 }
-                guard let source = pool.rows[audit.applied.sourceID], pool.rows[audit.applied.targetID] != nil else { throw KnowledgeEntityStoreError.scopeDenied }
+                try KnowledgeEntityOriginRows.verify(audit.origins, sources: sources, in: context)
+                let source = try KnowledgeEntityOriginRows.entity(audit.applied.sourceID, in: context)
                 if let undone = audit.undone { result = undone; return }
                 guard try KnowledgeStoreRows.latestRevision(in: context) == snapshot.revision else { throw KnowledgeEntityStoreError.staleSnapshot }
                 guard source.mergedIntoID == audit.applied.targetID else { throw KnowledgeEntityStoreError.mergeChanged }
-                _ = try incomingGroup(source.id, allowed: Set(pool.rows.keys), in: context)
+                let members = try incomingGroup(source.id, in: context)
+                _ = try KnowledgeEntityOriginRows.prove(members.subtracting(audit.origins.map(\.entityID)),
+                    sources: sources, historicalPolicies: true, in: context)
                 let receipt = try revision(operationID: operationID, sourceID: source.id, targetID: audit.applied.targetID,
                     snapshot: snapshot, isUndo: true, in: context)
                 source.mergedIntoID = nil
@@ -131,7 +140,7 @@ enum KnowledgeEntityMergeRows {
 
     /// Merging or splitting a root affects every inbound redirect. An excluded
     /// descendant must not have its identity changed by a narrower selection.
-    private static func incomingGroup(_ root: UUID, allowed: Set<UUID>, in context: ModelContext) throws -> Set<UUID> {
+    private static func incomingGroup(_ root: UUID, in context: ModelContext) throws -> Set<UUID> {
         var pending = [root]
         var seen: Set<UUID> = []
         while let id = pending.popLast() {
@@ -139,7 +148,6 @@ enum KnowledgeEntityMergeRows {
             guard seen.count <= KnowledgeEntityResolutionRows.entityLimit else { throw KnowledgeEntityResolutionError.redirectLimit }
             let children = try context.fetch(FetchDescriptor<KnowledgeEntity>(predicate: #Predicate { $0.mergedIntoID == id }))
             for child in children {
-                guard allowed.contains(child.id) else { throw KnowledgeEntityStoreError.scopeDenied }
                 pending.append(child.id)
             }
         }
@@ -166,7 +174,7 @@ enum KnowledgeEntityMergeRows {
 
     // swiftlint:disable:next function_parameter_count
     private static func revision(operationID: UUID, sourceID: UUID, targetID: UUID,
-                                 snapshot: KnowledgeEntityResolutionSnapshot, isUndo: Bool, in context: ModelContext) throws -> KnowledgeEntityMergeReceipt {
+                                 snapshot: KnowledgeEntityMutationSnapshot, isUndo: Bool, in context: ModelContext) throws -> KnowledgeEntityMergeReceipt {
         let number = try KnowledgeStoreRows.latestRevision(in: context) + 1
         let revision = KnowledgeRevision(number: number, policyRevisionKey: snapshot.policyRevisionKey, assertionCount: 0)
         context.insert(revision)

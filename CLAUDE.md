@@ -2976,6 +2976,10 @@ hold for every phase; code comments cite this section.
   canonical revision, kind, visible state, all affected inbound origins, cycles
   and depth. Redirects are not path-compressed. Assertions, relations, events,
   evidence and original names/aliases are never reassigned or rewritten.
+  Mutation proofs are separate from discovery limits: fresh write snapshots
+  contain source tokens only, origin discovery pages through matching jobs, and
+  audits pin exact origin job IDs for all affected identities. Undo verifies
+  those specific jobs even after 128 newer compilations or 1,024 other entities.
   The edge, versioned/checksummed review audit, candidate state and a new
   projection-outbox revision commit atomically. Operation UUIDs are idempotent;
   undo records its own receipt and reopens its candidate. An undone operation
