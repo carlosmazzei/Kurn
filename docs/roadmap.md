@@ -125,10 +125,9 @@ condensation that can orient extraction, never evidence. So the refactor keeps
 
 Small PRs, each behind the disabled-by-default `knowledgeEnabled` flag, each
 with its tests, migration where needed, and the docs move on ship (spec §16).
-They land as PRs into the integration branch `feature/knowledge-engine` (CI runs
-on every PR whatever its base, and on pushes to that branch for a coverage base,
-`.github/workflows/swift.yml`), which reaches `main` through one PR; that PR drops
-the branch from the workflow's push list again.
+K0 and its groundwork landed through the integration branch
+`feature/knowledge-engine`; later phases land as PRs into `main` (CI runs on every
+PR whatever its base).
 The spec's three stop-for-review gates are kept: **before changing navigation
 globally, before enabling any cloud processing, before migrating data.**
 
