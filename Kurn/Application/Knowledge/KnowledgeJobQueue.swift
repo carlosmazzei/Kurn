@@ -161,7 +161,7 @@ final class KnowledgeJobQueue {
     func hasLocalWork() async -> Bool {
         guard let records = try? await storeHost.writer().queuedJobs(kinds: Set(handlers.keys)) else { return false }
         return records.contains { $0.envelope?.work.provider.kind == .appleOnDevice
-            && !["explicit_retry_required", "feature_disabled", "provider_unavailable", "provider_blocked"].contains($0.code ?? "") }
+            && !["explicit_retry_required", "feature_disabled", "provider_unavailable", "provider_blocked", "policy_denied", "cloud_review_required"].contains($0.code ?? "") }
     }
 
     private func canRun(_ work: KnowledgeQueuedWork) -> Bool {

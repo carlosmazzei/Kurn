@@ -59,6 +59,7 @@ extension KnowledgeStore {
                 job.stateRaw = (envelope.failures >= 3 ? KnowledgeJobState.failed : .deferred).rawValue
                 job.lastErrorCode = code
             } else {
+                guard handle.work.kind != .extraction else { throw KnowledgeStoreError.invalidCompilation }
                 job.stateRaw = KnowledgeJobState.succeeded.rawValue
                 job.lastErrorCode = nil
             }

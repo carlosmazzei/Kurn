@@ -12,7 +12,7 @@ enum KnowledgeQueueRows {
         return context
     }
 
-    private static func envelope(_ job: KnowledgeJob) throws -> KnowledgeQueueEnvelope {
+    static func envelope(_ job: KnowledgeJob) throws -> KnowledgeQueueEnvelope {
         guard let data = job.checkpointData else { throw KnowledgeQueueError.unreadableCheckpoint }
         let result = JSONStorage.decodeAuthoritative(KnowledgeQueueEnvelope.self, from: data)
         if case .unsupportedVersion = result { throw KnowledgeQueueError.unsupportedCheckpoint }
@@ -23,6 +23,12 @@ enum KnowledgeQueueRows {
             throw KnowledgeQueueError.unreadableCheckpoint
         }
         return value
+    }
+
+    static func requireLease(_ handle: KnowledgeJobHandle, job: KnowledgeJob?) throws {
+        guard let job, job.id == handle.id, job.stateRaw == KnowledgeJobState.running.rawValue else { throw KnowledgeQueueError.staleLease }
+        let payload = try envelope(job)
+        guard payload.leaseID == handle.leaseID, payload.work == handle.work else { throw KnowledgeQueueError.staleLease }
     }
 
     private static func record(_ job: KnowledgeJob) throws -> KnowledgeQueuedRecord {
@@ -44,7 +50,7 @@ enum KnowledgeQueueRows {
         let rows = try context.fetch(FetchDescriptor<KnowledgeJob>(predicate: #Predicate {
             $0.kindRaw == kindRaw && $0.createdAt <= createdBefore
         }))
-        for row in rows { context.delete(row) }
+        for row in rows where kind != .extraction || row.stateRaw != KnowledgeJobState.succeeded.rawValue { context.delete(row) }
         try context.save()
     }
 
@@ -61,6 +67,7 @@ enum KnowledgeQueueRows {
 
     static func enqueue(_ requested: KnowledgeQueuedWork, explicitRetry: Bool, restartCompleted: Bool,
                         container: ModelContainer) throws -> KnowledgeQueuedRecord {
+        guard requested.kind != .extraction || !restartCompleted else { throw KnowledgeStoreError.invalidJob }
         let context = context(container)
         var requested = requested
         // Repeated requests while paused/waiting join the same unfinished

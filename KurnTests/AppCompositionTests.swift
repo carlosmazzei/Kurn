@@ -30,6 +30,8 @@ struct AppCompositionTests {
         #expect(environment.semanticIndex.appSettings === settings)
         #expect(environment.wiki.appSettings === settings)
         #expect(environment.wiki.jobQueue === environment.knowledgeJobs)
+        #expect(environment.knowledge.jobQueue === environment.knowledgeJobs)
+        #expect(environment.transcription.knowledgeCoordinator === environment.knowledge)
         #expect(environment.summaries.appSettings === settings)
         #expect(environment.summaries.modelContext === container.mainContext)
         #expect(environment.summaries.reviewPrompt === environment.reviewPrompt)

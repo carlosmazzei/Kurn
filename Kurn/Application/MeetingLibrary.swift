@@ -96,7 +96,7 @@ struct MeetingLibrary {
         let fileNames = meeting.recordings.map(\.fileName)
             + meeting.recordings.flatMap { $0.photos.map(\.fileName) }
             + meeting.attachments.map(\.fileName)
-        let jobs = try wikiJobs(for: [meeting.id])
+        let jobs = try derivedJobs(for: [meeting.id])
         try journaledDelete(fileNames: fileNames) {
             for job in jobs { context.delete(job) }
             context.delete(meeting)
@@ -113,19 +113,24 @@ struct MeetingLibrary {
         let fileNames = recordings.map(\.fileName)
             + recordings.flatMap { $0.photos.map(\.fileName) }
             + meetings.flatMap { $0.attachments.map(\.fileName) }
-        let jobs = try wikiJobs(for: Set(meetings.map(\.id)))
+        let jobs = try derivedJobs(for: Set(meetings.map(\.id)))
         try journaledDelete(fileNames: fileNames) {
             for job in jobs { context.delete(job) }
             for meeting in meetings { context.delete(meeting) }
         }
     }
 
-    /// Operational wiki checkpoints no longer cascade from Meeting. Fetch
+    /// Operational checkpoints do not cascade from Meeting. Canonical history
+    /// is retained for K2.8 deletion; unfinished extraction is purged now. Fetch
     /// before moving any files; deletion shares the journal's model commit.
-    private func wikiJobs(for meetingIDs: Set<UUID>) throws(AppError) -> [KnowledgeJob] {
-        let kind = KnowledgeJobKind.meetingArticle.rawValue
+    private func derivedJobs(for meetingIDs: Set<UUID>) throws(AppError) -> [KnowledgeJob] {
+        let article = KnowledgeJobKind.meetingArticle.rawValue
+        let extraction = KnowledgeJobKind.extraction.rawValue
+        let succeeded = KnowledgeJobState.succeeded.rawValue
         do {
-            return try context.fetch(FetchDescriptor<KnowledgeJob>(predicate: #Predicate { $0.kindRaw == kind }))
+            return try context.fetch(FetchDescriptor<KnowledgeJob>(predicate: #Predicate {
+                $0.kindRaw == article || ($0.kindRaw == extraction && $0.stateRaw != succeeded)
+            }))
                 .filter { $0.meetingID.map(meetingIDs.contains) ?? false }
         } catch { throw .persistenceFailed(error.localizedDescription) }
     }

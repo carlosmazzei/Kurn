@@ -2784,8 +2784,8 @@ hold for every phase; code comments cite this section.
   revision is the projection outbox while `projectionPending`. A meeting without a
   `SourceContextLink` is in context `unknown`, so the V6 → V7 stage is lightweight and
   writes nothing. `LibraryEraser` deletes all ten. `KnowledgeStore` (K1.5) is
-  their canonical writer. K1.6a wires the shared queue and meeting articles;
-  K1.6b still needs to connect canonical extraction.
+  their canonical writer. K1.6 wires the shared queue, meeting articles and
+  disabled-by-default, local-only canonical extraction.
 - **Transcript revisions and anchors (K1.3).** KurnCore's
   `KnowledgeTranscriptSnapshot` freezes transcript array order and UUID anchors
   (lowercase strings), and produces versioned, length-prefixed UTF-8 canonical
@@ -2812,8 +2812,8 @@ hold for every phase; code comments cite this section.
   supporting assertion with a compatible predicate; a superseded event belongs
   to the object of `supersedes` (the replaced entity). Replies are capped at 2 MB;
   decoding errors expose fixed codes rather than content.
-  `Application/Knowledge/KnowledgeExtractionService` is value-in/value-out and
-  unwired: it accepts an injected `LLMProvider`, `ContextBudget` and live
+  `Application/Knowledge/KnowledgeExtractionService` is value-in/value-out: K1.6b
+  composes it through `KnowledgeCompilationCoordinator`. It accepts an injected `LLMProvider`, `ContextBudget` and live
   authorization callback. Full context goes first when it fits; otherwise
   segment-aligned blocks retain every anchor. Planning reserves half the response
   allowance for assertions/evidence and budgets the UUID coverage list against
@@ -2831,7 +2831,7 @@ hold for every phase; code comments cite this section.
   constructing prompts and before each provider call, including repairs; output
   records source fingerprint, strategy, examined anchors and targeted pass count.
   This does not enable cloud processing, write canonical rows, or establish
-  semantic extraction accuracy: K0.4 benchmarking and K1.6 scheduling remain.
+  semantic extraction accuracy: K0.4 benchmarking remains.
 - **Canonical writer and projection outbox (K1.5).** `KnowledgeStore` is a
   `@ModelActor` over the existing protected container. The host must own one
   writer per container; K1.6a's `KnowledgeStoreHost` constructs it off-main,
@@ -2910,10 +2910,41 @@ hold for every phase; code comments cite this section.
   article jobs in its journaled model commit. Late replies refetch the meeting
   and cannot recreate deleted articles/jobs. Repeated forced requests coalesce
   while unfinished; a completed rebuild allows a new generation.
-  This does **not** activate canonical extraction: K1.6b still must add its
-  producer, per-recording checkpoints and policy-backed rebuild identity. The
-  independent `knowledgeEnabled` flag remains off by default, and existing wiki
-  consent never authorizes compiling knowledge across meetings.
+  Canonical extraction is a separate producer (K1.6b, below). The independent
+  `knowledgeEnabled` flag remains off by default, and existing wiki consent
+  never authorizes compiling knowledge across meetings.
+- **Canonical extraction producer (K1.6b).** `KnowledgeCompilationCoordinator`
+  is retained by `AppEnvironment` and shares the article queue/writer. Successful
+  transcription submits canonical work only while `knowledgeEnabled`; there is
+  no implicit library backfill or new Settings/navigation UI. The selected
+  summary provider/model is captured, and only Apple on-device is admitted:
+  a hard release gate blocks canonical cloud compilation even if policy and
+  personal consent permit it. No model download is triggered. The stable
+  host-owned workspace policy defaults to on-device/internal; named context
+  policies must be supplied explicitly, never silently replaced by that default.
+  Policy persistence, scope controls, consent and backfill UI remain K2.7.
+  `KnowledgeCompilationIdentity` retains exact v1 keys and adds reversible v2
+  keys with a generation digest covering provider configuration, model, policy
+  revisions and an explicit rebuild operation UUID. Retries keep their operation
+  identity; restoring an obsolete/cancelled compilation requires an explicit
+  new rebuild identity rather than silently minting a generation.
+  Recording dates are UTC instants; the host does not invent a historical
+  capture timezone. Persisted context kind is supplied to extraction.
+  Completed recording passes are checkpointed in the protected job, bound to
+  its exact source/policy identity and revalidated on restore. An interrupted
+  recording restarts; earlier complete recordings do not. Source/context and
+  live authorization are rechecked before retrieval, prompts, every call/repair,
+  each checkpoint and commit. A changed source/provider/policy discards the old
+  intent; disabling the feature defers it. Deleting a meeting purges unfinished
+  extraction jobs, preventing late publication; the full historical canonical
+  deletion pipeline remains K2.8.
+  Canonical commit requires the running queue lease and saves that same job's
+  succeeded state, graph, provenance and projection outbox atomically. Expired
+  or erased leases cannot publish or recreate jobs. Generic queue completion
+  cannot mark extraction successful, and operational erasure retains succeeded
+  canonical provenance. Completed submissions validate replay/current support
+  before the terminal shortcut. No schema migration or cloud activation is
+  introduced by this integration.
 - **Public material is synthetic.** The golden set
   (`Packages/KurnCore/Tests/KurnCoreTests/Fixtures/knowledge/`, format
   `kurn.knowledge-fixture` v1) holds fictional meetings in Portuguese and

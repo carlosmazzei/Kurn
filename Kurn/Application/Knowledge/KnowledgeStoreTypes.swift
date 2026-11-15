@@ -12,6 +12,7 @@ struct KnowledgeStoreSnapshot: Sendable {
     let contextID: UUID?
     let contextClassification: KnowledgeClassification
     let contextPolicyID: String?
+    var contextKind: KnowledgeContextKind = .unknown
 
     struct RecordingSource: Sendable {
         let id: UUID
@@ -23,7 +24,7 @@ struct KnowledgeStoreSnapshot: Sendable {
     }
 }
 
-struct KnowledgeRecordingCompilation: Sendable {
+struct KnowledgeRecordingCompilation: Codable, Sendable {
     let recordingID: UUID
     let transcriptFingerprint: String
     let strategy: String
@@ -47,6 +48,8 @@ struct KnowledgeCommitRequest: Sendable {
     let schemaVersion: Int
     let provider: AIProvider
     let compilations: [KnowledgeRecordingCompilation]
+    var generation: String? = nil
+    var lease: KnowledgeJobHandle? = nil
 }
 
 struct KnowledgeCommitReceipt: Sendable, Equatable {

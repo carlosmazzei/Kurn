@@ -51,4 +51,22 @@ struct KnowledgeCompilationIdentityTests {
             #expect(KnowledgeCompilationIdentity(idempotencyKey: key) == nil)
         }
     }
+    @Test func generatedKeysPreserveLegacyIdentityAndScopeWhileDistinguishingRebuilds() throws {
+        let legacy = try KnowledgeCompilationIdentity(scope: "workspace", meetingID: meetingID,
+            transcriptFingerprint: fingerprint, extractorVersion: "v1")
+        let first = try KnowledgeCompilationIdentity(scope: "workspace", meetingID: meetingID,
+            transcriptFingerprint: fingerprint, extractorVersion: "v1", generation: "provider/model/policy:1")
+        let rebuild = try KnowledgeCompilationIdentity(scope: "workspace", meetingID: meetingID,
+            transcriptFingerprint: fingerprint, extractorVersion: "v1", generation: "provider/model/policy:1/rebuild:2")
+        #expect(try legacy.idempotencyKey().hasPrefix("knowledge.compile.v1:"))
+        #expect(try first.idempotencyKey().hasPrefix("knowledge.compile.v2:"))
+        #expect(try first.idempotencyKey() != rebuild.idempotencyKey())
+        #expect(try KnowledgeCompilationIdentity(idempotencyKey: first.idempotencyKey()) == first)
+        #expect(try KnowledgeCompilationIdentity(idempotencyKey: legacy.idempotencyKey()) == legacy)
+        #expect(throws: KnowledgeCompilationIdentityError.invalidIdentity) {
+            try KnowledgeCompilationIdentity(scope: "workspace", meetingID: meetingID,
+                transcriptFingerprint: fingerprint, extractorVersion: "v1", generation: " ")
+        }
+    }
+
 }

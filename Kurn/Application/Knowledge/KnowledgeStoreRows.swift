@@ -53,7 +53,8 @@ enum KnowledgeStoreRows {
         encoder.outputFormatting = [.withoutEscapingSlashes]
         return KnowledgeStoreSnapshot(meetingID: meetingID, scope: scope, canonicalRevision: try latestRevision(in: context),
             transcriptFingerprint: digest(try encoder.encode(fields)), policyRevisionKey: KnowledgePolicyEvaluator.revisionKey(auth.policies),
-            recordings: sources, contextID: occasion?.id, contextClassification: classification, contextPolicyID: occasion?.policyID)
+            recordings: sources, contextID: occasion?.id, contextClassification: classification, contextPolicyID: occasion?.policyID,
+            contextKind: KnowledgeContextKind(rawValue: occasion?.kindRaw ?? "unknown") ?? .unknown)
     }
 
     static func authorize(_ auth: KnowledgeExtractionAuthorization, source: KnowledgeStoreSnapshot, provider: AIProvider) throws {
@@ -81,15 +82,22 @@ enum KnowledgeStoreRows {
               Set(sources.map(\.id)) == Set(compilations.map(\.recordingID)) else { throw KnowledgeStoreError.invalidCompilation }
         let byID = Dictionary(uniqueKeysWithValues: sources.map { ($0.id, $0) })
         return try compilations.map { compilation in
-            guard let source = byID[compilation.recordingID], source.fingerprint == compilation.transcriptFingerprint,
-                  ["fullContext", "blocks"].contains(compilation.strategy), compilation.targetedPassCount >= 0,
-                  (1...64).contains(compilation.passes.count) else { throw KnowledgeStoreError.invalidCompilation }
-            let revision = try KnowledgeTranscriptRevision(segments: source.segments, language: source.language)
-            let documents = try compilation.passes.map { try KnowledgeExtraction.decode($0, segments: revision.snapshot.sourceSegments) }
-            let covered = Set(documents.flatMap(\.examinedSegmentIDs))
-            guard covered == Set(revision.snapshot.sourceSegments.map(\.id)) else { throw KnowledgeStoreError.incompleteCoverage }
-            return ValidatedRecording(source: source, compilation: compilation, documents: documents)
+            guard let source = byID[compilation.recordingID] else { throw KnowledgeStoreError.invalidCompilation }
+            return try validateRecording(compilation, source: source)
         }
+    }
+
+    static func validateRecording(_ compilation: KnowledgeRecordingCompilation,
+                                  source: KnowledgeStoreSnapshot.RecordingSource) throws -> ValidatedRecording {
+        guard source.fingerprint == compilation.transcriptFingerprint, !source.segments.isEmpty,
+              ["fullContext", "blocks"].contains(compilation.strategy), (0...64).contains(compilation.targetedPassCount),
+              (1...64).contains(compilation.passes.count) else { throw KnowledgeStoreError.invalidCompilation }
+        let revision = try KnowledgeTranscriptRevision(segments: source.segments, language: source.language)
+        let documents = try compilation.passes.map { try KnowledgeExtraction.decode($0, segments: revision.snapshot.sourceSegments) }
+        guard Set(documents.flatMap(\.examinedSegmentIDs)) == Set(revision.snapshot.sourceSegments.map(\.id)) else {
+            throw KnowledgeStoreError.incompleteCoverage
+        }
+        return ValidatedRecording(source: source, compilation: compilation, documents: documents)
     }
 
     // swiftlint:disable:next function_parameter_count

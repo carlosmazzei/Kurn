@@ -1,0 +1,258 @@
+import Foundation
+import KurnCore
+import SwiftData
+import Testing
+@testable import Kurn
+
+extension SwiftDataConcurrencySensitiveTests {
+@MainActor
+struct KnowledgeCompilationQueueTests {
+    @MainActor private final class PolicyState {
+        var policy = KnowledgeProcessingPolicy.defaultDeny()
+        var enabled = true
+        var authorization: KnowledgeExtractionAuthorization {
+            KnowledgeExtractionAuthorization(featureEnabled: enabled, policies: [policy], sourceClassifications: [.internal], userConsentedToRemote: true)
+        }
+    }
+
+    private actor Gate {
+        var started = false
+        private var continuation: CheckedContinuation<Void, Never>?
+        private var released = false
+        func wait() async {
+            started = true
+            guard !released else { return }
+            await withCheckedContinuation { continuation = $0 }
+        }
+        func release() {
+            released = true
+            continuation?.resume()
+            continuation = nil
+        }
+    }
+
+    private actor Provider: LLMProvider {
+        let provider = AIProvider.appleOnDevice
+        let failAt: Int?
+        let gateAt: Int?
+        let gate: Gate?
+        var calls = 0
+        init(failAt: Int? = nil, gateAt: Int? = nil, gate: Gate? = nil) {
+            self.failAt = failAt
+            self.gateAt = gateAt
+            self.gate = gate
+        }
+        func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult { SummaryResult(sections: []) }
+        func chat(systemPrompt: String, messages: [ChatMessage], options: TextGenerationOptions) async throws -> String {
+            calls += 1
+            if calls == gateAt { await gate?.wait() }
+            if calls == failAt { throw KnowledgeQueueError.workFailed }
+            let input = try #require(messages.first?.content.data(using: .utf8))
+            let raw = try #require(JSONSerialization.jsonObject(with: input) as? [String: Any])
+            let segments = try #require(raw["segments"] as? [[String: Any]])
+            let first = try #require(segments.first)
+            let anchor = try #require(first["id"] as? String)
+            let quote = try #require(first["text"] as? String)
+            let wire: [String: Any] = ["version": 1,
+                "entities": [["ref": "e1", "kind": "topic", "name": "Example topic", "aliases": []]],
+                "assertions": [["ref": "a1", "subject": "e1", "predicate": "hasStatus", "value": ["type": "enum", "value": "open"],
+                    "modality": "reported", "polarity": "positive", "claimKind": "internalStatusReport", "authorityStatus": "attributed",
+                    "confidence": "low", "attributedToSegmentID": anchor, "evidence": [["segmentIDs": [anchor], "quote": quote]]]],
+                "events": [], "examinedSegmentIDs": segments.compactMap { $0["id"] as? String }]
+            return String(decoding: try JSONSerialization.data(withJSONObject: wire), as: UTF8.self)
+        }
+    }
+
+    private struct Fixture {
+        let container: ModelContainer
+        let meeting: Meeting
+        let settings: AppSettings
+        let queue: KnowledgeJobQueue
+        let coordinator: KnowledgeCompilationCoordinator
+        let policy: PolicyState
+    }
+
+    private func fixture(recordings: Int = 1, provider: Provider = Provider(), foreground: Bool = true) throws -> Fixture {
+        let schema = KurnModelGraph.schema
+        let container = try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)])
+        let context = container.mainContext
+        context.autosaveEnabled = false
+        let meeting = Meeting(title: "Example compilation")
+        context.insert(meeting)
+        for index in 0..<recordings {
+            let recording = Recording(meeting: meeting, fileName: "synthetic-\(index).m4a", duration: 2, transcriptionStatus: .done)
+            context.insert(recording)
+            let transcript = Transcript(recording: recording, segments: [TranscriptSegment(speakerLabel: "Speaker 1",
+                startTime: 0, endTime: 2, text: "Example topic is open (\(index)).")], language: "en")
+            context.insert(transcript)
+            recording.transcript = transcript
+        }
+        try context.save()
+        let defaults = try #require(UserDefaults(suiteName: "knowledge-compile-tests-\(UUID().uuidString)"))
+        let settings = AppSettings(defaults: defaults)
+        settings.knowledgeEnabled = true
+        settings.aiProviderID = AIProvider.appleOnDevice.id
+        let queue = KnowledgeJobQueue(container: container, foreground: foreground)
+        let policy = PolicyState()
+        let coordinator = KnowledgeCompilationCoordinator(queue: queue, settings: settings, authorization: { policy.authorization },
+            resolveProvider: { _, _ in provider }, isProviderUsable: { _ in true })
+        return Fixture(container: container, meeting: meeting, settings: settings, queue: queue, coordinator: coordinator, policy: policy)
+    }
+
+    private func wait(_ gate: Gate) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(15))
+        while !(await gate.started) {
+            guard ContinuousClock.now < deadline else { throw KnowledgeQueueError.workFailed }
+            await Task.yield()
+        }
+    }
+
+    @Test func canonicalCommitCompletesTheQueueRowAndRetainsProvenance() async throws {
+        let provider = Provider()
+        let f = try fixture(recordings: 2, provider: provider)
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id) == .completed)
+        let read = ModelContext(f.container)
+        let job = try #require(read.fetch(FetchDescriptor<KnowledgeJob>()).first)
+        let revision = try #require(read.fetch(FetchDescriptor<KnowledgeRevision>()).first)
+        #expect(revision.jobID == job.id)
+        #expect(revision.projectionPending)
+        #expect(revision.assertionCount == 2)
+        #expect(job.stateRaw == "succeeded")
+        let bytes = try #require(job.checkpointData)
+        let provenance = try #require(JSONStorage.decodeAuthoritative(KnowledgeCommitProvenance.self, from: bytes).decodedValue)
+        #expect(provenance.recordings.count == 2)
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id) == .completed)
+        #expect(await provider.calls == 2)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeRevision>()) == 1)
+    }
+
+    @Test func retryRestoresCompletedRecordingsAfterAProviderFailure() async throws {
+        let provider = Provider(failAt: 2)
+        let f = try fixture(recordings: 2, provider: provider)
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id) == .failed)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeAssertion>()) == 0)
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id, trigger: .explicit) == .completed)
+        #expect(await provider.calls == 3)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeAssertion>()) == 2)
+    }
+
+    @Test func capturePauseRetainsEarlierRecordingsAndResumesOnlyTheInterruptedOne() async throws {
+        let gate = Gate()
+        let provider = Provider(gateAt: 2, gate: gate)
+        let f = try fixture(recordings: 2, provider: provider)
+        let task = Task { await f.coordinator.compile(meetingID: f.meeting.id) }
+        try await wait(gate)
+        f.queue.setRecording(true)
+        await gate.release()
+        #expect(await task.value == .deferred)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeRevision>()) == 0)
+        let jobs = try await f.queue.writer().queuedJobs(kinds: ["extraction"])
+        let bytes = try #require(jobs.first?.envelope?.progress)
+        let checkpoint = try #require(JSONStorage.decodeAuthoritative(KnowledgeCompilationCheckpoint.self, from: bytes).decodedValue)
+        #expect(checkpoint.recordings.count == 1)
+        f.queue.setRecording(false)
+        await f.queue.waitUntilIdle()
+        #expect(await provider.calls == 3)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeAssertion>()) == 2)
+    }
+
+    @Test func policyRevisionChangeDiscardsTheOldWorkAndDoesNotPublishItsReply() async throws {
+        let gate = Gate()
+        let provider = Provider(gateAt: 1, gate: gate)
+        let f = try fixture(provider: provider)
+        let task = Task { await f.coordinator.compile(meetingID: f.meeting.id) }
+        try await wait(gate)
+        f.policy.policy.revision += 1
+        await gate.release()
+        #expect(await task.value == .deferred)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeAssertion>()) == 0)
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id) == .completed)
+        #expect(await provider.calls == 2)
+        let jobs = try ModelContext(f.container).fetch(FetchDescriptor<KnowledgeJob>())
+        #expect(jobs.count == 2)
+        #expect(Set(jobs.map(\.idempotencyKey)).count == 2)
+    }
+
+    @Test func changedSourceCannotBePublishedAndDeletionCannotRecreateItsJob() async throws {
+        for delete in [false, true] {
+            let gate = Gate()
+            let provider = Provider(gateAt: 1, gate: gate)
+            let f = try fixture(provider: provider)
+            let task = Task { await f.coordinator.compile(meetingID: f.meeting.id) }
+            try await wait(gate)
+            if delete {
+                try MeetingLibrary(context: f.container.mainContext).deleteMeeting(f.meeting)
+            } else {
+                let transcript = try #require(f.meeting.recordings.first?.transcript)
+                transcript.segments = [TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 2, text: "Corrected source.")]
+                try f.container.mainContext.save()
+            }
+            await gate.release()
+            #expect(await task.value == .deferred)
+            let read = ModelContext(f.container)
+            #expect(try read.fetchCount(FetchDescriptor<KnowledgeAssertion>()) == 0)
+            #expect(try read.fetchCount(FetchDescriptor<KnowledgeRevision>()) == 0)
+            if delete { #expect(try read.fetchCount(FetchDescriptor<KnowledgeJob>()) == 0) }
+        }
+    }
+
+    @Test func featureRevocationDefersWithoutPublishingAndCloudIsBlockedEvenWithPolicyConsent() async throws {
+        let gate = Gate()
+        let provider = Provider(gateAt: 1, gate: gate)
+        let f = try fixture(provider: provider)
+        let task = Task { await f.coordinator.compile(meetingID: f.meeting.id) }
+        try await wait(gate)
+        f.settings.knowledgeEnabled = false
+        await gate.release()
+        #expect(await task.value == .deferred)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeRevision>()) == 0)
+        f.settings.knowledgeEnabled = true
+        f.settings.aiProviderID = AIProvider.openAI.id
+        f.policy.policy.allowedRemoteProviderIDs = [AIProvider.openAI.id]
+        f.policy.policy.maxRemoteClassification = .restricted
+        #expect(await f.coordinator.compile(meetingID: UUID(), trigger: .explicit) == .deferred)
+        #expect(f.coordinator.lastFailureCode == "cloud_review_required")
+        #expect(await provider.calls == 1)
+        f.settings.knowledgeEnabled = false
+        f.settings.wikiEnabled = true
+        #expect(await f.coordinator.compile(meetingID: UUID()) == .deferred)
+        #expect(f.coordinator.lastFailureCode == "feature_disabled")
+    }
+
+    @Test func explicitRebuildGenerationIsIdempotentAndRetiresPreviousMachineAssertions() async throws {
+        let provider = Provider()
+        let f = try fixture(provider: provider)
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id) == .completed)
+        let generation = UUID()
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id, trigger: .explicit, rebuildGeneration: generation) == .completed)
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id, trigger: .explicit, rebuildGeneration: generation) == .completed)
+        #expect(await provider.calls == 2)
+        let rows = try ModelContext(f.container).fetch(FetchDescriptor<KnowledgeAssertion>())
+        #expect(rows.filter { $0.retractedAt == nil }.count == 1)
+        #expect(rows.filter { $0.retractedAt != nil }.count == 1)
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id) == .failed)
+        #expect(f.coordinator.lastFailureCode == "knowledge_obsolete_job")
+    }
+
+    @Test func futureRecordingCheckpointIsPreservedAndNeverReachesTheProvider() async throws {
+        let provider = Provider()
+        let f = try fixture(provider: provider, foreground: false)
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id) == .deferred)
+        let store = await f.queue.writer()
+        let jobs = try await store.queuedJobs(kinds: ["extraction"])
+        let job = try #require(jobs.first)
+        let claimed = try await store.claimJob(id: job.id)
+        let handle = try #require(claimed)
+        var future = KnowledgeCompilationCheckpoint(workKey: handle.work.key)
+        future.version = 999
+        let bytes = try KnowledgeStoreRows.authoritativeData(future)
+        try await store.storeJobProgress(bytes, handle: handle)
+        try await store.finishJob(handle, interrupted: true)
+        f.queue.setForeground(true)
+        await f.queue.waitUntilIdle()
+        #expect(await provider.calls == 0)
+        let pending = try await store.queuedJobs(kinds: ["extraction"])
+        #expect(pending.first?.envelope?.progress == bytes)
+    }
+}
+}
