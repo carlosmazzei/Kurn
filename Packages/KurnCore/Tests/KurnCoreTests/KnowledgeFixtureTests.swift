@@ -79,6 +79,8 @@ struct KnowledgeFixture: Decodable {
     struct Forbidden: Decodable {
         /// The segments that would tempt a wrong extraction into this assertion.
         let segmentIDs: [String]
+        /// The tempting span, verbatim, so rewording the segment fails the suite.
+        let quote: String
         let subject: String
         let predicate: String
         let object: String?
@@ -281,11 +283,15 @@ struct KnowledgeFixtureTests {
             let sources = Set(fixture.sources.map(\.id))
             let segmentsBySource = Dictionary(uniqueKeysWithValues: fixture.sources.map { ($0.id, Set($0.segments.map(\.id))) })
             let allSegments = segmentsBySource.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+            let texts = Dictionary(uniqueKeysWithValues: fixture.sources.flatMap { $0.segments.map { ($0.id, $0.text) } })
             for forbidden in fixture.expected.mustNotAssert {
                 #expect(entities[forbidden.subject] != nil, "\(fixture.id): unknown subject in mustNotAssert")
                 let scope = forbidden.source.flatMap { segmentsBySource[$0] } ?? allSegments
                 #expect(!forbidden.segmentIDs.isEmpty && Set(forbidden.segmentIDs).isSubset(of: scope),
                         "\(fixture.id): a refusal names the segments that tempt it")
+                let tempting = forbidden.segmentIDs.compactMap { texts[$0] }.joined(separator: " ")
+                #expect(!forbidden.quote.isEmpty && tempting.contains(forbidden.quote),
+                        "\(fixture.id): a refusal quotes its tempting span verbatim")
                 #expect(KnowledgeFixtureVocabulary.predicates.contains(forbidden.predicate))
                 if let object = forbidden.object { #expect(entities[object] != nil) }
                 if let source = forbidden.source { #expect(sources.contains(source)) }
@@ -323,13 +329,14 @@ struct KnowledgeFixtureTests {
                     #expect(refused.contains(id), "\(fixture.id)/\(hardCase): \(id) needs a refusal")
                 }
             }
-            // Relative dates resolve to a date value or a coarser-than-day validity.
-            if let ids = fixture.caseSegments["relativeDate"] {
+            // Every relative-date segment resolves to a date value or a
+            // coarser-than-day validity in an assertion that cites it.
+            for id in fixture.caseSegments["relativeDate"] ?? [] {
                 let resolved = fixture.expected.assertions.contains { assertion in
-                    assertion.evidence.contains { !Set($0.segmentIDs).isDisjoint(with: ids) }
+                    assertion.evidence.contains { $0.segmentIDs.contains(id) }
                         && (assertion.value?.type == "date" || assertion.precision == "month")
                 }
-                #expect(resolved, "\(fixture.id): a relative date must resolve to a date or a month")
+                #expect(resolved, "\(fixture.id)/\(id): a relative date must resolve to a date or a month")
             }
             // Reopening is an explicit status change cited from the reopening segment.
             if let ids = fixture.caseSegments["reopen"] {

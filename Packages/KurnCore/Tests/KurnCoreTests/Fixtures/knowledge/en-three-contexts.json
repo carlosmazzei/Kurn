@@ -56,9 +56,9 @@
        "evidence": [{"source": "m3", "segmentIDs": ["s4"], "quote": "The operational cost is still not validated"}]}
     ],
     "mustNotAssert": [
-      {"segmentIDs": ["s3"], "subject": "e4", "predicate": "inspiredBy", "reason": "Nobody said the forecast or the briefing motivated the pilot; only a thematic link exists."},
-      {"segmentIDs": ["s1"], "subject": "e1", "predicate": "hasStatus", "value": "approved", "source": "m1", "reason": "An analyst forecast is not a decision."},
-      {"segmentIDs": ["s3"], "subject": "e4", "predicate": "adoptedIn", "reason": "A pilot was approved; nothing was adopted."}
+      {"segmentIDs": ["s3"], "quote": "We approve a three-month pilot", "subject": "e4", "predicate": "inspiredBy", "reason": "Nobody said the forecast or the briefing motivated the pilot; only a thematic link exists."},
+      {"segmentIDs": ["s1"], "quote": "will run coding agents in production", "subject": "e1", "predicate": "hasStatus", "value": "approved", "source": "m1", "reason": "An analyst forecast is not a decision."},
+      {"segmentIDs": ["s3"], "quote": "a three-month pilot", "subject": "e4", "predicate": "adoptedIn", "reason": "A pilot was approved; nothing was adopted."}
     ],
     "mustNotMerge": [["e2", "e3"]]
   }

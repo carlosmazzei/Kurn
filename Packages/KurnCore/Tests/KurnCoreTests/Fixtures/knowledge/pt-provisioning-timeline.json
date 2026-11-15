@@ -92,8 +92,8 @@
        "evidence": [{"source": "m6", "segmentIDs": ["s10"], "quote": "A automação está pronta, falta só a liberação."}]}
     ],
     "mustNotAssert": [
-      {"segmentIDs": ["s2", "s3"], "subject": "e2", "predicate": "hasStatus", "value": "approved", "source": "m1", "reason": "Only a proposal; the decision is deferred to the next meeting."},
-      {"segmentIDs": ["s10"], "subject": "e1", "predicate": "hasStatus", "value": "completed", "reason": "Ready but not released is not completed."}
+      {"segmentIDs": ["s2", "s3"], "quote": "por enquanto é só uma proposta", "subject": "e2", "predicate": "hasStatus", "value": "approved", "source": "m1", "reason": "Only a proposal; the decision is deferred to the next meeting."},
+      {"segmentIDs": ["s10"], "quote": "falta só a liberação", "subject": "e1", "predicate": "hasStatus", "value": "completed", "reason": "Ready but not released is not completed."}
     ],
     "mustNotMerge": []
   }
