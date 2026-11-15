@@ -286,5 +286,50 @@ struct KnowledgeEntityResolutionTests {
         #expect(try after.fetch(FetchDescriptor<KnowledgeAssertion>()).allSatisfy { $0.retractedAt == nil })
     }
 
+    @Test func futureCompilationIdentityCannotBeSilentlyTreatedAsAnEmptyCandidatePool() async throws {
+        let f = try await fixture()
+        let context = ModelContext(f.container)
+        let job = try #require(context.fetch(FetchDescriptor<KnowledgeJob>()).first)
+        let original = try #require(job.checkpointData)
+        job.idempotencyKey = "knowledge.compile.v999:future"
+        try context.save()
+        await #expect(throws: KnowledgeEntityStoreError.unsupportedPayload) { try await snapshot(f) }
+        let after = ModelContext(f.container)
+        #expect(try after.fetch(FetchDescriptor<KnowledgeJob>()).first?.checkpointData == original)
+        #expect(try after.fetch(FetchDescriptor<KnowledgeEntity>()).allSatisfy { $0.mergedIntoID == nil })
+    }
+
+    @Test func persistenceFailuresEmitSafeIdentityEventsAndScopeRefusalsDoNot() async throws {
+        let f = try await fixture(names: ["Example A", "Example B"])
+        let ids = try entityIDs(f)
+        let access = authorization(f)
+        let request = KnowledgeEntityMergeRequest(operationID: UUID(), sourceID: ids[0], targetID: ids[1], snapshot: try await snapshot(f))
+        let capture = EntityMutationEventCapture()
+        ReliabilityLog.handler = { capture.record($0) }
+        defer { ReliabilityLog.handler = nil }
+        await #expect(throws: AppError.self) {
+            try await f.store.mergeEntities(request, authorization: { access },
+                beforeSave: { throw AppError.persistenceFailed("SYNTHETIC_PRIVATE_DETAIL") })
+        }
+        let event = try #require(capture.events.first { $0.outcome == .failed })
+        #expect(event.operation == "knowledge_entity_identity")
+        #expect(event.stage == "merge")
+        #expect(event.code == AppError.persistenceFailed("").logCode)
+        let encoded = String(decoding: try JSONEncoder().encode(event), as: UTF8.self)
+        #expect(!encoded.contains("SYNTHETIC_PRIVATE_DETAIL"))
+        #expect(!encoded.contains("Example"))
+        let denied = authorization(f, indices: [0])
+        await #expect(throws: KnowledgeEntityStoreError.scopeDenied) { try await f.store.mergeEntities(request, authorization: { denied }) }
+        #expect(capture.events.filter { $0.outcome == .failed }.count == 1)
+    }
+
 }
+}
+
+/// The log handler is Sendable; capture reads and writes share the same lock.
+private final class EntityMutationEventCapture: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [ReliabilityEvent] = []
+    func record(_ event: ReliabilityEvent) { lock.withLock { values.append(event) } }
+    var events: [ReliabilityEvent] { lock.withLock { values } }
 }

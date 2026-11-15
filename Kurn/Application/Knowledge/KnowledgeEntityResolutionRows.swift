@@ -105,7 +105,10 @@ enum KnowledgeEntityResolutionRows {
             let jobs = try context.fetch(descriptor)
             result.truncated = result.truncated || jobs.count > historyLimit
             for job in jobs.prefix(historyLimit) {
-                guard let identity = KnowledgeCompilationIdentity(idempotencyKey: job.idempotencyKey), identity.scope == source.scope else { continue }
+                guard let identity = KnowledgeCompilationIdentity(idempotencyKey: job.idempotencyKey) else {
+                    throw KnowledgeEntityStoreError.unsupportedPayload
+                }
+                guard identity.scope == source.scope else { continue }
                 guard identity.meetingID == source.meetingID, identity.extractorVersion == job.pipelineVersion else {
                     throw KnowledgeEntityStoreError.unreadablePayload
                 }

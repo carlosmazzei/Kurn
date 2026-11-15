@@ -17,7 +17,9 @@ extension KnowledgeStore {
                        beforeSave: @Sendable () throws -> Void = {}) async throws -> KnowledgeEntityMergeReceipt {
         let auth = await authorization()
         try Task.checkCancellation()
-        return try KnowledgeEntityMergeRows.apply(request, auth: auth, container: modelContainer, beforeSave: beforeSave)
+        return try KnowledgeEntityMutationDiagnostics.run(operationID: request.operationID, stage: "merge") {
+            try KnowledgeEntityMergeRows.apply(request, auth: auth, container: modelContainer, beforeSave: beforeSave)
+        }
     }
 
     func undoEntityMerge(operationID: UUID, snapshot: KnowledgeEntityResolutionSnapshot,
@@ -25,7 +27,9 @@ extension KnowledgeStore {
                          beforeSave: @Sendable () throws -> Void = {}) async throws -> KnowledgeEntityMergeReceipt {
         let auth = await authorization()
         try Task.checkCancellation()
-        return try KnowledgeEntityMergeRows.undo(operationID: operationID, snapshot: snapshot, auth: auth, container: modelContainer, beforeSave: beforeSave)
+        return try KnowledgeEntityMutationDiagnostics.run(operationID: operationID, stage: "undo") {
+            try KnowledgeEntityMergeRows.undo(operationID: operationID, snapshot: snapshot, auth: auth, container: modelContainer, beforeSave: beforeSave)
+        }
     }
 }
 
@@ -36,5 +40,34 @@ extension KnowledgeEntityResolutionRows {
         context.autosaveEnabled = false
         let sources = try sources(meetingIDs: meetingIDs, scope: scope, auth: auth, in: context)
         return try snapshot(sources: sources, pool: pool(sources: sources, in: context), in: context)
+    }
+}
+
+/// Mutation failures need durable, content-free diagnostics even before the
+/// review UI exists. Expected scope/staleness and graph refusals are not faults.
+private enum KnowledgeEntityMutationDiagnostics {
+    static func run(operationID: UUID, stage: String, body: () throws -> KnowledgeEntityMergeReceipt) throws -> KnowledgeEntityMergeReceipt {
+        let id = OperationID(String(operationID.uuidString.prefix(8)))
+        let started = Date()
+        do {
+            let result = try body()
+            ReliabilityLog.record(ReliabilityEvent(operationID: id, operation: "knowledge_entity_identity", stage: stage,
+                outcome: .succeeded, elapsedSeconds: Date().timeIntervalSince(started)))
+            return result
+        } catch is CancellationError {
+            ReliabilityLog.record(ReliabilityEvent(operationID: id, operation: "knowledge_entity_identity", stage: stage,
+                outcome: .cancelled, elapsedSeconds: Date().timeIntervalSince(started), code: "interrupted"))
+            throw CancellationError()
+        } catch let error as KnowledgeEntityStoreError where [.scopeDenied, .staleSnapshot, .alreadyMerged, .operationUndone, .mergeChanged].contains(error) {
+            throw error
+        } catch let error as KnowledgeEntityResolutionError {
+            throw error
+        } catch {
+            let code = (error as? KnowledgeEntityStoreError)?.rawValue ?? (error as? KnowledgeStoreError)?.rawValue
+                ?? (error as? AppError)?.logCode ?? "identity_mutation_failed"
+            ReliabilityLog.record(ReliabilityEvent(operationID: id, operation: "knowledge_entity_identity", stage: stage,
+                outcome: .failed, elapsedSeconds: Date().timeIntervalSince(started), code: code))
+            throw error
+        }
     }
 }
