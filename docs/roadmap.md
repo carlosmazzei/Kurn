@@ -35,7 +35,7 @@ merely moves data off-device still needs consent even when no LLM is involved
 ## Native harness — remaining work
 
 NH00–NH10 and the follow-ups from the 2026-11-14 review against the Swift agent-harness spec are
-merged into `feature/native-harness`; what they built is described in `CLAUDE.md` ("Agent harness"
+merged; what they built is described in `CLAUDE.md` ("Agent harness"
 and the sections after it), and the contract is `docs/contracts/native-harness-v1.md` with its
 machine-checked catalog (`docs/contracts/native-harness-v1.json`, `Tools/check_native_harness_contracts.py`).
 Of the contract's 97 items, 57 are verified, 28 are excluded by the local profile (desktop tools, RPC,
