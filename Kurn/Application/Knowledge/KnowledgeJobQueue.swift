@@ -11,6 +11,12 @@ final class KnowledgeJobQueue {
     enum Outcome { case completed, deferred, failed }
     typealias Handler = @MainActor (KnowledgeJobHandle) async throws -> Void
     typealias Recovery = @MainActor (KnowledgeQueuedWork) throws -> Bool
+    typealias Erase = @MainActor (KnowledgeStore, KnowledgeJobKind, Date) async throws -> Void
+    private struct CancellationRequest {
+        let kind: KnowledgeJobKind
+        let cutoff: Date
+        let epoch: Int
+    }
 
     let storeHost: KnowledgeStoreHost
     private let scheduler: ResourceScheduler
@@ -24,15 +30,19 @@ final class KnowledgeJobQueue {
     private var runErrors: [UUID: Error] = [:]
     private var cancellationInProgress = false
     private var invalidationEpoch = 0
+    private var pendingCancellation: CancellationRequest?
+    @ObservationIgnored private let eraseJobs: Erase
     private(set) var activeJobID: UUID?
     private(set) var lastFailureCode: String?
     @ObservationIgnored private var drainTask: Task<Void, Never>?
     @ObservationIgnored private var cancellationTask: Task<Void, Never>?
 
-    init(container: ModelContainer, foreground: Bool = true, scheduler: ResourceScheduler = .shared) {
+    init(container: ModelContainer, foreground: Bool = true, scheduler: ResourceScheduler = .shared,
+         eraseJobs: @escaping Erase = { try await $0.eraseJobs(kind: $1, createdBefore: $2) }) {
         storeHost = KnowledgeStoreHost(container: container)
         self.foreground = foreground
         self.scheduler = scheduler
+        self.eraseJobs = eraseJobs
         automaticBudget = foreground ? 5 : 0
     }
 
@@ -85,7 +95,10 @@ final class KnowledgeJobQueue {
         if record.state == .succeeded { return .completed }
         if record.state == .failed { return .failed }
         if record.state == .cancelled { return .deferred }
-        if cancellationInProgress { await cancellationTask?.value }
+        if cancellationInProgress {
+            resumeCancellation()
+            await cancellationTask?.value
+        }
         guard canRun(record.envelope?.work ?? work) else { return .deferred }
         if explicit && foreground && record.state != .running { explicitJobs.insert(record.id) }
         wake()
@@ -111,19 +124,33 @@ final class KnowledgeJobQueue {
     /// request. A fresh user request after Clear gets a new generation key.
     func cancel(kind: KnowledgeJobKind) {
         invalidationEpoch += 1
-        let cutoff = Date()
-        let epoch = invalidationEpoch
+        pendingCancellation = CancellationRequest(kind: kind, cutoff: Date(), epoch: invalidationEpoch)
         cancellationInProgress = true
         pause()
+        cancellationTask?.cancel()
+        cancellationTask = nil
+        resumeCancellation()
+    }
+
+    private func resumeCancellation() {
+        guard let request = pendingCancellation, cancellationTask == nil else { return }
         cancellationTask = Task {
             do {
-                try await storeHost.writer().eraseJobs(kind: kind, createdBefore: cutoff)
-                guard epoch == invalidationEpoch else { return }
+                let store = await storeHost.writer()
+                try await eraseJobs(store, request.kind, request.cutoff)
+                guard request.epoch == invalidationEpoch else { return }
+                pendingCancellation = nil
                 cancellationInProgress = false
                 cancellationTask = nil
+                lastFailureCode = nil
                 wake()
+            } catch {
+                guard request.epoch == invalidationEpoch else { return }
+                lastFailureCode = "queue_cancel_failed"
+                cancellationTask = nil
+                // Keep the publication barrier and original cutoff. A later
+                // foreground/recording opportunity or submission retries it.
             }
-            catch { lastFailureCode = "queue_cancel_failed" }
         }
     }
 
@@ -147,7 +174,8 @@ final class KnowledgeJobQueue {
     }
 
     private func wake() {
-        guard drainTask == nil, !cancellationInProgress, !recording, foreground || backgroundOpportunity else { return }
+        if cancellationInProgress { resumeCancellation(); return }
+        guard drainTask == nil, !recording, foreground || backgroundOpportunity else { return }
         drainTask = Task(priority: .utility) { [weak self] in
             guard let self else { return }
             await drain()

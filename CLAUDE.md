@@ -2881,7 +2881,10 @@ hold for every phase; code comments cite this section.
   `AppEnvironment`, shared by the wiki facade and future canonical producer.
   Typed host intents and lease-checked, versioned checkpoints live in
   `KnowledgeJob`, written through the environment's one `KnowledgeStoreHost`.
-  A stale worker cannot checkpoint or resurrect erased work. Deferrals do not
+  A stale worker cannot checkpoint or resurrect erased work. A failed clear keeps
+  its original cutoff and publication barrier, retrying on later opportunities.
+  Obsolete source/provider cancellations allow a fresh coalesced generation,
+  while deliberate cancellations remain final. Deferrals do not
   consume the failure limit; three genuine failures require manual retry.
   `ResourceWorkKind.knowledgeGeneration` reserves 50 units locally or 5 remotely
   (initial estimates); the reservation is released before completion is observed.
@@ -2892,7 +2895,8 @@ hold for every phase; code comments cite this section.
   user requests remain distinct from fresh permission to override a circuit.
   A launched provider call interrupted remotely requires explicit retry; crashes
   before resource admission can resume. Recovery checks for an already committed
-  article before repeating a call, covering a crash between article save and job
+  article before repeating a call; forced rebuilds must differ from their captured
+  prior article revision (independent of wall-clock order), covering a crash between article save and job
   completion. Foreground resume remains authoritative. The optional
   `ai.kurn.knowledge.processing` BG window admits on-device work only, checks
   protected-data/store availability and expires cooperatively without late

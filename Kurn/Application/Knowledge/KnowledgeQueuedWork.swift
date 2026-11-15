@@ -14,10 +14,12 @@ struct KnowledgeQueuedWork: Codable, Sendable, Equatable {
     let sourceFingerprint: String
     let force: Bool
     let explicitlyRequested: Bool
+    /// Distinguishes a rebuilt output from the matching article that predated it.
+    let priorArticleVersion: String?
 
     // swiftlint:disable:next function_parameter_count
     static func article(meetingID: UUID, generator: String, provider: AIProvider, model: String,
-                        fingerprint: String, force: Bool, explicit: Bool = false, generation: String = "") throws -> Self {
+                        fingerprint: String, force: Bool, explicit: Bool = false, generation: String = "", priorArticleVersion: String? = nil) throws -> Self {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let providerDigest = SHA256.hash(data: try encoder.encode(provider)).map { String(format: "%02x", $0) }.joined()
@@ -25,12 +27,12 @@ struct KnowledgeQueuedWork: Codable, Sendable, Equatable {
         let digest = SHA256.hash(data: try encoder.encode(fields)).map { String(format: "%02x", $0) }.joined()
         return Self(key: "knowledge.article.v1:\(digest)\(force ? ":\(UUID().uuidString)" : "")", kind: .meetingArticle,
             meetingID: meetingID, pipelineVersion: generator, provider: provider, model: model,
-            sourceFingerprint: fingerprint, force: force, explicitlyRequested: explicit)
+            sourceFingerprint: fingerprint, force: force, explicitlyRequested: explicit, priorArticleVersion: priorArticleVersion)
     }
 
     func regenerated() -> Self {
         Self(key: key + ":\(UUID().uuidString)", kind: kind, meetingID: meetingID, pipelineVersion: pipelineVersion,
-            provider: provider, model: model, sourceFingerprint: sourceFingerprint, force: force, explicitlyRequested: explicitlyRequested)
+            provider: provider, model: model, sourceFingerprint: sourceFingerprint, force: force, explicitlyRequested: explicitlyRequested, priorArticleVersion: priorArticleVersion)
     }
 }
 

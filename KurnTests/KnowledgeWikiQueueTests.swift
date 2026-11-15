@@ -111,4 +111,35 @@ struct KnowledgeWikiQueueTests {
         let read = ModelContext(container)
         #expect(try read.fetchCount(FetchDescriptor<KnowledgeJob>()) == 1)
     }
+    @Test func recoveringAForcedRemoteRebuildDoesNotMistakeTheOldArticleForNewOutput() async throws {
+        let container = TestModelContainer.make()
+        let context = container.mainContext
+        let settings = MeetingFixtures.isolatedSettings()
+        settings.wikiEnabled = true
+        settings.aiProviderID = AIProvider.openAI.id
+        let llm = ScriptedLLMProvider()
+        let queue = KnowledgeJobQueue(container: container)
+        let wiki = WikiCoordinator(modelContext: context, appSettings: settings, providerCircuitBreaker: MeetingFixtures.freshCircuit(),
+            wikiService: WikiService(summaryService: SummaryService(resolveProvider: { _, _ in llm })), isProviderUsable: { _ in true }, jobQueue: queue)
+        let meeting = MeetingFixtures.transcribed("Example rebuild recovery", in: context)
+        #expect(await wiki.generate(meeting) == .generated)
+        meeting.wikiArticle?.updatedAt = Date(timeIntervalSince1970: 1)
+        try context.save()
+        queue.setForeground(false)
+        #expect(await wiki.generate(meeting, force: true) == .skipped)
+        let store = await queue.writer()
+        let records = try await store.queuedJobs(kinds: ["meetingArticle"])
+        let record = try #require(records.first)
+        let claimed = try await store.claimJob(id: record.id)
+        let handle = try #require(claimed)
+        try await store.markJobStarted(handle)
+        // Simulate a new worker/process observing a remote call that might
+        // have started. The old matching article does not satisfy Rebuild.
+        queue.setForeground(true)
+        await queue.waitUntilIdle()
+        let pending = try await store.queuedJobs(kinds: ["meetingArticle"])
+        #expect(pending.first?.code == "explicit_retry_required")
+        #expect(llm.summarizeCalls.count == 1)
+    }
+
 }

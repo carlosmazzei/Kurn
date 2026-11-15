@@ -247,5 +247,46 @@ struct KnowledgeJobQueueTests {
         #expect(third.id != first.id)
     }
 
+    @Test func obsoleteArticleIdentityCanStartAgainWithoutRevivingDeliberateCancellation() async throws {
+        let container = try container()
+        let store = KnowledgeStore(modelContainer: container)
+        for code in ["provider_changed", "source_changed", "user_cancelled"] {
+            let work = try work()
+            let first = try await store.enqueue(work, explicitRetry: false, restartCompleted: true)
+            let claimed = try await store.claimJob(id: first.id)
+            let handle = try #require(claimed)
+            try await store.discardJob(handle, code: code)
+            let next = try await store.enqueue(work, explicitRetry: false, restartCompleted: true)
+            let again = try await store.enqueue(work, explicitRetry: false, restartCompleted: true)
+            #expect(again.id == next.id)
+            #expect((next.id == first.id) == (code == "user_cancelled"))
+            #expect(try await store.jobState(id: first.id) == .cancelled)
+        }
+    }
+
+    @Test func failedClearRetriesOnANewRequestAndKeepsTheOriginalCutoff() async throws {
+        let container = try container()
+        var fail = true
+        let queue = KnowledgeJobQueue(container: container, foreground: false, eraseJobs: { store, kind, cutoff in
+            if fail { throw KnowledgeQueueError.persistenceFailed }
+            try await store.eraseJobs(kind: kind, createdBefore: cutoff)
+        })
+        var calls = 0
+        queue.register(kind: .meetingArticle) { _ in calls += 1 }
+        _ = try await queue.submit(work(), explicit: false)
+        queue.cancel(kind: .meetingArticle)
+        await queue.waitUntilIdle()
+        #expect(queue.lastFailureCode == "queue_cancel_failed")
+        #expect(calls == 0)
+        fail = false
+        _ = try await queue.submit(work(), explicit: true)
+        queue.setForeground(true)
+        await queue.waitUntilIdle()
+        #expect(calls == 1)
+        #expect(queue.lastFailureCode == nil)
+        let read = ModelContext(container)
+        #expect(try read.fetchCount(FetchDescriptor<KnowledgeJob>()) == 1)
+    }
+
 }
 }

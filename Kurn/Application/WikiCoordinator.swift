@@ -127,7 +127,8 @@ final class WikiCoordinator {
         defer { generatingMeetingIDs.remove(meetingID) }
         do {
             let work = try KnowledgeQueuedWork.article(meetingID: meetingID, generator: generator, provider: provider,
-                model: model, fingerprint: hash, force: force, explicit: trigger == .explicit, generation: clearedGeneration)
+                model: model, fingerprint: hash, force: force, explicit: trigger == .explicit, generation: clearedGeneration,
+                priorArticleVersion: meeting.wikiArticle.map(Self.articleVersion))
             let outcome = try await jobQueue.submit(work, explicit: trigger == .explicit, restartCompleted: true)
             switch outcome {
             case .completed: return .generated
@@ -221,12 +222,20 @@ final class WikiCoordinator {
         }
     }
 
+    /// The article is read-only outside generation. Capture its exact previous
+    /// revision rather than comparing wall clocks (which can move backwards).
+    private static func articleVersion(_ article: WikiArticle) -> String {
+        let identity = article.id.uuidString + ":" + String(article.updatedAt.timeIntervalSinceReferenceDate.bitPattern) + ":" + article.bodyMarkdown
+        return SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
     private func hasCommitted(_ work: KnowledgeQueuedWork) throws -> Bool {
         let context = ModelContext(modelContext.container)
         let meetingID = work.meetingID
         guard let meeting = try context.fetch(FetchDescriptor<Meeting>(predicate: #Predicate { $0.id == meetingID })).first,
               let article = meeting.wikiArticle else { return false }
-        return !article.bodyMarkdown.isEmpty && article.sourceContentHash == work.sourceFingerprint
+        return (!work.force || Self.articleVersion(article) != work.priorArticleVersion)
+            && !article.bodyMarkdown.isEmpty && article.sourceContentHash == work.sourceFingerprint
             && article.generatorModelIdentifier == work.pipelineVersion
             && Self.contentHash(meeting.assembledContextText()) == work.sourceFingerprint
     }
