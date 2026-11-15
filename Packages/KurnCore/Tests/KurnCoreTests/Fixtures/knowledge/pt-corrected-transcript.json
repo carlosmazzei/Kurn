@@ -32,7 +32,7 @@
        "evidence": [{"source": "m1", "segmentIDs": ["s2"], "quote": "O prazo continua em dezembro."}]}
     ],
     "mustNotAssert": [
-      {"segmentIDs": ["s1"], "quote": "é de trezentos mil reais", "subject": "e1", "predicate": "reportsMetric", "value": "200000", "reason": "The amount comes from a superseded transcript revision."}
+      {"segmentIDs": ["s1"], "quote": "é de duzentos mil reais", "fromEarlierRevision": true, "subject": "e1", "predicate": "reportsMetric", "value": "200000", "reason": "The amount comes from a superseded transcript revision."}
     ],
     "mustNotMerge": []
   }

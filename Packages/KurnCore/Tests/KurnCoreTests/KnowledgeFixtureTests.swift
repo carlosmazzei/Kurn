@@ -81,6 +81,9 @@ struct KnowledgeFixture: Decodable {
         let segmentIDs: [String]
         /// The tempting span, verbatim, so rewording the segment fails the suite.
         let quote: String
+        /// The span comes from the segments' earlier transcript revision
+        /// (`correctedFrom`): a correction is what makes it wrong.
+        let fromEarlierRevision: Bool?
         let subject: String
         let predicate: String
         let object: String?
@@ -284,14 +287,21 @@ struct KnowledgeFixtureTests {
             let segmentsBySource = Dictionary(uniqueKeysWithValues: fixture.sources.map { ($0.id, Set($0.segments.map(\.id))) })
             let allSegments = segmentsBySource.values.reduce(into: Set<String>()) { $0.formUnion($1) }
             let texts = Dictionary(uniqueKeysWithValues: fixture.sources.flatMap { $0.segments.map { ($0.id, $0.text) } })
+            let earlierTexts = Dictionary(uniqueKeysWithValues: fixture.sources.flatMap { ($0.correctedFrom ?? []).map { ($0.id, $0.text) } })
             for forbidden in fixture.expected.mustNotAssert {
                 #expect(entities[forbidden.subject] != nil, "\(fixture.id): unknown subject in mustNotAssert")
                 let scope = forbidden.source.flatMap { segmentsBySource[$0] } ?? allSegments
                 #expect(!forbidden.segmentIDs.isEmpty && Set(forbidden.segmentIDs).isSubset(of: scope),
                         "\(fixture.id): a refusal names the segments that tempt it")
-                let tempting = forbidden.segmentIDs.compactMap { texts[$0] }.joined(separator: " ")
-                #expect(!forbidden.quote.isEmpty && tempting.contains(forbidden.quote),
-                        "\(fixture.id): a refusal quotes its tempting span verbatim")
+                let current = forbidden.segmentIDs.compactMap { texts[$0] }.joined(separator: " ")
+                if forbidden.fromEarlierRevision == true {
+                    let earlier = forbidden.segmentIDs.compactMap { earlierTexts[$0] }.joined(separator: " ")
+                    #expect(!forbidden.quote.isEmpty && earlier.contains(forbidden.quote) && !current.contains(forbidden.quote),
+                            "\(fixture.id): a refusal of a corrected value quotes the earlier revision, not the current one")
+                } else {
+                    #expect(!forbidden.quote.isEmpty && current.contains(forbidden.quote),
+                            "\(fixture.id): a refusal quotes its tempting span verbatim")
+                }
                 #expect(KnowledgeFixtureVocabulary.predicates.contains(forbidden.predicate))
                 if let object = forbidden.object { #expect(entities[object] != nil) }
                 if let source = forbidden.source { #expect(sources.contains(source)) }
@@ -328,6 +338,13 @@ struct KnowledgeFixtureTests {
                 for id in fixture.caseSegments[hardCase] ?? [] {
                     #expect(refused.contains(id), "\(fixture.id)/\(hardCase): \(id) needs a refusal")
                 }
+            }
+            // A planted instruction is refused as a whole: the refusal quotes
+            // its entire segment, so trimming the instruction fails the suite.
+            for id in fixture.caseSegments["promptInjection"] ?? [] {
+                let wholeSegment = fixture.sources.flatMap(\.segments).first { $0.id == id }?.text
+                let quotesIt = fixture.expected.mustNotAssert.contains { $0.segmentIDs == [id] && $0.quote == wholeSegment }
+                #expect(quotesIt, "\(fixture.id)/\(id): the injection refusal must quote the whole segment")
             }
             // Every relative-date segment resolves to a date value or a
             // coarser-than-day validity in an assertion that cites it.

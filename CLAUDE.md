@@ -2752,7 +2752,8 @@ hold for every phase; code comments cite this section.
   exhibit it (`caseSegments`), each of those is cited as evidence or named by a
   refusal (a refusal must name it for irony, injection, wrong speaker,
   provisional decisions and forecasts), every refusal quotes its tempting span
-  verbatim, every relative-date segment resolves to a date or a month, and a
+  verbatim (a planted instruction in full; a corrected value from the earlier
+  revision and absent from the current one), every relative-date segment resolves to a date or a month, and a
   reopening is an asserted status change — so removing or rewording the
   segment that makes a case hard fails the suite. Fixtures, screenshots, issues and
   commits never name a real organization or use real meeting content.
