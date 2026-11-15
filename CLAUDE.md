@@ -2662,6 +2662,14 @@ decisions, action items, numbers, names. `Meeting.wikiArticle` is one-to-one and
   owns the main-actor/SwiftData half; the LLM call runs off-main in the service.
 - Gated by `AppSettings.wikiEnabled`, **off by default** — it makes a paid cloud
   LLM call per transcription.
+- **It is being refactored into the Knowledge Engine** (roadmap, "Knowledge
+  Engine — wiki refactor"). The article stays as the *episodic* layer — a
+  per-meeting condensation that may orient extraction but is never evidence —
+  while a canonical layer of attributed, evidence-backed, bitemporal assertions
+  feeds a global wiki, a timeline and a graph. Until that ships, nothing here
+  changes; new wiki work should go through that plan rather than extend
+  `WikiCoordinator`'s own generate/backfill loop, which the plan folds into a
+  shared knowledge job queue.
 
 **`GeneratedDocument`** (`Models/GeneratedDocument.swift`) is a saved agent artifact.
 The Documents library's plus button opens library chat. Ask the agent for a
