@@ -129,7 +129,8 @@ extension KnowledgeExtraction {
             }
         }
         for event in events {
-            guard let assertion = assertionsByID[event.assertion], assertion.subject == event.entity else {
+            guard let assertion = assertionsByID[event.assertion],
+                  event.entity == (event.kind == .superseded ? assertion.object : assertion.subject) else {
                 throw KnowledgeExtractionError.unknownReference
             }
             try Self.checkDates(from: event.occurredAt, to: nil)

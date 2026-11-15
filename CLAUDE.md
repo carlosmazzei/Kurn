@@ -2807,12 +2807,18 @@ hold for every phase; code comments cite this section.
   stated dates, original contiguous verbatim evidence, cited attribution anchors
   and explicit examined-segment coverage. Models cannot set review state, confer
   human confirmation, or emit merge/context-link operations. Events require a
-  supporting assertion with a compatible predicate. Replies are capped at 2 MB;
+  supporting assertion with a compatible predicate; a superseded event belongs
+  to the object of `supersedes` (the replaced entity). Replies are capped at 2 MB;
   decoding errors expose fixed codes rather than content.
   `Application/Knowledge/KnowledgeExtractionService` is value-in/value-out and
   unwired: it accepts an injected `LLMProvider`, `ContextBudget` and live
   authorization callback. Full context goes first when it fits; otherwise
-  segment-aligned blocks retain every anchor. Oversized individual segments fail
+  segment-aligned blocks retain every anchor. Planning reserves half the response
+  allowance for assertions/evidence and budgets the UUID coverage list against
+  the other half. Both initial and targeted input use the full allowance when
+  possible. Provider-reported output truncation permits one split of a pass
+  into two smaller passes, never recursive, within the same 64-pass ceiling.
+  Oversized individual segments fail
   explicitly. One targeted round requests unexamined anchors; a remaining gap
   fails the run. At most 64 extraction passes, each with one fresh repair on a
   schema/validation error (never on transport failure); repair sends only the

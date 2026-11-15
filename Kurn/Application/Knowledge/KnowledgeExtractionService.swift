@@ -1,3 +1,4 @@
+import AgentHarness
 import Foundation
 import KurnCore
 
@@ -55,30 +56,73 @@ struct KnowledgeExtractionService: Sendable {
             KnowledgeExtractionPrompt.Source(id: source.id, speaker: segment.speakerLabel,
                 startMs: source.startMs, endMs: source.endMs, text: source.text)
         }
-        let fullInput = try KnowledgeExtractionPrompt.input(sources, context: context)
-        let strategy: Strategy = budget.fits(fullInput) ? .fullContext : .blocks
-        let groups = try strategy == .fullContext ? [sources] : blocks(sources, context: context, budget: budget)
-        var passes: [KnowledgeExtraction] = []
-        var examined: Set<String> = []
-        for group in groups {
-            let pass = try await run(group, context: context, revision: revision, llm: llm, authorization: authorization)
-            passes.append(pass)
-            examined.formUnion(pass.examinedSegmentIDs)
-        }
+        let groups = try plan(sources, context: context, budget: budget)
+        let initial = try await runGroups(groups, context: context, revision: revision, llm: llm,
+            authorization: authorization, remainingPasses: 64)
+        let examined = Set(initial.documents.flatMap(\.examinedSegmentIDs))
         // Explicit coverage of all anchors implies start/middle/end coverage.
-        // One bounded targeted round addresses omissions; no silent truncation,
-        // endless extraction loop or second synthesis over generated text.
+        // Apply the same input AND output planning to the one targeted round.
         let missing = sources.filter { !examined.contains($0.id) }
-        let targeted = try missing.isEmpty ? [] : blocks(missing, context: context, budget: budget)
-        guard groups.count + targeted.count <= 64 else { throw KnowledgeExtractionServiceError.requestLimit }
-        for group in targeted {
-            let pass = try await run(group, context: context, revision: revision, llm: llm, authorization: authorization)
-            passes.append(pass)
-            examined.formUnion(pass.examinedSegmentIDs)
+        let targeted = try missing.isEmpty ? [] : plan(missing, context: context, budget: budget)
+        let recovery = try await runGroups(targeted, context: context, revision: revision, llm: llm,
+            authorization: authorization, remainingPasses: 64 - initial.attempts)
+        let passes = initial.documents + recovery.documents
+        guard Set(passes.flatMap(\.examinedSegmentIDs)).count == sources.count else {
+            throw KnowledgeExtractionServiceError.incompleteCoverage
         }
-        guard examined.count == sources.count else { throw KnowledgeExtractionServiceError.incompleteCoverage }
+        let strategy: Strategy = groups.count == 1 && !initial.wasSplit ? .fullContext : .blocks
         return Result(transcriptFingerprint: revision.fingerprint, strategy: strategy, passes: passes,
-            examinedSegmentIDs: sources.map(\.id), targetedPassCount: targeted.count)
+            examinedSegmentIDs: sources.map(\.id), targetedPassCount: recovery.attempts)
+    }
+
+    /// Reserve half the output allowance for assertions/evidence. UUID coverage
+    /// alone must never consume the full response before any knowledge fits.
+    private func outputFits(_ sources: [KnowledgeExtractionPrompt.Source]) throws -> Bool {
+        let data = try JSONEncoder().encode(sources.map(\.id))
+        return TokenEstimate.tokens(in: String(decoding: data, as: UTF8.self)) + 100 <= TextGenerationOptions.document.maxOutputTokens / 2
+    }
+
+    private func plan(
+        _ sources: [KnowledgeExtractionPrompt.Source], context: KnowledgeExtractionContext, budget: ContextBudget
+    ) throws -> [[KnowledgeExtractionPrompt.Source]] {
+        if budget.fits(try KnowledgeExtractionPrompt.input(sources, context: context)), try outputFits(sources) { return [sources] }
+        return try blocks(sources, context: context, budget: budget)
+    }
+
+    private struct Batch {
+        var documents: [KnowledgeExtraction] = []
+        var attempts = 0
+        var wasSplit = false
+    }
+
+    // swiftlint:disable:next function_parameter_count
+    private func runGroups(
+        _ groups: [[KnowledgeExtractionPrompt.Source]], context: KnowledgeExtractionContext,
+        revision: KnowledgeTranscriptRevision, llm: any LLMProvider,
+        authorization: @Sendable () async -> KnowledgeExtractionAuthorization, remainingPasses: Int
+    ) async throws -> Batch {
+        guard groups.count <= remainingPasses else { throw KnowledgeExtractionServiceError.requestLimit }
+        var result = Batch()
+        for (index, group) in groups.enumerated() {
+            result.attempts += 1
+            do {
+                result.documents.append(try await run(group, context: context, revision: revision, llm: llm, authorization: authorization))
+            } catch AppError.generationTruncated {
+                // One split only, preserving original anchors. A single huge
+                // segment or a second truncation fails explicitly, never loops.
+                guard group.count > 1 else { throw AppError.generationTruncated }
+                guard result.attempts + 2 + (groups.count - index - 1) <= remainingPasses else {
+                    throw KnowledgeExtractionServiceError.requestLimit
+                }
+                result.wasSplit = true
+                let middle = group.count / 2
+                for half in [Array(group[..<middle]), Array(group[middle...])] {
+                    result.attempts += 1
+                    result.documents.append(try await run(half, context: context, revision: revision, llm: llm, authorization: authorization))
+                }
+            }
+        }
+        return result
     }
 
     private func blocks(
@@ -88,7 +132,9 @@ struct KnowledgeExtractionService: Sendable {
         var groups: [[KnowledgeExtractionPrompt.Source]] = []
         var current: [KnowledgeExtractionPrompt.Source] = []
         for source in sources {
-            if !mapBudget.fits(try KnowledgeExtractionPrompt.input(current + [source], context: context)) {
+            let inputFits = mapBudget.fits(try KnowledgeExtractionPrompt.input(current + [source], context: context))
+            let coverageFits = try outputFits(current + [source])
+            if !inputFits || !coverageFits {
                 guard !current.isEmpty else { throw KnowledgeExtractionServiceError.segmentExceedsBudget }
                 groups.append(current)
                 current = []
