@@ -2785,6 +2785,22 @@ hold for every phase; code comments cite this section.
   `SourceContextLink` is in context `unknown`, so the V6 → V7 stage is lightweight and
   writes nothing. `LibraryEraser` deletes all ten. Nothing writes them yet: the single
   writer is K1.5.
+- **Transcript revisions and anchors (K1.3).** KurnCore's
+  `KnowledgeTranscriptSnapshot` freezes transcript array order and UUID anchors
+  (lowercase strings), and produces versioned, length-prefixed UTF-8 canonical
+  bytes over language and every segment's ID, speaker label, exact IEEE time
+  and confidence bits, and unnormalized text. Creation dates, pipeline reports
+  and speaker display names are not revision inputs. Duplicate IDs, non-finite
+  values, inverted/negative or unrepresentable times fail closed; millisecond
+  anchors round start down/end up without dropping sub-millisecond spans.
+  The app's `KnowledgeTranscriptRevision` hashes those bytes with SHA-256
+  (lowercase hex) and resolves evidence only when its fingerprint matches;
+  preserving a quote or UUID after an edit never makes an old revision valid.
+  `Transcript.knowledgeRevision()` decodes authoritative bytes directly and
+  rejects corruption rather than fingerprinting the presentation getter's empty
+  fallback. There is no transcript history or new persisted field/migration.
+  K1.5 must recapture the revision at commit and maintain stored evidence
+  availability; this step provides the snapshot/resolution boundary only.
 - **Public material is synthetic.** The golden set
   (`Packages/KurnCore/Tests/KurnCoreTests/Fixtures/knowledge/`, format
   `kurn.knowledge-fixture` v1) holds fictional meetings in Portuguese and
