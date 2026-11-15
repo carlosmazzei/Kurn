@@ -216,7 +216,8 @@ struct KnowledgeMaintenanceTests {
             try await project(f)
             let context = ModelContext(f.container)
             let row = try job(kind, in: context)
-            var envelope = try #require(JSONSerialization.jsonObject(with: try #require(row.checkpointData)) as? [String: Any])
+            let original = try #require(row.checkpointData)
+            var envelope = try #require(JSONSerialization.jsonObject(with: original) as? [String: Any])
             envelope["version"] = 999
             let future = try JSONSerialization.data(withJSONObject: envelope)
             row.checkpointData = future
@@ -246,7 +247,8 @@ struct KnowledgeMaintenanceTests {
         try await compile(f, duplicate: true)
         let context = ModelContext(f.container)
         let row = try #require(context.fetch(FetchDescriptor<KnowledgeReview>()).first)
-        var envelope = try #require(JSONSerialization.jsonObject(with: try #require(row.payloadData)) as? [String: Any])
+        let original = try #require(row.payloadData)
+        var envelope = try #require(JSONSerialization.jsonObject(with: original) as? [String: Any])
         envelope["version"] = 999
         let bytes = try JSONSerialization.data(withJSONObject: envelope)
         row.payloadData = bytes
