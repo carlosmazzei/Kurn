@@ -37,7 +37,7 @@ public enum KnowledgeMaintenanceError: String, Error, Sendable {
     case limitExceeded = "maintenance_limit_exceeded"
 }
 
-public struct KnowledgeMaintenanceFinding: Codable, Equatable, Sendable, Identifiable {
+public struct KnowledgeMaintenanceFinding: Equatable, Sendable, Identifiable {
     public let code: Code
     /// Only IDs already authorized by the host. Unknown link targets are never
     /// included; a broken-link finding identifies its readable source page.

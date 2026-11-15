@@ -35,6 +35,9 @@ enum KnowledgeMaintenanceProjectionRows {
                 input.findings.append(.init(code: .invalidProjection, subjects: []))
             }
             do {
+                guard stored.pages.allSatisfy({ $0.narrative == nil || $0.narrative?.entityID == $0.entity.id }) else {
+                    throw KnowledgeWikiProjectionError.invalidNarrative
+                }
                 _ = try KnowledgeWikiProjector.project(wiki, narratives: stored.pages.compactMap(\.narrative))
             } catch {
                 if KnowledgeMaintenanceRows.isFuture(error) { throw KnowledgeMaintenanceError.unsupportedArtifact }
@@ -48,7 +51,7 @@ enum KnowledgeMaintenanceProjectionRows {
         }
     }
 
-    static func candidates(sources: [KnowledgeStoreSnapshot], input: inout KnowledgeMaintenanceInput,
+    static func candidates(sources: [KnowledgeStoreSnapshot], wiki: KnowledgeWikiSnapshot, input: inout KnowledgeMaintenanceInput,
                            in context: ModelContext) throws {
         let kind = KnowledgeReviewItemKind.mergeCandidate.rawValue
         let open = KnowledgeReviewItemState.open.rawValue
@@ -57,6 +60,13 @@ enum KnowledgeMaintenanceProjectionRows {
         let rows = try context.fetch(descriptor)
         guard rows.count <= KnowledgeMaintenanceLinter.findingLimit else { throw KnowledgeMaintenanceError.limitExceeded }
         let entities = Set(input.entities.map(\.id))
+        let nodes = Dictionary(uniqueKeysWithValues: wiki.entities.map {
+            ($0.id, KnowledgeEntityRedirect(id: $0.id, kind: $0.kind, targetID: $0.targetID))
+        })
+        var roots: [UUID: UUID] = [:]
+        for id in entities {
+            if nodes[id] == nil { roots[id] = id } else { roots[id] = try KnowledgeEntityRedirectGraph.resolve(id, nodes: nodes) }
+        }
         for row in rows {
             try Task.checkCancellation()
             // An unreadable/unselected subject envelope cannot establish an
@@ -73,7 +83,8 @@ enum KnowledgeMaintenanceProjectionRows {
                 guard Set(subjects) == Set([candidate.sourceID, candidate.match.entityID]) else {
                     throw KnowledgeMaintenanceError.invalidInput
                 }
-                input.candidates.append(.init(candidate.sourceID, candidate.match.entityID))
+                guard let left = roots[candidate.sourceID], let right = roots[candidate.match.entityID], left != right else { continue }
+                input.candidates.append(.init(left, right))
             } catch {
                 if KnowledgeMaintenanceRows.isFuture(error) { throw KnowledgeMaintenanceError.unsupportedArtifact }
                 // The unreadable row cannot establish an authorized identity.

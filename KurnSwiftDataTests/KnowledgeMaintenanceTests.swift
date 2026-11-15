@@ -257,6 +257,70 @@ struct KnowledgeMaintenanceTests {
         #expect(unchanged.stateRaw == "open")
     }
 
+    @Test func narrativeOnTheWrongPageCannotBeReportedCleanEvenWithSharedAssertions() async throws {
+        let f = try fixture()
+        try await compile(f)
+        try await project(f)
+        let context = ModelContext(f.container)
+        let row = try job(.projection, in: context)
+        let stored = try KnowledgeWikiProjectionRows.payload(row)
+        var raw = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(stored)) as? [String: Any])
+        var pages = try #require(raw["pages"] as? [[String: Any]])
+        pages[0]["narrative"] = ["version": 1, "entityID": stored.pages[1].entity.id.uuidString,
+            "paragraphs": [["text": "Synthetic shared claim.", "assertionIDs": [try #require(stored.snapshot.facts.first?.id).uuidString]]]]
+        raw["pages"] = pages
+        let broken = try JSONDecoder().decode(KnowledgeWikiProjection.self, from: JSONSerialization.data(withJSONObject: raw))
+        row.checkpointData = try KnowledgeStoreRows.authoritativeData(broken)
+        try context.save()
+        #expect(try await codes(report(f)) == [.invalidNarrative])
+        let auth = f.auth
+        await #expect(throws: KnowledgeWikiStoreError.unreadableProjection) {
+            try await f.store.wikiProjection(meetingIDs: f.ids, scope: "workspace", authorization: { auth })
+        }
+    }
+
+    @Test func mergedCandidateWithoutReviewIDIsOmittedAndReturnsAfterUndo() async throws {
+        let f = try fixture()
+        try await compile(f, duplicate: true)
+        let context = ModelContext(f.container)
+        let review = try #require(context.fetch(FetchDescriptor<KnowledgeReview>()).first)
+        let candidate = try #require(KnowledgeEntityResolutionRows.reviewPayload(review).candidate)
+        let auth = KnowledgeEntityResolutionAuthorization(extraction: f.auth.extraction, meetingIDs: f.ids)
+        let token = try await f.store.entityMutationSnapshot(meetingIDs: f.ids, scope: "workspace", authorization: { auth })
+        let operation = UUID()
+        _ = try await f.store.mergeEntities(.init(operationID: operation, sourceID: candidate.sourceID,
+            targetID: candidate.match.entityID, snapshot: token), authorization: { auth })
+        try await project(f)
+        #expect(try await report(f).report.isClean)
+        let reviewID = review.id
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<KnowledgeReview>(predicate: #Predicate { $0.id == reviewID })).first?.stateRaw == "open")
+        let undo = try await f.store.entityMutationSnapshot(meetingIDs: f.ids, scope: "workspace", authorization: { auth })
+        _ = try await f.store.undoEntityMerge(operationID: operation, snapshot: undo, authorization: { auth })
+        try await project(f)
+        #expect(try await codes(report(f)) == [.duplicateCandidate])
+    }
+
+    @Test func missingOrMalformedCurrentOrphanYieldsAnIncompleteReportWithOtherCoverage() async throws {
+        for variant in 0..<3 {
+            let f = try fixture(count: 2)
+            try await compile(f, meetingID: f.meetings[0].id, unused: true)
+            try await compile(f, meetingID: f.meetings[1].id)
+            try await project(f)
+            let context = ModelContext(f.container)
+            let orphan = try #require(context.fetch(FetchDescriptor<KnowledgeEntity>()).first { $0.canonicalName == "Unused example" })
+            if variant == 0 { context.delete(orphan) }
+            if variant == 1 { orphan.kindRaw = "invalid-kind" }
+            if variant == 2 { orphan.reviewStateRaw = "invalid-state" }
+            try context.save()
+            let result = try await report(f)
+            #expect(!result.report.isComplete)
+            #expect(result.report.coverage.count == 2)
+            #expect(codes(result).contains(.canonicalUnavailable))
+            #expect(!codes(result).contains(.orphanEntity))
+            #expect(!codes(result).contains(.duplicateCandidate))
+        }
+    }
+
     @Test func wellFormedBrokenProjectionLinksIdentifyOnlyTheReadablePage() async throws {
         let f = try fixture()
         try await compile(f)
