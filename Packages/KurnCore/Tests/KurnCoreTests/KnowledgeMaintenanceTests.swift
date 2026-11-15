@@ -132,6 +132,15 @@ struct KnowledgeMaintenanceTests {
             #expect(finding.subjects.count == 2)
             #expect(finding.id.contains(code.rawValue))
             #expect(!finding.recommendation.rawValue.isEmpty)
+            let encoded = try JSONEncoder().encode(finding)
+            #expect(try JSONDecoder().decode(KnowledgeMaintenanceFinding.self, from: encoded) == finding)
+            var fields = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+            #expect(fields["id"] as? String == finding.id)
+            #expect(fields["recommendation"] as? String == finding.recommendation.rawValue)
+            fields["id"] = "forged-id"
+            #expect(throws: DecodingError.self) {
+                try JSONDecoder().decode(KnowledgeMaintenanceFinding.self, from: JSONSerialization.data(withJSONObject: fields))
+            }
         }
     }
 }

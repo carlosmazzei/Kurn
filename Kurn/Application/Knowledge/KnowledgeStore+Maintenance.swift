@@ -38,17 +38,36 @@ private enum KnowledgeMaintenanceReader {
         } catch {
             if KnowledgeMaintenanceRows.isFuture(error) { throw KnowledgeMaintenanceError.unsupportedArtifact }
             if (error as? KnowledgeWikiProjectionError) == .projectionLimit { throw KnowledgeMaintenanceError.limitExceeded }
-            input.isComplete = false
-            input.findings.append(.init(code: .canonicalUnavailable, subjects: sources.map { .init(.meeting, $0.meetingID) }))
+            unavailable(sources: sources, input: &input)
         }
         if let wiki, input.isComplete {
-            try catalog(wiki: wiki, currentIDs: currentEntityIDs, input: &input, in: context)
-            try KnowledgeMaintenanceProjectionRows.candidates(sources: sources, input: &input, in: context)
+            do {
+                try catalog(wiki: wiki, currentIDs: currentEntityIDs, input: &input, in: context)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                if KnowledgeMaintenanceRows.isFuture(error) { throw KnowledgeMaintenanceError.unsupportedArtifact }
+                if (error as? KnowledgeMaintenanceError) == .limitExceeded { throw error }
+                unavailable(sources: sources, input: &input)
+            }
+            if input.isComplete {
+                try KnowledgeMaintenanceProjectionRows.candidates(sources: sources, wiki: wiki, input: &input, in: context)
+            }
         }
         try KnowledgeMaintenanceProjectionRows.inspect(sources: sources, wiki: input.isComplete ? wiki : nil, input: &input, in: context)
         try Task.checkCancellation()
         return KnowledgeScopedMaintenanceReport(scope: scope, policyRevisionKey: KnowledgePolicyEvaluator.revisionKey(auth.policies),
             sources: KnowledgeEntityResolutionRows.tokens(sources), report: try KnowledgeMaintenanceLinter.inspect(input))
+    }
+
+    private static func unavailable(sources: [KnowledgeStoreSnapshot], input: inout KnowledgeMaintenanceInput) {
+        input.isComplete = false
+        input.entities = []
+        input.assertionIDs = []
+        input.evidenceIDs = []
+        input.pages = []
+        input.candidates = []
+        input.findings.append(.init(code: .canonicalUnavailable, subjects: sources.map { .init(.meeting, $0.meetingID) }))
     }
 
     private static func catalog(wiki: KnowledgeWikiSnapshot, currentIDs: Set<UUID>,
