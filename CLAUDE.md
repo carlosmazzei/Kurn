@@ -2738,6 +2738,27 @@ hold for every phase; code comments cite this section.
   `KnowledgePolicyEvaluator.revisionKey` names the policy revisions every cache
   key must include. It is checked before retrieval, before a prompt is
   assembled, before egress and before export.
+- **Closed vocabularies and host-side checks (K1.1).** KurnCore's `Knowledge/`
+  holds the canonical layer's persisted vocabularies (`KnowledgeEntityKind`,
+  `KnowledgeModality`, `KnowledgePolarity`, `KnowledgeReviewState`,
+  `KnowledgeConfidenceBand`, `KnowledgeClaimKind`, `KnowledgeAuthorityStatus`,
+  `KnowledgeContextKind`, `KnowledgeOrganizationRole`) — raw values never change
+  once shipped, and an unknown term from a model is rejected or queued for
+  review, never stored as a free string. `KnowledgePredicate` is the closed
+  predicate set with a versioned registry (`registryVersion`, `rule`: allowed
+  subject kinds, entity object kinds or value types, symmetry, and whether an
+  explicit statement is required — ownership, assignment, influence, adoption);
+  `KnowledgePredicateRule.violation` returns a fixed snake-case
+  `KnowledgeSchemaViolation`. `KnowledgeTemporalValue` keeps the stated
+  precision (`yyyy-MM`, `yyyy-MM-dd`, an instant in UTC) and rejects impossible
+  dates; `KnowledgeTypedValue` is the string/number+unit/boolean/date/enum
+  object whose wire form always carries the value as a string.
+  `KnowledgeEvidenceValidator` checks every citation against the transcript
+  revision being compiled — known, distinct segments, a quote verbatim under a
+  conservative normalization (canonical composition, typographic quotes folded,
+  whitespace collapsed; case, diacritics and punctuation kept) and a time range
+  inside the cited segments — and returns a fixed `KnowledgeEvidenceRejection`.
+  Quote hashing needs CryptoKit and is the app's job.
 - **Public material is synthetic.** The golden set
   (`Packages/KurnCore/Tests/KurnCoreTests/Fixtures/knowledge/`, format
   `kurn.knowledge-fixture` v1) holds fictional meetings in Portuguese and
