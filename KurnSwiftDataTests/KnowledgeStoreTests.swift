@@ -378,32 +378,34 @@ struct KnowledgeStoreTests {
 
 
     @Test func restoringAnOlderSourceRequiresANewGenerationInsteadOfReplayingRetractedKnowledge() async throws {
-        let fixture = try fixture()
-        let transcript = try #require(fixture.meeting.recordings.first?.transcript)
-        let originalSegments = transcript.segments
-        let original = try await request(snapshot(fixture))
-        _ = try await commit(original, fixture: fixture)
-        var changed = originalSegments
-        changed[0].text += " Revised."
-        transcript.segments = changed
-        try fixture.context.save()
-        _ = try await commit(request(snapshot(fixture)), fixture: fixture)
-        transcript.segments = originalSegments
-        try fixture.context.save()
-        let restored = try await snapshot(fixture)
-        #expect(restored.transcriptFingerprint == original.snapshot.transcriptFingerprint)
-        await #expect(throws: KnowledgeStoreError.obsoleteJob) { try await commit(request(restored), fixture: fixture) }
-        let rebuilt = try await commit(request(restored, version: "extractor-v1:generation-2"), fixture: fixture)
-        #expect(rebuilt.number == 3)
-        #expect(rebuilt.projectionPending)
-        let context = ModelContext(fixture.container)
-        let active = try context.fetch(FetchDescriptor<KnowledgeAssertion>()).filter { $0.retractedAt == nil }
-        #expect(active.count == 1)
-        #expect(active[0].revisionID == rebuilt.revisionID)
-        let available = try context.fetch(FetchDescriptor<KnowledgeEvidence>()).filter(\.isAvailable)
-        #expect(available.count == 1)
-        #expect(available[0].assertionID == active[0].id)
-        #expect(try await fixture.store.pendingProjection()?.number == 3)
+        for intermediateScope in ["workspace", "other"] {
+            let fixture = try fixture()
+            let transcript = try #require(fixture.meeting.recordings.first?.transcript)
+            let originalSegments = transcript.segments
+            let original = try await request(snapshot(fixture))
+            _ = try await commit(original, fixture: fixture)
+            var changed = originalSegments
+            changed[0].text += " Revised."
+            transcript.segments = changed
+            try fixture.context.save()
+            _ = try await commit(request(snapshot(fixture, scope: intermediateScope)), fixture: fixture)
+            transcript.segments = originalSegments
+            try fixture.context.save()
+            let restored = try await snapshot(fixture)
+            #expect(restored.transcriptFingerprint == original.snapshot.transcriptFingerprint)
+            await #expect(throws: KnowledgeStoreError.obsoleteJob) { try await commit(request(restored), fixture: fixture) }
+            let rebuilt = try await commit(request(restored, version: "extractor-v1:generation-2"), fixture: fixture)
+            #expect(rebuilt.number == 3)
+            #expect(rebuilt.projectionPending)
+            let context = ModelContext(fixture.container)
+            let active = try context.fetch(FetchDescriptor<KnowledgeAssertion>()).filter { $0.retractedAt == nil }
+            #expect(active.count == 1)
+            #expect(active[0].revisionID == rebuilt.revisionID)
+            let available = try context.fetch(FetchDescriptor<KnowledgeEvidence>()).filter(\.isAvailable)
+            #expect(available.count == 1)
+            #expect(available[0].assertionID == active[0].id)
+            #expect(try await fixture.store.pendingProjection()?.number == 3)
+        }
     }
 
     @Test func corruptedAndFutureProvenanceAreRefusedWithoutOverwritingTheirBytes() async throws {
