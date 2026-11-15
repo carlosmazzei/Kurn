@@ -509,5 +509,30 @@ struct KnowledgeStoreTests {
         #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeRevision>()) == 0)
     }
 
+    @Test func futureWorkingEnvelopeCannotBeBypassedThroughAnUnleasedCommit() async throws {
+        let f = try fixture()
+        let token = try await snapshot(f)
+        let work = try KnowledgeQueuedWork.extraction(snapshot: token, provider: .appleOnDevice, model: "synthetic-local")
+        _ = try await f.store.enqueue(work, explicitRetry: false, restartCompleted: false)
+        let context = ModelContext(f.container)
+        let row = try #require(context.fetch(FetchDescriptor<KnowledgeJob>()).first)
+        let original = try #require(row.checkpointData)
+        var raw = try #require(JSONSerialization.jsonObject(with: original) as? [String: Any])
+        raw["version"] = 999
+        let future = try JSONSerialization.data(withJSONObject: raw)
+        row.checkpointData = future
+        try context.save()
+        var commit = try request(token, version: work.pipelineVersion)
+        commit.generation = work.generation
+        let unleased = commit
+        let auth = f.auth
+        await #expect(throws: KnowledgeQueueError.unsupportedCheckpoint) {
+            try await f.store.commit(unleased, authorization: { auth })
+        }
+        let read = ModelContext(f.container)
+        #expect(try read.fetch(FetchDescriptor<KnowledgeJob>()).first?.checkpointData == future)
+        #expect(try read.fetchCount(FetchDescriptor<KnowledgeAssertion>()) == 0)
+    }
+
 }
 }

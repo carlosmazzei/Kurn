@@ -34,10 +34,10 @@ extension KnowledgeStoreRows {
                         return
                     }
                 }
-                if let existing, existing.stateRaw != KnowledgeJobState.succeeded.rawValue,
-                   let bytes = existing.checkpointData,
-                   JSONStorage.decodeAuthoritative(KnowledgeQueueEnvelope.self, from: bytes).decodedValue?.work.compilation != nil,
-                   request.lease == nil { throw KnowledgeStoreError.invalidJob }
+                if let existing, existing.checkpointData != nil {
+                    _ = try KnowledgeQueueRows.envelope(existing)
+                    guard request.lease != nil else { throw KnowledgeStoreError.invalidJob }
+                }
                 if let lease = request.lease {
                     guard lease.work.key == key, lease.work.provider == request.provider,
                           lease.work.compilation?.policyRevisionKey == current.policyRevisionKey else { throw KnowledgeStoreError.invalidJob }
