@@ -2693,6 +2693,82 @@ Ordinary assistant replies cannot be saved as documents.
   retain artifact references and provenance on the pending question, including
   across retries. There is no separate one-shot document generation flow.
 
+### Knowledge Engine decisions
+
+The wiki refactor ("Knowledge Engine — wiki refactor" in `docs/roadmap.md`)
+follows an external specification (v1.3 with its §20 private-corporate
+extension) that is deliberately not kept in the repository. These decisions
+hold for every phase; code comments cite this section.
+
+- **Canonical facts, projected views** (ADR-001). Attributed, evidence-backed
+  assertions and events are the source of truth; the global wiki, the timeline,
+  the graph and the search documents are projections of one canonical revision
+  and never updated by independent pipelines. Markdown is never the only record
+  of a decision, and nothing extracted from a generated page counts as evidence.
+- **SwiftData, locally** (ADR-002); **bitemporal from the first schema** (ADR-003:
+  valid time and transaction time apart, half-open intervals, explicit
+  precision, no "latest meeting wins").
+- **Full context first, evidence-grounded** (ADR-004): `ContextBudget` decides
+  between the whole transcript and semantic blocks; the strategy and coverage
+  are recorded, never a silent truncation; the meeting's `WikiArticle` and
+  summary orient extraction but are never evidence.
+- **Knowledge as a primary destination** (ADR-005) and **timeline before graph
+  animation** (ADR-006); navigation changes wait for review.
+- **Read-only agent access** (ADR-007): knowledge is queried through more
+  `AgentTool`s registered in `Application/Agent/Tools/` on the existing
+  `NativeHarness`, answering in the compact text form of `ChatSourceToolText`
+  with a final revision/coverage/warnings line, not a second harness or JSON
+  envelopes. `AgentBudgetPlanner` keeps sizing runs; hop, evidence and node
+  bounds are per-tool argument limits. Reading knowledge (pages, timeline,
+  graph, search) works offline with no provider; only Ask needs an `AgentModel`.
+- **Separate opt-in, default-deny egress** (ADR-008, spec §20.5).
+  `AppSettings.knowledgeEnabled` (off by default, independent of
+  `wikiEnabled`) gates everything. KurnCore's `KnowledgePolicyEvaluator`
+  decides each operation (`KnowledgeOperation`: extraction, page narrative,
+  semantic lint, embedding, answer synthesis, export) under the intersection of
+  every `KnowledgeProcessingPolicy` in play — workspace, sources, contexts —
+  so a derivative inherits the strictest restriction and the most restricted
+  `KnowledgeClassification` of its sources. The default policy keeps all work
+  on the device and exports nothing; a remote destination needs the policy to
+  name the provider, a classification ceiling covering every source, and then
+  the user's consent, checked in that order because consent never substitutes
+  for corporate authorization. No policy, or no source, is a refusal. Denials
+  are a fixed snake-case vocabulary safe for logs, and
+  `KnowledgePolicyEvaluator.revisionKey` names the policy revisions every cache
+  key must include. It is checked before retrieval, before a prompt is
+  assembled, before egress and before export.
+- **Public material is synthetic.** The golden set
+  (`Packages/KurnCore/Tests/KurnCoreTests/Fixtures/knowledge/`, format
+  `kurn.knowledge-fixture` v1) holds fictional meetings in Portuguese and
+  English with stable segment IDs, the entities and assertions a correct
+  extraction yields, what it must not assert and which entities it must not
+  merge. `KnowledgeFixtureTests` checks that every quote is verbatim in the
+  segments it cites, every reference resolves, values use the spec's closed
+  vocabularies, organizations are named `Example …`, and each hard case the
+  set claims (negation, irony, homonyms, wrong speaker, provisional decisions,
+  relative dates, late arrival, reopening, supersession, units, corrected
+  transcripts, prompt injection, external contexts, forecasts that are not
+  decisions) is structurally present. Fixtures, screenshots, issues and
+  commits never name a real organization or use real meeting content.
+
+Where the checkout makes the specification bend:
+
+| Spec says | The checkout has | Decision |
+| --- | --- | --- |
+| A separate `KnowledgeHarness` with its own tool loop and JSON envelopes `{data, revision, coverage, …}` | `NativeHarness` (AgentHarness) driving `HarnessChatService`; source tools return compact plain text (`ChatSourceToolText`) because JSON per item cost ~45% of a page | Register knowledge tools as more `AgentTool`s in `Application/Agent/Tools/`; keep the compact text form and add a final `revision: … coverage: … warnings: …` line instead of a JSON envelope. Tool *arguments* stay JSON. No second harness |
+| Harness limits of 8 tool calls / 2 hops / 12k context tokens | `AgentBudgetPlanner` sizes 10–48 turns and 20–192 calls from the workload; the context window is resolved per model | Keep the planner; the 2-hop / 20-evidence / 40-node bounds become per-tool argument limits, not run limits |
+| A local planner + synthesis call when the provider has no tool calling | Chat requires an `AgentModel`; Apple's on-device model shows `ChatArtifactProviderNotice` | Ask stays agent-only. What must work without a provider is *reading*: Knowledge Home, pages, timeline, graph and lexical/semantic search, all offline |
+| Full-context-first extraction for meetings up to 2–3 h | `ContextBudget` already fits a whole transcript per model window, with `SummaryService`'s map/reduce as the overflow path; the on-device model's window is far too small for a full transcript | Reuse `ContextBudget` for the full-vs-blocks decision; the on-device model may run only the blocks strategy, and only once the K1 evaluation shows it meets the gates. No silent truncation: the strategy and coverage are recorded on the job |
+| `transcriptRevisionID`, evidence pointing at a transcript revision | `Transcript` has no revision identity and keeps no history; `TranscriptSegment.id` is a UUID that a re-transcription regenerates | K1 adds a revision fingerprint (SHA-256 over the canonical segment encoding, as `WikiCoordinator.contentHash` does today) and segment IDs as evidence anchors. With no retained history, evidence from a superseded revision is marked unavailable (spec §12.1 permits this) rather than pretending to be verifiable |
+| Single writer `ModelActor` for commits | Coordinators are `@MainActor` over the app's main `ModelContext`; services run off-main on value types | ADR: a `KnowledgeStore` `@ModelActor` on the same container for canonical commits and the projection outbox, with Sendable DTOs at its boundary; UI reads stay on the main context. Measure main-thread fetch cost before adding any second store |
+| New models alongside existing ones | `KurnSchemaV6` (1.5.0, the harness session storage) lists the live classes; V5 is frozen in `KurnSchemaV5Models.swift` | K1 is `KurnSchemaV7` (1.6.0): freeze V6, add the knowledge models additively, a lightweight stage, `SchemaV6MigrationTests` writing every V6 entity, and bump `KurnModelGraph.currentSchemaVersion` |
+| Graph as SwiftData relations | `Meeting` cascades its derived artifacts; there is no shared-entity model yet | Entities, assertions and evidence relate by persisted UUIDs, never by `@Relationship` to `Meeting` (no blind cascade across shared entities, spec §13). Deletion is explicit through a `KnowledgeDeletionCoordinator` called by `MeetingLibrary.deleteMeetings`, recording deletion and `LibraryEraser` |
+| Typed `AppRoute` and `kurn://entity/…` deep links | The app deliberately declares no URL scheme (any app could open one, see "Cross-device control") | Typed in-process routes only; Markdown links in generated pages resolve through a router that accepts `entity:`/`evidence:` IDs and nothing else, consistent with `MarkdownPresentation` disabling links. No registered URL scheme |
+| Embeddings and hybrid retrieval | `SemanticSearchService.hybridSearch` (on-device `NLContextualEmbedding` + BM25 + RRF) over `SemanticChunk` | Extend the same index with typed documents (page, assertion, event, alias) carrying `modelIdentifier`; no cloud embeddings, so no extra consent for indexing |
+| Export bundle (JSONL, Markdown, GraphML) | Meeting export via share sheet (`MeetingExport`, `DocumentExport`) | Knowledge export is disabled by default, has no generic share sheet in the corporate mode, and lands last (K6) after the egress audit |
+| Settings → Knowledge with provider, scope, backfill | Settings → Wiki (`WikiSettingsView`) with `wikiEnabled` and bulk missing/rebuild | Settings → Wiki becomes Settings → Knowledge: the meeting wiki keeps its own toggle and consent, Knowledge adds its own; neither implies the other |
+| `ProcessingPolicy`, `KnowledgeWorkspace`, `KnowledgeContext` (§20.1) | Provider consent is per feature (`wikiEnabled`, `correctionEnabled`, …); the provider circuit breaker gates automatic calls | One workspace in `mode=privateCorporate`; `KnowledgeProcessingPolicy` (KurnCore, pure) evaluates destination × operation × classification and is checked before retrieval, prompt assembly, egress and export. Folders are not ACLs |
+
 ### Attached documents (PDFs)
 
 A meeting can carry PDFs as reference material for its summaries

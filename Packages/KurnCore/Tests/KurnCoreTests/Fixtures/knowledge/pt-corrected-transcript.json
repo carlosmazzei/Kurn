@@ -1,0 +1,38 @@
+{
+  "format": "kurn.knowledge-fixture",
+  "version": 1,
+  "id": "pt-corrected-transcript",
+  "language": "pt-BR",
+  "summary": "Synthetic. A misheard amount is corrected in a later transcript revision; only the corrected revision may be cited.",
+  "covers": ["correctedTranscript", "units", "relativeDate"],
+  "sources": [
+    {
+      "id": "m1", "context": "internalMeeting", "organization": null,
+      "recordedAt": "2026-11-06T17:00:00Z", "ingestedAt": "2026-11-06T18:00:00Z", "timezone": "America/Sao_Paulo",
+      "correctedFrom": [
+        {"id": "s1", "speaker": "Speaker 1", "startMs": 0, "endMs": 5000, "text": "O orçamento do projeto Atlas é de duzentos mil reais."}
+      ],
+      "segments": [
+        {"id": "s1", "speaker": "Speaker 1", "startMs": 0, "endMs": 5000, "text": "O orçamento do projeto Atlas é de trezentos mil reais."},
+        {"id": "s2", "speaker": "Speaker 2", "startMs": 5500, "endMs": 9000, "text": "O prazo continua em dezembro."}
+      ]
+    }
+  ],
+  "expected": {
+    "entities": [
+      {"ref": "e1", "kind": "project", "name": "Projeto Atlas", "aliases": ["Atlas"]}
+    ],
+    "assertions": [
+      {"ref": "a1", "subject": "e1", "predicate": "reportsMetric", "value": {"type": "number", "value": "300000", "unit": "BRL"},
+       "modality": "reported", "polarity": "positive", "claimKind": "internalStatusReport", "validFrom": "2026-11-06", "precision": "day",
+       "evidence": [{"source": "m1", "segmentIDs": ["s1"], "quote": "é de trezentos mil reais"}]},
+      {"ref": "a2", "subject": "e1", "predicate": "dueOn", "value": {"type": "date", "value": "2026-12", "precision": "month"},
+       "modality": "reported", "polarity": "positive", "claimKind": "internalStatusReport", "validFrom": "2026-11-06", "precision": "day",
+       "evidence": [{"source": "m1", "segmentIDs": ["s2"], "quote": "O prazo continua em dezembro."}]}
+    ],
+    "mustNotAssert": [
+      {"subject": "e1", "predicate": "reportsMetric", "value": "200000", "reason": "The amount comes from a superseded transcript revision."}
+    ],
+    "mustNotMerge": []
+  }
+}

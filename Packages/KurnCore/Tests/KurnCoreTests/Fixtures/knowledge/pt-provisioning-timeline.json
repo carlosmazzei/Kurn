@@ -1,0 +1,99 @@
+{
+  "format": "kurn.knowledge-fixture",
+  "version": 1,
+  "id": "pt-provisioning-timeline",
+  "language": "pt-BR",
+  "summary": "Synthetic. A proposal becomes a decision, meets a risk and a blocker, is revised and then superseded; one meeting is imported weeks after it happened.",
+  "covers": ["provisionalDecision", "units", "relativeDate", "lateArrival", "supersede"],
+  "sources": [
+    {
+      "id": "m1", "context": "internalMeeting", "organization": null,
+      "recordedAt": "2026-09-10T13:00:00Z", "ingestedAt": "2026-09-10T14:00:00Z", "timezone": "America/Sao_Paulo",
+      "segments": [
+        {"id": "s1", "speaker": "Speaker 1", "startMs": 0, "endMs": 6000, "text": "Hoje o provisionamento de ambientes leva cinco dias em média."},
+        {"id": "s2", "speaker": "Speaker 2", "startMs": 6500, "endMs": 12000, "text": "Proponho automatizar o provisionamento com scripts de infraestrutura."},
+        {"id": "s3", "speaker": "Speaker 1", "startMs": 12500, "endMs": 18000, "text": "Podemos decidir isso na próxima reunião, por enquanto é só uma proposta."}
+      ]
+    },
+    {
+      "id": "m2", "context": "internalMeeting", "organization": null,
+      "recordedAt": "2026-09-25T13:00:00Z", "ingestedAt": "2026-09-25T14:00:00Z", "timezone": "America/Sao_Paulo",
+      "segments": [
+        {"id": "s4", "speaker": "Speaker 1", "startMs": 0, "endMs": 5000, "text": "Está aprovado: vamos automatizar o provisionamento de ambientes."},
+        {"id": "s5", "speaker": "Speaker 2", "startMs": 5500, "endMs": 11000, "text": "Eu fico responsável pela automação, com entrega prevista para outubro."}
+      ]
+    },
+    {
+      "id": "m3", "context": "internalMeeting", "organization": null,
+      "recordedAt": "2026-10-15T13:00:00Z", "ingestedAt": "2026-10-15T14:00:00Z", "timezone": "America/Sao_Paulo",
+      "segments": [
+        {"id": "s6", "speaker": "Speaker 1", "startMs": 0, "endMs": 7000, "text": "Identificamos um risco: a política de segurança pode bloquear os scripts."}
+      ]
+    },
+    {
+      "id": "m4", "context": "internalMeeting", "organization": null,
+      "recordedAt": "2026-10-20T13:00:00Z", "ingestedAt": "2026-11-14T10:00:00Z", "timezone": "America/Sao_Paulo",
+      "segments": [
+        {"id": "s7", "speaker": "Speaker 3", "startMs": 0, "endMs": 6000, "text": "A equipe de segurança ainda não aprovou o acesso, estamos bloqueados."}
+      ]
+    },
+    {
+      "id": "m5", "context": "internalMeeting", "organization": null,
+      "recordedAt": "2026-10-30T13:00:00Z", "ingestedAt": "2026-10-30T14:00:00Z", "timezone": "America/Sao_Paulo",
+      "segments": [
+        {"id": "s8", "speaker": "Speaker 2", "startMs": 0, "endMs": 7000, "text": "Revisamos o plano: a automação vai usar a ferramenta interna em vez dos scripts."}
+      ]
+    },
+    {
+      "id": "m6", "context": "internalMeeting", "organization": null,
+      "recordedAt": "2026-11-10T13:00:00Z", "ingestedAt": "2026-11-10T14:00:00Z", "timezone": "America/Sao_Paulo",
+      "segments": [
+        {"id": "s9", "speaker": "Speaker 1", "startMs": 0, "endMs": 8000, "text": "Decidimos substituir a decisão de setembro: o provisionamento passa a ser feito pela plataforma interna."},
+        {"id": "s10", "speaker": "Speaker 2", "startMs": 8500, "endMs": 12000, "text": "A automação está pronta, falta só a liberação."}
+      ]
+    }
+  ],
+  "expected": {
+    "entities": [
+      {"ref": "e1", "kind": "project", "name": "Provisionamento de ambientes", "aliases": ["provisionamento"]},
+      {"ref": "e2", "kind": "decisionThread", "name": "Automação do provisionamento", "aliases": []},
+      {"ref": "e3", "kind": "risk", "name": "Bloqueio pela política de segurança", "aliases": []},
+      {"ref": "e4", "kind": "team", "name": "Equipe de segurança", "aliases": []},
+      {"ref": "e5", "kind": "initiative", "name": "Provisionamento pela plataforma interna", "aliases": ["plataforma interna"]}
+    ],
+    "assertions": [
+      {"ref": "a1", "subject": "e1", "predicate": "reportsMetric", "value": {"type": "number", "value": "5", "unit": "day"},
+       "modality": "reported", "polarity": "positive", "claimKind": "internalStatusReport", "validFrom": "2026-09-10", "precision": "day",
+       "evidence": [{"source": "m1", "segmentIDs": ["s1"], "quote": "leva cinco dias em média"}]},
+      {"ref": "a2", "subject": "e2", "predicate": "hasStatus", "value": {"type": "enum", "value": "proposed"},
+       "modality": "proposed", "polarity": "positive", "claimKind": "internalProposal", "validFrom": "2026-09-10", "precision": "day",
+       "evidence": [{"source": "m1", "segmentIDs": ["s2"], "quote": "Proponho automatizar o provisionamento"}]},
+      {"ref": "a3", "subject": "e2", "predicate": "hasStatus", "value": {"type": "enum", "value": "approved"},
+       "modality": "agreed", "polarity": "positive", "claimKind": "internalDecision", "validFrom": "2026-09-25", "precision": "day",
+       "evidence": [{"source": "m2", "segmentIDs": ["s4"], "quote": "Está aprovado: vamos automatizar o provisionamento de ambientes."}]},
+      {"ref": "a4", "subject": "e1", "predicate": "dueOn", "value": {"type": "date", "value": "2026-10", "precision": "month"},
+       "modality": "agreed", "polarity": "positive", "claimKind": "commitment", "validFrom": "2026-09-25", "precision": "day",
+       "evidence": [{"source": "m2", "segmentIDs": ["s5"], "quote": "com entrega prevista para outubro"}]},
+      {"ref": "a5", "subject": "e3", "predicate": "hasStatus", "value": {"type": "enum", "value": "identified"},
+       "modality": "reported", "polarity": "positive", "claimKind": "internalStatusReport", "validFrom": "2026-10-15", "precision": "day",
+       "evidence": [{"source": "m3", "segmentIDs": ["s6"], "quote": "a política de segurança pode bloquear os scripts"}]},
+      {"ref": "a6", "subject": "e4", "predicate": "blocks", "object": "e1",
+       "modality": "reported", "polarity": "positive", "claimKind": "internalStatusReport", "validFrom": "2026-10-20", "precision": "day",
+       "evidence": [{"source": "m4", "segmentIDs": ["s7"], "quote": "ainda não aprovou o acesso, estamos bloqueados"}]},
+      {"ref": "a7", "subject": "e2", "predicate": "hasStatus", "value": {"type": "enum", "value": "revised"},
+       "modality": "agreed", "polarity": "positive", "claimKind": "internalDecision", "validFrom": "2026-10-30", "precision": "day",
+       "evidence": [{"source": "m5", "segmentIDs": ["s8"], "quote": "Revisamos o plano"}]},
+      {"ref": "a8", "subject": "e5", "predicate": "supersedes", "object": "e2",
+       "modality": "agreed", "polarity": "positive", "claimKind": "internalDecision", "validFrom": "2026-11-10", "precision": "day",
+       "evidence": [{"source": "m6", "segmentIDs": ["s9"], "quote": "Decidimos substituir a decisão de setembro"}]},
+      {"ref": "a9", "subject": "e1", "predicate": "hasStatus", "value": {"type": "enum", "value": "readyPendingRelease"},
+       "modality": "reported", "polarity": "positive", "claimKind": "internalStatusReport", "validFrom": "2026-11-10", "precision": "day",
+       "evidence": [{"source": "m6", "segmentIDs": ["s10"], "quote": "A automação está pronta, falta só a liberação."}]}
+    ],
+    "mustNotAssert": [
+      {"subject": "e2", "predicate": "hasStatus", "value": "approved", "source": "m1", "reason": "Only a proposal; the decision is deferred to the next meeting."},
+      {"subject": "e1", "predicate": "hasStatus", "value": "completed", "reason": "Ready but not released is not completed."}
+    ],
+    "mustNotMerge": []
+  }
+}

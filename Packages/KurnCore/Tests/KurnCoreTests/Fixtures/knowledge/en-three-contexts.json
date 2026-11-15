@@ -1,0 +1,64 @@
+{
+  "format": "kurn.knowledge-fixture",
+  "version": 1,
+  "id": "en-three-contexts",
+  "language": "en",
+  "summary": "Synthetic. An analyst forecast at a conference, a vendor claim at a briefing and an internal pilot decision share one topic; nobody says the earlier contacts motivated the pilot.",
+  "covers": ["externalContexts", "forecastNotDecision", "units"],
+  "sources": [
+    {
+      "id": "m1", "context": "conferenceSession", "organization": "Example Analyst Firm",
+      "recordedAt": "2026-09-16T09:00:00Z", "ingestedAt": "2026-09-16T12:00:00Z", "timezone": "America/New_York",
+      "segments": [
+        {"id": "s1", "speaker": "Speaker 1", "startMs": 0, "endMs": 7000, "text": "By 2028, most engineering teams will run coding agents in production."}
+      ]
+    },
+    {
+      "id": "m2", "context": "executiveBriefing", "organization": "Example Vendor",
+      "recordedAt": "2026-10-08T14:00:00Z", "ingestedAt": "2026-10-08T15:00:00Z", "timezone": "America/New_York",
+      "segments": [
+        {"id": "s2", "speaker": "Speaker 1", "startMs": 0, "endMs": 6000, "text": "Our agent platform cuts review time in half for teams like yours."}
+      ]
+    },
+    {
+      "id": "m3", "context": "internalMeeting", "organization": null,
+      "recordedAt": "2026-11-04T14:00:00Z", "ingestedAt": "2026-11-04T15:00:00Z", "timezone": "America/New_York",
+      "segments": [
+        {"id": "s3", "speaker": "Speaker 1", "startMs": 0, "endMs": 6000, "text": "We approve a three-month pilot of agentic engineering with the platform team."},
+        {"id": "s4", "speaker": "Speaker 2", "startMs": 6500, "endMs": 12000, "text": "The operational cost is still not validated, that stays an open question."}
+      ]
+    }
+  ],
+  "expected": {
+    "entities": [
+      {"ref": "e1", "kind": "topic", "name": "Agentic engineering", "aliases": ["coding agents"]},
+      {"ref": "e2", "kind": "organization", "name": "Example Analyst Firm", "aliases": []},
+      {"ref": "e3", "kind": "organization", "name": "Example Vendor", "aliases": []},
+      {"ref": "e4", "kind": "initiative", "name": "Agentic engineering pilot", "aliases": []},
+      {"ref": "e5", "kind": "question", "name": "Operational cost of the pilot", "aliases": []}
+    ],
+    "assertions": [
+      {"ref": "a1", "subject": "e2", "predicate": "forecastFor", "object": "e1",
+       "modality": "hypothetical", "polarity": "positive", "claimKind": "analystForecast", "validFrom": "2026-09-16", "precision": "day",
+       "evidence": [{"source": "m1", "segmentIDs": ["s1"], "quote": "By 2028, most engineering teams will run coding agents in production."}]},
+      {"ref": "a2", "subject": "e3", "predicate": "reportsMetric", "value": {"type": "number", "value": "50", "unit": "percent"},
+       "modality": "reported", "polarity": "positive", "claimKind": "vendorClaim", "validFrom": "2026-10-08", "precision": "day",
+       "evidence": [{"source": "m2", "segmentIDs": ["s2"], "quote": "cuts review time in half"}]},
+      {"ref": "a3", "subject": "e4", "predicate": "hasStatus", "value": {"type": "enum", "value": "approved"},
+       "modality": "agreed", "polarity": "positive", "claimKind": "internalDecision", "validFrom": "2026-11-04", "precision": "day",
+       "evidence": [{"source": "m3", "segmentIDs": ["s3"], "quote": "We approve a three-month pilot of agentic engineering"}]},
+      {"ref": "a4", "subject": "e4", "predicate": "relatesTo", "object": "e1",
+       "modality": "observed", "polarity": "positive", "claimKind": "internalDecision", "validFrom": "2026-11-04", "precision": "day",
+       "evidence": [{"source": "m3", "segmentIDs": ["s3"], "quote": "pilot of agentic engineering"}]},
+      {"ref": "a5", "subject": "e5", "predicate": "hasStatus", "value": {"type": "enum", "value": "open"},
+       "modality": "reported", "polarity": "positive", "claimKind": "question", "validFrom": "2026-11-04", "precision": "day",
+       "evidence": [{"source": "m3", "segmentIDs": ["s4"], "quote": "The operational cost is still not validated"}]}
+    ],
+    "mustNotAssert": [
+      {"subject": "e4", "predicate": "inspiredBy", "reason": "Nobody said the forecast or the briefing motivated the pilot; only a thematic link exists."},
+      {"subject": "e1", "predicate": "hasStatus", "value": "approved", "source": "m1", "reason": "An analyst forecast is not a decision."},
+      {"subject": "e4", "predicate": "adoptedIn", "reason": "A pilot was approved; nothing was adopted."}
+    ],
+    "mustNotMerge": [["e2", "e3"]]
+  }
+}
