@@ -2851,8 +2851,8 @@ hold for every phase; code comments cite this section.
   revision and canonical revision are rechecked before mutation. The canonical
   graph, succeeded job, retained attribution/ref-map provenance, coverage and
   `KnowledgeRevision.projectionPending` outbox are saved together; failures roll
-  back all rows and retractions. Provenance and coverage use `JSONStorage`
-  authoritative envelopes with checksums; unreadable/future job data is refused
+  back all rows and retractions. Authoritative JSON (provenance, coverage, aliases,
+  typed values and evidence anchors) uses `JSONStorage` envelopes with checksums; unreadable/future job data is refused
   without overwriting its bytes. The injected `beforeSave` seam proves rollback.
   KurnCore's `KnowledgeCompilationIdentity` encodes an unambiguous, reversible
   job key over scope, meeting ID, meeting source fingerprint, extractor version

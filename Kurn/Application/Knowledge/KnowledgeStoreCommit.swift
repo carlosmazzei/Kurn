@@ -56,11 +56,11 @@ extension KnowledgeStoreRows {
                 try KnowledgeStoreRows.retirePrevious(identity: identity, current: current, at: now, in: context)
                 let provenance = try KnowledgeStoreRows.insert(validated, snapshot: current, revisionID: revision.id,
                     extractorVersion: request.extractorVersion, at: now, in: context)
-                guard let provenanceData = JSONStorage.encodeAuthoritative(provenance),
-                      let coverageData = JSONStorage.encodeAuthoritative(validated.map { item in
+                let provenanceData = try authoritativeData(provenance)
+                let coverageData = try authoritativeData(validated.map { item in
                     KnowledgeCommitProvenance.Coverage(recordingID: item.source.id,
                         examinedSegmentIDs: item.source.segments.map { $0.id.uuidString.lowercased() })
-                }) else { throw KnowledgeStoreError.invalidCompilation }
+                })
                 job.checkpointData = provenanceData
                 job.coverageData = coverageData
                 job.strategyRaw = validated.contains { $0.compilation.strategy == "blocks" } ? "blocks" : "fullContext"
