@@ -3,7 +3,7 @@ import KurnCore
 
 /// Scope names never grant access. The host supplies a fresh source-ID ACL on
 /// every read/publication; deterministic projections require no provider.
-struct KnowledgeWikiAuthorization: Sendable {
+struct KnowledgeSourceAuthorization: Sendable {
     var featureEnabled: Bool
     var meetingIDs: Set<UUID>
     var policies: [KnowledgeProcessingPolicy]
@@ -13,14 +13,16 @@ struct KnowledgeWikiAuthorization: Sendable {
         KnowledgeExtractionAuthorization(featureEnabled: featureEnabled, policies: policies, sourceClassifications: sourceClassifications)
     }
 
-    func authorize(classifications: [KnowledgeClassification]) throws {
-        let request = KnowledgeProcessingRequest(operation: .pageNarrative, destination: .onDevice,
+    func authorize(classifications: [KnowledgeClassification], operation: KnowledgeOperation = .pageNarrative) throws {
+        let request = KnowledgeProcessingRequest(operation: operation, destination: .onDevice,
             sourceClassifications: sourceClassifications + classifications, userConsentedToRemote: false)
         guard KnowledgePolicyEvaluator.evaluate(request, under: policies, featureEnabled: featureEnabled).isAllowed else {
             throw KnowledgeWikiStoreError.scopeDenied
         }
     }
 }
+
+typealias KnowledgeWikiAuthorization = KnowledgeSourceAuthorization
 
 struct KnowledgeWikiProjectionSnapshot: Sendable {
     let scope: String

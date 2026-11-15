@@ -13,12 +13,12 @@ enum KnowledgeWikiSourceRows {
     }
 
     static func sources(meetingIDs: Set<UUID>, scope: String, auth: KnowledgeWikiAuthorization,
-                        in context: ModelContext) throws -> [KnowledgeStoreSnapshot] {
+                        operation: KnowledgeOperation = .pageNarrative, in context: ModelContext) throws -> [KnowledgeStoreSnapshot] {
         guard !meetingIDs.isEmpty, meetingIDs.count <= 16, meetingIDs.isSubset(of: auth.meetingIDs),
               !scope.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, scope.utf8.count <= 256 else {
             throw KnowledgeWikiStoreError.scopeDenied
         }
-        try auth.authorize(classifications: [])
+        try auth.authorize(classifications: [], operation: operation)
         let sources = try meetingIDs.sorted { $0.uuidString < $1.uuidString }.map {
             try KnowledgeStoreRows.readSnapshot(meetingID: $0, scope: scope, auth: auth.extraction, in: context)
         }
@@ -29,7 +29,7 @@ enum KnowledgeWikiSourceRows {
                 }
             }
         }
-        try auth.authorize(classifications: sources.map(\.contextClassification))
+        try auth.authorize(classifications: sources.map(\.contextClassification), operation: operation)
         return sources
     }
 
