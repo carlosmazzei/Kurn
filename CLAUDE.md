@@ -2748,16 +2748,21 @@ hold for every phase; code comments cite this section.
   predicate set with a versioned registry (`registryVersion`, `rule`: allowed
   subject kinds, entity object kinds or value types, symmetry, and whether an
   explicit statement is required — ownership, assignment, influence, adoption);
-  `KnowledgePredicateRule.violation` returns a fixed snake-case
-  `KnowledgeSchemaViolation`. `KnowledgeTemporalValue` keeps the stated
-  precision (`yyyy-MM`, `yyyy-MM-dd`, an instant in UTC) and rejects impossible
-  dates; `KnowledgeTypedValue` is the string/number+unit/boolean/date/enum
+  `KnowledgePredicate.violation(subjectKind:objectKind:value:)` checks that rule
+  and then the value's closed vocabulary (`hasStatus` takes only
+  `KnowledgeStatus`, the spec's decision/action/risk states plus open, blocked,
+  revised and ready), returning a fixed snake-case `KnowledgeSchemaViolation`.
+  `KnowledgeTemporalValue` keeps the stated precision (`yyyy-MM`, `yyyy-MM-dd`,
+  an instant in UTC), accepts ASCII digits only and rejects impossible dates; `KnowledgeTypedValue` is the string/number+unit/boolean/date/enum
   object whose wire form always carries the value as a string.
   `KnowledgeEvidenceValidator` checks every citation against the transcript
-  revision being compiled — known, distinct segments, a quote verbatim under a
-  conservative normalization (canonical composition, typographic quotes folded,
-  whitespace collapsed; case, diacritics and punctuation kept) and a time range
-  inside the cited segments — and returns a fixed `KnowledgeEvidenceRejection`.
+  revision being compiled — known, distinct segments, contiguous and cited in
+  transcript order (so a quote cannot be stitched across a skipped "not" or a
+  reordered line), a quote verbatim under a conservative normalization
+  (canonical composition, typographic quotes folded, whitespace collapsed;
+  case, diacritics and punctuation kept) and a time range whose both ends fall
+  inside a cited segment (it may cross a pause between them, never sit in one)
+  — and returns a fixed `KnowledgeEvidenceRejection`.
   Quote hashing needs CryptoKit and is the app's job.
 - **Public material is synthetic.** The golden set
   (`Packages/KurnCore/Tests/KurnCoreTests/Fixtures/knowledge/`, format

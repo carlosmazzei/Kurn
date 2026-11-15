@@ -32,13 +32,13 @@ public struct KnowledgeTemporalValue: Hashable, Sendable {
         case .unknown:
             return nil
         case .month:
-            guard let values = Self.numbers(text, pattern: #"^(\d{4})-(\d{2})$"#) else { return nil }
+            guard let values = Self.numbers(text, pattern: #"^([0-9]{4})-([0-9]{2})$"#) else { return nil }
             parts = values
         case .day:
-            guard let values = Self.numbers(text, pattern: #"^(\d{4})-(\d{2})-(\d{2})$"#) else { return nil }
+            guard let values = Self.numbers(text, pattern: #"^([0-9]{4})-([0-9]{2})-([0-9]{2})$"#) else { return nil }
             parts = values
         case .instant:
-            guard let values = Self.numbers(text, pattern: #"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$"#)
+            guard let values = Self.numbers(text, pattern: #"^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})Z$"#)
             else { return nil }
             parts = values
         }
@@ -81,9 +81,14 @@ public struct KnowledgeTemporalValue: Hashable, Sendable {
         guard let regex = try? NSRegularExpression(pattern: pattern),
               let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text))
         else { return nil }
-        return (1..<match.numberOfRanges).compactMap { index in
-            Range(match.range(at: index), in: text).flatMap { Int(text[$0]) }
+        // ASCII digits only, and every group must convert: a capture that
+        // does not is a refusal, never a shorter array to index past.
+        var values: [Int] = []
+        for index in 1..<match.numberOfRanges {
+            guard let range = Range(match.range(at: index), in: text), let value = Int(text[range]) else { return nil }
+            values.append(value)
         }
+        return values
     }
 
     private static func daysIn(month: Int, year: Int) -> Int {

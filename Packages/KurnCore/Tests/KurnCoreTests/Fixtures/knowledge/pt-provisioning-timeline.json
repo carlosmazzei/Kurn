@@ -87,7 +87,7 @@
       {"ref": "a8", "subject": "e5", "predicate": "supersedes", "object": "e2",
        "modality": "agreed", "polarity": "positive", "claimKind": "internalDecision", "validFrom": "2026-11-10", "precision": "day",
        "evidence": [{"source": "m6", "segmentIDs": ["s9"], "quote": "Decidimos substituir a decisão de setembro"}]},
-      {"ref": "a9", "subject": "e1", "predicate": "hasStatus", "value": {"type": "enum", "value": "readyPendingRelease"},
+      {"ref": "a9", "subject": "e1", "predicate": "hasStatus", "value": {"type": "enum", "value": "ready"},
        "modality": "reported", "polarity": "positive", "claimKind": "internalStatusReport", "validFrom": "2026-11-10", "precision": "day",
        "evidence": [{"source": "m6", "segmentIDs": ["s10"], "quote": "A automação está pronta, falta só a liberação."}]}
     ],

@@ -30,6 +30,13 @@ struct KnowledgeTemporalValueTests {
         #expect(KnowledgeTemporalValue(text: "anything", precision: .unknown) == nil)
     }
 
+    /// Arabic-Indic and other non-ASCII digits are refused, not parsed or crashed on.
+    @Test func refusesNonASCIIDigits() {
+        #expect(KnowledgeTemporalValue(text: "٢٠٢٦-١١", precision: .month) == nil)
+        #expect(KnowledgeTemporalValue(text: "٢٠٢٦-١١-٠٥", precision: .day) == nil)
+        #expect(KnowledgeTemporalValue(text: "２０２６-１１", precision: .month) == nil)
+    }
+
     @Test func leapYearsFollowTheGregorianRule() {
         #expect(KnowledgeTemporalValue(text: "2028-02-29", precision: .day) != nil)
         #expect(KnowledgeTemporalValue(text: "2100-02-29", precision: .day) == nil)
@@ -118,6 +125,16 @@ struct KnowledgePredicateRegistryTests {
         #expect(KnowledgePredicate.resolves.rule.violation(subjectKind: .person, objectKind: .question, valueType: nil) == nil)
     }
 
+    @Test func statusesComeFromTheClosedVocabulary() {
+        let status = KnowledgePredicate.hasStatus
+        #expect(status.allowedEnumerations == Set(KnowledgeStatus.allCases.map(\.rawValue)))
+        #expect(status.violation(subjectKind: .project, objectKind: nil, value: .enumeration("approved")) == nil)
+        #expect(status.violation(subjectKind: .project, objectKind: nil, value: .enumeration("doneish")) == .valueNotInVocabulary)
+        #expect(status.violation(subjectKind: .project, objectKind: nil, value: .number(1, unit: nil)) == .valueTypeNotAllowed)
+        #expect(KnowledgePredicate.reportsMetric.allowedEnumerations == nil)
+        #expect(KnowledgePredicate.partOf.violation(subjectKind: .team, objectKind: .organization, value: nil) == nil)
+    }
+
     @Test func violationCodesAreStableSnakeCase() {
         for violation in KnowledgeSchemaViolation.allCases {
             #expect(violation.rawValue.allSatisfy { $0.isLowercase || $0 == "_" })
@@ -147,6 +164,7 @@ struct KnowledgeVocabularyTests {
         #expect(KnowledgeOrganizationRole.allCases.count == 7)
         #expect(KnowledgeAuthorityStatus.allCases.count == 6)
         #expect(KnowledgeConfidenceBand.allCases == [.low, .medium, .high])
+        #expect(KnowledgeStatus.inProgress.rawValue == "inProgress" && KnowledgeStatus.allCases.count == 19)
         #expect(KnowledgeModality.allCases.count == 7 && KnowledgePolarity.allCases.count == 2)
     }
 }
@@ -156,6 +174,30 @@ struct KnowledgeEvidenceValidatorTests {
         KnowledgeSourceSegment(id: "s1", startMs: 0, endMs: 5000, text: "We’re not   migrating\nthis quarter."),
         KnowledgeSourceSegment(id: "s2", startMs: 5500, endMs: 9000, text: "Alex owns the runbook.")
     ])
+
+    /// `s1 s2 s3` say "We will / not / ship."; no citation may drop the "not".
+    private let negation = KnowledgeEvidenceValidator(segments: [
+        KnowledgeSourceSegment(id: "s1", startMs: 0, endMs: 1000, text: "We will"),
+        KnowledgeSourceSegment(id: "s2", startMs: 1000, endMs: 1500, text: "not"),
+        KnowledgeSourceSegment(id: "s3", startMs: 1500, endMs: 2500, text: "ship.")
+    ])
+
+    @Test func refusesQuotesStitchedAcrossSkippedOrReorderedSegments() {
+        #expect(negation.validate(KnowledgeEvidenceClaim(segmentIDs: ["s1", "s3"], quote: "We will ship.")) == .failure(.segmentsNotContiguous))
+        #expect(negation.validate(KnowledgeEvidenceClaim(segmentIDs: ["s3", "s1"], quote: "ship. We will")) == .failure(.segmentsNotContiguous))
+        #expect((try? negation.validate(KnowledgeEvidenceClaim(segmentIDs: ["s1", "s2", "s3"], quote: "We will not ship.")).get()) != nil)
+    }
+
+    @Test func refusesTimeRangesInAGapOrOutsideTheCitedSegments() {
+        let gap = KnowledgeEvidenceClaim(segmentIDs: ["s1", "s2"], quote: "this quarter.", startMs: 5100, endMs: 5400)
+        #expect(validator.validate(gap) == .failure(.timeOutsideSegments))
+        let startsInGap = KnowledgeEvidenceClaim(segmentIDs: ["s1", "s2"], quote: "Alex", startMs: 5100, endMs: 6000)
+        #expect(validator.validate(startsInGap) == .failure(.timeOutsideSegments))
+        let endsInGap = KnowledgeEvidenceClaim(segmentIDs: ["s1", "s2"], quote: "We", startMs: 1000, endMs: 5200)
+        #expect(validator.validate(endsInGap) == .failure(.timeOutsideSegments))
+        let other = KnowledgeEvidenceClaim(segmentIDs: ["s2"], quote: "Alex", startMs: 1000, endMs: 6000)
+        #expect(validator.validate(other) == .failure(.timeOutsideSegments))
+    }
 
     @Test func acceptsAVerbatimQuoteUnderConservativeNormalization() throws {
         let result = try validator.validate(KnowledgeEvidenceClaim(segmentIDs: ["s1"], quote: "We're not migrating this quarter.")).get()
