@@ -56,7 +56,10 @@ struct SchemaV6MigrationTests {
 
         try withOpen(url) { context in
             for type in KnowledgeTestRows.modelTypes {
-                #expect(try KnowledgeTestRows.count(type, in: context) == 1, "\(type) did not survive a reopen")
+                #expect(
+                    try KnowledgeTestRows.count(type, in: context) == KnowledgeTestRows.insertedCount(of: type),
+                    "\(type) did not survive a reopen"
+                )
             }
             let assertion = try #require(try context.fetch(FetchDescriptor<KnowledgeAssertion>()).first)
             #expect(assertion.id == assertionID && assertion.sourceMeetingID == seeded.meetingID)
