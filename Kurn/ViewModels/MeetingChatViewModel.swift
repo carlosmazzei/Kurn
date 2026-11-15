@@ -2,20 +2,25 @@
 //  MeetingChatViewModel.swift
 //  Kurn
 //
-//  Drives "chat with your meetings": owns the in-memory conversation, gathers
-//  the pre-embedded passages to search over, and calls `MeetingChatService` for
-//  a grounded answer. All SwiftData reads happen on the main actor; the
-//  retrieval + LLM call run off-main in the service.
+//  Drives "chat with your meetings": owns the in-memory conversation and runs each
+//  question through NativeHarness (`HarnessChatService`) with the selected sources.
+//  Chat needs a cloud provider with an `AgentModel`; Apple's on-device model has none.
 //
 //  A conversation is also the unit of persistence: `configure(meeting:modelContext:)`
 //  wires up the `ChatSession` scope (per-meeting or library-wide), and a
 //  successfully completed exchange is saved into `session` — created lazily on
 //  the first one, so a conversation the user opens and abandons never leaves an
-//  empty row in the history list. Only finished exchanges are persisted; a
-//  cancelled or failed reply is dropped from `turns` (see `dropPartialReply`)
-//  before `persist()` would ever see it.
+//  empty row in the history list. Document mutations also save the session.
+//  A cancelled/failed partial answer is dropped, while its execution trace and
+//  reported usage are retained on the retryable question (see `dropPartialReply`).
+//
+//  NH05: the app retains this object through `ChatConversationHost`, not the view,
+//  so a run survives its view being dismissed. A run is an owned `AgentRunHandle`;
+//  `cancel()` is a request, and the conversation stays busy (`phase == .cancelling`)
+//  until the producer has terminated and the partial reply has been reconciled.
 //
 
+import AgentHarness
 import Foundation
 import KurnCore
 import Observation
@@ -24,47 +29,31 @@ import SwiftData
 @MainActor
 @Observable
 final class MeetingChatViewModel {
-    /// One rendered turn in the conversation.
-    struct Turn: Identifiable {
-        let id: UUID
-        let role: ChatMessage.Role
-        var text: String
-        var citations: [SemanticSearchService.Hit] = []
-        /// Token usage the provider reported for this reply, and its
-        /// estimated USD cost (`ModelPricing`, `nil` for an unrecognized
-        /// model) — both `nil` until the reply finishes, and permanently
-        /// `nil` for a provider/response that never reports usage.
-        var usage: TokenUsage?
-        var costUSD: Double?
-        /// Wall-clock time the reply took to fully generate, set once it
-        /// finishes.
-        var elapsedSeconds: TimeInterval?
-
-        /// `id` defaults to a fresh `UUID` for a brand-new turn; restoring a
-        /// saved one (`Turn.init(_ persisted:)` below) passes its stored id
-        /// through instead, so a turn's identity survives a save/load
-        /// round trip.
-        init(
-            id: UUID = UUID(),
-            role: ChatMessage.Role,
-            text: String,
-            citations: [SemanticSearchService.Hit] = [],
-            usage: TokenUsage? = nil,
-            costUSD: Double? = nil,
-            elapsedSeconds: TimeInterval? = nil
-        ) {
-            self.id = id
-            self.role = role
-            self.text = text
-            self.citations = citations
-            self.usage = usage
-            self.costUSD = costUSD
-            self.elapsedSeconds = elapsedSeconds
-        }
-    }
-
     private(set) var turns: [Turn] = []
     private(set) var isResponding = false
+    /// What the current run is doing; `.idle` exactly when `isResponding` is false.
+    private(set) var phase: ChatRunPhase = .idle
+    /// The current run's turn, request and tool calls (NH05 phase/identity projection).
+    private(set) var runProgress = AgentRunProgress()
+    /// Tool calls the model is still writing, as running steps for the live reply; empty otherwise.
+    private(set) var writingSteps: [AgentRunStep] = []
+    /// When the current run started, for the live status line's elapsed time; nil while idle.
+    private(set) var runStartedAt: Date?
+    /// The context the provider last reported for this conversation, kept between runs (a new run
+    /// knows none until its first response) until the next report; nil after a reset or a load.
+    private(set) var lastContextTokens: Int?
+    private(set) var scopeEditor = ChatSourceScopeEditor()
+    var scope: ChatSourceScope { scopeEditor.scope }
+    private(set) var artifacts: [ChatDocumentArtifact] = []
+    @ObservationIgnored private var workspace = ChatDocumentWorkspace()
+    /// The destructive change the current run waits on the person for (`ChatChangeConfirmation`).
+    let changeConfirmation = ChatChangeConfirmation()
+    @ObservationIgnored private var generation = UUID()
+    @ObservationIgnored private var conversationID = UUID()
+    @ObservationIgnored private var retryArtifacts: [ChatArtifactReference] = []
+    @ObservationIgnored private var retryOrigins: [UUID: ChatArtifactOrigin] = [:]
+    private let agentModelFactory: HarnessChatService.ModelFactory
+    private let harnessService: HarnessChatService
     /// The saved conversation backing `turns`, or `nil` for a not-yet-saved
     /// one — set by `configure`, `startNewSession`, or `load(session:)`, and
     /// created lazily by `persist()` on the first successful exchange.
@@ -77,241 +66,294 @@ final class MeetingChatViewModel {
     /// `session`'s id, exposed for the history list to highlight the
     /// currently open conversation. `nil` for one not yet saved.
     var currentSessionID: UUID? { session?.id }
-    /// The pipeline stage currently reported by `MeetingChatService`, shown as
-    /// a "reasoning" row while the assistant's turn has no text yet. Cleared
-    /// once the reply starts streaming (the growing text bubble replaces it)
-    /// and whenever a turn finishes, errors, or is cancelled.
-    private(set) var currentPhase: ChatPhase?
-    /// Supplementary detail for `currentPhase`, e.g. "(2/5)" while a
-    /// large-library "Ask" works through several blocks of meeting notes —
-    /// see `ChatStreamEvent.progress`. Cleared alongside `currentPhase`.
-    private(set) var currentPhaseDetail: String?
+    /// The store and the meeting this chat saves into (nil meeting: the library).
+    var storeContext: ModelContext? { modelContext }
+    var scopeMeeting: Meeting? { meeting }
+    var artifactSession: ChatSession? { session }
     var error: AppError?
 
-    private let chatService: MeetingChatService
-    // H8 PR 20: `deinit` is nonisolated even on a `@MainActor` class (Swift
-    // gives it no way to hop actors before the object is gone), so cancelling
-    // `task` there needs unchecked access — confirmed by CI, which rejected
-    // a plain `private var task` with "main actor-isolated property 'task'
-    // can not be referenced from a nonisolated context". This is the same
-    // "the compiler can't prove it, but it's fine" shape PR 18 already
-    // resolved for `LockScreenRecordingController.activity`: every other
-    // access to `task` (`send`/`cancel`/`reset`) is already isolated to the
-    // main actor as normal, and the one added by `deinit` can't race them —
-    // `deinit` only runs once the object's refcount reaches zero, and the
-    // task's own closure holds a strong reference to `self` (via its
-    // `guard let self`) for as long as it's actively mutating state, which
-    // makes that reference and deinit mutually exclusive by construction.
-    // `@ObservationIgnored` keeps this a plain stored property; behind the
-    // `@Observable` accessors `nonisolated(unsafe)` would have no effect.
-    @ObservationIgnored private nonisolated(unsafe) var task: Task<Void, Never>?
+    /// The run's owner task. Retained until the run settles, which is what `send` and
+    /// `waitUntilSettled` key off. Dismissing a view no longer cancels it (it used to, from
+    /// `deinit`, when the view owned this object): the host retains the conversation instead.
+    @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var runToken: UUID?
+    /// Question turns of the loaded session whose runs were interrupted (`ChatRunRecovery`).
+    private var interruptedQuestionIDs: Set<UUID> = []
+    /// The session and `ChatRunRecord` of the current run, closed as `.ended` when it settles.
+    @ObservationIgnored private var runRecord: (session: ChatSession, record: ChatRunRecord)?
+    /// What the current run was asked, kept until it settles so a background wind-down can
+    /// hand it to `pendingForegroundResume`.
+    @ObservationIgnored private var currentRequest: ForegroundResume?
+    /// A question the background wind-down stopped, sent again once on return to the
+    /// foreground (`resumeAfterForeground`). A user stop, a new question, `reset` or `load`
+    /// clear it: only an interruption the user did not ask for is resumed.
+    @ObservationIgnored var pendingForegroundResume: ForegroundResume?
+    /// A question a dead process left interrupted, which reopening its conversation resumes once
+    /// (`resumeInterruptedRun`, `ChatRunRecovery.resumableInterruptedRun`). Set by `load`;
+    /// cleared by `reset`, `send` and the resume itself.
+    var interruptedResume: InterruptedResume?
+    /// Whether the last stopped run committed a document change before it stopped. A resumed
+    /// run would call the tool again under a new invocation identity, which no receipt matches,
+    /// so such a question is left for the user to retry instead of being resumed.
+    @ObservationIgnored var stoppedRunCommittedEffects = false
+    /// The background-execution window held for the current run (see `send`).
+    @ObservationIgnored private var backgroundWindow: (any BackgroundExecutionWindow)?
+    @ObservationIgnored private let makeBackgroundWindow: @MainActor () -> any BackgroundExecutionWindow
+    /// Input queued for the running reply (NH08, `MeetingChatViewModel+Queue`); nil with no run.
+    @ObservationIgnored var inputQueue: AgentInputQueue?
+    @ObservationIgnored var queueObserver: Task<Void, Never>?
+    /// The queued lists shown above the composer.
+    var queued = AgentInputQueue.Snapshot()
+    /// Text handed back to the composer: queued input a stop or a failed run did not answer.
+    var restoredDraft: String?
+    /// The composer's unsent text, and what of it is saved (`MeetingChatViewModel+Draft`).
+    var draft = ""
+    @ObservationIgnored var savedDraft = ""
+    /// Whether the next answer starts by summarizing the earlier conversation (manual compaction).
+    var compactsNextAnswer = false
+    /// Whether the person stopped the last reply; shown once the stop settled. A new question,
+    /// `reset` and `load` clear it.
+    var replyWasStopped = false
+    /// The saved conversation's tree as the chat shows it (NH09).
+    var branches = ChatBranchPresentation()
+    /// The saved question being edited in the composer; sending asks it again in its place.
+    var editingQuestionID: UUID?
 
-    /// H8 PR 20, item 1's "chat/search tasks cancel on dismissal": this view
-    /// model is owned by `MeetingChatView`'s `@State`, so SwiftUI deallocates
-    /// it when the chat tab/sheet leaves the hierarchy — but nothing
-    /// previously cancelled `task` when that happened, so a reply already in
-    /// flight (a paid cloud LLM call) kept running to completion in the
-    /// background after the user navigated away. `deinit` is the reliable
-    /// backstop regardless of which dismissal path was taken.
-    deinit {
-        task?.cancel()
+    /// Tests pass a scripted `AgentModel` through `agentModelFactory`.
+    init(agentModelFactory: @escaping HarnessChatService.ModelFactory = {
+            provider, model in
+            try ProviderFactory.agentModel(for: provider, model: model,
+                                           reasoning: { ChatReasoningPreference.level(for: provider, model: model) })
+         },
+         harnessService: HarnessChatService = HarnessChatService(),
+         makeBackgroundWindow: @escaping @MainActor () -> any BackgroundExecutionWindow = { BackgroundActivity() }) {
+        self.agentModelFactory = agentModelFactory
+        self.harnessService = harnessService
+        self.makeBackgroundWindow = makeBackgroundWindow
     }
 
-    /// `chatService` defaults to the live retrieval + provider stack; tests
-    /// pass one over a stub embedder and a scripted provider.
-    init(chatService: MeetingChatService = MeetingChatService()) {
-        self.chatService = chatService
-    }
-
-    /// Send `question`. When `transcriptText` is non-nil the scope is a single
-    /// meeting (full-transcript grounding, falling back to retrieval over
-    /// `candidates` only for very long meetings); when nil the scope is the whole
-    /// library (retrieval over `candidates`). `provider`/`model` come from the
-    /// summary settings. No-op while a previous reply is still in flight.
-    ///
-    /// The reply streams in: `MeetingChatService` reports `ChatStreamEvent`s
-    /// from off the main actor, so they are bridged through an `AsyncStream`
-    /// into a single `@MainActor` consumer task that applies them in order —
-    /// the same pattern `TranscriptionCoordinator` uses for transcription
-    /// phases. The assistant `Turn` is created lazily, on the first text
-    /// delta, so an error before any text arrives leaves no stray turn behind.
-    func send(
-        question: String,
-        transcriptText: String?,
-        candidates: [SemanticSearchService.Candidate],
-        summariesByMeeting: [UUID: String] = [:],
-        articlesByMeeting: [UUID: WikiArticleSnapshot] = [:],
-        provider: AIProvider,
-        model: String,
-        runID: OperationID = OperationID()
-    ) {
+    /// Send `question` to the agent over the current source scope. `provider`/`model` come from
+    /// the summary settings. No-op while a previous reply is still in flight. A provider without
+    /// an `AgentModel` (Apple's on-device model) fails with the cloud-provider notice; the view
+    /// disables the composer for it before that can happen.
+    func send(question: String, provider: AIProvider, model: String, runID: OperationID = OperationID(),
+              commandID: String? = nil) {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isResponding else { return }
+        guard !trimmed.isEmpty, !isResponding, task == nil else { return }
+        // A named command already in the log is refused before its question is saved, so a repeat
+        // leaves the conversation untouched (a concurrent repeat is undone below).
+        if let commandID, let session, let modelContext,
+           ChatRunBranch.contains(command: commandID, in: session, store: SwiftDataAgentSessionStore(context: modelContext)) {
+            error = Self.presentedError(AgentSessionOwnerError.duplicateCommand)
+            return
+        }
+        error = nil
+        replyWasStopped = false
+        pendingForegroundResume = nil
+        interruptedResume = nil
+        stoppedRunCommittedEffects = false
+
+        generation = UUID()
+        let generation = self.generation
 
         turns.append(Turn(role: .user, text: trimmed))
-        isResponding = true
-        currentPhase = nil
-        currentPhaseDetail = nil
-        let history = Self.buildHistory(from: Array(turns.dropLast()))
-        // Streaming can append a partial assistant turn before cancellation is
-        // observed (unlike the old atomic-answer flow, which only appended on
-        // success). Remember where the reply would start so a cancel can drop
-        // it, keeping the "silently drop the pending turn" behavior intact.
-        let turnCountBeforeReply = turns.count
-        // `runID` correlates every `ReliabilityEvent` this turn produces — the
-        // service's own per-stage events (validation, provider, answer) and
-        // this view model's own outcome event below — the same
-        // caller-generates-the-id convention `DocumentGenerationViewModel`
-        // uses for `DocumentGenerationService`. A parameter (defaulted) so a
-        // test can pick its own events out of the process-global log.
-        let startedAt = Date()
-
-        let (stream, continuation) = AsyncStream<ChatStreamEvent>.makeStream()
-        let onEvent: MeetingChatService.ChatEventHandler = { event in
-            continuation.yield(event)
-        }
-        let consumer = Task { @MainActor [weak self] in
-            var assistantIndex: Int?
-            for await event in stream {
-                guard let self else { return }
-                switch event {
-                case .phase(let phase):
-                    self.currentPhase = phase
-                    self.currentPhaseDetail = nil
-                case .progress(let detail):
-                    self.currentPhaseDetail = detail
-                case .delta(let text):
-                    if assistantIndex == nil {
-                        self.currentPhase = nil
-                        self.currentPhaseDetail = nil
-                        self.turns.append(Turn(role: .assistant, text: ""))
-                        assistantIndex = self.turns.count - 1
-                    }
-                    if let assistantIndex {
-                        self.turns[assistantIndex].text += text
-                    }
-                }
+        // The run's durable command identity (NH05): the question turn it answers, unless the
+        // caller names one, so the same command is never run twice from the session's log.
+        let command = commandID ?? turns[turns.count - 1].id.uuidString
+        turns[turns.count - 1].artifacts = retryArtifacts
+        turns[turns.count - 1].artifactOrigins = retryOrigins
+        retryArtifacts = []
+        retryOrigins = [:]
+        // Persistence barrier (NH05): the question is saved before any request, so a crash or a
+        // suspension mid-run can lose the reply but never the question. A failed save stops here
+        // with the question left retryable; nothing is sent that the store has not accepted.
+        do { try persistOrThrow() } catch {
+            if !(error is CancellationError) {
+                self.error = .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.invalid", comment: "Saved chat storage error"))
             }
+            return
         }
-
-        // Close the channel and wait for the consumer to apply every pending
-        // event before touching completion/error state, the same
-        // `drainEvents` idiom `TranscriptionCoordinator` uses for its own
-        // off-main phase callbacks.
-        func drainEvents() async {
-            continuation.finish()
-            await consumer.value
+        // A question sent from the composer was its draft, which is not one any more. A resumed
+        // question comes from the conversation, not the composer: the draft stays.
+        if draft.trimmingCharacters(in: .whitespacesAndNewlines) == trimmed {
+            draft = ""
+            if !savedDraft.isEmpty { saveDraft() }
         }
+        isResponding = true
+        phase = .preparing
+        runProgress = AgentRunProgress()
+        currentRequest = ForegroundResume(question: trimmed, provider: provider, model: model)
+        let token = UUID()
+        runToken = token
+        beginRunRecord(token, questionTurnID: turns[turns.count - 1].id)
+        // Suspension policy (NH05): a run outlives its view, so it can also outlive the
+        // foreground. Hold a finite background window for it; when the system reclaims the
+        // window, stop the run so it settles as an interruption (retryable question, committed
+        // artifacts kept) instead of being frozen mid-request or mid-tool.
+        let window = makeBackgroundWindow()
+        backgroundWindow = window
+        window.begin(name: "ai.kurn.chat") { [weak self] in
+            self?.expireInBackground(token, runID: runID)
+        }
+        let priorTurns = Array(turns.dropLast())
+        // A cancel or failure drops whatever reply was appended after the question, so the
+        // question stays as the retryable, unanswered turn.
+        let turnCountBeforeReply = turns.count
+        // `runID` correlates the `ReliabilityEvent` this turn produces; a parameter (defaulted) so
+        // a test can pick its own events out of the process-global log.
+        let startedAt = Date()
+        runStartedAt = startedAt
 
         task = Task { [weak self] in
             guard let self else { return }
+            defer { self.settle(token) }
             do {
-                let answer: MeetingChatService.Answer
-                if let transcriptText {
-                    answer = try await chatService.answerAboutMeeting(
-                        question: trimmed, history: history, transcriptText: transcriptText,
-                        candidates: candidates, provider: provider, model: model,
-                        runID: runID, onEvent: onEvent
-                    )
-                } else {
-                    answer = try await chatService.answerAcrossLibrary(
-                        question: trimmed, history: history, candidates: candidates,
-                        summariesByMeeting: summariesByMeeting, articlesByMeeting: articlesByMeeting,
-                        provider: provider, model: model, runID: runID, onEvent: onEvent
-                    )
+                try Task.checkCancellation()
+                guard let agentModel = try agentModelFactory(provider, model) else {
+                    throw AppError.apiError(statusCode: 0, message: NSLocalizedString(
+                        "chat.artifact.cloud_required", comment: "Chat provider requirement"))
                 }
-                await drainEvents()
-                self.applyFinal(answer, model: model, elapsed: Date().timeIntervalSince(startedAt))
-                // Reported at "view_model" stage, distinct from the service's
-                // own unstaged success event — the same two-tier shape
-                // `DocumentGenerationViewModel`/`DocumentGenerationService`
-                // use (one signal per layer: did the API call succeed, did
-                // the whole user-visible round trip succeed).
+                let answered = try await self.runHarness(agentModel, runID: token, commandID: command, question: trimmed,
+                                                         history: priorTurns,
+                                                         provider: provider, model: model, startedAt: startedAt)
+                try Task.checkCancellation()
+                guard self.generation == generation else { throw CancellationError() }
+                self.persist()
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "meeting_chat", stage: "view_model",
-                    outcome: .succeeded, elapsedSeconds: Date().timeIntervalSince(startedAt)
+                    outcome: answered ? .succeeded : .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                    code: answered ? nil : "agent_limit"
                 ))
             } catch is CancellationError {
-                // User cancelled; drop whatever streamed in so far, silently.
-                // Leaving the question turn in place is what makes it
-                // `retryableQuestion` afterward.
-                await drainEvents()
-                self.dropPartialReply(keeping: turnCountBeforeReply)
+                if self.generation == generation { self.dropPartialReply(keeping: turnCountBeforeReply) }
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "meeting_chat", stage: "view_model",
                     outcome: .cancelled, elapsedSeconds: Date().timeIntervalSince(startedAt)
                 ))
-            } catch let appError as AppError {
-                // Same drop as cancellation: a half-streamed answer next to
-                // an error alert reads as a broken reply, not a retryable
-                // question, so `retryableQuestion` needs the turn list back
-                // at just the question for this to be one clean asset.
-                await drainEvents()
-                self.dropPartialReply(keeping: turnCountBeforeReply)
-                self.error = appError
-                ReliabilityLog.record(ReliabilityEvent(
-                    operationID: runID, operation: "meeting_chat", stage: "view_model",
-                    outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
-                    code: appError.logCode
-                ))
             } catch {
-                await drainEvents()
-                self.dropPartialReply(keeping: turnCountBeforeReply)
-                self.error = .apiError(statusCode: 0, message: error.localizedDescription)
+                let appError = Self.presentedError(error)
+                if self.generation == generation {
+                    self.dropPartialReply(keeping: turnCountBeforeReply)
+                    // A repeat that raced past the check above ran nothing: its question goes too.
+                    if (error as? AgentSessionOwnerError) == .duplicateCommand, self.turns.last?.role == .user {
+                        self.turns.removeLast()
+                        self.persist()
+                    }
+                    self.error = appError
+                }
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "meeting_chat", stage: "view_model",
                     outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
-                    code: "unexpected"
+                    code: ChatRunBranch.isWriteFailure(error) ? "run_transcript_write_failed"
+                        : error is AppError ? appError.logCode : "unexpected"
                 ))
             }
-            self.isResponding = false
-            self.currentPhase = nil
-            self.currentPhaseDetail = nil
-            self.task = nil
         }
     }
 
-    /// Replace the streamed-in assistant text with the service's final answer
-    /// (they should already match) and attach its citations, which only
-    /// arrive with the completed `Answer` — streaming deltas carry text only.
-    /// Also attaches the provider's token usage (if it reported one), the
-    /// estimated cost that implies under `model`, and how long the reply
-    /// took to generate.
-    private func applyFinal(_ answer: MeetingChatService.Answer, model: String, elapsed: TimeInterval) {
-        guard let index = turns.lastIndex(where: { $0.role == .assistant }) else { return }
-        turns[index].text = answer.text
-        turns[index].citations = answer.citations
-        turns[index].usage = answer.usage
-        turns[index].elapsedSeconds = elapsed
-        turns[index].costUSD = answer.usage.flatMap { ModelPricing.estimatedCostUSD(model: model, usage: $0) }
-        persist()
+    /// Ends the run `token` started, whichever conversation is on screen by now: a fenced old
+    /// generation cannot change content, but it still owns the busy state until it terminates.
+    private func settle(_ token: UUID) {
+        guard runToken == token else { return }
+        runToken = nil
+        task = nil
+        currentRequest = nil
+        isResponding = false
+        phase = .idle
+        writingSteps = []
+        runStartedAt = nil
+        backgroundWindow?.end()
+        backgroundWindow = nil
+        markRunRecord(.ended)
+    }
+
+    /// Writes the `.running` `ChatRunRecord` for this run into the saved session. Best effort: a
+    /// failure is reported, not fatal, since the question itself is already durable.
+    private func beginRunRecord(_ token: UUID, questionTurnID: UUID) {
+        guard let session, let modelContext else { return }
+        let record = ChatRunRecord(runID: token.uuidString, questionTurnID: questionTurnID)
+        runRecord = (session, record)
+        writeRunRecord(record, in: session, context: modelContext)
+    }
+
+    private func markRunRecord(_ state: ChatRunRecord.State) {
+        guard let current = runRecord else { return }
+        runRecord = nil
+        let target = current.session
+        guard let modelContext, !target.isDeleted, target.modelContext != nil else { return }
+        var updated = current.record
+        updated.state = state
+        writeRunRecord(updated, in: target, context: modelContext)
+    }
+
+    private func writeRunRecord(_ record: ChatRunRecord, in target: ChatSession, context: ModelContext) {
+        do {
+            try SwiftDataAgentSessionStore(context: context).put(record.record(), in: target,
+                                                                 expectedRevision: target.canonicalRevision)
+        } catch {
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: OperationID(String(record.runID.prefix(8))), operation: "meeting_chat",
+                stage: "run_record", outcome: .failed, code: "run_record_write_failed"
+            ))
+        }
+    }
+
+    /// The background window for run `token` is running out: cancel it like a user stop,
+    /// early enough (`BackgroundDeadline`) that settling still runs inside the window. The
+    /// system's own expiration may call this again; only the first call acts.
+    private func expireInBackground(_ token: UUID, runID: OperationID) {
+        guard runToken == token, phase != .cancelling else { return }
+        ReliabilityLog.record(ReliabilityEvent(
+            operationID: runID, operation: "meeting_chat", stage: "background",
+            outcome: .cancelled, code: "background_expired"
+        ))
+        let request = currentRequest
+        cancel()
+        // The system stopped it, not the person.
+        replyWasStopped = false
+        pendingForegroundResume = request
+    }
+
+    /// Returns once the current run, if any, has terminated and reconciled its reply.
+    func waitUntilSettled() async {
+        while let task { await task.value }
     }
 
     // MARK: - Persistence
 
     /// Saves the whole conversation so far into `session`, creating it (and
     /// deriving its title from the first question) on the first successful
-    /// exchange. Never called for a cancelled/failed reply — `dropPartialReply`
-    /// removes those turns before `applyFinal`, the only caller, is reached.
+    /// exchange. A cancelled/failed reply never reaches it with its partial turns —
+    /// `dropPartialReply` removes those first.
     /// A save failure is logged and surfaced but leaves the conversation on
     /// screen exactly as it is — the user's answer is not lost, only its
     /// persistence.
-    private func persist() {
+    private func persist(turns savedTurns: [Turn]? = nil) {
+        do { try persistOrThrow(turns: savedTurns) }
+        catch is CancellationError {}
+        catch { self.error = .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.invalid", comment: "Saved chat storage error")) }
+    }
+
+    private func persistOrThrow(turns savedTurns: [Turn]? = nil) throws {
         guard let modelContext else { return }
+        // A retained conversation can outlive its meeting or saved session: deleting either while
+        // a run settles must not write into (or resurrect) a deleted row.
+        if let meeting, meeting.isDeleted || meeting.modelContext == nil { throw CancellationError() }
+        if let session, session.isDeleted || session.modelContext == nil { throw CancellationError() }
         let target: ChatSession
         if let session {
             target = session
         } else {
             let firstQuestion = turns.first(where: { $0.role == .user })?.text ?? ""
             target = ChatSession(meeting: meeting, title: ChatSession.title(from: firstQuestion))
+            target.id = conversationID
             modelContext.insert(target)
             session = target
         }
-        target.turns = turns.map(PersistedChatTurn.init)
-        target.updatedAt = Date()
-        if let saveError = modelContext.saveOrError() {
-            self.error = saveError
-        }
+        try SwiftDataAgentSessionStore(context: modelContext).writePresentation(target,
+            turns: (savedTurns ?? turns).map(PersistedChatTurn.init), scope: scope, artifacts: artifacts, preserveCommittedArtifacts: true)
+        artifacts = try target.harnessSnapshot().artifacts
+        refreshBranches()
     }
 
     /// Removes any turn appended after `count` — the partial assistant reply
@@ -320,7 +362,14 @@ final class MeetingChatViewModel {
     /// sitting next to an error. Leaves the question turn itself untouched.
     private func dropPartialReply(keeping count: Int) {
         guard turns.count > count else { return }
+        for turn in turns.dropFirst(count) {
+            turns[count - 1].inheritArtifacts(from: turn)
+            turns[count - 1].steps = turn.steps
+            turns[count - 1].usage = turn.usage
+            turns[count - 1].costUSD = turn.costUSD
+        }
         turns.removeLast(turns.count - count)
+        persist()
     }
 
     /// The question of the most recent turn when it ended without a reply —
@@ -336,49 +385,66 @@ final class MeetingChatViewModel {
     /// Removes the trailing unanswered user turn so a retry can re-send it
     /// without leaving a duplicate question bubble behind. No-op unless
     /// `retryableQuestion` is non-nil.
+    /// Whether the retryable question is one whose run the app was closed during (a crash, or a
+    /// suspension the background wind-down could not outrun), found by `ChatRunRecovery`.
+    var retryableQuestionWasInterrupted: Bool {
+        guard retryableQuestion != nil, let last = turns.last else { return false }
+        return interruptedQuestionIDs.contains(last.id)
+    }
+
     func dropRetryableQuestion() {
         guard retryableQuestion != nil else { return }
-        turns.removeLast()
+        let pending = turns.removeLast()
+        retryArtifacts = pending.artifacts
+        retryOrigins = pending.artifactOrigins
     }
 
-    /// Prior turns as chat history. Turns are plain text to keep token cost
-    /// down, but the most recent answer's retrieved excerpts are re-appended as a
-    /// compact context block so follow-up questions stay grounded in what the
-    /// previous answer was based on. (Full per-turn context is intentionally not
-    /// kept — that is the synthesis path's job, not the lookup path's.)
-    static func buildHistory(from prior: [Turn]) -> [ChatMessage] {
-        var history = prior.map { ChatMessage(role: $0.role, content: $0.text) }
-        if let lastAnswer = prior.last(where: { $0.role == .assistant }),
-           !lastAnswer.citations.isEmpty {
-            history.append(ChatMessage(role: .user, content: contextBlock(from: lastAnswer.citations)))
-        }
-        return history
-    }
-
-    /// A short, bounded reminder of the excerpts the previous answer used.
-    private static func contextBlock(from hits: [SemanticSearchService.Hit]) -> String {
-        let lines = hits.prefix(8).map { hit -> String in
-            let meeting = hit.meetingTitle.isEmpty ? "" : " (\(hit.meetingTitle))"
-            return "[\(hit.start.clockDisplay)]\(meeting) \(hit.speakerLabel): \(hit.text)"
-        }.joined(separator: "\n")
-        return "For reference, my previous answer was grounded on these excerpts:\n\(lines)"
-    }
-
-    /// Cancel an in-flight reply.
+    /// Requests cancellation of the in-flight reply. The conversation stays busy in `.cancelling`
+    /// until the run settles (`waitUntilSettled`); the run itself drops the partial reply and
+    /// keeps its trace, usage and committed artifacts on the retryable question.
     func cancel() {
-        task?.cancel()
-        task = nil
-        isResponding = false
+        pendingForegroundResume = nil
+        guard let task else { return }
+        phase = .cancelling
+        replyWasStopped = true
+        // Queued input is cleared before the stop and handed back to the composer (NH08).
+        guard let queue = inputQueue else { task.cancel(); return }
+        Task { [weak self] in
+            let pending = (try? await queue.clear()) ?? []
+            self?.restoreToDraft(pending.map(\.text))
+            task.cancel()
+        }
     }
 
     /// Starts a brand-new, unsaved conversation — the "new chat" affordance.
     /// Nothing is written until the first exchange completes (`persist()`),
     /// so an abandoned new chat never leaves an empty row in history.
     func reset() {
+        // A draft that could not be saved stays in the composer of the new conversation.
+        let kept = saveDraft() ? "" : draft
+        editingQuestionID = nil
         cancel()
+        // Fences the cancelled run: it can no longer touch what is shown from here on.
+        generation = UUID()
         turns.removeAll()
+        retryArtifacts = []
+        retryOrigins = [:]
         error = nil
         session = nil
+        interruptedQuestionIDs = []
+        replyWasStopped = false
+        interruptedResume = nil
+        runProgress = AgentRunProgress()
+        lastContextTokens = nil
+        conversationID = UUID()
+        artifacts = []
+        workspace = ChatDocumentWorkspace()
+        scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id)
+        branches = ChatBranchPresentation()
+        draft = kept
+        savedDraft = ""
+        compactsNextAnswer = false
+        if !kept.isEmpty { error = Self.draftSaveError }
     }
 
     // MARK: - Session history
@@ -388,16 +454,17 @@ final class MeetingChatViewModel {
     /// scopes both the same way it scopes retrieval — `nil` for the
     /// library-wide "Ask".
     func configure(meeting: Meeting?, modelContext: ModelContext) {
+        let changedMeeting = self.meeting?.id != meeting?.id
+        if changedMeeting { reset() }
         self.meeting = meeting
+        if changedMeeting || self.modelContext == nil { scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id) }
         self.modelContext = modelContext
     }
 
     /// Saved conversations in the current scope, most-recently-active first.
     /// Fetches every `ChatSession` and filters in memory rather than a
     /// predicate over the optional `meeting` relationship, the same
-    /// resolve-scope-in-Swift shape `MeetingChatView`'s own
-    /// `summariesByMeeting`/`articlesByMeeting` already use for a fetch this
-    /// infrequent.
+    /// resolve-scope-in-Swift shape, which is cheap for a fetch this infrequent.
     func pastSessions() -> [ChatSession] {
         guard let modelContext else { return [] }
         let all = (try? modelContext.fetch(FetchDescriptor<ChatSession>())) ?? []
@@ -407,82 +474,210 @@ final class MeetingChatViewModel {
             .sorted { $0.updatedAt > $1.updatedAt }
     }
 
+    /// Documents saved outside a run (an undo): shown, and what the next run starts from.
+    func adoptDocuments(_ values: [ChatDocumentArtifact]) throws {
+        workspace = try ChatDocumentWorkspace(artifacts: values)
+        artifacts = values
+    }
+
     /// Loads a previously saved conversation for display and continuation.
     func load(session: ChatSession) {
+        guard session.meeting?.id == meeting?.id else { return }
+        // Text typed in a new, unsaved conversation goes along to one with no draft of its own.
+        // Text typed in a new conversation, or a draft that could not be saved, goes along.
+        let saved = saveDraft()
+        let carried = self.session == nil || !saved ? draft : ""
+        editingQuestionID = nil
         cancel()
-        self.session = session
-        turns = session.turns.map(Turn.init)
-        error = nil
+        generation = UUID()
+        do {
+            if let modelContext { try SwiftDataAgentSessionStore(context: modelContext).migrate(session) }
+            let restored = try session.harnessSnapshot()
+            let workspace = try ChatDocumentWorkspace(artifacts: restored.artifacts)
+            self.session = session
+            conversationID = session.id
+            self.workspace = workspace
+            artifacts = restored.artifacts
+            scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id, scope: restored.scope)
+            // An interrupted run's recorded steps show under the question it left unanswered.
+            let recovered = modelContext.map {
+                ChatRunRecovery.restoringInterruptedRun(in: restored.turns, session: session, context: $0)
+            } ?? (turns: restored.turns, interrupted: [])
+            turns = recovered.turns.map(Turn.init)
+            interruptedQuestionIDs = recovered.interrupted
+            replyWasStopped = false
+            runProgress = AgentRunProgress()
+            lastContextTokens = nil
+            interruptedResume = modelContext.flatMap { context in
+                ChatRunRecovery.resumableInterruptedRun(in: recovered.turns, session: session, context: context)
+            }.flatMap { runID in recovered.turns.last.map { InterruptedResume(question: $0.text, runID: runID) } }
+            retryArtifacts = []
+            retryOrigins = [:]
+            error = nil
+            restoreDraft(of: session, carrying: carried)
+            if !saved { error = Self.draftSaveError }
+            compactsNextAnswer = false
+            restoreLeftoverQueue(of: session)
+            refreshBranches()
+        } catch {
+            self.error = .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.invalid", comment: "Saved chat storage error"))
+        }
+    }
+
+    func updateScope(_ scope: ChatSourceScope) {
+        guard !isResponding else { return }
+        scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id, scope: scope)
+        if session != nil { persist() }
+    }
+
+    private func runHarness(_ agentModel: any AgentModel, runID: UUID, commandID: String, question: String,
+                            history priorTurns: [Turn],
+                            provider: AIProvider, model: String, startedAt: Date) async throws -> Bool {
+        guard let modelContext else {
+            throw AppError.apiError(statusCode: 0, message: "Chat requires a configured model context.")
+        }
+        let workspace = workspace
+        let generation = self.generation
+        // The question this run answers is the turn `send` just appended.
+        let questionID = turns.last?.id
+        let completedTurns = Array(turns.dropLast())
+        let initialArtifacts = await workspace.snapshot()
+        let origin = ChatArtifactOrigin(question: question, modelIdentifier: "\(provider.id):\(model)",
+                                        sources: try ChatArtifactSources.capture(scope: scope, context: modelContext))
+        let priorOrigins = Dictionary(uniqueKeysWithValues: initialArtifacts.map {
+            ($0.id, ChatArtifactStore.origin(artifactID: $0.id, in: turns.map(PersistedChatTurn.init)))
+        })
+        try Task.checkCancellation()
+        if initialArtifacts != artifacts {
+            artifacts = initialArtifacts
+            persist(turns: completedTurns)
+        }
+        var service = harnessService
+        service.conversationID = conversationID
+        service.documentOrigin = origin
+        let acceptedTurns = turns
+        service.confirmChange = { [weak self] call in await self?.confirmChange(call) ?? false }
+        service.prepareDocumentSession = { [weak self] in
+            guard let self, self.generation == generation else { throw CancellationError() }
+            try self.persistOrThrow(turns: acceptedTurns)
+        }
+        // The run's canonical history goes on its own branch of the saved session, anchored at
+        // the accepted question, written by an `AgentSession` owner (`ChatRunBranch`); `runID`
+        // matches the run's `ChatRunRecord`.
+        let savedSession = session
+        let owner = try savedSession.map {
+            try ChatRunBranch.owner(session: $0, store: SwiftDataAgentSessionStore(context: modelContext))
+        }
+        let queue = startInputQueue()
+        defer { stopInputQueue() }
+        let run = try await service.start(model: agentModel, provider: provider, modelIdentifier: model,
+                                          context: modelContext, scope: scope, workspace: workspace,
+                                          history: Self.buildHistory(from: priorTurns), question: question,
+                                          owner: owner, runID: runID, commandID: commandID, questionID: questionID,
+                                          replay: ChatReplayHistory.load(
+                                              turns: priorTurns.map { .init(id: $0.id, role: $0.role, text: $0.text) },
+                                              session: savedSession, store: SwiftDataAgentSessionStore(context: modelContext)),
+                                          inputQueue: queue, compactFirst: compactsNextAnswer && savedSession != nil)
+        compactsNextAnswer = false
+        // Whatever ends this function, the run has settled first: a cancelled or failed run is
+        // only reported once nothing can still call a tool or write its effect.
+        do { try Task.checkCancellation() } catch {
+            await run.terminate()
+            throw error
+        }
+        let index = turns.count
+        turns.append(Turn(role: .assistant, text: ""))
+        var timeline = AgentRunTrace()
+        var toolsSeen = 0
+        var exchanges: [AgentRunSnapshot.Exchange] = []
+        do {
+            for try await view in run.snapshots {
+                try Task.checkCancellation()
+                if self.generation == generation {
+                    runProgress = view.progress
+                    phase = phase.following(runProgress)
+                    if let tokens = runProgress.contextTokens { lastContextTokens = tokens }
+                }
+                timeline = view.trace
+                turns[index].steps = timeline.steps
+                if self.generation == generation { writingSteps = view.streamingToolCalls.map(\.step) }
+                turns[index].usage = timeline.hasUsage
+                    ? TokenUsage(promptTokens: timeline.usage.inputTokens, completionTokens: timeline.usage.outputTokens) : nil
+                turns[index].costUSD = timeline.hasUsage ? ModelPricing.estimatedCostUSD(model: model, usage: timeline.usage) : nil
+                // Queued input the run took in shows as its own question and reply (NH08).
+                exchanges = view.exchanges
+                turns = Self.presenting(exchanges, fallback: view.text, in: turns, from: index)
+                // Coalescing can fold several tool calls into one snapshot: take every one that
+                // finished since the last snapshot seen.
+                let finished = view.finishedTools.dropFirst(toolsSeen)
+                toolsSeen = view.finishedTools.count
+                if finished.contains(where: { !$0.isError && ChatRunBranch.documentTools.contains($0.name) }) {
+                    let snapshot = await workspace.snapshot()
+                    try Task.checkCancellation()
+                    turns[index].recordArtifacts(from: artifacts, to: snapshot,
+                                                origin: origin, priorOrigins: priorOrigins)
+                    artifacts = snapshot
+                    var pending = turns[index - 1]
+                    pending.inheritArtifacts(from: turns[index])
+                    persist(turns: completedTurns + [pending])
+                }
+            }
+            try Task.checkCancellation()
+            await run.settle()
+        } catch {
+            await run.terminate()
+            if self.generation == generation { runProgress.finish() }
+            // Queued input this run took in but did not finish answering goes back to the composer.
+            await restoreUnansweredInput(exchanges.dropFirst().compactMap(\.input))
+            // A run whose end entry alone failed to save gets one more attempt at it, without
+            // re-running anything; a branch still left open is closed by the next launch sweep.
+            if ChatRunBranch.isWriteFailure(error), let owner {
+                try? await owner.retrySettlement()
+                _ = await owner.waitUntilSettled()
+            }
+            let snapshot = await workspace.snapshot()
+            // Any document change this run committed rules out an automatic resume.
+            if snapshot != initialArtifacts { stoppedRunCommittedEffects = true }
+            if self.generation == generation, snapshot != artifacts {
+                turns[index - 1].recordArtifacts(from: artifacts, to: snapshot,
+                                                origin: origin, priorOrigins: priorOrigins)
+                artifacts = snapshot
+                persist(turns: completedTurns + [turns[index - 1]])
+            }
+            // A run whose session was deleted under it writes nothing more and reports nothing.
+            if let savedSession, savedSession.isDeleted || savedSession.modelContext == nil { throw CancellationError() }
+            throw error
+        }
+        turns[index].elapsedSeconds = Date().timeIntervalSince(startedAt)
+        // A run that stopped at a limit leaves its queue: that input goes back to the composer.
+        await restoreUnansweredInput([])
+        if exchanges.count <= 1, ChatRunNotice.needsRetry(steps: timeline.steps, answer: turns[index].text) {
+            let stopped = turns.removeLast()
+            turns[index - 1].steps = stopped.steps
+            turns[index - 1].inheritArtifacts(from: stopped)
+            turns[index - 1].usage = stopped.usage
+            turns[index - 1].costUSD = stopped.costUSD
+            turns[index - 1].elapsedSeconds = stopped.elapsedSeconds
+            return false
+        }
+        return true
     }
 
     /// Permanently deletes `target`. If it was the open conversation, starts
     /// a fresh one in its place so the view doesn't keep showing turns that
     /// no longer exist on disk.
-    func delete(_ target: ChatSession) {
-        guard let modelContext else { return }
+    /// Returns whether `target` was deleted, so a list can keep a refused row.
+    @discardableResult
+    func delete(_ target: ChatSession) -> Bool {
+        guard let modelContext else { return false }
         let wasCurrent = target.id == session?.id
+        // The open conversation's run writes into its session until it settles.
+        guard !(wasCurrent && isResponding) else { return false }
         modelContext.delete(target)
         if let saveError = modelContext.saveOrError() {
             self.error = saveError
         }
         if wasCurrent { reset() }
-    }
-}
-
-private extension PersistedChatTurn {
-    /// Snapshot of a rendered `Turn` for JSON storage.
-    init(_ turn: MeetingChatViewModel.Turn) {
-        self.init(
-            id: turn.id,
-            role: turn.role,
-            text: turn.text,
-            citations: turn.citations.map(PersistedCitation.init),
-            usage: turn.usage,
-            costUSD: turn.costUSD,
-            elapsedSeconds: turn.elapsedSeconds
-        )
-    }
-}
-
-private extension PersistedCitation {
-    init(_ hit: SemanticSearchService.Hit) {
-        self.init(
-            meetingID: hit.meetingID,
-            recordingID: hit.recordingID,
-            meetingTitle: hit.meetingTitle,
-            start: hit.start,
-            speakerLabel: hit.speakerLabel,
-            text: hit.text
-        )
-    }
-}
-
-private extension MeetingChatViewModel.Turn {
-    /// Restores a rendered `Turn` from a saved session. `end`/`score` have no
-    /// persisted counterpart (unused once retrieval ranking is done), so
-    /// reconstructed citations zero them — display and jump-to-citation only
-    /// ever read `start`/`speakerLabel`/`text`/the two ids.
-    init(_ persisted: PersistedChatTurn) {
-        self.init(
-            id: persisted.id,
-            role: persisted.role,
-            text: persisted.text,
-            citations: persisted.citations.map { citation in
-                SemanticSearchService.Hit(
-                    chunkID: UUID(),
-                    meetingID: citation.meetingID,
-                    recordingID: citation.recordingID,
-                    text: citation.text,
-                    start: citation.start,
-                    end: citation.start,
-                    speakerLabel: citation.speakerLabel,
-                    score: 0,
-                    meetingTitle: citation.meetingTitle
-                )
-            },
-            usage: persisted.usage,
-            costUSD: persisted.costUSD,
-            elapsedSeconds: persisted.elapsedSeconds
-        )
+        return true
     }
 }

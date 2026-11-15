@@ -15,7 +15,7 @@ import coverage_gate  # noqa: E402
 import lcov  # noqa: E402
 
 SCOPE = {
-    "include": ["Kurn/", "Packages/KurnCore/Sources/"],
+    "include": ["Kurn/", "Packages/KurnCore/Sources/", "Packages/AgentHarness/Sources/"],
     "exclude": [
         {"pattern": "Kurn/Views/**", "reason": "views"},
         {"pattern": "Kurn/ContentView.swift", "reason": "root view"},
@@ -41,7 +41,7 @@ class Workspace:
         test.addCleanup(self.dir.cleanup)
         self.root = self.dir.name
         for rel in ["Kurn/Services/A.swift", "Kurn/Models/B.swift", "Kurn/Views/V.swift",
-                    "Packages/KurnCore/Sources/KurnCore/C.swift"]:
+                    "Packages/KurnCore/Sources/KurnCore/C.swift", "Packages/AgentHarness/Sources/AgentHarness/A.swift"]:
             path = os.path.join(self.root, rel)
             os.makedirs(os.path.dirname(path), exist_ok=True)
             open(path, "w").close()
@@ -69,6 +69,9 @@ class RelativeTests(unittest.TestCase):
         linux = "/home/runner/work/Kurn/Kurn/Packages/KurnCore/Sources/KurnCore/C.swift"
         self.assertEqual(lcov.relative(mac, ws.root), "Kurn/Services/A.swift")
         self.assertEqual(lcov.relative(linux, ws.root), "Packages/KurnCore/Sources/KurnCore/C.swift")
+        harness = "/home/runner/work/Kurn/Kurn/Packages/AgentHarness/Sources/AgentHarness/A.swift"
+        self.assertEqual(lcov.relative(harness, ws.root), "Packages/AgentHarness/Sources/AgentHarness/A.swift")
+        self.assertEqual(lcov.layer_of("Packages/AgentHarness/Sources/AgentHarness/A.swift"), "Packages/AgentHarness")
         self.assertEqual(lcov.relative(mac, None), "Kurn/Services/A.swift")
 
     def test_hits_are_unioned_across_tracefiles(self):
@@ -82,19 +85,32 @@ class RelativeTests(unittest.TestCase):
 
 
 class ScopeTests(unittest.TestCase):
+    def test_independent_package_is_measured_without_a_bootstrap_floor(self):
+        ws = Workspace(self, floor={"target": 80.0, "tolerance": 1.0, "total": 85.3,
+                                    "layers": {"Packages/KurnCore": 97.4}})
+        report = ws.write("harness.lcov", tracefile({
+            "/home/runner/work/Kurn/Kurn/Packages/AgentHarness/Sources/AgentHarness/A.swift": {1: 1}
+        }))
+        code, output = ws.run(report)
+        self.assertEqual(code, 0)
+        self.assertIn("`Packages/AgentHarness` | 1 | 100.0%", output)
+
     def test_include_roots_and_exclusions(self):
         scope = lcov.Scope(SCOPE["include"], SCOPE["exclude"])
         self.assertTrue(scope.contains("Kurn/Services/A.swift"))
         self.assertTrue(scope.contains("Kurn/AppComposition.swift"))
         self.assertTrue(scope.contains("Packages/KurnCore/Sources/KurnCore/C.swift"))
+        self.assertTrue(scope.contains("Packages/AgentHarness/Sources/AgentHarness/A.swift"))
         self.assertFalse(scope.contains("Kurn/Views/Settings/X.swift"))
         self.assertFalse(scope.contains("Kurn/ContentView.swift"))
         self.assertFalse(scope.contains("KurnWatch/W.swift"))
         self.assertFalse(scope.contains("Packages/KurnCore/Tests/T.swift"))
+        self.assertFalse(scope.contains("Packages/AgentHarness/Tests/T.swift"))
 
     def test_repository_scope_file_is_valid_and_every_exclusion_has_a_reason(self):
         scope = lcov.Scope.load()
         self.assertTrue(scope.include)
+        self.assertTrue(scope.contains("Packages/AgentHarness/Sources/AgentHarness/A.swift"))
         for entry in scope.exclude:
             self.assertTrue(entry.get("reason", "").strip(), entry["pattern"])
 

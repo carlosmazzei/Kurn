@@ -2,7 +2,8 @@
   "_comment": "What the coverage gate (Tools/coverage_gate.py) measures. A file counts when its repository-relative path starts with an `include` root and matches no `exclude` pattern. Every exclusion carries its reason; an adapter may only be listed once all of its decisions live in a tested type (see CLAUDE.md, 'Coverage gate'). An adapter entry also records `maxLines`, the file's size when it was excluded: Tools/lcov.py's Scope.audit fails the static-policy job when an adapter grows past it, so new code landing in an unmeasured file is a visible, reviewed budget change rather than a silent one. A pattern that no longer matches any file fails the same check.",
   "include": [
     "Kurn/",
-    "Packages/KurnCore/Sources/"
+    "Packages/KurnCore/Sources/",
+    "Packages/AgentHarness/Sources/"
   ],
   "exclude": [
     {

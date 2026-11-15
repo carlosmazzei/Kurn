@@ -74,6 +74,5 @@ struct AppErrorTests {
         #expect(AppError.ambiguousProviderResult.logCode == "provider_result_ambiguous")
         #expect(AppError.networkPolicyRestricted.logCode == "network_policy_restricted")
         #expect(AppError.generationTruncated.logCode == "generation_truncated")
-        #expect(AppError.documentGenerationFailed("private detail").logCode == "document_generation")
     }
 }

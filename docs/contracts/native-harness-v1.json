@@ -1,0 +1,2244 @@
+{
+  "manifestVersion": 1,
+  "contractVersion": 1,
+  "specReference": {
+    "kind": "attached-reference",
+    "piRevision": "f064465d10d6a8e5c19f687bba1b5b5499b51680"
+  },
+  "baselineCommit": "6ec656b93c6cf59cbc3dc32f9bd08e1abb1517ed",
+  "profileConstraints": {
+    "appOnly": true,
+    "backend": false,
+    "externalExtensions": false,
+    "sourceSelection": true,
+    "saveConversationArtifacts": true
+  },
+  "contractDocument": "docs/contracts/native-harness-v1.md",
+  "fixtures": [
+    {
+      "id": "runtime",
+      "path": "Packages/AgentHarness/Tests/AgentHarnessTests/Fixtures/nh01-runtime-v1.json",
+      "sha256": "a6ac16922696defe52b7351eca08c0acc1230e8b8aa842d3a1dc6c4587059b22",
+      "consumer": {
+        "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContractFixtureTests.swift",
+        "symbol": "legacyMessagesPreserveOpaqueReplayDataAndInvalidRawArguments"
+      }
+    },
+    {
+      "id": "domain",
+      "path": "Packages/KurnCore/Tests/KurnCoreTests/Fixtures/nh01-domain-v1.json",
+      "sha256": "57d9b989598ff6993a7eef8bef10254e5f13ad177f78bec6178b70eb4492abdb",
+      "consumer": {
+        "path": "Packages/KurnCore/Tests/KurnCoreTests/ChatContractFixtureTests.swift",
+        "symbol": "selectedPartsEmptyOverridesAndLegacyDefaultsSurviveRoundTrip"
+      }
+    },
+    {
+      "id": "session",
+      "path": "KurnTests/Fixtures/nh01-session-v1.json",
+      "sha256": "26ee75219069ce79af2e3928d4f0bd5f021bcaa63f19263dd22bb68367633844",
+      "consumer": {
+        "path": "KurnTests/NativeHarnessContractFixtureTests.swift",
+        "symbol": "legacySessionRestoresScopeTraceArtifactsAndRetryIdentity"
+      }
+    }
+  ],
+  "components": [
+    {
+      "id": "C01",
+      "title": "Mensagens",
+      "sourceDocument": "01-nucleo.md",
+      "disposition": "required",
+      "increment": "NH02",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContractFixtureTests.swift",
+          "symbol": "legacyMessagesPreserveOpaqueReplayDataAndInvalidRawArguments"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentContractTests.swift",
+          "symbol": "nativeCodecKeepsExactMillisecondsAndOpaqueFields"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeCodecTests.swift",
+          "symbol": "nativeMessagesMatchIndependentGolden"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeIdentityTests.swift",
+          "symbol": "repeatedProviderIDsGetDistinctLocalInvocationsAndCorrelatedResults"
+        },
+        {
+          "path": "KurnTests/SchemaV5MigrationTests.swift",
+          "symbol": "realV5DiskUpgradeConversionAndRepeatedReopenPreserveIdentityScopeArtifactsAndBytes"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionEntryTests.swift",
+          "symbol": "graphKeepsSiblingsAndSelectsAnOlderLeafIndependentlyOfAppendOrder"
+        }
+      ],
+      "note": "Native v1 user/assistant/tool-result codecs, exact or explicitly unknown timestamps, owner-assigned request/invocation identity and raw argument validation (NH02), stored as indexed checked entries with per-session V5 conversion (NH03)."
+    },
+    {
+      "id": "C02",
+      "title": "Streaming",
+      "sourceDocument": "01-nucleo.md",
+      "disposition": "required",
+      "increment": "NH02",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentWireStreamTests.swift"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentContractTests.swift",
+          "symbol": "reducerOrdersInterleavedBlocksAndFinalReplacesDeltasAndUsage"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentRuntimeTests.swift",
+          "symbol": "terminalCallbacksFenceLateContentAndFailedCallbacksFenceExecution"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeIdentityTests.swift",
+          "symbol": "failuresProduceNativeAuditEvenBeforeFirstBlock"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeWireTests.swift",
+          "symbol": "conflictingProviderFinalBecomesOneFailedAudit"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentLateFailureTests.swift",
+          "symbol": "harnessNeverExecutesCallsWhenTheTransportReportsAnErrorAfterFinish"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRequestCorrelationTests.swift",
+          "symbol": "nextContextCheckAndRunCompletionDoNotInheritThePreviousRequestOrInvocation"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRequestCorrelationTests.swift",
+          "symbol": "compactionDecisionsAreRunScopedAndOnlySummaryEventsCarryTheSummaryRequest"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentPersistenceBarrierTests.swift",
+          "symbol": "userAssistantAndResultCommitsPrecedeDependentWork"
+        },
+        {
+          "path": "KurnTests/ChatRunTranscriptTests.swift",
+          "symbol": "aRunRecordsItsMessagesOnABranchAnchoredAtTheQuestion"
+        }
+      ],
+      "note": "Ordered bounded blocks, final replacement and terminal fencing (NH02); awaited message/usage barriers and durable run entries written by AgentSession (NH05)."
+    },
+    {
+      "id": "C03",
+      "title": "Catálogo e capacidades dos modelos",
+      "sourceDocument": "01-nucleo.md",
+      "disposition": "required",
+      "increment": "NH07",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContractFixtureTests.swift",
+          "symbol": "savedTraceRetainsIdentityCapacityAndLegacyDateUnits"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentModelCapabilitiesTests.swift",
+          "symbol": "anExactCatalogEntryGivesEveryFactAndTheVendorsCaching"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentModelCapabilitiesTests.swift",
+          "symbol": "theRunStartRecordsTheSnapshot"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentModelCapabilitiesTests.swift",
+          "symbol": "aSnapshotFromALaterVersionStillReads"
+        },
+        {
+          "path": "KurnTests/MeetingChatCapabilityTests.swift",
+          "symbol": "aRunRecordsTheSnapshotInItsStepsAndItsBranch"
+        },
+        {
+          "path": "KurnTests/MeetingChatCapabilityTests.swift",
+          "symbol": "aModelWithoutToolsIsRefusedBeforeAnyRequest"
+        }
+      ],
+      "note": "NH07: a versioned per-model capability snapshot (tools, reasoning and the effort sent, image input, prompt caching, alias) from the bundled catalog and fresh provider metadata, recorded in the run's context resolution and its run-start entry; a model known to lack tools is refused before any request."
+    },
+    {
+      "id": "C04",
+      "title": "Adapter de provider",
+      "sourceDocument": "01-nucleo.md",
+      "disposition": "required",
+      "increment": "NH02",
+      "targetStatus": "partial",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContractFixtureTests.swift",
+          "symbol": "providerRequestsMatchTheFrozenBaseline"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentReplayTests.swift",
+          "symbol": "providerCopiesPreserveCanonicalDataAndPairNormalizedIDs"
+        },
+        {
+          "path": "KurnTests/ProviderHTTPTests+Agent.swift",
+          "symbol": "agentRejectsMissingKeyAndInvalidURL"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeWireTests.swift",
+          "symbol": "namespaceAndPrivateProtocolFactsSurviveWireReduction"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeIdentityTests.swift",
+          "symbol": "failedMessagesAndTheirResultsStayOutOfReplay"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentModelCapabilitiesTests.swift",
+          "symbol": "freshProviderFactsOverrideTheCatalogAndQualifyAnAlias"
+        },
+        {
+          "path": "KurnTests/ProviderHTTPTests+SelectedModelMetadata.swift",
+          "symbol": "selectedAnthropicAliasUsesDetailAndCachesTheCanonicalModel"
+        }
+      ],
+      "note": "All four wire adapters accept native blocks and own preparation terminals. Per-model capability flags and alias qualification (the provider's canonical ID, kept while its metadata is fresh) are recorded in the run's capability snapshot. Open: authenticated live-provider qualification, which needs real credentials and cannot run in CI; signed reasoning still replays only to the identical requested model."
+    },
+    {
+      "id": "C05",
+      "title": "Loop do agente",
+      "sourceDocument": "01-nucleo.md",
+      "disposition": "required",
+      "increment": "NH05",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/NativeHarnessTests.swift"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "startStreamsTheRunAndEndsOnlyOnceItHasSettled"
+        },
+        {
+          "path": "KurnTests/ChatRunTranscriptTests.swift",
+          "symbol": "aRunRecordsItsMessagesOnABranchAnchoredAtTheQuestion"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunSnapshotTests.swift",
+          "symbol": "anOwnedRunsEventsCoalesceIntoItsFinishedSnapshot"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "aSecondQuestionReplaysTheFirstRunsCallsAndResults"
+        }
+      ],
+      "note": "NH05: each chat run is owned by an AgentSession that persists its canonical branch and is observed through coalesced snapshots. NH06: the next run replays those branches as canonical history."
+    },
+    {
+      "id": "C06",
+      "title": "Estado e barreiras",
+      "sourceDocument": "01-nucleo.md",
+      "disposition": "required",
+      "increment": "NH05",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "KurnTests/NativeHarnessContractFixtureTests.swift",
+          "symbol": "legacySessionRestoresScopeTraceArtifactsAndRetryIdentity"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "failedMessageSaveStopsModelAndRemainsExplicitlyBlocked"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "aRunWhoseStartAcknowledgementWasLostIsNotItsOwnDuplicate"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunProgressTests.swift",
+          "symbol": "aRunMovesThroughItsPhasesWithItsIdentities"
+        },
+        {
+          "path": "KurnTests/ChatRunRecordTests.swift",
+          "symbol": "aSettledRunWhoseEndWasNotSavedIsClosedAsAPersistenceFailure"
+        }
+      ],
+      "note": "NH05: awaited message/usage barriers, typed persistence failure, durable command idempotency, phase/identity projection and closure of unfinished branches."
+    },
+    {
+      "id": "C07",
+      "title": "Filas e continuação",
+      "sourceDocument": "01-nucleo.md",
+      "disposition": "required",
+      "increment": "NH08",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "steeringEntersAfterTheWholeToolBatchBeforeTheNextRequest"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "everyChangeIsSavedBeforeItIsAcknowledged"
+        },
+        {
+          "path": "KurnTests/MeetingChatQueueTests.swift",
+          "symbol": "steeringEntersTheReplyAndShowsAsItsOwnQuestionAndAnswer"
+        }
+      ],
+      "note": "NH08: FIFO steering and follow-up queues with one/all modes, complete-list updates and stable IDs, saved before acknowledgement; drained items are committed as user messages; continueRun answers an open request or one queued selection."
+    },
+    {
+      "id": "C08",
+      "title": "Cancelamento",
+      "sourceDocument": "01-nucleo.md",
+      "disposition": "required",
+      "increment": "NH05",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "KurnTests/MeetingChatHarnessFailureTests.swift"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "cancellationWaitsForProviderTerminationAndAuditWrites"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "anAbortEndsTheObservationCancelledAfterTheToolSettles"
+        },
+        {
+          "path": "KurnTests/ChatConversationHostTests.swift",
+          "symbol": "anExpiredBackgroundWindowStopsTheRunAsAnInterruption"
+        }
+      ],
+      "note": "NH05: an abort settles only after the producer and its tools terminated and the end entry was written; the chat stays cancelling until then."
+    },
+    {
+      "id": "C09",
+      "title": "Armazenamento",
+      "sourceDocument": "02-sessoes-contexto.md",
+      "disposition": "required",
+      "increment": "NH03",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "KurnTests/NativeHarnessContractFixtureTests.swift",
+          "symbol": "legacySessionRestoresScopeTraceArtifactsAndRetryIdentity"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionEntryTests.swift",
+          "symbol": "graphKeepsSiblingsAndSelectsAnOlderLeafIndependentlyOfAppendOrder"
+        },
+        {
+          "path": "KurnTests/SchemaV5MigrationTests.swift",
+          "symbol": "realV5DiskUpgradeConversionAndRepeatedReopenPreserveIdentityScopeArtifactsAndBytes"
+        },
+        {
+          "path": "KurnTests/HarnessSessionStoreTests.swift",
+          "symbol": "saveFailureRollsBackOnlyTheAppendGroupAndCanResumeWithoutDuplicates"
+        },
+        {
+          "path": "KurnTests/HarnessSessionStoreTests.swift",
+          "symbol": "salvageAndErasureIncludeLibraryWideAndOrphanedHarnessData"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentPersistenceBarrierTests.swift",
+          "symbol": "userAssistantAndResultCommitsPrecedeDependentWork"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "aSecondQuestionReplaysTheFirstRunsCallsAndResults"
+        }
+      ],
+      "note": "NH03 supplies indexed checked entries, an independent active leaf, immutable artifact revisions and recovery metadata containers; frozen V5 upgrades to additive V6 with original bytes retained. Runtime barriers landed in NH05 and active-path canonical replay in NH06."
+    },
+    {
+      "id": "C10",
+      "title": "Árvore e navegação",
+      "sourceDocument": "02-sessoes-contexto.md",
+      "disposition": "required",
+      "increment": "NH09",
+      "targetStatus": "partial",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTreeTests.swift",
+          "symbol": "navigationOpensABranchWhereItWasLeftAndChangesOnlyTheLeaf"
+        },
+        {
+          "path": "KurnTests/ChatSessionTreeTests.swift",
+          "symbol": "navigationSelectsAnotherBranchAndItsDocumentsWithoutLosingAny"
+        },
+        {
+          "path": "KurnTests/ChatSessionTreeTests.swift",
+          "symbol": "labelsAndRenamesAreMetadata"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTreeTests.swift",
+          "symbol": "sessionUsageCoversEveryBranchAndContextUsageOnlyTheSelectedPath"
+        },
+        {
+          "path": "KurnTests/ChatSessionTreeTests.swift",
+          "symbol": "theTreeOfEveryBranchOpensTheOneChosen"
+        }
+      ],
+      "note": "NH09: alternatives, atomic navigation while settled, fork, clone, labels, rename, branch-aware artifact revisions and save actions, and usage over every branch versus the selected path. A tree of every branch opens the one chosen. Open: branch summaries."
+    },
+    {
+      "id": "C11",
+      "title": "Projeção de contexto",
+      "sourceDocument": "02-sessoes-contexto.md",
+      "disposition": "required",
+      "increment": "NH06",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "KurnTests/NativeHarnessContractFixtureTests.swift",
+          "symbol": "narrowedScopeReplaysPlainHistoryWithoutLegacyCitationsToolsOrDocumentBodies"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "aSecondQuestionReplaysTheFirstRunsCallsAndResults"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "runsOutsideTheCurrentSourcesReplayAsPlainText"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunBranchTests.swift",
+          "symbol": "aReplyCutOffByTheOutputLimitNeverReplays"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextEditTests.swift",
+          "symbol": "removingACallRemovesItsResultsWithIt"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "anExchangeLeftOutIsNotReplayedUntilItIsIncludedAgain"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextEditTests.swift",
+          "symbol": "aLaterEditCanIncludeAMessageAgain"
+        }
+      ],
+      "note": "NH06: replay projects each answered question's run branch (request, calls, results, answer) from the log, excludes audit-only replies, applies context edits and the newest permitted checkpoint, and keeps reads outside the current source authorization out of context. The chat records context edits from a question's menu (leave an exchange out of later answers, or include it again)."
+    },
+    {
+      "id": "C12",
+      "title": "System prompt e instruções",
+      "sourceDocument": "02-sessoes-contexto.md",
+      "disposition": "required",
+      "increment": "NH06",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContractFixtureTests.swift",
+          "symbol": "providerRequestsMatchTheFrozenBaseline"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSystemPromptTests.swift",
+          "symbol": "aPatchChangesOnlyTheSectionsItNamesAndNullRemovesOne"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSystemPromptTests.swift",
+          "symbol": "eachRunRecordsItsPromptPatchAndToolDelta"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "aSecondQuestionReplaysTheFirstRunsCallsAndResults"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSystemPromptTests.swift",
+          "symbol": "theNextRequestSeesAPromptChangedByATool"
+        }
+      ],
+      "note": "NH06: ordered system sections with Kurn's meeting-assistant instructions as a stable prefix and the document index as its own section; each run records its prompt as a patch on the previous run's and its declared tools with their delta. Within a run the prompt is refreshed after each tool batch, so the request after a document mutation lists the new version."
+    },
+    {
+      "id": "C13",
+      "title": "Compactação",
+      "sourceDocument": "02-sessoes-contexto.md",
+      "disposition": "required",
+      "increment": "NH06",
+      "targetStatus": "partial",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextTests.swift"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "aSummaryIsCommittedBeforeTheRequestThatUsesIt"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "aSecondCompactionUpdatesTheFirstAndReplayUsesTheNewest"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "aSavedCompactionIsReusedOnlyWhereItsRunMayBeRead"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "aRunAskedToCompactFirstSummarizesBeforeItsFirstRequest"
+        }
+      ],
+      "note": "NH06: durable summary checkpoints committed before use and reused on replay; no omission note stands in for a summary. Manual compaction summarizes before the next answer's first request. Optional branch summaries remain open."
+    },
+    {
+      "id": "C14",
+      "title": "Retry e recuperação",
+      "sourceDocument": "02-sessoes-contexto.md",
+      "disposition": "required",
+      "increment": "NH07",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputRecoveryTests.swift"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRetryPolicyTests.swift",
+          "symbol": "aTransientFailureIsSentAgainAsANewRequest"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRetryPolicyTests.swift",
+          "symbol": "permanentFailuresAndVisibleTextAreNeverRetried"
+        },
+        {
+          "path": "KurnTests/AppErrorTransientRetryTests.swift",
+          "symbol": "otherFailuresAreNot"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRetryPolicyTests.swift",
+          "symbol": "aHostsRetryAfterHintShapesTheWaitAndNothingElse"
+        },
+        {
+          "path": "KurnTests/ProviderHTTPTests+Agent.swift",
+          "symbol": "aRejectedAgentRequestCarriesTheProvidersRetryAfter"
+        }
+      ],
+      "note": "NH07: the session is the one retry owner; transient failures before visible text are retried as new requests with bounded, cancellable backoff that honours the provider's Retry-After (carried by the agent stream as AgentRetryAfter), and failed attempts stay as audit data."
+    },
+    {
+      "id": "C15",
+      "title": "Configuração e trust",
+      "sourceDocument": "02-sessoes-contexto.md",
+      "disposition": "required",
+      "increment": "NH04",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/KurnCore/Tests/KurnCoreTests/ChatContractFixtureTests.swift",
+          "symbol": "selectedPartsEmptyOverridesAndLegacyDefaultsSurviveRoundTrip"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "KurnTests/AuthorizedChatSourceReaderTests.swift"
+        },
+        {
+          "path": "KurnTests/ChatRunTranscriptTests.swift",
+          "symbol": "aRunRecordsItsMessagesOnABranchAnchoredAtTheQuestion"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "runsOutsideTheCurrentSourcesReplayAsPlainText"
+        }
+      ],
+      "note": "NH04 captures immutable source IDs/parts/content revisions and rejects deleted sources; NH05 records the run authorization in its run-start entry; NH06 replays a run canonically only while it was authorized for sources the current run may read."
+    },
+    {
+      "id": "C16",
+      "title": "Credenciais",
+      "sourceDocument": "02-sessoes-contexto.md",
+      "disposition": "required",
+      "increment": "NH07",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentPerRequestModelTests.swift",
+          "symbol": "everyRequestResolvesItsCredentialsAgain"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentPerRequestModelTests.swift",
+          "symbol": "aRevokedCredentialFailsTheNextRequest"
+        },
+        {
+          "path": "KurnTests/ProviderFactoryTests.swift",
+          "symbol": "aKeyRemovedDuringARunFailsTheNextRequest"
+        }
+      ],
+      "note": "NH07: credentials are resolved for every request, compaction included; a removed key fails the next request. OAuth remains separate work."
+    },
+    {
+      "id": "C17",
+      "title": "Uso, cache e diagnóstico",
+      "sourceDocument": "02-sessoes-contexto.md",
+      "disposition": "required",
+      "increment": "NH07",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContractFixtureTests.swift",
+          "symbol": "savedTraceRetainsIdentityCapacityAndLegacyDateUnits"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputUsageTests.swift",
+          "symbol": "cachedInputIsCountedOnceInTheInputTotal"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/NativeHarnessTests.swift",
+          "symbol": "aRunsCostIsKnownOnlyWhenEveryUsageWasPriced"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/NativeHarnessTests.swift",
+          "symbol": "aCostCeilingItCannotCheckStopsTheRun"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunTraceRestorationTests.swift",
+          "symbol": "restoredUsageKeepsItsCacheCounts"
+        },
+        {
+          "path": "KurnTests/ModelPricingTests.swift",
+          "symbol": "cacheReadsAndWritesArePricedAtTheirOwnRates"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunTraceRestorationTests.swift",
+          "symbol": "aRequestsUsageCountsOnce"
+        }
+      ],
+      "note": "NH07: input/output/reasoning/cache-read/cache-write counters with reasoning and cache counted once; unknown cost stays unknown and an unverifiable cost ceiling stops the run; the app passes its price table as the estimator. Cache reads and writes are priced at their own rates, and usage entries name their request so one request counts once."
+    },
+    {
+      "id": "C18",
+      "title": "Registro e pipeline",
+      "sourceDocument": "03-ferramentas.md",
+      "disposition": "required",
+      "increment": "NH04",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputLimitTests.swift"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolSchemaTests.swift"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolPipelineTests.swift"
+        },
+        {
+          "path": "KurnTests/ChatDocumentEffectTests.swift"
+        }
+      ],
+      "note": "NH04 local bundled-tool profile: strict checked schema registry, transformed-argument policy revalidation, terminal progress fences, bounded independent reads and atomic local document receipts. No external extensions or result-replacement/termination hooks."
+    },
+    {
+      "id": "C19",
+      "title": "Ferramentas desktop e equivalentes locais",
+      "sourceDocument": "03-ferramentas.md",
+      "disposition": "adapted",
+      "increment": "NH04",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "KurnTests/ChatTranscriptToolPageTests.swift"
+        },
+        {
+          "path": "Packages/KurnCore/Tests/KurnCoreTests/ChatContractFixtureTests.swift",
+          "symbol": "artifactBodiesAndHistoricalReferencesKeepIndependentVersions"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatDocumentEffectTests.swift"
+        },
+        {
+          "path": "KurnTests/AuthorizedChatSourceReaderTests.swift"
+        },
+        {
+          "path": "KurnTests/ChatTranscriptToolPageTests.swift"
+        }
+      ],
+      "note": "Kurn source/document equivalents retain Unicode-safe pagination and source selection. Local document mutations commit revisions and receipts before success; saved library documents remain independent."
+    },
+    {
+      "id": "C20",
+      "title": "Extensões",
+      "sourceDocument": "04-extensibilidade.md",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Outside the app-only profile: no external runtime, gateway or extension loader."
+    },
+    {
+      "id": "C21",
+      "title": "Recursos, skills, templates e temas",
+      "sourceDocument": "04-extensibilidade.md",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Outside the app-only profile: no external runtime, gateway or extension loader."
+    },
+    {
+      "id": "C22",
+      "title": "MCP",
+      "sourceDocument": "04-extensibilidade.md",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Outside the app-only profile: no external runtime, gateway or extension loader."
+    },
+    {
+      "id": "C23",
+      "title": "Codemode",
+      "sourceDocument": "04-extensibilidade.md",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Outside the app-only profile: no external runtime, gateway or extension loader."
+    },
+    {
+      "id": "C24",
+      "title": "Interface nativa",
+      "sourceDocument": "05-interface-integracao.md",
+      "disposition": "required",
+      "increment": "NH08",
+      "targetStatus": "partial",
+      "baselineEvidence": [
+        {
+          "path": "KurnTests/ChatStepPresentationTests.swift"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "KurnTests/MeetingChatQueueTests.swift",
+          "symbol": "aStopHandsQueuedInputBackToTheComposer"
+        },
+        {
+          "path": "KurnTests/ChatRunStatusTests.swift",
+          "symbol": "eachPhaseHasItsOwnStatus"
+        },
+        {
+          "path": "KurnTests/ChatScrollFollowingTests.swift",
+          "symbol": "aReaderOfOlderMessagesStaysWhereTheyAreUnlessTheyAsk"
+        }
+      ],
+      "note": "NH08: Steer/After this task actions, queued list with edit/remove, retry delay, compaction and confirmed-stop status in words, reading position kept. Open: an owner retained per session across runs, model/provider changes at request boundaries, and a waitingForUser phase (no tool asks for confirmation yet)."
+    },
+    {
+      "id": "C25",
+      "title": "Interfaces públicas",
+      "sourceDocument": "05-interface-integracao.md",
+      "disposition": "adapted",
+      "increment": "NH05",
+      "targetStatus": "partial",
+      "baselineEvidence": [
+        {
+          "path": "KurnTests/MeetingChatHarnessTests.swift"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "aCommandAlreadyInTheLogDoesNothing"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunSnapshotTests.swift",
+          "symbol": "aSlowObserverGetsTheNewestSnapshotAndNeverMissesTheLast"
+        },
+        {
+          "path": "KurnTests/ChatRunRecordTests.swift",
+          "symbol": "aReopenedInterruptedRunIsResumedOnceAndOnlyOnce"
+        }
+      ],
+      "note": "Local typed commands replace RPC: start with a durable command ID, abort, settle and retry settlement, observed through newest-only snapshots. Open: the qualified pi JSONL v3 interchange subset (native export landed in NH10)."
+    },
+    {
+      "id": "C26",
+      "title": "Importar, exportar e compartilhar",
+      "sourceDocument": "05-interface-integracao.md",
+      "disposition": "adapted",
+      "increment": "NH10",
+      "targetStatus": "partial",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionArchiveTests.swift",
+          "symbol": "aRoundTripKeepsIdentityEveryBranchOpaqueDataAndUsage"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionArchiveTests.swift",
+          "symbol": "whatCannotBeTrustedIsRejected"
+        },
+        {
+          "path": "KurnTests/ChatSessionArchiveTests.swift",
+          "symbol": "anImportIsANewConversationWithTheWholeTreeAndItsDocuments"
+        },
+        {
+          "path": "KurnTests/ChatSessionArchiveTests.swift",
+          "symbol": "theChatExportsAndImportsConversations"
+        },
+        {
+          "path": "KurnTests/ChatSessionArchiveTests.swift",
+          "symbol": "anotherHostsRecordsAndHeaderFieldsGoOnToTheNextExport"
+        }
+      ],
+      "note": "NH10: native versioned JSONL archive with every branch, the leaf, runs, usage and document revisions; new-copy import and identity-preserving restore only when free; rejection of untrusted archives; reading export (Markdown, Word or inert HTML) through the share sheet. Another host's records and header fields survive an app import and the next export. Open: the pi JSONL v3 subset."
+    },
+    {
+      "id": "C27",
+      "title": "Modelos virtuais e não conversacionais",
+      "sourceDocument": "04-extensibilidade.md",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Outside the app-only profile: no external runtime, gateway or extension loader."
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "A01",
+      "scenario": "Prompt sem tools",
+      "requirement": "Um turno, assistant final e settle",
+      "disposition": "required",
+      "increment": "NH02",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/NativeHarnessTests.swift",
+          "symbol": "plainAnswer"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "startStreamsTheRunAndEndsOnlyOnceItHasSettled"
+        }
+      ],
+      "note": "A prompt without tools is one request, one final assistant message and a run that settles only after its terminal entry is saved."
+    },
+    {
+      "id": "A02",
+      "scenario": "Tool seguido de resposta",
+      "requirement": "Segundo request recebe assistant e toolResult correlacionados",
+      "disposition": "required",
+      "increment": "NH02",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContractFixtureTests.swift",
+          "symbol": "providerRequestsMatchTheFrozenBaseline"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentPersistenceBarrierTests.swift",
+          "symbol": "userAssistantAndResultCommitsPrecedeDependentWork"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeIdentityTests.swift",
+          "symbol": "repeatedProviderIDsGetDistinctLocalInvocationsAndCorrelatedResults"
+        }
+      ],
+      "note": "The second request receives the committed assistant turn and its correlated tool results, with local invocation identities even when provider call IDs recur."
+    },
+    {
+      "id": "A03",
+      "scenario": "Dois prompts simultâneos no Agent",
+      "requirement": "Segundo é rejeitado ou enfileirado explicitamente na camada de sessão",
+      "disposition": "required",
+      "increment": "NH05",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "acceptanceExcludesConcurrentPromptsEvenDuringPreparation"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "aCommandAlreadyInTheLogDoesNothing"
+        },
+        {
+          "path": "KurnTests/ChatConversationHostTests.swift",
+          "symbol": "phaseFollowsTheRunUntilItSettles"
+        }
+      ],
+      "note": "NH05: the session owner rejects a second prompt as busy from acceptance, before any store await; the chat refuses a send until its run settles. A repeated command is refused durably from the log. Queueing it instead is NH08."
+    },
+    {
+      "id": "A04",
+      "scenario": "System patch por seção",
+      "requirement": "Replay altera só seção indicada; null remove",
+      "disposition": "required",
+      "increment": "NH06",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSystemPromptTests.swift",
+          "symbol": "aPatchChangesOnlyTheSectionsItNamesAndNullRemovesOne"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSystemPromptTests.swift",
+          "symbol": "eachRunRecordsItsPromptPatchAndToolDelta"
+        }
+      ],
+      "note": "NH06: a run's systemPatch changes only the sections it names; an explicit null removes one."
+    },
+    {
+      "id": "A05",
+      "scenario": "Mudança de loadout",
+      "requirement": "Próxima request declara delta e conjunto efetivo correto",
+      "disposition": "required",
+      "increment": "NH06",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSystemPromptTests.swift",
+          "symbol": "eachRunRecordsItsPromptPatchAndToolDelta"
+        }
+      ],
+      "note": "NH06: each run-start records the declared tools and what was added or removed since the previous run."
+    },
+    {
+      "id": "A06",
+      "scenario": "Stream em fragmentos UTF-8/JSON",
+      "requirement": "Mesmo conteúdo final sem caracteres corrompidos",
+      "disposition": "required",
+      "increment": "NH02",
+      "targetStatus": "partial",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentWireStreamTests.swift"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentWireTests.swift",
+          "symbol": "anthropicThinkingSignaturesAndInterleavedCallsRetainOrder"
+        }
+      ],
+      "note": "Indexed JSON fragments and Unicode native codecs are exercised against synthetic SSE chunking. Open: qualification against real provider transports."
+    },
+    {
+      "id": "A07",
+      "scenario": "Blocos intercalados",
+      "requirement": "Índices mantêm texto/thinking/toolCall separados",
+      "disposition": "required",
+      "increment": "NH02",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentWireTests.swift",
+          "symbol": "anthropicThinkingSignaturesAndInterleavedCallsRetainOrder"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentWireTests.swift",
+          "symbol": "indexedChatCallsStayInProviderOrderWhenFragmentsArriveOutOfOrder"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentWireTests.swift",
+          "symbol": "responsesFinalReorderKeepsKnownItemBlockIdentity"
+        }
+      ],
+      "note": "Native block indices preserve thinking/text/call separation and provider ordering through interleaved fragments; this verifies the in-process criterion, not durable session storage."
+    },
+    {
+      "id": "A08",
+      "scenario": "End difere dos deltas",
+      "requirement": "End substitui reconstrução",
+      "disposition": "required",
+      "increment": "NH02",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentContractTests.swift",
+          "symbol": "reducerOrdersInterleavedBlocksAndFinalReplacesDeltasAndUsage"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentRuntimeTests.swift",
+          "symbol": "authoritativeNativeFinalReplacesDraftAndDoesNotExecuteRemovedCalls"
+        },
+        {
+          "path": "KurnTests/ProviderHTTPTests+Agent.swift",
+          "symbol": "agentFinalCorrectsStreamedDraftAndReplayChangesAreTraced"
+        }
+      ],
+      "note": "The authoritative final replaces draft blocks, text, calls and usage, including corrected/removed/reordered Responses items. Removed calls never execute."
+    },
+    {
+      "id": "A09",
+      "scenario": "Erro antes de start",
+      "requirement": "Mensagem final de erro e nenhum estado pendente eterno",
+      "disposition": "required",
+      "increment": "NH02",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentContractTests.swift",
+          "symbol": "providerBoundaryAlwaysEmitsOneTerminal"
+        },
+        {
+          "path": "KurnTests/ProviderHTTPTests+Agent.swift",
+          "symbol": "agentRejectsMissingKeyAndInvalidURL"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeIdentityTests.swift",
+          "symbol": "failuresProduceNativeAuditEvenBeforeFirstBlock"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "aRunStartThatCannotBeSavedFailsWithoutBlockingTheSession"
+        },
+        {
+          "path": "KurnTests/ChatRunTranscriptTests.swift",
+          "symbol": "aFailedCommitFailsTheRunBeforeAnyRequest"
+        }
+      ],
+      "note": "Preparation emits one typed failure before any start event; the failure is a committed native audit and the session settles without a pending state."
+    },
+    {
+      "id": "A10",
+      "scenario": "Listener async em agent_end",
+      "requirement": "Agent permanece ocupado até listener terminar",
+      "disposition": "required",
+      "increment": "NH05",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "terminalPersistenceKeepsTheSessionBusyUntilItsSaveCompletes"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "startStreamsTheRunAndEndsOnlyOnceItHasSettled"
+        }
+      ],
+      "note": "NH05: the owner stays busy until the producer terminated and its terminal entry was saved, and its observation ends only then. There is no public listener API; the host awaits settlement."
+    },
+    {
+      "id": "A11",
+      "scenario": "Dois tools paralelos, segundo termina primeiro",
+      "requirement": "UI segue conclusão; transcript segue ordem do assistant",
+      "disposition": "required",
+      "increment": "NH04",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolPipelineTests.swift",
+          "symbol": "boundedReadsCompleteOutOfOrderButAppendInCallOrderAndFenceLateProgress"
+        }
+      ],
+      "note": "NH04 local app-only profile; native session ownership and recovery orchestration remain NH05."
+    },
+    {
+      "id": "A12",
+      "scenario": "Tool sequential em lote misto",
+      "requirement": "Nenhuma sobreposição de execução do lote",
+      "disposition": "required",
+      "increment": "NH04",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolPipelineTests.swift",
+          "symbol": "oneSequentialToolSerializesWholeBatch"
+        }
+      ],
+      "note": "NH04 local app-only profile; native session ownership and recovery orchestration remain NH05."
+    },
+    {
+      "id": "A13",
+      "scenario": "Steering durante tools",
+      "requirement": "Todas terminam antes da injeção; próxima request recebe steering",
+      "disposition": "required",
+      "increment": "NH08",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "steeringEntersAfterTheWholeToolBatchBeforeTheNextRequest"
+        },
+        {
+          "path": "KurnTests/MeetingChatQueueTests.swift",
+          "symbol": "steeringEntersTheReplyAndShowsAsItsOwnQuestionAndAnswer"
+        }
+      ],
+      "note": "NH08: every call of the batch finishes before steering is injected, and the next request carries it."
+    },
+    {
+      "id": "A14",
+      "scenario": "Follow-up durante tools",
+      "requirement": "Só entra quando scheduler esgota tools e steering",
+      "disposition": "required",
+      "increment": "NH08",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "aFollowUpWaitsUntilTheRunWouldFinish"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "steeringIsTakenBeforeAFollowUpWhenBothWait"
+        }
+      ],
+      "note": "NH08: a follow-up enters only when no tool call and no steering is left."
+    },
+    {
+      "id": "A15",
+      "scenario": "Modos one/all",
+      "requirement": "Quantidade drenada correta em ambas as filas",
+      "disposition": "required",
+      "increment": "NH08",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "modesDrainOneOrAll"
+        }
+      ],
+      "note": "NH08: one and all modes drain the right number of items."
+    },
+    {
+      "id": "A16",
+      "scenario": "continue com só system",
+      "requirement": "Erro sem consumir pendências",
+      "disposition": "required",
+      "increment": "NH08",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "continuingWithNothingToAnswerFailsWithoutConsumingTheQueue"
+        }
+      ],
+      "note": "NH08: continuing an empty history, or a finished reply with nothing queued, fails before any request without consuming the queues."
+    },
+    {
+      "id": "A17",
+      "scenario": "continue após assistant com fila",
+      "requirement": "Uma seleção de fila, sem duplicar drain inicial",
+      "disposition": "required",
+      "increment": "NH08",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "continuingAfterAReplyTakesOneSelectionWithoutDrainingTwice"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "continuingAnOpenRequestAnswersItWithoutTakingQueuedInput"
+        }
+      ],
+      "note": "NH08: continuing after a reply takes one queue selection; the run's own end drains the rest without taking any input twice."
+    },
+    {
+      "id": "A18",
+      "scenario": "Hooks end/continue",
+      "requirement": "End não consulta filas; continue assegura uma request sem duplicar natural",
+      "disposition": "adapted",
+      "increment": "NH08",
+      "targetStatus": "partial",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "continuingAnOpenRequestAnswersItWithoutTakingQueuedInput"
+        }
+      ],
+      "note": "NH08: continuation ensures one request for an open history without a duplicate natural drain. Kurn has no end/continue hooks; a run's end consults the queues as part of its loop."
+    },
+    {
+      "id": "A19",
+      "scenario": "Tool desconhecida/schema inválido",
+      "requirement": "Erro sem efeito, com execution_end",
+      "disposition": "required",
+      "increment": "NH04",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/NativeHarnessTests.swift"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolSchemaTests.swift"
+        }
+      ],
+      "note": "NH04 local app-only profile; native session ownership and recovery orchestration remain NH05."
+    },
+    {
+      "id": "A20",
+      "scenario": "argumentsError ou assistant length com calls",
+      "requirement": "argumentsError bloqueia aquela chamada; length bloqueia todas as chamadas da resposta",
+      "disposition": "required",
+      "increment": "NH02",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputLimitTests.swift",
+          "symbol": "truncatedTurnNeverExecutesTools"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentRuntimeTests.swift",
+          "symbol": "nativeInvalidArgumentsProduceErrorDataAndContentFreeDiagnostics"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentRuntimeTests.swift",
+          "symbol": "lengthBlocksEveryCallAndKeepsPairedSyntheticResults"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputRecoveryTests.swift",
+          "symbol": "emptyLimitedReplyRetriesWithoutReexecutingCommittedToolsAndRetainsBlockedAudit"
+        }
+      ],
+      "note": "Invalid raw arguments block that invocation while a valid sibling executes; length blocks every invocation, retains raw calls and adds synthetic errors without confirmation/effects. Durable audit restoration remains NH03/NH04, beyond this execution criterion."
+    },
+    {
+      "id": "A21",
+      "scenario": "Gate bloqueia",
+      "requirement": "Não executa nem roda tool_result; resultado de erro completo",
+      "disposition": "required",
+      "increment": "NH04",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolPipelineTests.swift",
+          "symbol": "policyDeniesOrRevalidatesTransformedArguments"
+        }
+      ],
+      "note": "NH04 local app-only profile; native session ownership and recovery orchestration remain NH05."
+    },
+    {
+      "id": "A22",
+      "scenario": "Tool retorna isError com structuredContent",
+      "requirement": "Erro ao modelo, dados programáticos preservados",
+      "disposition": "required",
+      "increment": "NH04",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolPipelineTests.swift",
+          "symbol": "structuredDataSurvivesCodecButNeverEntersProviderReplay"
+        }
+      ],
+      "note": "NH04 local app-only profile; native session ownership and recovery orchestration remain NH05."
+    },
+    {
+      "id": "A23",
+      "scenario": "After hook troca content",
+      "requirement": "Structured antigo é descartado se não substituído",
+      "disposition": "conditional",
+      "increment": "NH04",
+      "targetStatus": "conditional",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Required only if the corresponding internal result-replacement/termination policy is exposed; it is not exposed today."
+    },
+    {
+      "id": "A24",
+      "scenario": "Terminate misto/unânime",
+      "requirement": "Só unanimidade interrompe follow-up automático de tool batch",
+      "disposition": "conditional",
+      "increment": "NH04",
+      "targetStatus": "conditional",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Required only if the corresponding internal result-replacement/termination policy is exposed; it is not exposed today."
+    },
+    {
+      "id": "A25",
+      "scenario": "Updates depois da resolução",
+      "requirement": "Ignorados",
+      "disposition": "required",
+      "increment": "NH04",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolPipelineTests.swift",
+          "symbol": "boundedReadsCompleteOutOfOrderButAppendInCallOrderAndFenceLateProgress"
+        }
+      ],
+      "note": "NH04 local app-only profile; native session ownership and recovery orchestration remain NH05."
+    },
+    {
+      "id": "A26",
+      "scenario": "Read grande/linha longa/emoji",
+      "requirement": "Limites e próxima offset corretos; UTF-8 íntegro",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A27",
+      "scenario": "Write/edit concorrentes no mesmo path",
+      "requirement": "Janela read-modify-write serializada",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A28",
+      "scenario": "Aliases symlink para arquivo existente",
+      "requirement": "Mesma fila de mutação",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A29",
+      "scenario": "Edit com várias trocas",
+      "requirement": "Matching sobre original; sem cascata",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A30",
+      "scenario": "Edit ambíguo/overlap/no-op",
+      "requirement": "Erro antes de escrita",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A31",
+      "scenario": "Edit BOM/CRLF/fuzzy",
+      "requirement": "Regiões não tocadas preservadas",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A32",
+      "scenario": "Shell exit/timeout/abort/output enorme",
+      "requirement": "Status real, árvore encerrada e full output recuperável",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A33",
+      "scenario": "Grep/find/ls no limite exato",
+      "requirement": "Não alegar corte sem evidência de registros adicionais",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A34",
+      "scenario": "Branch irmã longa",
+      "requirement": "Não entra no contexto ativo",
+      "disposition": "required",
+      "increment": "NH06",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "aRunForAQuestionNotOnTheShownPathIsNotReplayed"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunBranchTests.swift",
+          "symbol": "aFailedRunHasNoAnswer"
+        }
+      ],
+      "note": "NH06: only the run that answered a question on the shown path is replayed; sibling branches (failed, stopped or for another question) never enter context."
+    },
+    {
+      "id": "A35",
+      "scenario": "Fork versus clone",
+      "requirement": "Fork antes de user com draft; clone inclui posição atual",
+      "disposition": "required",
+      "increment": "NH09",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTreeTests.swift",
+          "symbol": "aForkCopiesThePathBeforeItsQuestionWithoutLaterRunsOrBranches"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTreeTests.swift",
+          "symbol": "aCloneCopiesTheSelectedPathWithTheRunsThatAnsweredIt"
+        },
+        {
+          "path": "KurnTests/ChatSessionTreeTests.swift",
+          "symbol": "aForkStartsBeforeItsQuestionAndACloneKeepsTheBranchShown"
+        },
+        {
+          "path": "KurnTests/ChatSessionTreeTests.swift",
+          "symbol": "theChatMovesBetweenVersionsForksAndDuplicates"
+        }
+      ],
+      "note": "NH09: fork copies the path before the selected question into a new conversation and restores the question as a draft; clone copies the branch shown; the source keeps every branch."
+    },
+    {
+      "id": "A36",
+      "scenario": "Context edit",
+      "requirement": "Altera futuro contexto; raw/UI/custo intactos",
+      "disposition": "required",
+      "increment": "NH06",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextEditTests.swift",
+          "symbol": "aRemovedResultIsStubbedSoItsCallKeepsAResult"
+        },
+        {
+          "path": "KurnTests/ChatReplayHistoryTests.swift",
+          "symbol": "aContextEditChangesOnlyWhatIsReplayed"
+        }
+      ],
+      "note": "NH06: context edits apply to replay only; the log, the shown conversation and recorded usage are unchanged, and calls keep their results."
+    },
+    {
+      "id": "A37",
+      "scenario": "Compactação padrão",
+      "requirement": "Resumo + recente + checkpoint, sem toolResult órfão",
+      "disposition": "required",
+      "increment": "NH06",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextTests.swift"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "aSummaryIsCommittedBeforeTheRequestThatUsesIt"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextTests.swift",
+          "symbol": "cutInsideATurnSplitsItAndNeverSeparatesResults"
+        }
+      ],
+      "note": "NH06: summary plus kept tail plus a durable checkpoint; the cut never separates a call from its result."
+    },
+    {
+      "id": "A38",
+      "scenario": "Duas compactações e retain-none",
+      "requirement": "Fronteiras corretas e sem perda de trecho que precisava resumir",
+      "disposition": "required",
+      "increment": "NH06",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "aSecondCompactionUpdatesTheFirstAndReplayUsesTheNewest"
+        }
+      ],
+      "note": "NH06: a second compaction updates the previous summary and the newest checkpoint covers everything the first did. Retain-none does not apply: the policy always keeps the newest cut point (keepRecentTokens >= 1)."
+    },
+    {
+      "id": "A39",
+      "scenario": "Compactação falha/cancela",
+      "requirement": "Nenhuma compaction fictícia nem retry indevido",
+      "disposition": "required",
+      "increment": "NH06",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputLimitTests.swift",
+          "symbol": "truncatedSummaryLeavesTheContextUnchanged"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "anUnusableSummaryWritesNoCheckpoint"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRealContextTests.swift",
+          "symbol": "unusableSummaryAfterOverflowFailsTheRunExplicitly"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputLimitTests.swift",
+          "symbol": "truncatedSummaryLeavesTheContextUnchanged"
+        }
+      ],
+      "note": "NH06: an unusable, failed or overflowing summary writes no checkpoint and no omission note; after an overflow the run fails with AgentContextReductionError instead of retrying."
+    },
+    {
+      "id": "A40",
+      "scenario": "Overflow com recuperação",
+      "requirement": "Falha persiste; edits após agent_end; retry depois de resumo salvo",
+      "disposition": "required",
+      "increment": "NH06",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputRecoveryTests.swift"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "anOverflowRetryRunsOnlyAfterItsSummaryIsSaved"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentCompactionCheckpointTests.swift",
+          "symbol": "aCheckpointThatCannotBeSavedStopsTheRunBeforeItsRequest"
+        }
+      ],
+      "note": "NH06: the failed attempt stays in the log as audit data, the checkpoint is saved before the single retry, and a checkpoint that cannot be saved stops the run before any request uses it."
+    },
+    {
+      "id": "A41",
+      "scenario": "Retry transitório e cancelamento do delay",
+      "requirement": "Tentativas limitadas; abort não inicia outra",
+      "disposition": "required",
+      "increment": "NH07",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRetryPolicyTests.swift",
+          "symbol": "attemptsAreBounded"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRetryPolicyTests.swift",
+          "symbol": "cancellingDuringTheWaitStartsNoOtherAttempt"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRetryPolicyTests.swift",
+          "symbol": "delaysBackOffHonourRetryAfterAndStayBounded"
+        }
+      ],
+      "note": "NH07: attempts and total wait are bounded, Retry-After is honoured when the error carries it, and a cancel during the wait starts no new attempt."
+    },
+    {
+      "id": "A42",
+      "scenario": "Uso nested/reasoning/cache",
+      "requirement": "Sem dupla contagem",
+      "disposition": "required",
+      "increment": "NH07",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputUsageTests.swift"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputUsageTests.swift",
+          "symbol": "cachedInputIsCountedOnceInTheInputTotal"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputUsageTests.swift",
+          "symbol": "unreportedCountsStayUnknownWhenUsagesAreAdded"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputUsageTests.swift",
+          "symbol": "reportedReasoningCountsSurviveLimitedEmptyReplies"
+        }
+      ],
+      "note": "NH07: reasoning is part of output and cache reads/writes part of input, each counted once in all four wire formats; unreported counts stay unknown when added."
+    },
+    {
+      "id": "A43",
+      "scenario": "Context usage pós-compactação",
+      "requirement": "Desconhecido distinto de zero",
+      "disposition": "required",
+      "increment": "NH06",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunProgressTests.swift",
+          "symbol": "contextUsageIsUnknownUntilReportedAndAgainAfterACompaction"
+        }
+      ],
+      "note": "NH06: context usage is nil (unknown), never zero, before reported usage, after a compaction and when no input is reported; summary usage never sets it."
+    },
+    {
+      "id": "A44",
+      "scenario": "Modelo menor/virtual e compaction override",
+      "requirement": "Budget do modelo efetivo e validação de settings corretos",
+      "disposition": "required",
+      "increment": "NH06",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputBudgetTests.swift",
+          "symbol": "matchesPiHeadroomCases"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextTests.swift",
+          "symbol": "aSmallModelsBudgetsComeFromItsOwnWindowNotTheDefaults"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContextTests.swift",
+          "symbol": "summaryRequestsFitASmallWindow"
+        }
+      ],
+      "note": "NH06: thresholds, kept tail and summary output come from the effective model's own window and output limit; the 16k/20k defaults never apply to a small model. Kurn has no user compaction override setting."
+    },
+    {
+      "id": "A45",
+      "scenario": "agent_end com retry previsto",
+      "requirement": "UI continua ocupada até agent_settled",
+      "disposition": "required",
+      "increment": "NH05",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatConversationHostTests.swift",
+          "symbol": "phaseFollowsTheRunUntilItSettles"
+        },
+        {
+          "path": "KurnTests/ChatConversationHostTests.swift",
+          "symbol": "compactionAndAnOutputRetryHaveTheirOwnPhases"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunProgressTests.swift",
+          "symbol": "theRetryWaitLastsAcrossItsTurnAndCompactionUntilItsRequest"
+        }
+      ],
+      "note": "NH05: an output-limit retry keeps the run in retryWaiting until its request starts, and the chat stays busy (cancelling included) until the run settles. Bounded session retries across runs are NH07."
+    },
+    {
+      "id": "A46",
+      "scenario": "Cancelar e restaurar fila",
+      "requirement": "clear antes de abort; draft recebe pendências",
+      "disposition": "required",
+      "increment": "NH08",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "KurnTests/MeetingChatQueueTests.swift",
+          "symbol": "aStopHandsQueuedInputBackToTheComposer"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentInputQueueTests.swift",
+          "symbol": "everyChangeIsSavedBeforeItIsAcknowledged"
+        }
+      ],
+      "note": "NH08: a stop clears the queue before it aborts and hands pending input back to the composer; a reopened conversation hands back what a dead process left queued."
+    },
+    {
+      "id": "A47",
+      "scenario": "Scroll fora do fim",
+      "requirement": "Atualizações não roubam posição de leitura",
+      "disposition": "required",
+      "increment": "NH08",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatScrollFollowingTests.swift",
+          "symbol": "aReaderOfOlderMessagesStaysWhereTheyAreUnlessTheyAsk"
+        }
+      ],
+      "note": "NH08: new turns scroll into view only while the reader is at the end or for their own question."
+    },
+    {
+      "id": "A48",
+      "scenario": "Tool desconhecida em sessão antiga",
+      "requirement": "Fallback legível sem crash",
+      "disposition": "required",
+      "increment": "NH08",
+      "targetStatus": "verified",
+      "baselineEvidence": [
+        {
+          "path": "KurnTests/ChatStepPresentationTests.swift"
+        }
+      ],
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatStepPresentationTests.swift",
+          "symbol": "documentTitlesPreferExplicitTitlesAndUnknownArgumentsHaveLocalizedFallbacks"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRunTraceRestorationTests.swift",
+          "symbol": "aResultWithoutItsCallStillAppearsAndAnErrorReadsAsFailed"
+        }
+      ],
+      "note": "An unknown tool or stop reason from an older session presents a localized fallback, and a restored run with an unmatched result still reads without a crash."
+    },
+    {
+      "id": "A49",
+      "scenario": "Diálogo RPC cancelado/timeout",
+      "requirement": "Uma resposta válida ou resolução do host; nunca aprovação automática",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A50",
+      "scenario": "Troca de sessão com busy/navegação simultânea",
+      "requirement": "Conflito não move leaf parcialmente",
+      "disposition": "required",
+      "increment": "NH05",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "branchModeChainsTheRunWithoutMovingTheSelectedLeaf"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionTests.swift",
+          "symbol": "aConflictingWriterIsRetriedOnTheNewSnapshot"
+        },
+        {
+          "path": "KurnTests/ChatConversationHostTests.swift",
+          "symbol": "resetFencesARunThatIsStillSettling"
+        },
+        {
+          "path": "KurnTests/ChatRunRecordTests.swift",
+          "symbol": "theLaunchSweepClosesTheBranchADeadProcessLeftOpen"
+        }
+      ],
+      "note": "NH05: a run writes on its own branch and never moves the selected leaf; a raced append is rebuilt on the new snapshot, a reset or reload fences the old run, and an unfinished branch is closed without moving the leaf."
+    },
+    {
+      "id": "A51",
+      "scenario": "Dynamic Type/VoiceOver",
+      "requirement": "Controles utilizáveis, estados legíveis sem só cor",
+      "disposition": "required",
+      "increment": "NH08",
+      "targetStatus": "partial",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatRunStatusTests.swift",
+          "symbol": "eachPhaseHasItsOwnStatus"
+        }
+      ],
+      "note": "NH08: queue and run states are in words with labelled controls. The accessibility audit does not reach a running conversation (seeded data has no provider), so Dynamic Type/VoiceOver remain a manual check."
+    },
+    {
+      "id": "A52",
+      "scenario": "HTML/Markdown hostil",
+      "requirement": "Viewer não executa conteúdo de ferramenta como código ativo",
+      "disposition": "required",
+      "increment": "NH10",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatSessionArchiveTests.swift",
+          "symbol": "theReadingExportIsTheBranchShown"
+        },
+        {
+          "path": "KurnTests/ChatSessionArchiveTests.swift",
+          "symbol": "theHTMLReadingExportIsInert"
+        }
+      ],
+      "note": "The reading export is Markdown, Word or one self-contained HTML page: every text is escaped, links and images keep only their text, and there is no script or external resource; the chat renders model Markdown with links disabled."
+    },
+    {
+      "id": "A53",
+      "scenario": "Trust negado",
+      "requirement": "Recursos protegidos pulados; instruções seguem regra explícita do pi",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A54",
+      "scenario": "Skill sob demanda e colisão",
+      "requirement": "Corpo só quando carregado; primeiro nome vence com aviso",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A55",
+      "scenario": "Template com quoting/default/slice",
+      "requirement": "Expansão determinística sem execução shell",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A56",
+      "scenario": "Reload e troca de extensão",
+      "requirement": "Cleanup antigo, novo binding, sem subscriptions duplicadas",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A57",
+      "scenario": "Plugin state ao navegar branch",
+      "requirement": "Reconstrução só de ancestrais ativos",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A58",
+      "scenario": "MCP servidor falha ou muda catálogo",
+      "requirement": "Erro isolado e tool retirada inacessível",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A59",
+      "scenario": "MCP hidden/deferred/direct",
+      "requirement": "Descoberta e declarações respeitam exposure",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A60",
+      "scenario": "Nested call por codemode",
+      "requirement": "Mesmo pipeline, parent ID, sem transcript extra e com uso agregado",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A61",
+      "scenario": "Codemode falha depois de efeito",
+      "requirement": "Output parcial/erro; efeito não revertido; store não commitado",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A62",
+      "scenario": "Codemode limites e promessas soltas",
+      "requirement": "Deadline/limite reportado e trabalho pendente cancelado",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A63",
+      "scenario": "RPC responses fora de ordem",
+      "requirement": "Futures resolvidas pelo ID correto",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A64",
+      "scenario": "Prompt handled",
+      "requirement": "Cliente não espera settle de run que não iniciou",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A65",
+      "scenario": "JSONL com U+2028/U+2029 e chunks parciais",
+      "requirement": "Só LF separa registros",
+      "disposition": "required",
+      "increment": "NH10",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionArchiveTests.swift",
+          "symbol": "onlyLFSeparatesRecordsWhateverTheChunks"
+        }
+      ],
+      "note": "NH10: AgentJSONLLines splits on LF only, across any chunking; U+2028/U+2029 stay inside strings; a final line without LF is read."
+    },
+    {
+      "id": "A66",
+      "scenario": "Conexão cai após comando aceito",
+      "requirement": "Reconciliação não duplica prompt nem mutação",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A67",
+      "scenario": "Gap de replay/snapshot",
+      "requirement": "Snapshot consistente ou erro de cursor; sem transcript silenciosamente incompleto",
+      "disposition": "excluded",
+      "increment": null,
+      "targetStatus": "excluded",
+      "baselineEvidence": [],
+      "targetEvidence": [],
+      "note": "Upstream transport/desktop/extension case excluded; local analogues are tracked separately."
+    },
+    {
+      "id": "A68",
+      "scenario": "Background/foreground",
+      "requirement": "Draft preservado e estado reconciliado, sem conclusão inventada",
+      "disposition": "required",
+      "increment": "NH10",
+      "targetStatus": "partial",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "KurnTests/MeetingChatDraftTests.swift",
+          "symbol": "aDraftSavedInTheBackgroundComesBackAndASentQuestionClearsIt"
+        },
+        {
+          "path": "KurnTests/MeetingChatDraftTests.swift",
+          "symbol": "theHostKeepsAConversationWhoseDraftHasNowhereToGo"
+        },
+        {
+          "path": "KurnTests/ChatConversationHostTests.swift",
+          "symbol": "aReplyStoppedInTheBackgroundResumesOnceInTheForeground"
+        }
+      ],
+      "note": "The unsent draft of a saved conversation is a .draft recovery record saved on going to the background, on switching conversations and before the host lets a conversation go; an unsaved conversation's draft keeps its view model retained. Runs stopped by the background window settle as interruptions and resume once. Open: the device check in docs/release-physical-checklist.md."
+    },
+    {
+      "id": "A69",
+      "scenario": "Export/import JSONL",
+      "requirement": "Identidade, árvore, dados opacos e custo preservados",
+      "disposition": "required",
+      "increment": "NH10",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionArchiveTests.swift",
+          "symbol": "aRoundTripKeepsIdentityEveryBranchOpaqueDataAndUsage"
+        },
+        {
+          "path": "KurnTests/ChatSessionArchiveTests.swift",
+          "symbol": "anImportIsANewConversationWithTheWholeTreeAndItsDocuments"
+        },
+        {
+          "path": "KurnTests/ChatSessionArchiveTests.swift",
+          "symbol": "aRestoreKeepsTheIdentityOnlyWhenNoConversationHasIt"
+        }
+      ],
+      "note": "NH10: the native archive round-trips identity, the whole tree, unknown entries, records and header fields, and recorded usage; an app import keeps every branch and its document revisions. Native round trip is the requirement; pi JSONL v3 interchange is not claimed."
+    },
+    {
+      "id": "A70",
+      "scenario": "Efeito remoto com resultado desconhecido",
+      "requirement": "Não reexecutar automaticamente comando mutante",
+      "disposition": "required",
+      "increment": "NH04",
+      "targetStatus": "verified",
+      "baselineEvidence": [],
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatDocumentEffectTests.swift"
+        }
+      ],
+      "note": "Remote effects remain excluded. Atomic local artifact revision/receipt saves qualify replay of known committed invocations, save failure and cancellation after commit. Reopen does not execute work."
+    }
+  ],
+  "nativeCases": [
+    {
+      "id": "K01",
+      "requirement": "Selected parts, empty overrides and legacy wiki defaults",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "Packages/KurnCore/Tests/KurnCoreTests/ChatContractFixtureTests.swift",
+          "symbol": "selectedPartsEmptyOverridesAndLegacyDefaultsSurviveRoundTrip"
+        }
+      ],
+      "note": "Synthetic automated evidence; not physical-device qualification."
+    },
+    {
+      "id": "K02",
+      "requirement": "Plain history excludes old retrieval citations, tool audit payloads and artifact bodies",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "KurnTests/NativeHarnessContractFixtureTests.swift",
+          "symbol": "narrowedScopeReplaysPlainHistoryWithoutLegacyCitationsToolsOrDocumentBodies"
+        }
+      ],
+      "note": "Synthetic automated evidence; not physical-device qualification."
+    },
+    {
+      "id": "K03",
+      "requirement": "Legacy artifacts save/update one library document while historical references keep their version",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "KurnTests/NativeHarnessContractFixtureTests.swift",
+          "symbol": "legacyArtifactsCanBeSavedAndUpdatedAsOneLibraryDocument"
+        }
+      ],
+      "note": "Synthetic automated evidence; not physical-device qualification."
+    },
+    {
+      "id": "K04",
+      "requirement": "Four provider request bodies preserve the frozen legacy replay mapping",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContractFixtureTests.swift",
+          "symbol": "providerRequestsMatchTheFrozenBaseline"
+        }
+      ],
+      "note": "Synthetic automated evidence; not physical-device qualification."
+    },
+    {
+      "id": "K05",
+      "requirement": "Corrupt source/artifact storage is surfaced instead of restoring an empty workspace",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "KurnTests/NativeHarnessContractFixtureTests.swift",
+          "symbol": "corruptScopeAndArtifactPayloadsAreSurfacedAsErrors"
+        }
+      ],
+      "note": "Synthetic automated evidence; not physical-device qualification."
+    },
+    {
+      "id": "K06",
+      "requirement": "Saved step identities, model-window provenance and Foundation Date units remain readable",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContractFixtureTests.swift",
+          "symbol": "savedTraceRetainsIdentityCapacityAndLegacyDateUnits"
+        }
+      ],
+      "note": "Synthetic automated evidence; not physical-device qualification."
+    },
+    {
+      "id": "K07",
+      "requirement": "Canonical source reads preserve Unicode and recoverable continuation",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "KurnTests/ChatTranscriptToolPageTests.swift"
+        }
+      ],
+      "note": "Synthetic automated evidence; not physical-device qualification."
+    },
+    {
+      "id": "K08",
+      "requirement": "Dynamic output headroom matches the selected pi reference",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputBudgetTests.swift",
+          "symbol": "matchesPiHeadroomCases"
+        }
+      ],
+      "note": "Synthetic automated evidence; not physical-device qualification."
+    },
+    {
+      "id": "K09",
+      "scenario": "Native exact-time and opaque block codecs",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentContractTests.swift",
+          "symbol": "nativeCodecKeepsExactMillisecondsAndOpaqueFields"
+        }
+      ]
+    },
+    {
+      "id": "K10",
+      "scenario": "Native provider stream and final reconciliation",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentWireTests.swift",
+          "symbol": "responsesFinalReorderKeepsKnownItemBlockIdentity"
+        }
+      ]
+    },
+    {
+      "id": "K11",
+      "scenario": "Blocked calls retained as non-executed audit results",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentRuntimeTests.swift",
+          "symbol": "lengthBlocksEveryCallAndKeepsPairedSyntheticResults"
+        }
+      ]
+    },
+    {
+      "id": "K12",
+      "scenario": "Replay policy changes traced without content",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "KurnTests/ProviderHTTPTests+Agent.swift",
+          "symbol": "agentFinalCorrectsStreamedDraftAndReplayChangesAreTraced"
+        }
+      ]
+    },
+    {
+      "id": "K13",
+      "scenario": "Known local artifact effect survives receipt replay and failed saves publish no effect",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "KurnTests/ChatDocumentEffectTests.swift"
+        }
+      ]
+    },
+    {
+      "id": "K14",
+      "scenario": "Source authorization uses fixed parts/content revisions and rejects deletion",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "KurnTests/AuthorizedChatSourceReaderTests.swift"
+        }
+      ]
+    },
+    {
+      "id": "K15",
+      "scenario": "Cancellation after durable commit preserves known success",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolPipelineTests.swift",
+          "symbol": "cancellationAfterCommittedEffectAcknowledgesSuccessAndStopsNextRequest"
+        },
+        {
+          "path": "KurnTests/ChatDocumentEffectTests.swift",
+          "symbol": "cancellationAfterSaveStillPublishesCommittedSnapshotAndReceipt"
+        }
+      ]
+    }
+  ],
+  "contractFixtures": [
+    {
+      "id": "native-v1",
+      "path": "Packages/AgentHarness/Tests/AgentHarnessTests/Fixtures/nh02-native-v1.json",
+      "sha256": "dc10659b4bdb39ee683ba2db6b4b48769dc5b7c5eed238e41ae1ae2baf47cdf5",
+      "consumer": {
+        "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeCodecTests.swift",
+        "symbol": "nativeMessagesMatchIndependentGolden"
+      }
+    }
+  ]
+}

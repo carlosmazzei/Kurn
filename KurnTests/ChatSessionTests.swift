@@ -4,7 +4,7 @@
 //
 //  Exercises `ChatSession` against a real in-memory `ModelContainer`: the
 //  per-meeting vs. library-wide scope, cascade delete with its meeting, the
-//  JSON `turns` round trip (citations and usage included), and the title
+//  JSON `turns` round trip (usage included), and the title
 //  derivation helper — the same shape `WikiArticleTests` uses for its model.
 //
 
@@ -67,19 +67,15 @@ struct ChatSessionTests {
         #expect(try context.fetchCount(FetchDescriptor<Meeting>()) == 1)
     }
 
-    @Test func turnsRoundTripThroughJSONStorageWithCitationsAndUsage() throws {
+    @Test func turnsRoundTripThroughJSONStorageWithUsage() throws {
         let context = makeContext()
         let session = ChatSession(meeting: nil, title: "Q1 recap")
         context.insert(session)
 
-        let citation = PersistedCitation(
-            meetingID: UUID(), recordingID: UUID(), meetingTitle: "Kickoff",
-            start: 12.5, speakerLabel: "Speaker 1", text: "We shipped it."
-        )
         let turns = [
-            PersistedChatTurn(id: UUID(), role: .user, text: "What shipped?", citations: [], usage: nil, costUSD: nil, elapsedSeconds: nil),
+            PersistedChatTurn(id: UUID(), role: .user, text: "What shipped?", usage: nil, costUSD: nil, elapsedSeconds: nil),
             PersistedChatTurn(
-                id: UUID(), role: .assistant, text: "The v2 release.", citations: [citation],
+                id: UUID(), role: .assistant, text: "The v2 release.",
                 usage: TokenUsage(promptTokens: 120, completionTokens: 40), costUSD: 0.0021, elapsedSeconds: 3.4
             )
         ]
@@ -93,8 +89,6 @@ struct ChatSessionTests {
         #expect(fetched.turns[1].text == "The v2 release.")
         #expect(fetched.turns[1].usage?.totalTokens == 160)
         #expect(fetched.turns[1].costUSD == 0.0021)
-        #expect(fetched.turns[1].citations.first?.speakerLabel == "Speaker 1")
-        #expect(fetched.turns[1].citations.first?.start == 12.5)
     }
 
     @Test func aNewSessionStartsWithNoTurns() {

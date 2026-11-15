@@ -1,0 +1,550 @@
+# Native harness contract v1
+
+Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04); session ownership implemented (NH05); projection and persistent compaction implemented (NH06, except branch summaries); usage, cost, retries, credentials and the model capability snapshot implemented (NH07, except authenticated live-provider qualification); queued input implemented (NH08, except a session-retained owner, model changes at request boundaries and `waitingForUser`); session tree implemented (NH09, except branch summaries); native archive, export and import implemented (NH10, except the pi JSONL v3 subset and device qualification)**. NH01 froze the NH00
+compatibility baseline. NH02 now produces native v1 assistant blocks at the provider
+boundary and consumes them in the harness. Indexed session storage and lazy legacy conversion are active; detailed runtime
+message persistence barriers (NH05) and canonical tool-history replay (NH06) are active; complete pi compatibility is not claimed.
+
+Baseline: `6ec656b93c6cf59cbc3dc32f9bd08e1abb1517ed`. The attached reference documents
+describe pi revision `f064465d10d6a8e5c19f687bba1b5b5499b51680`. Their A/C identifiers
+are reference criteria, not identifiers of upstream pi test functions.
+
+The [catalog](native-harness-v1.json) maps all C01–C27 and A01–A70 individually to
+scope, delivery increment, legacy evidence and target evidence. `partial` means that
+some named behavior is exercised; baseline and target evidence remain separate and do
+not establish the full target. Kurn characterization cases are separate from pi conformance.
+
+## Versions and ownership
+
+| Version | Meaning | Current reader/writer |
+| --- | --- | --- |
+| Fixture v1 | Frozen synthetic test inputs and expected legacy output | Test bundles and catalog validator |
+| Contract v1 | Native canonical message/event/entry rules specified here | Provider boundaries write user/assistant content envelopes; checked entry writer and presentation compatibility projection are active |
+| JSONStorage envelope v1 | Existing checksum envelope around authoritative app values | Existing app persistence; bare legacy JSON remains readable |
+| SwiftData V6 (1.5.0) | Current model graph | Frozen V5 (1.4.0), additive schema migration and atomic per-session conversion |
+| pi JSONL v3 | Qualified future interchange boundary | Not a native store schema; NH10 |
+
+`AgentHarness` owns generic messages, streams, execution, compaction and run contracts.
+`KurnCore` owns meeting/source/document domain values and has no harness dependency.
+The app binds storage, HTTP, credentials, source authorization, artifact persistence and
+presentation. Contract types must not pull SwiftData, SwiftUI or Kurn into AgentHarness.
+
+Product constraints are app-only ownership of execution and data; no application backend,
+gateway, shell, Node runtime, downloaded executable extension, MCP or codemode. Existing
+explicitly selected model providers remain direct HTTPS integrations. Source selection and
+saving conversation artifacts as library documents are required product behavior.
+
+## Frozen compatibility baseline
+
+The catalog names three fixtures and pins their SHA-256 checksums. They were captured from
+the baseline codecs once; tests must not regenerate expected values with the current
+encoder. Review a fixture change explicitly, retain old versions needed for compatibility,
+and update its version/catalog when semantics evolve.
+
+| Fixture | What it protects |
+| --- | --- |
+| `nh01-runtime-v1.json` | Legacy AgentMessage/AgentToolCall/AgentRunStep JSON, raw invalid arguments, opaque replay metadata, reported reasoning usage and all four provider request serializers |
+| `nh01-domain-v1.json` | Meeting/tag/folder/library scope, global parts, empty per-meeting overrides, legacy wiki defaults, artifact bodies and historical title/version references |
+| `nh01-session-v1.json` | Bare pre-envelope turns/scope/artifacts, stable turn IDs, ignored retrieval citations, trace/usage/cost restoration, retryable question and saving/updating a library document |
+
+The fixtures are synthetic and contain no user recordings or credentials. Frozen provider
+requests characterize serializers; they are never sent to a real provider and do not prove
+that a service accepts every opaque fixture field.
+
+Important current adaptations/gaps:
+
+- Replay is canonical since NH06: an earlier question a completed run answered goes back as that
+  run recorded it on its branch (request, calls, results, answer). A question with no completed
+  run, or whose run was authorized for other sources, replays as plain user/assistant text, so
+  narrowing sources never replays older reads. Old retrieval citations stored by the removed chat
+  never enter history; artifact title/version metadata is supplied as a system-prompt section.
+- Artifacts retain their own latest body/version. A historical reference retains its saved
+  title/version and must not silently become the newest revision. Saving again updates the
+  same library document for the session/artifact identity. Legacy missing model provenance
+  stays unknown; it is not reconstructed from today's selected model.
+- Runtime compaction changes only the request projection; a summary is a durable checkpoint
+  (NH06) that reopening or another question reuses. Manual compaction summarizes before the next answer;
+  branch summaries are not implemented.
+- Output-limited calls never execute. Their native call blocks and raw arguments are kept with
+  synthetic error results in the run's audit history, and a successful output recovery excludes
+  that interrupted exchange from retry context and from replay.
+- Every chat run is owned by an `AgentSession` (NH05) that writes its messages, usage and end on
+  a branch before the work that depends on them; durable command IDs make a start idempotent
+  across processes; queued input is saved before it is acknowledged (NH08). The chat stays busy
+  (`cancelling`) after a stop until the run has settled. Open: one owner retained per session
+  across runs (today one per run), and model changes at request boundaries.
+- Interchange is native (NH10, `kurn.agent-session` v1). The pi JSONL v3 subset is not implemented; another host's records
+  and header fields survive an app import and the next export, and the reading export is Markdown, Word or
+  inert HTML; integers past
+  2^53 inside opaque archive fields lose precision (documented limitation).
+- Legacy Codable Date fields use Foundation seconds since 2001. Preserve that codec while
+  reading old data. Contract v1/pi timestamps below are different fields and units.
+
+## Native identities and time
+
+Session, entry, run, model-request attempt, tool-call invocation, artifact revision and
+effect receipt identities are distinct. IDs are opaque nonempty strings, at most 128 UTF-8
+bytes. Existing UUID text can be retained without replacement. Never deduplicate by text
+equality, tool arguments or array position. A retry is a new request attempt; it does not
+change the identity of an already committed effect.
+
+Entries have a session-wide monotonic append ordinal and a nullable parent entry ID. The
+selected leaf is separate from the newest append. Events have a run-scoped sequence starting
+at one; event sequence is neither an entry ID nor append ordinal.
+
+| Field | Encoding |
+| --- | --- |
+| Message timestamp | Signed Int64 Unix milliseconds, preserved exactly |
+| Entry creation time | ISO 8601 UTC with explicit timezone |
+| Duration | Nonnegative monotonic milliseconds |
+| Legacy Date | Existing Foundation codec, decoded only through the legacy boundary |
+
+For example, `1700000000125` message milliseconds and
+`2023-11-14T22:13:20.125Z` entry time describe the same instant. Do not encode the
+millisecond integer as Foundation Date seconds or infer missing historical timestamps.
+
+## Target message and request contract — NH02
+
+Canonical messages, transient model events, persisted entries and visual turns are four
+different representations. Each provider request is a disposable projection of canonical
+data; normalization must not mutate saved signatures, raw arguments or message identity.
+
+Messages carry stable ID, role, timestamp and ordered content blocks. Assistant finals also
+carry provider/model/API identity, request-attempt ID, normalized stop reason, reported usage,
+and opaque provider replay data. Preserve response model/ID, raw stop reason, diagnostics and
+thinking-level metadata when supplied. Missing optional values stay absent.
+
+| Block | Required semantics |
+| --- | --- |
+| text | Text plus optional opaque signature |
+| thinking | Visible/redacted state, optional text and opaque signature; never public diagnostics |
+| toolCall | Invocation ID/name, raw argument text, parsed arguments or validation error, optional namespace and opaque replay data |
+| image | Explicit MIME type and bounded data/reference; unsupported adapters use an omission marker in the request copy |
+
+Final stop reasons distinguish stop, tool use, output length, error, abort and deferred.
+Pending is transient and cannot be committed as a final response. Deferred is unsupported
+until a provider implements its explicit recovery capability; no universal polling.
+
+The authoritative final message replaces reconstructed deltas. Text/thinking/tool blocks
+retain order and stable block identity through fragmentation/interleaving. An incomplete
+tool call, raw parse error or output-length response cannot execute a tool, even if salvaged
+JSON happens to validate. Record one synthetic error result per blocked invocation in the
+canonical transcript. Keep the original raw arguments in protected canonical data.
+
+Provider preparation/authentication/transport failures must produce a terminal protocol
+outcome, including failure before any start event. UI text is a projection and cannot be
+used to reconstruct canonical tool calls or decide whether a mutation committed.
+
+## Target events, accounting and barriers — NH02/NH05/NH07
+
+The native event envelope has `contractVersion`, session/run IDs, sequence, optional
+request/call IDs and a typed event payload. It is an in-process contract, not a gateway.
+Unsupported versions/required discriminants fail explicitly; never silently drop an entry.
+Unknown data in a declared opaque metadata field is retained without interpretation.
+
+Lifecycle distinguishes preparing, streaming, executing tools, waiting for user, compacting,
+retry wait, cancelling, interrupted and idle. Each accepted request gets exactly one terminal
+outcome. `runEnded` closes low-level execution; `sessionSettled` follows recovery and all
+required writes. Cancellation is a request followed by confirmation, not an immediate settle.
+
+Persistence/policy barriers are awaited. Final assistant data commits before tool effects;
+tool results commit before the next request. A UI subscriber receives bounded/coalesced
+snapshots and cannot block canonical progress indefinitely. Bound stream buffers, terminate
+explicitly on overflow and ignore late progress/events from a terminated generation.
+
+Usage belongs to request identity. Reported cumulative usage replaces partial usage; it does
+not add the same request twice. Missing usage/cost is unknown, not zero. Reasoning is an output
+component and is not added again to output. Summary/retry/failed-attempt usage is retained
+when reported. Run totals are not current context occupancy. A cost guard needs explicit
+pricing or a documented token/request fallback; it is not a provider billing guarantee.
+
+## Target store, source projection and effects — NH03/NH04/NH06
+
+The entry envelope has contract version, session/entry/parent IDs, append ordinal, entry
+creation time and a typed payload. Indexed SwiftData entries become canonical only after a
+validated per-session migration. Retain original turnsData until the migration commits;
+interruption is resumable and never performs a model request or tool mutation. Extend backup,
+salvage, erasure and real on-disk migration tests together. Corruption is not empty history.
+
+Projection follows active ancestors and source segments, applies system sections/context
+edits and replays saved compaction checkpoints. Tool calls/results remain paired. Record the
+authorized source snapshot and selected parts at the request boundary. Narrowing sources has
+an explicit memory policy; strict mode filters old excerpts, summaries and artifact metadata
+before sending a request. Never substitute today's scope for recorded historical evidence.
+
+Document effects use invocation/receipt identity and per-artifact serialization. Validate and
+authorize before execution, durably commit a revision/receipt before reporting success, then
+persist the result. Known committed effects are not repeated on retry/relaunch. An unknown
+effect outcome is surfaced for reconciliation. A saved library document remains independent
+of future chat branches; create/update/delete/re-save keep explicit provenance.
+
+## Validation and activation
+
+`python3 Tools/check_native_harness_contracts.py` checks complete A/C coverage, bounded
+profile scope, evidence links/test symbols, fixture versions, baselines and checksums. CI
+runs it with static policy. Tests decode real fixture bytes through current package/app
+readers; no provider keys or paid calls are needed.
+
+NH01 completion means the baseline and target are reviewable and traceable. Target evidence
+now identifies the exercised NH02 behavior; session-dependent criteria remain open. NH03
+activates store codecs/migration only after validation. NH00's real-corpus/device qualification and
+authenticated provider smoke tests remain separately open.
+
+## NH02 implementation boundary
+
+`AgentContentMessage` is the checked v1 user/assistant content envelope. It retains an
+opaque message ID, exact Int64 Unix milliseconds (absent when historically unknown), ordered
+stable block IDs, response/request identities, optional model/API, raw stop reason, reported
+usage and opaque replay fields. `AgentMessage.content` and `.tool(AgentToolResultMessage)`
+carry native messages alongside the frozen legacy input cases. Live user/assistant/results
+are native; `legacyProjection` is a read-only compatibility view. Results contain bounded
+text/image blocks, optional private details, an error flag and a typed synthetic block reason.
+Thinking/tool-call blocks cannot be decoded as tool results. The native golden is separate
+from NH01's immutable legacy fixtures and does not claim their baseline commit.
+
+The owner assigns a request ID before preparation and a logical invocation ID before tool
+execution; both remain distinct from provider response/call IDs. New retries, summaries and
+wrap-ups receive new request IDs. Reused provider call IDs cannot link a result to a different
+request. Session/run/request/invocation IDs travel in typed events and content-free diagnostic
+steps. New/reloaded conversations use their actual ChatSession UUID, with a new run UUID each
+time. Control characters are escaped in log IDs. Historical identities are never fabricated.
+
+Stream failures create native terminal audit messages even before the first block. Partial
+raw calls stay in the failure snapshot and get synthetic interrupted results without running
+tools. Detailed live protocol audit remains in memory until the NH05 owner writes it;
+NH03 persists the existing presentation/diagnostic projection as canonical entries.
+NH01 fixture bytes stay unchanged. The V5 graph is frozen and V6 adds entry/revision storage;
+effect receipts and awaited persistence barriers remain NH04/NH05.
+
+`AgentMessageReducer` orders interleaved blocks, bounds retained content to 4,096 blocks /
+8 MiB, rejects invalid transitions and replaces all accumulated blocks/usage with the final
+message. Thinking/redacted data never becomes visible text. Wire errors are sticky; malformed
+payloads, unknown required block types, incomplete tool calls, missing terminal events and
+explicit buffer overflow cannot be salvaged into executable calls. Anthropic requires both
+`content_block_stop` for a tool and `message_stop` for the response. Responses final output
+replaces stale/removed/reordered items, preserving known item identities. Chat Completions
+orders tool fragments by provider index. Trailing cumulative usage replaces earlier counts;
+Gemini reasoning is an output component, counted once.
+
+Every production AgentModel implementation uses `AgentModelBoundary`, covering credential/URL
+preparation and transport. It emits exactly one typed final/failure event. The harness fences
+late callbacks and prevents a failed stream from returning executable calls. Deferred outcomes
+are explicit and unsupported; no polling is introduced. Awaitable session barriers and event
+sequence envelopes remain NH05 work.
+
+Provider requests are disposable `AgentReplayProjection` copies. Error/aborted/deferred
+messages and their paired native results are omitted with `omittedMessages` diagnostics.
+Optional namespaces survive reduction/audit; unsupported namespaced calls produce explicit
+errors instead of dispatching an unqualified builtin. Namespace loss in wire replay is counted.
+Supplied declared diagnostics/thinking/reasoning protocol facts remain private metadata and
+are never blindly forwarded. IDs are normalized/relinked
+without touching canonical IDs. Invalid/incomplete arguments become `{}` only in a replay copy
+paired with their error result. Unsupported images/thinking use explicit omission markers;
+signed thinking and Gemini signatures are replayed only to the compatible API/model. Aliases
+without a qualified identity mapping remain conservative. No new image picker or model-level
+image/thinking capability claim is introduced; the per-model capability snapshot is NH07.
+
+`replayPrepared` persists numeric omission/normalization/sanitization counts. Request completion
+adds native/thinking block counts, invalid/incomplete call counts and a normalized stop code
+(0 stop, 1 tools, 2 length, 3 error, 4 abort, 5 deferred, 6 other). Request/summary failure adds
+`protocolFailure` (1 preparation, 2 transport, 3 invalid stream, 4 cancellation, 5 deferred;
+0 if no typed failure was observed). No content, signatures or raw errors enter these records.
+All returned disabled/length-limited calls receive synthetic tool-error audit results and
+`toolRequested`/`toolSkipped`/`toolFinished` diagnostics without invoking confirmation or tools.
+
+
+## NH03 activation boundary
+
+`AgentSessionEntry` checks native payloads, opaque host metadata, explicit UTC entry time,
+IDs and monotonic append ordinals. `AgentEntryGraph` validates every sibling and selects
+an active ancestor path independently of append order. The MainActor SwiftData adapter
+exchanges Sendable snapshots/commits through `AgentSessionStore`; expected revisions reject
+stale writes. Row indices are checked against checksummed payload envelopes.
+
+V5 models are frozen independently of live V6 classes. Conversion is a single atomic,
+resumable session unit, with a completion version, original turns/scope/artifact bytes and
+no model/tool callbacks. Missing historical timestamps, response identity and stop reasons
+stay absent. Only known artifact versions are migrated. Duplicate IDs, malformed content,
+unsupported versions and mismatched indices fail explicitly.
+
+The app compatibility writer records presentation messages/host metadata and selected
+scope/artifact revision references as append-only entries. A changed/deleted suffix selects
+a new branch; retained siblings stay available. Checked loads derive from the active path,
+not `turnsData`/`scopeData`/`artifactsData` caches. This is the sole production presentation
+writer. Since NH05 host increment 2, live model/tool messages are written behind awaited
+barriers on per-run branches that never move the selected leaf (below). NH06 replays those branches as the
+qualified source-aware canonical projection (below).
+
+Recovery records persist versioned run/queue/draft/effect metadata only. Their presence
+never resumes work or consumes a prompt. Generic effect metadata alone does not prove
+a commit; the validated NH04 local receipt profile below does. NH05/NH08 define session/queue behavior.
+
+The graph is shared by production, tests and whole-store protected backups. Markdown
+salvage includes conversations, retained native messages/artifact revisions, recovery metadata
+and independent library documents, while leaving live bytes unchanged. Library erasure
+removes all three new entities, including orphans, and per-session deletion cascades.
+
+
+## NH02 review corrections — PRs #337/#338
+
+The wire finish reason closes content, not transport validation. Until SSE EOF, explicit
+provider errors (including Responses typed failure events) invalidate the entire response.
+Failures are sticky and cannot be cleared by later usage updates. Malformed/oversized
+trailers fail explicitly; valid cumulative usage remains accepted and late content stays
+fenced. Tools cannot execute from a response invalidated after its finish reason.
+
+Diagnostic request correlation is scoped to the active model attempt. Request/summary
+terminal events retain that attempt's ID, then close it on success, failure or cancellation.
+Context checks, compaction decisions, retry decisions and run terminals outside requests
+carry session/run identity with no stale request ID. Summary requests get their own scope.
+Tool diagnostics explicitly reference their invocation's originating request without changing
+the ambient model scope; ending an invocation cannot leak its request into the next check.
+Existing persisted traces are retained as recorded rather than retrospectively relabeled.
+
+
+## NH04 activation boundary
+
+`AgentToolRegistry` accepts only the tools bundled by the host, with unique ASCII identifier
+names (1–64 bytes). Schemas are bounded to depth 32 and 4096 nodes. The non-coercing subset
+supports object/properties/required/boolean additionalProperties, homogeneous arrays/items,
+string Unicode-scalar length and UUID format, finite number/integer bounds, boolean, null,
+description and enum. Object roots and explicit properties/additionalProperties are required.
+Unknown keywords, references, combinators, patterns and other formats fail registration.
+Bundled source/document schemas use additionalProperties=false. Semantic authorization,
+empty text, size, identity and paging checks remain in the host tools.
+
+Every invocation is schema-checked before policy and rechecked after an allowed argument
+transformation. Denial, confirmation refusal, unknown tools, invalid arguments, errors and
+abort all close the tool lifecycle. Generic diagnostics contain numeric facts and opaque
+IDs, never raw arguments or exception descriptions. Progress phases are 0=validation,
+1=authorization, 2=execution, 3=commit, 4=committed, 5=recovered committed receipt. A shared
+terminal fence rejects late callbacks. The UI trace retains progress plus content-free
+validation/policy/abort/registration diagnostics. No after-result replacement hook or
+termination policy is exposed (A23/A24 remain conditional).
+
+Independent read batches use at most four workers (configurable bounded 1–16). Mixed batches
+containing any sequential/unknown tool run sequentially. All started workers settle before
+failure escapes. Progress/end events follow completion; native result messages append in
+original assistant call order. Document mutations are always sequential. Before extending a soft tool limit, the
+scheduler settles the currently authorized capacity so completed parallel reads contribute
+to progress. Repeated/stale reads cannot earn more budget, and the hard limit stays logged. Model-visible
+content, host details and structuredContent are separate native output fields; every wire
+adapter projects only explicit content. The existing Unicode-safe pagination remains.
+
+The app captures source metadata, selected parts, passage/attachment bodies, semantic
+candidates and SHA-256 content revisions before model IO. Later selection/content changes
+cannot expand that snapshot; source deletion and attachment deletion fail explicitly. The
+snapshot is per task; persisting authorization entries for later replay is NH05/NH06.
+
+The synchronous MainActor effect transaction reads the current checked session, plans a
+pure domain edit, then saves its immutable artifact revision, selected presentation state,
+artifact reference/provenance and effect receipt together. The receipt identifies the logical
+invocation/request/provider call, arguments digest, exact decimal artifact version and original result. The structured output also carries
+its version as decimal text, avoiding the Double precision limit of JSONValue numbers.
+A matching receipt returns that original result while retaining the latest workspace state;
+changed arguments/identity or a corrupt receipt fail without mutation. Receipts are immutable.
+A shared local mutation lease spans the save and workspace publication, including actor
+suspension and overlapping executors. Compatibility UI saves preserve newer committed
+artifacts/references/provenance during cancellation; explicit branch writes remain separate. A failed save
+restores only staged entries/revisions/receipt. A cancellation arriving after a successful
+save cannot erase the receipt or change the known committed result into a tool failure.
+
+New sessions are still lazy. Before the first document effect of each task, the accepted
+user presentation is saved for both new and existing conversations. Preparation runs only
+once per task, so a later mutation cannot rewind earlier committed artifacts. Other accepted input/message/result barriers, one owner per
+session, crash recovery scheduling and settle semantics remain NH05. Native tool messages
+are still in-memory until that owner persists them; reopen does not automatically execute
+anything. Canonical provider replay and persistent compaction remain NH06. Local durable
+receipt replay is qualified; no remote/unknown-outcome side-effect mechanism is introduced.
+
+
+## Initial NH05 package ownership boundary
+
+`NativeHarness.persistingMessages` and `persistingUsage` install awaited commits before
+model/tool dependencies advance. Failure audit and synthetic results use the same message
+barrier. `start` returns a producer handle: its bounded events are disposable observations,
+while `result()` waits for the producer itself and `cancel()` requests termination.
+The compatibility `run` API retains its original observation/cancellation contract.
+
+`AgentSession` owns an accepted run across store awaits, explicit cancellation and terminal
+writes. It writes `agent.run-start.v1`, `agent.usage.v1` and `agent.run-end.v1` custom entries
+alongside native messages, correlated by run ID. A failed terminal write blocks new work;
+`retrySettlement` retries the saved terminal entry without inference or effects, recognizing
+an identical entry when a commit acknowledgement was lost. `waitUntilSettled` returns the
+captured run state, including explicit persistence failure; it does not claim successful
+durability when a write failed. Message/usage failures require host recovery. Opening a new
+owner executes nothing. One owner per session is a host responsibility. `start` returns the run's
+identity and a disposable event stream that ends only after settlement, throwing the run's failure:
+a failed history write is the typed `persistenceFailed` (also when only the terminal entry failed
+after an answer, ahead of any other failure), an abort is a cancellation. The host may
+supply the run ID and extra run-start fields; the run ID field cannot be overridden.
+
+`appendMode: .branch` keeps the selected leaf where the host put it and chains the run's entries
+from the leaf at run start (an empty session's first entry becomes the leaf). Every append is built
+on the snapshot it is committed against; a revision conflict means another writer committed first,
+so the entry is rebuilt on the new snapshot and committed again, at most four times before the
+failure is reported. A failed commit writes nothing, so a retry cannot duplicate an entry, and the
+terminal entry's append identity is fixed so a retried save recognizes a lost acknowledgement.
+
+`start(observation:)` takes `.bounded` (default, newest 128 events) or `.complete` (every
+event, for a host presentation reducer that cannot tolerate a gap). Neither cancels the run
+when the observer goes away.
+
+## NH05 host activation, increment 1
+
+The app retains chat conversations in `ChatConversationHost` (built by `AppComposition`),
+one per scope (a meeting or the library-wide Ask), not in the view showing them. Dismissing
+the view no longer cancels a reply. Retention is bounded (four by default, least recently
+opened idle first) and never evicts a running conversation; "Delete all data" cancels every
+run, awaits settlement and forgets the conversations before erasing. A run is owned with
+complete observation (an `AgentSession` run once the conversation is saved, else the plain
+`AgentRunHandle`): every exit path aborts it and awaits its settlement before the conversation
+reports the run over, so a cancelled or failed reply is reported
+only after no tool can still run or commit an effect. `cancel()` is a request; the owner
+exposes `idle/preparing/streaming/executingTools/cancelling` and refuses a new prompt until
+settled. A conversation whose meeting or saved session was deleted writes nothing further,
+and the open session cannot be deleted under its own run. A run holds a finite background
+execution window; when it expires the run is cancelled and settles as a retryable interruption.
+The question is persisted before any request (a failed save sends nothing), and each run writes a
+`.run` recovery record, `running` then `ended`. A launch sweep marks records still `running` as
+`interrupted`; it never re-sends, resumes or replays a run. Reopening such a conversation shows
+that run's committed steps and usage under its retryable question, rebuilt without a write from its
+canonical branch (a later save of the conversation keeps them on the question, like a stopped run's) (`AgentRunTrace.restoring`): no output summary, which was never saved, an
+unanswered call as failed and no stop step without a saved end. A run the background wind-down stopped
+in a live process is sent again once when the app returns to the foreground, from the saved
+question with the same provider and model, only while that question is still the unanswered one
+and only if the stopped run committed no document change (its tool would run again under a new
+invocation identity); a user stop, a new question, a new chat or opening another saved conversation
+in that scope cancels it.
+
+## NH05 host activation, increment 2: canonical run history
+
+Each chat run commits its native messages (the question, assistant turns with tool calls, tool
+results, the answer) and each request's reported usage (`agent.usage.v1`) to the saved session,
+between a start entry (`agent.run-start.v1`, carrying the frozen authorization: effective source
+scope, resolved meeting IDs and `provider:model`, written before model IO) and an end entry
+(`agent.run-end.v1`: completed/failed/cancelled and the stop reason),
+through the harness's awaited sinks, before any dependent model or tool work. The entries form
+one branch per run: the first is a child of the session leaf when the run started (the accepted
+question), each later one a child of the previous, and every entry carries the run record's ID
+as `runID` metadata. The selected leaf never moves, so the presentation path, its projection and
+the compatibility writer's diff are unchanged, and a later presentation branch cannot detach a
+run's history. The run is an `AgentSession` run in `.branch` mode, with the run record's ID and the
+authorization as a host start field; a presentation or effect write landing between an append's
+load and commit is a revision conflict, rebuilt on the new snapshot. A failed commit fails the run (the question stays
+retryable; a retry starts a new branch), records `run_transcript_write_failed` and tells the user the
+reply's progress could not be saved and nothing more was sent, instead of the store's error text. Run entries are
+replayed by later runs as canonical history (NH06, below).
+
+Not yet activated: a `waitingForUser` phase (no tool asks for confirmation).
+
+Reopening a conversation a dead process interrupted resumes that run once, from the saved question
+with the chat's current provider and model, when the run committed no document change, was not
+itself a resume and was not resumed before: the resume runs under the durable command
+`resume-<runID>`, so it never repeats in this process or after another launch.
+
+The chat observes a run through `AgentRunSnapshots.coalescing`: a reducer drains the complete event
+observation into `AgentRunSnapshot`s (text, trace, `AgentRunProgress`, finished tool calls, outcome)
+and keeps only the newest for the view, so a slow observer skips snapshots instead of queueing every
+event, and the last snapshot always arrives before the stream ends with the run's failure. Ending
+observation stops the reducer, never the run; canonical writes never pass through it. A run carries
+a durable command ID in its start entry, and a command already in the log runs nothing. Each run's
+phase is projected with its turn, request and tool-call identities (`AgentRunProgress`). The launch
+sweep closes every run branch nothing ended with the end the run could not write.
+
+The package infrastructure above is not by itself completion of session acceptance criteria. UI/coordinator lifetime, canonical replay/provenance, crash/effect
+recovery, durable command deduplication and complete phase projection remain open in NH05;
+compaction/projection and queues retain their later roadmap boundaries.
+
+## Canonical replay and persistent compaction — NH06
+
+Raw entries, the selected (presentation) path, the model projection and each provider request copy
+stay distinct. `AgentRunBranch` reads a run back from the log; its `contextMessages` are what the
+run's model context held (audit-only failed, aborted, deferred or output-limited replies and their
+paired results are excluded) and `answer` exists only for a completed run ending in a final reply.
+`ChatReplayHistory` walks the shown turns: an answered question is replaced by the messages of the
+latest completed run recorded for it (`questionID` start field, or its command for older runs),
+provided that run was authorized for the same source scope and for no meeting the current run may
+not read; otherwise the question replays as plain text. Sibling branches never enter context.
+
+Context edits (`agent.context-edit.v1`, `AgentContextEdit`) change only the projection: removing an
+assistant message removes its results, a removed result becomes a stub, and the log, the shown
+conversation and recorded usage are unchanged. A summary compaction is a checkpoint
+(`agent.compaction.v1`: summary, first kept message ID, tokens before/after, split turn) committed
+through an awaited sink before any request uses it; replay applies the newest checkpoint of a
+permitted run whose kept message is present, and a later compaction updates its summary. Unusable,
+failed or overflowing summaries write nothing and no omission note stands in for one: after a
+provider overflow the run ends with `AgentContextReductionError`. Context usage after a compaction
+is unknown (`nil`), never zero. Budgets come from the effective model's own window and output limit.
+
+System prompts are ordered sections (`AgentSystemPrompt`): Kurn's meeting-assistant `instructions`
+form a stable prefix and the `documents` index is its own section. Each `agent.run-start.v1`
+records the first run's prompt (`system`), later runs' `systemPatch` (changed sections, `null`
+removing one) and the declared tools with their delta (`tools`); within a run the prompt is refreshed
+after each tool batch. Manual compaction (`compactingFirst`) summarizes before a run's first request.
+Open: optional branch summaries.
+
+## Usage, cost, retries and credentials — NH07
+
+`AgentUsage` carries input, output, reasoning, cache-read and cache-write counts. Reasoning is part of
+output and cache reads/writes are part of input, each counted once; Anthropic's separately reported
+cached input is added to its total. Unreported counts stay unknown. The estimator returns nil for an
+unpriced usage; `AgentRunOutcome.estimatedCostUSD` is nil (unknown, never zero) unless every usage was
+priced, and `maxCostUSD` counts as reached when it cannot be verified. The session owns retries of model
+requests (`AgentRetryPolicy`): only `AgentTransientError`s before visible text, as new requests with
+their own identities, with bounded and cancellable backoff that honours `Retry-After` when carried; the
+agent transport keeps its own retries off. Credentials are resolved per request (`AgentPerRequestModel`).
+Each run records what its model can do (`AgentModelCapabilities`, version 1): tool calling, reasoning
+and the effort the adapter sends, image input and the vendor's prompt caching, each `supported`,
+`unsupported` or `unknown`. `ModelCapabilityCatalog` supplies exact reviewed entries (a dated snapshot
+inherits its model's) and a Claude family rule; any other name stays unknown. Fresh provider metadata
+overrides what it reports (Gemini's `thinking`) and qualifies an alias with the canonical ID the provider
+resolved it to, whose catalog facts then apply. The snapshot travels in the run's context resolution (its
+context step) and in its `agent.run-start.v1` entry (`capabilities`, read back by
+`AgentRunBranch.capabilities`); older traces have none, and a later version's unknown values read as
+`unknown`. The chat refuses a model known to lack tools before any request. Open: authenticated
+live-provider qualification, which needs real credentials; signed reasoning still replays only to the
+identical requested model.
+
+## Queued input and execution UI — NH08
+
+`AgentInputQueue` keeps FIFO steering and follow-up queues that drain one or all items per boundary.
+Every change is saved (complete lists) before it is applied or acknowledged; updates carry the complete
+lists and stable IDs. A harness given a queue injects steering after each complete tool batch and before
+it would finish, and follow-ups only when no tool call and no steering is left; drained items are
+committed as user messages with the item's ID, and a stopped run leaves the rest queued. `continueRun`
+answers an open request or tool result directly, takes one queue selection after a finished reply, and
+fails with `AgentContinueError.nothingToContinue` — consuming nothing — when there is nothing to answer.
+The chat saves the queue as the session's `.queue` record, shows taken-in input as its own question and
+answer, clears the queue before a stop and hands pending input back to the composer, keeps the reader's
+position, and states retry delay, compaction and a confirmed stop in words. Open: a session-retained
+owner, model changes at request boundaries and `waitingForUser`.
+
+## Session tree — NH09
+
+`AgentSessionTree` reads a session's log as a tree without changing it. Alternatives at a message are
+the conversation's message entries with the same nearest message ancestor and role; navigation selects
+the newest conversation entry of a branch and commits only the leaf, checked against the revision; fork
+and clone copy the path (before the selected question, or to the selected leaf), the runs that answered
+it, its labels and context edits into a new session, and the source keeps every branch. Labels are
+detached metadata entries. Usage sums every branch's runs for the session and only the selected path's
+runs for the branch shown. The host navigates only while no run is active, rebuilds its presentation
+from the selected branch (documents follow the branch's revision map), keeps per-branch document
+revisions distinct and treats a saved document as current only for the same version and body. Open:
+branch summaries.
+
+## Interchange — NH10
+
+`AgentSessionArchive` is the native, versioned interchange (`kurn.agent-session`, version 1): JSON
+Lines with a header, one line per entry (encoded directly, so integers keep their exact form) and
+namespaced host records kept opaque. Unknown entries, record types and header fields survive a round
+trip. Only LF separates records (`AgentJSONLLines`, any chunking); U+2028/U+2029 are ordinary string
+characters. Reading rejects a missing or repeated header, another format or version, untyped lines,
+payloads past the line/total/entry/depth limits, entries of another session and broken graphs. A copy
+moves the graph to a new session identity. The app exports a conversation with its document revisions
+(exact stored bytes) and title, never run records, queued input or receipts; an import is a new
+conversation whose revisions are checked against their bytes before anything is written, and a
+restore keeps the identity only when no conversation has it. The reading export is the branch shown
+as Markdown. Not claimed: pi JSONL v3 interchange, an HTML export, keeping unknown host records inside
+the app's store, exact integers past 2^53 in opaque records and header fields (they pass through
+`JSONValue` doubles), and device/migration/stress qualification.

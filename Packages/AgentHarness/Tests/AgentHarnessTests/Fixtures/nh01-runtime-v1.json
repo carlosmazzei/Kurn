@@ -1,0 +1,458 @@
+{
+  "baselineCommit" : "6ec656b93c6cf59cbc3dc32f9bd08e1abb1517ed",
+  "expectedRequests" : {
+    "anthropic" : {
+      "max_tokens" : 321,
+      "messages" : [
+        {
+          "content" : [
+            {
+              "text" : "Find the decisão 🧭",
+              "type" : "text"
+            }
+          ],
+          "role" : "user"
+        },
+        {
+          "content" : [
+            {
+              "text" : "Looking up",
+              "type" : "text"
+            },
+            {
+              "id" : "call-1",
+              "input" : {
+                "query" : "decisão 🧭"
+              },
+              "name" : "lookup",
+              "type" : "tool_use"
+            }
+          ],
+          "role" : "assistant"
+        },
+        {
+          "content" : [
+            {
+              "content" : "First Second Third",
+              "is_error" : false,
+              "tool_use_id" : "call-1",
+              "type" : "tool_result"
+            }
+          ],
+          "role" : "user"
+        },
+        {
+          "content" : [
+            {
+              "text" : "Found the decision",
+              "type" : "text"
+            }
+          ],
+          "role" : "assistant"
+        }
+      ],
+      "model" : "fixture-model",
+      "stream" : true,
+      "system" : "Use fixture facts only",
+      "tools" : [
+        {
+          "description" : "Read fixture facts",
+          "input_schema" : {
+            "additionalProperties" : false,
+            "properties" : {
+              "query" : {
+                "type" : "string"
+              }
+            },
+            "required" : [
+              "query"
+            ],
+            "type" : "object"
+          },
+          "name" : "lookup"
+        }
+      ]
+    },
+    "gemini" : {
+      "contents" : [
+        {
+          "parts" : [
+            {
+              "text" : "Find the decisão 🧭"
+            }
+          ],
+          "role" : "user"
+        },
+        {
+          "parts" : [
+            {
+              "text" : "Looking up"
+            },
+            {
+              "functionCall" : {
+                "args" : {
+                  "query" : "decisão 🧭"
+                },
+                "id" : "wire-call-1",
+                "name" : "lookup"
+              },
+              "thoughtSignature" : "opaque-gemini-signature=="
+            }
+          ],
+          "role" : "model"
+        },
+        {
+          "parts" : [
+            {
+              "functionResponse" : {
+                "id" : "wire-call-1",
+                "name" : "lookup",
+                "response" : {
+                  "result" : "First Second Third"
+                }
+              }
+            }
+          ],
+          "role" : "user"
+        },
+        {
+          "parts" : [
+            {
+              "text" : "Found the decision"
+            }
+          ],
+          "role" : "model"
+        }
+      ],
+      "generationConfig" : {
+        "maxOutputTokens" : 321
+      },
+      "systemInstruction" : {
+        "parts" : [
+          {
+            "text" : "Use fixture facts only"
+          }
+        ]
+      },
+      "tools" : [
+        {
+          "functionDeclarations" : [
+            {
+              "description" : "Read fixture facts",
+              "name" : "lookup",
+              "parameters" : {
+                "additionalProperties" : false,
+                "properties" : {
+                  "query" : {
+                    "type" : "string"
+                  }
+                },
+                "required" : [
+                  "query"
+                ],
+                "type" : "object"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "openAI" : {
+      "max_completion_tokens" : 321,
+      "messages" : [
+        {
+          "content" : "Use fixture facts only",
+          "role" : "system"
+        },
+        {
+          "content" : "Find the decisão 🧭",
+          "role" : "user"
+        },
+        {
+          "content" : "Looking up",
+          "role" : "assistant",
+          "tool_calls" : [
+            {
+              "function" : {
+                "arguments" : "{\"query\":\"decisão 🧭\"}",
+                "name" : "lookup"
+              },
+              "id" : "call-1",
+              "type" : "function"
+            }
+          ]
+        },
+        {
+          "content" : "First Second Third",
+          "role" : "tool",
+          "tool_call_id" : "call-1"
+        },
+        {
+          "content" : "Found the decision",
+          "role" : "assistant"
+        }
+      ],
+      "model" : "fixture-model",
+      "reasoning_effort" : "low",
+      "stream" : true,
+      "stream_options" : {
+        "include_usage" : true
+      },
+      "tools" : [
+        {
+          "function" : {
+            "description" : "Read fixture facts",
+            "name" : "lookup",
+            "parameters" : {
+              "additionalProperties" : false,
+              "properties" : {
+                "query" : {
+                  "type" : "string"
+                }
+              },
+              "required" : [
+                "query"
+              ],
+              "type" : "object"
+            }
+          },
+          "type" : "function"
+        }
+      ]
+    },
+    "openAIResponses" : {
+      "include" : [
+        "reasoning.encrypted_content"
+      ],
+      "input" : [
+        {
+          "content" : "Find the decisão 🧭",
+          "role" : "user"
+        },
+        {
+          "encrypted_content" : "opaque-reasoning==",
+          "futureOpaqueField" : {
+            "preserve" : true
+          },
+          "id" : "rs_fixture",
+          "type" : "reasoning"
+        },
+        {
+          "content" : "Looking up",
+          "role" : "assistant"
+        },
+        {
+          "arguments" : "{\"query\":\"decisão 🧭\"}",
+          "call_id" : "call-1",
+          "name" : "lookup",
+          "type" : "function_call"
+        },
+        {
+          "call_id" : "call-1",
+          "output" : "First Second Third",
+          "type" : "function_call_output"
+        },
+        {
+          "content" : "Found the decision",
+          "role" : "assistant"
+        }
+      ],
+      "instructions" : "Use fixture facts only",
+      "max_output_tokens" : 321,
+      "model" : "fixture-model",
+      "reasoning" : {
+        "effort" : "low"
+      },
+      "store" : false,
+      "stream" : true,
+      "tools" : [
+        {
+          "description" : "Read fixture facts",
+          "name" : "lookup",
+          "parameters" : {
+            "additionalProperties" : false,
+            "properties" : {
+              "query" : {
+                "type" : "string"
+              }
+            },
+            "required" : [
+              "query"
+            ],
+            "type" : "object"
+          },
+          "strict" : false,
+          "type" : "function"
+        }
+      ]
+    }
+  },
+  "fixtureVersion" : 1,
+  "invalidCall" : {
+    "arguments" : null,
+    "id" : "invalid-1",
+    "name" : "lookup",
+    "providerMetadata" : {
+      "geminiID" : "wire-call-1",
+      "thoughtSignature" : "opaque-gemini-signature=="
+    },
+    "rawArguments" : "{\"query\":"
+  },
+  "maxOutputTokens" : 321,
+  "messages" : [
+    {
+      "user" : {
+        "_0" : "Find the decisão 🧭"
+      }
+    },
+    {
+      "assistant" : {
+        "providerMetadata" : {
+          "openAIResponses" : {
+            "reasoning" : [
+              {
+                "encrypted_content" : "opaque-reasoning==",
+                "futureOpaqueField" : {
+                  "preserve" : true
+                },
+                "id" : "rs_fixture",
+                "type" : "reasoning"
+              }
+            ]
+          }
+        },
+        "text" : "Looking up",
+        "toolCalls" : [
+          {
+            "arguments" : {
+              "query" : "decisão 🧭"
+            },
+            "id" : "call-1",
+            "name" : "lookup",
+            "providerMetadata" : {
+              "geminiID" : "wire-call-1",
+              "thoughtSignature" : "opaque-gemini-signature=="
+            },
+            "rawArguments" : "{\"query\":\"decisão 🧭\"}"
+          }
+        ]
+      }
+    },
+    {
+      "toolResult" : {
+        "callID" : "call-1",
+        "content" : "First Second Third",
+        "isError" : false,
+        "toolName" : "lookup"
+      }
+    },
+    {
+      "assistant" : {
+        "text" : "Found the decision",
+        "toolCalls" : [
+
+        ]
+      }
+    }
+  ],
+  "model" : "fixture-model",
+  "modelStopReasons" : [
+    {
+      "endTurn" : {
+
+      }
+    },
+    {
+      "toolUse" : {
+
+      }
+    },
+    {
+      "maxTokens" : {
+
+      }
+    },
+    {
+      "other" : {
+        "_0" : "provider-specific"
+      }
+    }
+  ],
+  "steps" : [
+    {
+      "contextResolution" : {
+        "catalogVersion" : "2026-11-08",
+        "contextWindowTokens" : 1050000,
+        "id" : "00000000-0000-0000-0000-000000000401",
+        "isCached" : false,
+        "limitKind" : "combined",
+        "maxOutputTokens" : 128000,
+        "modelID" : "gpt-6.1-terra",
+        "reason" : "catalogMatch",
+        "resolvedAt" : 721692800.125,
+        "source" : "fixed_table"
+      },
+      "id" : "2373E4B1-9F49-4EBF-890E-0E74FC855782",
+      "kind" : "context",
+      "status" : "finished"
+    },
+    {
+      "arguments" : {
+        "query" : "decisão 🧭"
+      },
+      "callID" : "call-1",
+      "id" : "895E12B3-3022-490B-8391-E34CDDBC6A1E",
+      "kind" : "tool",
+      "outputSummary" : "Read fixture facts",
+      "status" : "finished",
+      "toolName" : "lookup"
+    },
+    {
+      "diagnostic" : {
+        "kind" : "requestStarted",
+        "metrics" : {
+          "contextSafetyTokens" : 8232,
+          "contextTokens" : 54879,
+          "maxOutputTokens" : 128000
+        },
+        "recordedAt" : 721692800.125,
+        "resolutionID" : "00000000-0000-0000-0000-000000000401",
+        "runID" : "00000000-0000-0000-0000-000000000402",
+        "sequence" : 7
+      },
+      "id" : "43896F3A-4E00-4579-B263-5EE8B5CCDFB5",
+      "kind" : "diagnostic",
+      "status" : "finished"
+    },
+    {
+      "id" : "7F626015-F47B-4104-8F43-262088EDE20A",
+      "kind" : "stop",
+      "status" : "finished",
+      "stopReason" : "completed"
+    }
+  ],
+  "systemPrompt" : "Use fixture facts only",
+  "tools" : [
+    {
+      "description" : "Read fixture facts",
+      "inputSchema" : {
+        "additionalProperties" : false,
+        "properties" : {
+          "query" : {
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "query"
+        ],
+        "type" : "object"
+      },
+      "name" : "lookup"
+    }
+  ],
+  "usage" : {
+    "inputTokens" : 123,
+    "outputTokens" : 45,
+    "reasoningTokens" : 12
+  }
+}

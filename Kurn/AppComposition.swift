@@ -37,15 +37,25 @@ struct AppEnvironment {
     /// Times the App Store rating request after finished transcripts and
     /// summaries; presented by `reviewPromptPresenter()`.
     let reviewPrompt: ReviewPromptCoordinator
+    /// Chat conversations, retained beyond the views showing them so a reply keeps running
+    /// when its sheet or tab is dismissed (NH05).
+    let chatConversations: ChatConversationHost
 }
 
 @MainActor
 final class AppComposition {
     let settings: AppSettings
+    /// The remote model catalog: store-independent, applied from its saved copy at launch and
+    /// checked on activation while a cloud provider is in use.
+    let modelCatalog: ModelCatalogUpdater
     private var environment: AppEnvironment?
 
-    init(settings: AppSettings) {
+    init(settings: AppSettings, modelCatalog: ModelCatalogUpdater? = nil) {
         self.settings = settings
+        self.modelCatalog = modelCatalog ?? ModelCatalogUpdater(usesCloud: { [unowned settings] in
+            ModelCatalogUpdater.usesCloud(settings)
+        })
+        self.modelCatalog.loadStored()
     }
 
     /// The environment for `container`, built the first time it is asked for
@@ -86,7 +96,8 @@ final class AppComposition {
             semanticIndex: semanticIndex,
             wiki: wiki,
             recordingSession: RecordingSessionController(modelContext: context, settings: settings),
-            reviewPrompt: reviewPrompt
+            reviewPrompt: reviewPrompt,
+            chatConversations: ChatConversationHost()
         )
     }
 
@@ -114,5 +125,8 @@ final class AppComposition {
         // known on-device `.inProgress` work becomes `.pending`; cloud or
         // unknown work becomes `.failed` to prevent ambiguous paid replay.
         TranscriptionRecovery.sweepStaleTranscriptions(modelContainer: container)
+        // And after one that died mid-reply: a chat run still marked running is interrupted. Its
+        // question was saved before the run started and reopens as the retryable one.
+        ChatRunRecovery.sweep(context: context)
     }
 }

@@ -35,37 +35,22 @@ struct StreamingCursor: View {
     }
 }
 
-/// The pre-answer "reasoning" row: the current `ChatPhase` (or a generic
-/// "thinking" label before the first one arrives) plus a live elapsed-time
-/// readout, the same shape Claude's own "Thinking for Ns" indicator uses so a
-/// long wait still reads as active work. The label "breathes" — a slow,
-/// looping opacity pulse — under normal motion; Reduce Motion keeps it at
-/// full opacity and drops the pulse entirely, matching `StreamingCursor`.
+/// The "thinking" row shown before a summary's first fragment arrives: a generic label plus a
+/// live elapsed-time readout, the same shape Claude's own "Thinking for Ns" indicator uses so a
+/// long wait still reads as active work. The label "breathes" — a slow, looping opacity pulse —
+/// under normal motion; Reduce Motion keeps it at full opacity and drops the pulse entirely,
+/// matching `StreamingCursor`.
 struct ThinkingRow: View {
-    let phase: ChatPhase?
-    let detail: String?
     let startedAt: Date
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shimmer = false
 
-    /// Before the first `ChatPhase` arrives there's nothing to name yet, but
-    /// the row still needs an icon — reusing the platform `ProgressView`
-    /// spinner here reads as a different control from every other phase's
-    /// icon+label row that follows it. An SF Symbol in the same family (and
-    /// the same "breathing" treatment as the rest of this row) keeps the
-    /// very first moment visually consistent with the phases after it.
-    private static let defaultSystemImage = "ellipsis"
-
-    private var label: String {
-        let base = phase?.displayName ?? NSLocalizedString("chat.thinking", comment: "Assistant thinking")
-        guard let detail else { return base }
-        return "\(base) \(detail)"
-    }
+    private var label: String { NSLocalizedString("chat.thinking", comment: "Assistant thinking") }
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: phase?.systemImage ?? Self.defaultSystemImage)
+            Image(systemName: "ellipsis")
                 .font(.caption)
                 .accessibilityHidden(true)
             Text(label)

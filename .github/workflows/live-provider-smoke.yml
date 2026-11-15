@@ -1,0 +1,115 @@
+name: Live provider smoke
+
+# Qualification of the agent chat against real providers, on demand only: it spends API credit, so
+# it never runs on a push or a pull request. One agent run per vendor whose key secret is set
+# (OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY), through the app's own clients and the
+# harness, with a tool round trip; the time to the first streamed block, to the first reply text and to the end are
+# reported as `[live-smoke]` lines. The same job opens a conversation of a thousand saved entries
+# (`[session-scale]`) and counts the build's Swift concurrency warnings. No line carries a prompt,
+# an answer, a key or tool arguments.
+
+on:
+  workflow_dispatch:
+    inputs:
+      openai_model:
+        description: "OpenAI model (blank = the app's default)"
+        type: string
+        default: ""
+      anthropic_model:
+        description: "Anthropic model (blank = the app's default)"
+        type: string
+        default: ""
+      google_model:
+        description: "Gemini model (blank = the app's default)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: macos-26
+    timeout-minutes: 60
+
+    env:
+      XCODE_PROJECT: Kurn.xcodeproj
+      XCODE_SCHEME: Kurn
+      IOS_DESTINATION: platform=iOS Simulator,name=iPhone 17
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - uses: ./.github/actions/prepare-simulator
+
+      - uses: ./.github/actions/cache-spm-packages
+
+      # The app and its packages build in the Swift 6 language mode, where a data race the
+      # compiler can see is an error. What remains are warnings (a `@preconcurrency` import, an
+      # SDK type without a Sendable annotation): counted here, unique by file and line.
+      - name: Build for testing
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "$IOS_DESTINATION" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            clean build-for-testing \
+            | tee "$RUNNER_TEMP/build.log"
+
+      - name: Count concurrency warnings
+        if: always()
+        run: |
+          grep -E "warning: .*(Sendable|actor-isolated|nonisolated|data race|concurrency|main actor|MainActor|isolation)" \
+            "$RUNNER_TEMP/build.log" | sed -E 's/^.*\/(Kurn|Packages|KurnTests|KurnWatch|KurnLiveActivityExtension)\//\1\//' \
+            | sort -u > "$RUNNER_TEMP/concurrency-warnings.txt" || true
+          count=$(wc -l < "$RUNNER_TEMP/concurrency-warnings.txt" | tr -d ' ')
+          echo "[concurrency] warnings=$count"
+          {
+            echo "## Swift concurrency warnings: $count"
+            if [ "$count" -gt 0 ]; then
+              echo '```'
+              head -n 200 "$RUNNER_TEMP/concurrency-warnings.txt"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run the smoke and scale tests
+        env:
+          # xcodebuild forwards environment variables to the test runner only with the
+          # TEST_RUNNER_ prefix, which it strips.
+          TEST_RUNNER_KURN_LIVE_SMOKE: "1"
+          TEST_RUNNER_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TEST_RUNNER_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TEST_RUNNER_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TEST_RUNNER_KURN_LIVE_SMOKE_OPENAI_MODEL: ${{ inputs.openai_model }}
+          TEST_RUNNER_KURN_LIVE_SMOKE_ANTHROPIC_MODEL: ${{ inputs.anthropic_model }}
+          TEST_RUNNER_KURN_LIVE_SMOKE_GOOGLE_MODEL: ${{ inputs.google_model }}
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "$IOS_DESTINATION" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            test-without-building \
+            -only-testing:KurnTests/LiveProviderSmokeTests \
+            -only-testing:KurnTests/ChatSessionScaleTests \
+            | tee "$RUNNER_TEMP/smoke.log"
+
+      - name: Publish measurements
+        if: always()
+        run: |
+          {
+            echo "## Live provider smoke"
+            echo '```'
+            grep -hE '\[(live-smoke|session-scale)\]' "$RUNNER_TEMP/smoke.log" 2>/dev/null | sed -E 's/^.*(\[(live-smoke|session-scale)\])/\1/' || echo "no measurements"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

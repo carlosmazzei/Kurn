@@ -217,6 +217,7 @@ struct KurnApp: App {
                 .environment(appEnvironment.wiki)
                 .environment(appEnvironment.recordingSession)
                 .environment(appEnvironment.reviewPrompt)
+                .environment(appEnvironment.chatConversations)
                 .environment(incomingFiles)
                 // Both the app-switcher privacy placeholder and the lock screen
                 // live in a window above everything this hierarchy presents.
@@ -253,6 +254,8 @@ struct KurnApp: App {
         // the app-switcher snapshot captures.
         if phase == .background {
             accessGate.lock()
+            // Unsent chat text survives the process (A68).
+            environment.chatConversations.saveDrafts()
             #if canImport(BackgroundTasks)
             // Ask the system for a processing window to advance any
             // interrupted transcription while we're backgrounded.
@@ -265,6 +268,11 @@ struct KurnApp: App {
         // death. `.pending` recordings carry a checkpoint, so each continues
         // from its last completed chunk.
         if phase == .active {
+            // A chat reply the background wind-down stopped resumes once (NH05).
+            Task { await environment.chatConversations.resumeAfterForeground() }
+            // Reviewed model capacities and prices published between releases; daily at most,
+            // and only while a cloud provider is in use.
+            Task { await composition.modelCatalog.refreshIfDue() }
             // Reattach any orphaned recording (and end stuck Live
             // Activities) without waiting for the next cold launch. No-op
             // while a recorder session is live.

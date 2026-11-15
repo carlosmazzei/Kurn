@@ -364,20 +364,11 @@ struct MeetingDetailView: View {
                 selectedSummaryID = meeting.latestSummary?.id
             }
         case .chat:
-            MeetingChatView(meeting: meeting, onJump: jumpToCitation, onJumpToTime: jumpToTime)
+            MeetingChatView(meeting: meeting, onJumpToTime: jumpToTime)
         }
     }
 
-    /// Citation tap in the Chat tab: switch to the transcript and seek the
-    /// source recording to the cited moment (converting the absolute meeting
-    /// timestamp back to recording-relative time).
-    private func jumpToCitation(_ hit: SemanticSearchService.Hit) {
-        guard let recording = sortedRecordings.first(where: { $0.id == hit.recordingID }) else { return }
-        tab = .transcript
-        seek(recording, to: max(0, hit.start - startOffset(of: recording)))
-    }
-
-    /// Tap on a `[mm:ss]` cited in a full-context answer: find the recording
+    /// Tap on a `[m:ss]` cited in a chat answer: find the recording
     /// whose span contains that absolute meeting time and seek into it.
     private func jumpToTime(_ absolute: TimeInterval) {
         for recording in sortedRecordings {

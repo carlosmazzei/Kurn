@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import KurnCore
 
 struct ResolvedDocumentSources {
     let meetings: [Meeting]
@@ -23,30 +24,17 @@ enum DocumentSourceResolver {
         tags: [Tag],
         folders: [Folder]
     ) -> ResolvedDocumentSources {
-        let transcribed = meetings.filter(\.hasAnyTranscript)
+        let scopeKind: ChatSourceScope.Kind
         switch kind {
         case .transcripts:
-            let selected = transcribed.filter { selectedIDs.contains($0.id) }
-            return ResolvedDocumentSources(
-                meetings: selected,
-                sourceNames: selected.map(\.title)
-            )
+            scopeKind = .meetings
         case .tags:
-            return ResolvedDocumentSources(
-                meetings: transcribed.filter { meeting in
-                    meeting.tags.contains { selectedIDs.contains($0.id) }
-                },
-                sourceNames: tags.filter { selectedIDs.contains($0.id) }.map(\.name)
-            )
+            scopeKind = .tags
         case .folders:
-            let includedFolderIDs = descendantIDs(startingWith: selectedIDs, in: folders)
-            return ResolvedDocumentSources(
-                meetings: transcribed.filter { meeting in
-                    meeting.folder.map { includedFolderIDs.contains($0.id) } ?? false
-                },
-                sourceNames: folders.filter { selectedIDs.contains($0.id) }.map(\.name)
-            )
+            scopeKind = .folders
         }
+        return SourceScopeResolver.resolve(ChatSourceScope(kind: scopeKind, selectedIDs: selectedIDs),
+                                           meetings: meetings, tags: tags, folders: folders)
     }
 
     static func transcriptCount(in folder: Folder, meetings: [Meeting], folders: [Folder]) -> Int {

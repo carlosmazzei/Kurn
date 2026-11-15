@@ -373,12 +373,7 @@ struct MeetingsListView: View {
         }
         .sheet(isPresented: $showingAsk) {
             NavigationStack {
-                MeetingChatView(meeting: nil, onJump: { hit in
-                    showingAsk = false
-                    if let meeting = meetings.first(where: { $0.id == hit.meetingID }) {
-                        selectedMeeting = meeting
-                    }
-                })
+                MeetingChatView(meeting: nil)
                 .navigationTitle(NSLocalizedString("chat.ask.title", comment: "Ask across meetings"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {

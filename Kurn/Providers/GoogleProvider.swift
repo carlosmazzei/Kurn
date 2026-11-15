@@ -7,11 +7,14 @@
 //  wired here, so cloud transcription continues to route through OpenAI Whisper.
 //
 
+import AgentHarness
 import Foundation
 import KurnCore
 
 struct GoogleProvider: LLMProvider {
     let provider: AIProvider
+    /// The chat's chosen reasoning level for agent turns (`ChatReasoningPreference`); nil keeps the default.
+    var reasoning: AgentReasoningLevel?
 
     private let apiKey: String
     private let session: URLSession
@@ -135,63 +138,6 @@ struct GoogleProvider: LLMProvider {
         )
     }
 
-    // MARK: - Chat (streamGenerateContent, streaming)
-
-    @discardableResult
-    func streamChat(
-        systemPrompt: String,
-        messages: [ChatMessage],
-        options: TextGenerationOptions,
-        onDelta: @escaping @Sendable (String) -> Void
-    ) async throws -> TokenUsage? {
-        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
-
-        var contents: [[String: Any]] = []
-        for (index, message) in messages.enumerated() where message.role != .system {
-            let role = message.role == .assistant ? "model" : "user"
-            var text = message.content
-            if index == 0 && message.role == .user {
-                text = "\(systemPrompt)\n\n\(text)"
-            }
-            contents.append(["role": role, "parts": [["text": text]]])
-        }
-        if contents.isEmpty {
-            contents = [["role": "user", "parts": [["text": systemPrompt]]]]
-        }
-        let request = try makeStreamRequest(
-            timeout: options.timeout,
-            body: [
-                "contents": contents,
-                "generationConfig": ["maxOutputTokens": options.maxOutputTokens]
-            ]
-        )
-
-        let accumulator = StreamingAccumulator()
-        let usage = UsageAccumulator()
-        try await LLMHTTP.streamSSE(
-            request,
-            session: session,
-            policy: .interactive(totalDeadline: options.timeout)
-        ) { payload in
-            guard let data = payload.data(using: .utf8),
-                  let chunk = try? JSONDecoder().decode(GeminiResponse.self, from: data) else { return }
-            if let delta = Self.text(from: chunk), !delta.isEmpty {
-                accumulator.append(delta)
-                onDelta(delta)
-            }
-            // Each chunk repeats Gemini's running cumulative counts, so the
-            // last chunk that carries one is the final tally — overwriting on
-            // every occurrence rather than only the first gets that for free.
-            if let metadata = chunk.usageMetadata {
-                usage.set(promptTokens: metadata.promptTokenCount, completionTokens: metadata.candidatesTokenCount)
-            }
-        }
-        guard accumulator.receivedText else {
-            throw AppError.decodingError("empty Gemini response")
-        }
-        return usage.value
-    }
-
     // MARK: - Helpers
 
     /// The `generateContent` route for the configured model. Gemini model IDs are
@@ -237,16 +183,27 @@ struct GoogleProvider: LLMProvider {
     }
 }
 
-private struct GeminiResponse: Decodable {
-    let candidates: [GeminiCandidate]?
-    let usageMetadata: GeminiUsageMetadata?
+extension GoogleProvider: AgentModel {
+    var descriptor: AgentModelDescriptor? { AgentModelDescriptor(api: "gemini", model: model) }
+    func streamTurn(
+        _ request: AgentTurnRequest,
+        onEvent: @escaping @Sendable (AgentModelEvent) -> Void
+    ) async throws -> AgentTurnResponse {
+        try await AgentModelBoundary.perform(onEvent: onEvent, classifyFailure: { LLMHTTP.agentStreamFailure($0) }, prepare: {
+            try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+            var httpRequest = try makeStreamRequest(timeout: LLMHTTP.chatTimeout, body: [:])
+            let projection = AgentWireFormat.gemini.requestProjection(request, model: model, reasoning: reasoning)
+            if projection.adjustment.hasChanges { onEvent(.replayAdjusted(projection.adjustment)) }
+            httpRequest.httpBody = Data(try projection.body.encodedString().utf8)
+            return httpRequest
+        }, stream: { prepared in
+            try await LLMHTTP.streamAgent(prepared, session: session, format: .gemini, identity: request.identity, onEvent: onEvent)
+        })
+    }
 }
 
-/// Gemini reports cumulative token counts on (typically) every streamed
-/// chunk rather than once at the end, unlike OpenAI/Anthropic.
-private struct GeminiUsageMetadata: Decodable {
-    let promptTokenCount: Int?
-    let candidatesTokenCount: Int?
+private struct GeminiResponse: Decodable {
+    let candidates: [GeminiCandidate]?
 }
 
 private struct GeminiCandidate: Decodable {

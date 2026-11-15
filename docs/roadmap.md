@@ -32,6 +32,36 @@ why `wikiEnabled` and `correctionEnabled` default off), and a feature that
 merely moves data off-device still needs consent even when no LLM is involved
 (why `templatesSyncEnabled` defaults off).
 
+## Native harness — remaining work
+
+NH00–NH10 and the follow-ups from the 2026-11-14 review against the Swift agent-harness spec are
+merged; what they built is described in `CLAUDE.md` ("Agent harness"
+and the sections after it), and the contract is `docs/contracts/native-harness-v1.md` with its
+machine-checked catalog (`docs/contracts/native-harness-v1.json`, `Tools/check_native_harness_contracts.py`).
+Of the contract's 97 items, 57 are verified, 28 are excluded by the local profile (desktop tools, RPC,
+gateways, extensions), 10 are partial, 2 are conditional and none is pending. Persistence in SwiftData,
+user-supplied keys in the Keychain, provider failures thrown as typed errors and questions without
+images are deliberate departures, not gaps.
+
+| Area | Open item | Contract |
+| --- | --- | --- |
+| Capabilities | Set the `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/`GEMINI_API_KEY` secrets, dispatch `Live provider smoke` and record its first measurements (first content, first reply text, a 1,000-entry session, concurrency warnings); the workflow, the capability snapshot and alias qualification are done | C04 |
+| Reasoning | The chat sends one level (low, medium, high) for every provider: per-model level sets (OpenAI `minimal`/`none`, Gemini 3 `thinkingLevel`), a level remembered per provider, and visible-reasoning qualification on real providers (Responses summaries can need organization verification) | — |
+| Usage and cost | Provider-reported cost where a vendor reports one (cache-aware pricing and per-request usage are done) | C17 follow-up |
+| Compaction | Branch summaries; checkpoint anchoring for plain (identity-less) history | C10, C13 |
+| Run ownership | One owner retained per session across runs; model/provider changes at request boundaries; a `waitingForUser` phase in `AgentRunProgress` while a document replacement waits for confirmation | C24 |
+| Interchange | The pi JSONL v3 subset (only with fixtures); exact integers past 2^53 in opaque fields (accepted limitation) | C25, C26 |
+| Suspension | Reconcile background/foreground on a device (the release checklist's chat item) | A68 |
+| Qualification | Real-transport chunking, Dynamic Type/VoiceOver over a running conversation, migration/stress, Thread Sanitizer on the session/store boundaries, on-device request latency, memory and cancellation latency before any constant is tuned, and the physical-device checklist | A06, A51 |
+
+A18 stays partial by adaptation: Kurn exposes no end/continue hooks, and the loop consults the
+queues itself. A23 and A24 stay conditional: they apply only if result-replacement or unanimous-termination
+policies are ever exposed. The local profile is complete when this table is empty apart from
+accepted limitations and the device checks are recorded.
+
+The remote model catalog (`catalog/model-catalog-v1.json`) is read from the default branch, so it takes
+effect only once this work reaches `main`; until then the check gets a 404 and the bundled catalogs apply.
+
 ## Product capabilities
 
 ### Adopt
@@ -261,11 +291,17 @@ is listed so it is not rediscovered.
 
 ### Topic-aware correction
 
-- Not yet measured. Dispatch `pipeline-eval.yml` with `correction: only` on a
-  corpus whose earlier `corr=llm` row (the frequency-list corrector it
-  replaced) is in `docs/pipeline-evaluation.md`, record the new row, and only
-  then describe an effect on WER (insertions are the number to watch: the
-  faithfulness check exists to keep them flat).
+- Measured on 2026-11-05 (`docs/pipeline-evaluation.md`), on Nemotron Unified:
+  no measurable improvement over the corrector it replaced — English still
+  +0.54pp worse than no correction (old +0.63pp), Portuguese −0.38pp (old
+  −0.68pp). Nemotron reports no confidence, so every segment is sent. Next:
+  for engines without confidence, send only segments the critic flagged, and
+  re-run the same pair; optionally also reject corrections that delete more
+  than a few words, since `CorrectionFaithfulness` only blocks additions.
+- Measure the LLM's own run-to-run spread (two identical `correction: only`
+  dispatches) before reading a sub-1pp difference between correctors.
+- Aggregate substitution/insertion/deletion counts are not printed by the
+  harness, only per item; print them so a regression's kind is measurable.
 - `CorrectionFaithfulness` uses spelling closeness as its only proxy for
   "sounds like"; a homophone spelled very differently ("sequel" → "SQL") is
   accepted only through the grounded vocabulary. A per-language phonetic key
@@ -276,13 +312,12 @@ is listed so it is not rediscovered.
 
 ### On-device LLM (`FoundationModelsProvider`)
 
-- **Measure the on-device budgets.** `ContextBudget.onDevice`,
-  `FoundationModelsProvider`'s output-token ceiling and `MeetingChatService`'s
-  on-device pool sizes are conservative first-cut estimates against Apple's
+- **Measure the on-device budgets.** `ContextBudget.onDevice` and
+  `FoundationModelsProvider`'s output-token ceiling are conservative first-cut estimates against Apple's
   documented ~4096-token session window, commented as such in the code — not
   measured against real on-device runs the way the transcription pipeline is.
-- **Exercise the untested paths.** `LLMTranscriptCorrector`, `WikiService` and
-  `DocumentGenerationService` can select the on-device provider through the
+- **Exercise the untested paths.** `LLMTranscriptCorrector` and `WikiService`
+  can select the on-device provider through the
   generic factory path, but that has not been exercised or validated the way
   tagging, chat and summaries were.
 - **Measure availability.** `SystemLanguageModel.default.availability` depends
@@ -318,9 +353,7 @@ The H1–H10 hardening track is closed; its invariants and types are in
   deferred / retryScheduled / permanentFailure with reason codes and
   `nextAttemptAt`) was deferred — the bounded `automaticResumeAttempts` counter
   over `TranscriptionStatus` suffices until a concrete UI need appears (e.g.
-  "retrying in 2 minutes"). `DocumentGenerationService` has no durable map-stage
-  checkpoint, because it spans several meetings and has no single `Meeting` to
-  checkpoint against.
+  "retrying in 2 minutes").
 - **Network.** A dedicated "waiting / rate-limited" UI; FluidAudio's
   mid-transfer network path changes are unobservable (the library exposes no
   session to preflight against); background cloud upload stays off while
@@ -378,18 +411,14 @@ measured `ui-flake-rate` lane. Open, in the order they pay off:
    `.xctestrun` plus products uploaded as an artifact, and
    `test-without-building` in the shards removes two builds; the artifact
    transfer has to be measured against the build it saves.
-3. **Boot the simulator before `xcodebuild`.** `xcrun simctl boot` +
-   `simctl bootstatus -b` in `prepare-simulator` keeps the cold boot out of the
-   first test's time budget, which is where launch-time waits most often run
-   out.
-4. **Fewer launches per suite.** Each test relaunches the app (~10–15 s on a
+3. **Fewer launches per suite.** Each test relaunches the app (~10–15 s on a
    CI runner); checks that share a screen belong in one test, as
    `testMeetingDetailTabs` already does for the audit. Separate tests only
    where a failure would otherwise hide the next check.
-5. **Rebalance the shards from measured times.** `main` now also runs
+4. **Rebalance the shards from measured times.** `main` now also runs
    `BulkSelectionFlowUITests`; read the per-suite durations from the
    `.xcresult` and move suites so neither shard waits on the other.
-6. **Replace the remaining text handles.** Menu-picker options, segmented
+5. **Replace the remaining text handles.** Menu-picker options, segmented
    segments ("Single file") and the selection title ("Selected: N") are still
    matched by their en string, because SwiftUI does not surface an identifier
    set on a picker option. A custom `Menu` of identified `Button`s, or an

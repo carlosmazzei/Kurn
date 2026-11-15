@@ -76,12 +76,26 @@ send data only to the configured provider.
   (`StartRecordingControl`), or from a Home Screen, Lock Screen or StandBy
   widget on iPhone and iPad (`StartRecordingWidget`), without unlocking the
   app first.
-- Chat with your meetings and search them semantically, on device: transcripts
-  are embedded with Apple's `NaturalLanguage` framework and retrieval-grounded
-  answers come from the selected AI provider.
+- Search your meetings semantically, on device: transcripts are embedded with
+  Apple's `NaturalLanguage` framework. Chat with your meetings through an agent
+  that reads the sources you select and cites them; chat needs a cloud AI provider
+  (Apple's on-device model can't run the agent).
 - Optional, off-by-default derived artifacts: a per-meeting wiki article,
-  free-form documents synthesized across meetings, and an LLM correction pass
+  free-form documents created as agent artifacts in chat, and an LLM correction pass
   over the transcript with a change-magnitude guardrail.
+- Ask the agent in chat for a document, report, or minutes. Preview versioned
+  artifacts, save them to Documents, update a saved document after a revision,
+  or export Markdown, Word, and HTML. Ordinary chat replies are not documents.
+  Replacing a document's body asks first, and the document card can undo the
+  last change.
+- Work with a conversation the way a coding agent shows its work: the chat
+  streams the model's reasoning and each tool call (with its arguments as they
+  are written), lets you steer a running reply or queue a follow-up, regenerate
+  an answer or edit a question in place (each version stays reachable), fork or
+  duplicate a conversation, leave an exchange out of later answers, summarize
+  earlier messages on request, search saved conversations, and export or import
+  a conversation. Pick the model and reasoning level from the composer; a gauge
+  shows how much of the model's context the conversation uses.
 - Recognize returning voices: when a new speaker's voiceprint closely matches
   a named speaker from another meeting, Kurn suggests the name for
   confirmation — it never renames silently.
@@ -344,7 +358,10 @@ Kurn is designed to avoid a backend service controlled by the app.
 - ASR, diarization, and live-preview model loading is local-only; missing or
   corrupt weights do not trigger a background download. Explicit model
   downloads and opted-in cloud features use the network; the default summary
-  provider is Apple's on-device model.
+  provider is Apple's on-device model. While a cloud provider is in use, the app
+  checks this repository's published model catalog (context windows,
+  capabilities, list prices) at most once a day, with a request that carries no
+  key or content.
 - Cloud provider calls go through a hardened HTTP boundary: request timeouts,
   bounded retries, HTTPS-only URL validation with redirect limits, and a
   per-provider circuit breaker that stops retrying a failing vendor.

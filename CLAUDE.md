@@ -30,20 +30,519 @@ The project is an Xcode project (`Kurn.xcodeproj`) with three app targets: `Kurn
 `KurnSwiftDataTests` (SwiftData store boot/salvage and concurrency-sensitive
 suites, split into their own target for process isolation), `KurnUITests`
 (accessibility audit and fastlane screenshots) and `KurnWatchUITests`.
-There is no root `Package.swift`; two local packages live under `Packages/`:
+There is no root `Package.swift`; three local packages live under `Packages/`:
 `Packages/KurnCore` (pure-Foundation logic — `AppError`, `ReliabilityEvent`,
 the filesystem/clock seams, the transcript pipeline value types — compiled and
 tested with `swift test` on Linux, no Xcode needed; see
-`Packages/KurnCore/Package.swift`) and `Packages/WhisperCpp`, whose only target
+`Packages/KurnCore/Package.swift`), `Packages/AgentHarness` (standalone Foundation-only
+agent loop, context compaction and vendor wire formats, with no dependencies),
+and `Packages/WhisperCpp`, whose only target
 is a `.binaryTarget` pointing at whisper.cpp's official prebuilt XCFramework
 release asset (see "On-device Whisper (whisper.cpp)" below). The only remote
 package is FluidAudio.
+
+### Agent harness (`Packages/AgentHarness/`)
+
+`Packages/AgentHarness/README.md` is the module guide (seams, loop, sessions, entry types,
+invariants); keep it current when the harness's public shape changes.
+`AgentHarness` and `KurnCore` are independent Foundation-only packages: neither
+imports or depends on the other. `AgentHarness` owns the generic runtime, tool
+execution, compaction, script-aware `TokenEstimate`, model capacity catalog/resolver,
+overflow classification/contracts and `AgentRunTrace`/`AgentRunStep` reduction.
+`KurnCore/Chat/` contains meeting/source/artifact domain types only. The app's
+`Application/Agent/` composes the runtime, registers Kurn-specific source/document
+tool bindings and translates generic steps into localized presentation. HTTP,
+SwiftData and trace-file persistence remain host adapters. `Tools/check_static_policy.py`
+rejects imports that cross these boundaries. Do not add runtime convenience
+extensions or tool schemas back to KurnCore. Generation's bounded map/reduce
+`ContextBudget` lives in `Application/Generation/`; it uses the harness estimator
+without imposing its 100k practical cap on agent conversations.
+Compaction prompts are injectable through `AgentContextPolicy.summaryPrompts`: the
+runtime defaults are domain-neutral; `ChatCompactionPrompts.profile` in the app
+preserves the meeting/source/citation instructions used by Kurn.
+
+The NH01 baseline and target are in `docs/contracts/native-harness-v1.md` and its
+machine-checked catalog. Frozen synthetic fixtures live in each package's test
+resources and in `KurnTests/Fixtures`; they pin legacy message/wire/step codecs,
+source selections and artifact/session restoration before canonical migration.
+`Tools/check_native_harness_contracts.py` validates all 27 components/70 acceptance
+cases, evidence links, profile exclusions and fixture hashes in CI. Legacy evidence
+is separate from target conformance. NH02 activates native user/assistant/tool-result messages at the provider/runtime
+boundary, with ordered blocks, final reconciliation, replay copies and canonical failure
+snapshots. The harness assigns request and logical invocation IDs before execution;
+provider call IDs may recur. Diagnostics correlate session/run/request/invocation IDs.
+Historical unknown timestamps/API/model remain absent. NH03 introduces V6 indexed session entries, immutable artifact revisions and recovery-metadata
+containers. V5's entire graph is frozen. Per-session conversion is atomic/idempotent,
+retains the original bytes and preserves unknown historical values. The UI uses the checked
+active-path projection; presentation caches are rebuildable and cannot override canonical reads.
+The compatibility writer records presentation changes as append-only branches. Runtime message
+production with awaited barriers (NH05) and canonical tool replay (NH06) are described below. Keep fixture-version,
+contract-version, JSONStorage-envelope, SwiftData-schema and pi-JSONL versions distinct.
+
+`ChatSourceScope` persists meeting/tag/folder/library selection,
+global transcript/summary/wiki/attachment parts and optional per-meeting overrides
+(including an empty selection). Legacy `includeWikis` payloads decode to the old defaults.
+`ChatSourceTools` exposes bounded, paginated read-only source tools, validating
+arguments and enforcing a fixed allowed-meeting/part snapshot on reads and search results.
+Search uses transcript-enabled meetings only; listing masks disallowed availability,
+and tools with no eligible meeting are omitted. Tool results are compact plain text
+(`ChatSourceToolText`), not JSON: one `id | title | … | readable: …` line per source,
+passages as `[m:ss] Speaker: text` (rounded, `h:mm:ss` past an hour — the transcript's own
+`clockDisplay` form) under a `meeting <id>:` header written once per run,
+and a final `page: … of N; next offset: n` (or `end`) line. Per-item JSON keys, quoting and
+a meeting ID on every passage cost ~45% of a transcript page, and seconds made the model
+convert to the `[mm:ss]` it must cite. Tool schemas and arguments stay JSON (vendor wire
+formats require it); document tools use the same header/page-line text.
+Explicit `AgentToolOutput.isError` results let tools report recoverable failures
+without throwing. `SourceScopeResolver` shares transcribed-only selection with
+the document composer; `LibraryChatSourceReader` snapshots SwiftData sources and
+uses existing hybrid search, summary rendering and stored attachment text. Wiki
+reads require opt-in. `MeetingChatViewModel` runs every question through
+`HarnessChatService`; chat needs a provider with an `AgentModel`, so with Apple's on-device
+model (or another non-agent provider) the chat shows `ChatArtifactProviderNotice` and the
+composer is disabled. The earlier retrieval chat (`MeetingChatService`) was removed.
+`ChatSourceScopeEditor` locks meeting selection to one ID or allows library scope
+editing. `AgentRunTrace` reduces events to Codable structured steps and live usage.
+The adapter removes wiki from global and override parts when `wikiEnabled` is off.
+Replies cite meeting titles and `[m:ss]` timestamps in text; KurnCore's
+`ChatTimestampCitations` turns those into tappable chips. Retrieval citations stored by the
+removed chat are ignored when old turns decode. `ChatSourceSheet` edits meeting-locked parts or library
+selections/global parts/per-meeting overrides; scope edits persist for the next message.
+`ChatSourcePresentation` shares wiki gating and validation with the adapter; invalid
+scopes disable Send/Retry and show inline guidance. The adapter retains a localized,
+defensive validation error for sources removed after UI validation. The selector is
+hidden for Apple on-device and other non-agent providers, which cannot chat.
+`ChatStepTimelineView` shows a run as it happened, Claude Code-style (`ChatActivityPresentation` orders and words it): the model's reasoning as one line ("Thinking…" with the text streaming beneath it, then "Thought for N s", which expands), the narration it wrote beside tool calls, and each tool call with a status dot and a `⎿` result line, successive calls of one tool folded into one line ("Read 3 transcripts", `⎿` naming the first two meetings, queries or documents and "+N"; `ChatToolGroupRow`). While the run streams, reasoning shows only its two newest lines; once the reply is done the whole activity folds into one summary line ("Thought for 12 s · 6 actions", `ChatActivityPresentation.summary`) that expands on tap, with context and diagnostic steps under "Details". `AgentRunTrace` records reasoning (`thinking` steps, timed while observed live) and narration (`narration` steps), each bounded to 8,000 scalars, and restores both from committed messages; the streamed reply starts over after narration, which lives in its step. The live status line says what the run is doing, for how long and how many tokens it has written.
+`ChatStepPresentation` maps structured tool/stop data to localization keys outside
+Views; expandable arguments/output previews cap at 2000 scalars. The chat shows live
+usage/cost and compact per-turn `ChatArtifactReference` title/version rows (no duplicate
+document bodies in turn JSON). Optional references preserve old turn decoding;
+`ChatArtifactCard` previews and saves artifacts into the document library.
+
+`AgentContextResolution` is the immutable capacity snapshot for a run. Its source is
+API (with cache flag and retrieval date), fixed table (with catalog revision), or
+fixed fallback; it records the exact model ID, token value and input/combined
+semantics. `AgentRunTrace` persists it as a context step, so reopening a chat
+does not recompute provenance from today's catalog. Older traces show an unknown
+origin. Provider metadata uses an endpoint/API-shape/exact-model keyed V2 cache
+with a 24-hour lifetime; unscoped V1 values are not promoted to API evidence.
+`ProviderModelsService` records Anthropic input/output limits, Gemini input/output
+limits without collapsing versioned IDs, and compatible-server context/output
+limits (bounded by routed OpenRouter limits when supplied). Anthropic and Gemini
+list pagination is bounded and rejects missing/repeated cursors. The bundled
+`ModelContextCatalog` supplies exact, reviewed current model capacities, including
+GPT-6.1 Terra's 1,050,000 tokens, ahead of conservative legacy-family defaults.
+`AgentModelCapabilities` (AgentHarness, version 1) is the run's capability snapshot: tools,
+reasoning plus the effort the adapter sends, image input and the vendor's prompt caching, each
+`supported`/`unsupported`/`unknown`. `ModelCapabilityCatalog` has exact reviewed entries and a Claude
+3+ family rule; any other name stays unknown rather than inheriting a similar model's facts. Fresh
+provider metadata (`ModelContextWindowStore.recordCapabilities`, from the Anthropic/Gemini detail
+requests) overrides what it reports and qualifies an alias with its canonical ID. `HarnessChatService`
+resolves it before the run, refuses a model known to lack tools (`chat.model.tools_unsupported`) and
+records it in the context resolution and the run-start entry (`AgentRunBranch.capabilities`); the
+context step lists it. `OpenAIProvider.agentReasoningEffort` is the single source of the effort sent.
+The chat's reasoning level (`AppSettings.chatReasoningLevel`, nil = the vendor's default) is chosen with the
+model in the composer's model chip (`ChatModelChip`/`ChatModelSheet`, `ChatModelPickerViewModel`; the chat
+shares its model with summaries). AgentHarness's `AgentReasoningLevel` maps it per vendor in
+`AgentWireFormat.requestProjection(reasoning:)`: Responses `reasoning.effort` plus `summary: auto` (visible
+reasoning), Chat Completions `reasoning_effort`, Anthropic `thinking` and Gemini `thinkingConfig` with
+`includeThoughts`, both with a token budget kept below the output limit (at least 1,024, else none). Summary
+requests never carry it. `ChatReasoningPreference` decides whether a request carries it: never for a model the
+capability catalog says cannot reason, and on a compatible endpoint only for one it says can;
+`ProviderFactory.agentModel(reasoning:)` sets it on the vendor client, and the run's capability snapshot
+records the level sent in place of OpenAI's fixed default. The system prompt's `user_context` section (between
+`instructions` and `documents`) gives today's date, weekday, time zone and locale, so relative dates resolve
+against the person's calendar; it changes once a day. Beside the chip, `ChatContextGauge` shows the context the
+provider last reported against the newest run's window (`MeetingChatViewModel.lastContextTokens`, kept between
+runs until the next report).
+Prompt caching is keyed by the conversation: `HarnessChatService` builds the harness with
+`NativeHarness.cachingPrompts(key:)` (the session ID), which puts `AgentTurnRequest.promptCacheKey` on every
+normal and wrap-up request, never on a summary. Anthropic then gets two `cache_control` breakpoints
+(`AgentWireFormat.markAnthropicCacheBreakpoints`): the end of the system prompt, which covers the tools and
+changes only when the prompt does, and the last cacheable block of the newest message, so each request in a
+tool loop reads the conversation before its new messages from the cache. OpenAI Responses gets
+`prompt_cache_key`; Chat Completions endpoints and Gemini (implicit caching) are left unchanged, and a request
+without a key is byte-for-byte what it was. Cache reads and writes are counted and priced as above.
+
+The bundled catalogs can be corrected between releases by a remote one (`catalog/model-catalog-v1.json`,
+format `kurn.model-catalog` schema 1, served from the default branch's raw URL; `catalog/README.md`).
+AgentHarness's `ModelCatalogDocument` reads it strictly — one format and schema, at most 256 KiB and 2,000
+models, IDs of lowercase letters, digits and `._:-`, windows of 1,024–20M tokens, an output limit within its
+window, known capability values, prices of 0–10,000 USD per million tokens and cache multipliers of 0–10 —
+and refuses the whole document on any break. `ModelCatalogOverlay` applies one over the bundled catalogs per
+fact it states (`ModelContextCatalog.entry`, `ModelCapabilityCatalog.facts`, the app's `ModelPricing` by exact
+ID before its prefix table), never one older than the bundled versions or than the one applied, nor dated more
+than two days ahead; a run that used its facts records `remote-<version>` as its `catalogVersion`. The app's
+`ModelCatalogUpdater` (built by `AppComposition`) applies the saved copy at launch and checks on activation,
+only while the selected summary/chat provider is a cloud vendor with a key, at most once a day (a failed or
+refused check waits too), with a header-less GET through `LLMHTTP.sendValidated` (15 s, response bounded by
+the document limit); it saves a document only once it has been applied. `ModelCatalogDocumentTests` checks
+that the published file agrees with the bundled facts it repeats. It changes estimates only, never an endpoint
+or what is sent.
+
+`ProviderModelMetadataService` refreshes the selected model in the settings picker
+and before an agent run. Anthropic/Gemini details resolve aliases and retain both
+the requested and canonical IDs; Groq details include completion limits (vendor/model
+IDs are encoded as one path component). Compatible endpoints refresh their listing
+instead of inventing a detail route. Official OpenAI model details have no documented
+capacity fields, so no detail request is issued for them. Metadata requests use the
+existing transport with an eight-second deadline; a coordinator deduplicates by
+store/provider/API-shape/endpoint/model/credential in memory and permits four concurrent
+lookups. Missing credentials, unsupported metadata and refresh failures do not block
+the model's normal request. Cancellation still propagates to the caller.
+Each field has its own timestamp; partial responses cannot renew or erase an omitted
+field. Cache TTL is 24 hours; failed/incomplete lookups retry after 15 minutes, while a
+manual refresh can force a lookup. Endpoint-scoped older metadata stays stored after
+failure but expired fields cannot win capacity resolution. The immutable conversation
+snapshot records the metadata lookup outcome and whether the selected window came from
+the current fetch or cache. Optional fields preserve existing cache/trace decoding. The resolved output limit caps
+both normal/wrap-up turns and compaction summaries; reserve size must never override
+a smaller provider output limit.
+
+Output budgets belong to `AgentHarness`, not the host. Before every normal, wrap-up
+and summary request, `AgentOutputBudget` applies pi's `clampMaxTokensToContext` policy
+(reference revision `f064465d10d6a8e5c19f687bba1b5b5499b51680`,
+`packages/ai/src/api/simple-options.ts`). Desired output is the resolved model capacity,
+or an explicit caller ceiling capped by that capacity. Unknown capacities use an explicit
+4,096-token fallback. Estimate current input from the latest applicable provider usage plus
+subsequent messages, otherwise from the request. Subtract input and a safety margin of
+`max(4096, ceil(input * 0.15))` from the window; cap desired output to that room. If this
+leaves less than 32,768 tokens, use `min(32768, window - input - 4096)` instead. The request
+floor is one token, matching pi; oversized input still needs normal overflow recovery.
+The Responses wire adapter enforces its API minimum of 16 tokens and emits a typed
+budget-adjustment event, persisted in the same trace for normal and summary calls.
+There is no 32k initial ceiling, 64k hard ceiling, or quarter-window output rule.
+
+The compaction reserve remains a separate threshold. Never reserve the full model output
+maximum as a reason to compact an otherwise fitting conversation. Summaries also start
+from model capacity, not fractions of that reserve. Summary input is fitted only when it
+cannot fit with even one output token and the framing margin; actual output is then
+calculated from the fitted request. Serialization/fitting losses remain explicitly logged.
+
+An empty, unseen response stopped below the desired output capacity can attempt forced
+compaction and one retry per run, while turn/cost budgets allow it and only if context is
+actually reduced. Its reported usage is counted. The interrupted response, tool calls and
+replay metadata are discarded; previously committed tools never execute as part of recovery.
+The app retains its visibility guard: partial visible replies are not automatically replayed.
+Unknown usage, actual exhaustion of desired output capacity, explicit caller caps and failed
+recovery remain explicit `outputLimit` outcomes. Retry preparation/denial and each request's
+estimated input, desired/effective output, selected safety margin, available room and fallback
+status are content-free trace facts. Older budget-extension diagnostic cases stay decodable.
+Request completion diagnostics record the per-request budget, token usage, visible text
+size, discarded tool-call count and output-limit flag; missing usage remains marked as
+unreported. Responses/Chat Completions reasoning-token details and Gemini thought-token
+counts are logged when reported, never inferred or accompanied by reasoning content.
+Run totals are cumulative over requests and must not be read as current context usage.
+`AgentUsage` also carries `cacheReadTokens`/`cacheWriteTokens` (NH07): prompt-cache reads and writes as the
+provider reported them, both part of `inputTokens` — the whole input sent — and never added to it again,
+just as reasoning is part of output. Anthropic reports cached input apart from `input_tokens`, so its
+accumulator adds it to the total; OpenAI (`cached_tokens`), Responses and Gemini (`cachedContentTokenCount`)
+already include it. Unreported counts stay nil when usages are added. `agent.usage.v1` entries record
+them with the request they belong to (`requestID`), and `AgentRunTrace.restoring` and
+`AgentSessionTree.usage` count one request's usage once (entries from before requests were named each count).
+The cost estimator returns nil for a usage it cannot price (NH07). `AgentRunOutcome.estimatedCostUSD`
+is the run's estimated cost, summaries included, or nil — unknown, never zero — when there was no estimator
+or any usage went unpriced. `AgentLimits.maxCostUSD` is checked only against a known cost: without an
+estimator, or once a usage could not be priced, the ceiling cannot be verified and counts as reached, so
+no further request is sent. `HarnessChatService` passes `ModelPricing` as the estimator; it prices cache
+reads and writes at the vendor's own rates (OpenAI and Gemini discount reads, Anthropic also surcharges
+writes) and the rest of the input at the full rate, and the chat's per-answer cost uses the same usage. The figure is an
+estimate from a price table, not a provider billing cap.
+The session is the one retry owner for model requests (NH07, `AgentRetryPolicy`); the agent transport keeps
+its own retries off. A request that failed with an `AgentTransientError` before any visible text is sent
+again as a new request with its own identity, after a cancellable wait: exponential backoff from one
+second, the provider's `Retry-After` when the error carries one, at most `maxAttempts` attempts and
+`maxWaitSeconds` of waiting. A cancel during the wait starts no new attempt, and two generations are never
+joined. Each failed attempt stays in the log as audit data, and `requestRetryScheduled` diagnostics record
+the attempt and delay. `AgentRunProgress` shows the wait as `retryWaiting`. The chat uses `.standard`
+(three attempts). `AppError` is transient for 408/429/5xx statuses and connection failures, but not for
+timeouts or lost connections the provider may already be generating for, nor for auth, configuration,
+quota or context errors. `AppError` cannot carry a `Retry-After`, so the agent stream
+(`LLMHTTP.streamAgent`) throws a transient rejection whose response had one as an `AgentRetryAfter`
+around the `AppError`: the policy waits that long and the harness unwraps it everywhere else, so the
+run's failure, its audit and the stream classification only ever see the `AppError`.
+Credentials are resolved per request (NH07): `ProviderFactory.agentModel` returns an `AgentPerRequestModel`,
+which builds the vendor client from the Keychain for every request, compaction summaries included. A key
+replaced during a run is used from the next request on, and a key removed fails that request explicitly.
+The first resolution happens when the model is created, so a missing key still fails before the run.
+
+
+`AgentDiagnostic` carries only fixed event/metric vocabulary, numeric counts and
+opaque correlation IDs. The synchronous injected sink records lifecycle,
+request/summary, compaction decisions, tools, skipped calls, first limit and
+wrap-up independently of the UI consumer. `HarnessDiagnostics` mirrors these
+to `AppLog.generation` at notice and records limit summaries in `ReliabilityLog`
+even if wrap-up produces an answer. `HarnessTraceStore` keeps protected JSONL
+per run, up to 512 KiB with an explicit incomplete marker and reserved terminal;
+it retains 20 completed runs, preserves active runs and expires abandoned active
+traces after seven days during pruning. Log export includes this trace independently
+of console verbosity. No prompts, excerpts, bodies, tool arguments or raw errors
+enter diagnostic records. Failed/cancelled partial answer text is removed, while
+its trace and reported usage persist on the retryable question.
+
+Transcript tool pagination preserves full passage text. A page is bounded by
+8,000 Unicode scalars and an 18,000-byte budget including framing; a partial
+passage returns the same passage `offset` plus `textOffset` for its unread suffix.
+Search previews and metadata may still be clipped, but canonical transcript
+reads no longer go through the 500-scalar field preview. Summary requests report
+the count of characters omitted by per-result clipping and request fitting;
+the source data remains in the app. Compaction that does not reduce the estimated
+context is skipped rather than reported as a successful reduction.
+`AgentTextPage` applies both scalar and byte bounds to canonical summary/wiki/attachment
+and document reads, including room for headers and continuation framing. It never
+silently returns a non-progressing continuation. Tool diagnostics separate preview loss
+(`omittedScalars`/`omittedItems`) from retrievable continuation
+(`deferredScalars`/`deferredItems`). Search reports its ranked top-100 window and whether
+it is full, without claiming a count of undiscovered hits. Transcript counters include
+all fetched passages, even after an early page break. Summary diagnostics distinguish
+per-tool serialization clipping from history fitting. The trace remains content-free;
+tool text, document bodies, credentials and error messages never enter numeric metrics.
+
+
+`ChatDocumentWorkspace` owns versioned `ChatDocumentArtifact` values, initialized
+from a persisted snapshot when reopening a conversation. `ChatDocumentTools` creates,
+replaces, appends sections and reads paginated markdown (8000 scalars per page;
+200000 per document). Mutations return ID/version and a human-readable summary,
+not document bodies. Models are instructed to use artifacts for documents/reports/minutes
+rather than paste them in chat. Saving artifacts into the document library is an app concern.
+Each session restores its workspace and source scope. Document mutations persist artifacts
+immediately, even if the reply is later cancelled; partial assistant turns are not saved.
+Replayed history is canonical (NH06, `ChatReplayHistory`): an earlier answered question goes back
+as the run that answered it recorded it on its branch (`AgentRunBranch.contextMessages` — its request,
+tool calls, tool results and answer, without failed, aborted, deferred or output-limited replies and
+their results). Runs record the question turn they answer (`questionID` start field). A question with
+no completed run, or whose run was authorized for other sources or for a meeting the current run may
+not read, replays as plain text, so narrowing the sources never replays older reads.
+
+`NativeHarness` is an Apple-free, provider-neutral sequential tool loop. `AgentModel`
+supplies streaming text and turn responses; `AgentTool` supplies schemas, optional
+confirmation and execution. `AgentEvent` exposes turns, text, tools, compaction,
+usage and the final outcome. Tool failures become error results for model recovery;
+provider failures throw, and stream termination cancels in-flight work. Turn, tool
+and optional estimated-cost limits finish with an explicit stop reason. Cost is
+accounted from reported usage through the caller's estimator, including summary calls.
+Context management follows pi-coding-agent's design (no code copied). `AgentContextPolicy`
+holds the model's real `contextWindow`, a `reserveTokens` kept free for the reply (16,384) and
+`keepRecentTokens` (20,000); a request is compacted once its context exceeds the window minus
+the reserve (never below half the window), with no fraction and no practical cap.
+`HarnessChatService` resolves the window per provider and model through
+`ModelContextWindowStore.resolution` → AgentHarness's `ModelContextWindows.resolve`:
+fresh capacity metadata reported by the endpoint, else the catalog/legacy table, else
+`unknownWindow` (32,768). Unlike `ContextBudget` (summaries and the wiki) it applies no 100k
+cap: every turn resends the whole context, so a long run on a large window costs more, and
+`AgentLimits.maxCostUSD` is the guard. The context size is the provider-reported usage of the
+latest turn (input + output) plus estimates of only the messages appended since; before any
+usage, or after a compaction, it is a full estimate. Estimates are per message (text,
+tool-call arguments, replay metadata, a fixed framing overhead) through an injected Sendable
+estimator (the standalone default is the script-aware `TokenEstimate`), never by re-encoding already-JSON tool results.
+`AgentContextCompactor.plan` walks back from the newest message until `keepRecentTokens`
+(capped at half the threshold) and cuts at the nearest user or assistant message, never at a
+tool result. A cut inside the current turn is a split turn: the turn's earlier part gets its own
+prefix summary, so the kept suffix keeps its request. Summary requests are tool-less and send
+the conversation as labelled text (`serialize`, tool results clipped to 2,000 characters) with a
+structured prompt (goal, progress, findings with citations, sources and documents, next steps);
+a later compaction updates the previous summary instead of replacing it. Summary output is
+capped at 80% (history) and 50% (turn prefix) of the reserve, and at a quarter/eighth of the
+window, and the serialized conversation is trimmed from its oldest end so the summary request's
+input and output fit the window (an 8k model is never asked for 13k of output). A summary cut off by the output
+limit is not used. Compaction runs before a turn when over the threshold, and is forced after a
+provider rejects a turn as too long (`isContextOverflow`; the adapter passes
+`AppError` conformance to `AgentContextOverflowError`, delegating to the harness's
+`AgentContextOverflow` classifier, whose markers exclude rate limiting/throttling); the turn is then retried once, only if nothing was streamed
+and the context actually shrank. No note ever stands in for a summary (NH06): a summary that is
+cut off, unusable or whose own request overflows leaves the context unchanged and reports the
+compaction failed. After an overflow that ends the run with `AgentContextReductionError` (the chat
+says the conversation is too long for the model, `chat.context.reduction_failed`); an output-limit
+recovery is denied and the run keeps its `.outputLimit` outcome; a threshold compaction sends the
+request as it is. Compaction changes only model context; outcomes retain full history.
+Manual compaction (`NativeHarness.compactingFirst`) summarizes the earlier context before a run's first
+request whatever its size, through the same durable checkpoint; a conversation too short to summarize is sent
+as it is and a failed summary changes nothing. The chat's "Summarize earlier messages first" toggle
+(`MeetingChatViewModel.compactsNextAnswer`) applies it to the next answer of a saved conversation.
+A summary compaction is a durable checkpoint (NH06, `AgentCompactionCheckpoint`): the harness hands it
+to the awaited `persistingCompaction` sink before any request uses the compacted context, and
+`AgentSession` commits it on the run's branch as `agent.compaction.v1` (summary, first kept message ID,
+tokens before/after, split turn), so a request never runs on context the log lacks and a failed save
+fails the run. Only real summaries are checkpoints; an unusable or failed summary, or
+a kept message without an identity (legacy plain history) writes none. Replay applies the newest
+checkpoint of a permitted run whose kept message is in the history (`ChatReplayHistory`), so a reopened
+conversation reuses the summary and a later compaction updates it.
+`AgentRunProgress.contextTokens` is the context size the provider last reported for a response (input
+plus reply); it is nil — unknown, never zero — before any reported usage, after a compaction and when a
+provider reports no input, and a summary request's usage never sets it.
+System prompts are ordered sections (`AgentSystemPrompt`): the chat's `instructions` never change and
+form a stable prefix, its `documents` index is the section a document mutation changes. Each run's
+`agent.run-start.v1` records the first run's whole prompt (`system`) and then a patch on the previous
+run's (`systemPatch`: changed or added sections, `null` removing one), plus its declared tools and their
+delta from the previous run (`tools`: `AgentToolLoadout`). `AgentRunBranch.systemPrompts(of:)` folds
+the patches back into each run's prompt.
+Within a run, `NativeHarness.refreshingSystemPrompt` asks for the prompt again after each complete tool
+batch: the chat rebuilds it from the workspace, so the request after a document mutation lists the new
+version (diagnostic `systemPromptRefreshed`); the run-start entry keeps the prompt the run began with.
+Queued input (NH08, `AgentInputQueue`): two FIFO queues, *steering* and *follow-up*, each draining one item
+or all of them per boundary. Every change saves the complete lists through `persist` before it is applied
+or acknowledged, and `updates()` streams the complete lists with stable item IDs. A harness given a queue
+(`receivingInput`) injects steering after each complete tool batch and before it would finish, and a
+follow-up only once no tool call and no steering is left. Each drained item is committed as a user
+message carrying the item's ID; a run that stops leaves the rest queued, and `clear()` returns it.
+`AgentRunSnapshot.exchanges` splits a run's conversation at each item it took in. In the chat, a reply that
+is running offers "Steer" and "After this task" for the typed text (`MeetingChatViewModel+Queue`,
+`ChatQueuedInputView`). The lists are saved in the session's `.queue` record (`ChatInputQueueRecord`), and
+each item taken in shows as its own question and answer turn. A stop clears the queue before it aborts
+and hands pending input back to the composer (`restoredDraft`), as does a failed run with the input it
+took in. A reopened conversation hands back what a dead process left queued. `ChatReplayHistory` skips
+the turns of input a replayed run already contains.
+The session tree (NH09, `AgentSessionTree`): an entry is never rewritten, a new branch is new entries
+under an older one, and the selected leaf picks the conversation. Runs hang off the question they answer
+and never move the leaf; labels (`agent.label.v1`) and context edits are detached metadata with no parent.
+The tree gives the alternatives at a message (the conversation's message entries with the same nearest
+message ancestor and role), the leaf a navigation opens (the newest conversation entry of that branch),
+a navigation commit that only moves the leaf, and copies for fork and clone (the path, the runs that
+answered it, its labels and context edits; IDs, times and payloads kept, ordinals renumbered). Usage is
+summed over every branch's runs or only over the runs of the selected path. In the app
+(`SwiftDataAgentSessionStore+Tree`, `MeetingChatViewModel+Branches`), a question asked again in the
+same place shows "‹ n of m ›"; navigating checks the revision, rebuilds the presentation caches and
+saves atomically, and is offered only while no reply runs (`canChangeBranch`). Fork copies the path
+before a question into a new conversation and hands the question back to the composer (nothing before
+the first question means a new, unsaved conversation); "Duplicate conversation" copies the branch shown.
+"Regenerate answer" and "Edit question" ask a saved question again in its place, in the same conversation
+(`MeetingChatViewModel.askAgain`): `SwiftDataAgentSessionStore.rewind` adds a presentation state under the
+question's parent (the sources and documents saved with the question) and selects it, so the conversation
+shows just what came before; the question sent next is written beside the earlier one and reads as another
+version. Nothing is removed. Editing puts the question in the composer (`editingQuestionID`, with a cancel
+banner) until it is taken; a rewind that cannot be saved keeps the edit there. A conversation migrated from
+before the session log has one state for all its turns, so asking an older question again (like forking from
+it) starts with the sources and documents that state holds, not those of the moment it was first asked. The history sheet searches saved conversations (`ChatSessionSearch`): every query
+word must occur, ignoring case and accents, in the title or the turns of the branch each is open on, and a
+match in the turns shows an excerpt.
+A copy ends on the conversation's state at that point (the state saved right there, else the nearest
+before it), rebases its revision IDs and copies only the revisions it shows; the source keeps every
+branch. Labels and renames are metadata. Artifact revisions are per branch: the same version written with
+other content is a revision of its own (`branchRevisionID`, the version's ID plus a digest of its bytes),
+never a conflict, and the save action reads a saved document as current only when it holds that version
+with the same body (`ChatArtifactStore.action`). `ChatBranchPresentation.usageSummary` lists the branch
+shown and every branch when they differ. "All branches" (`ChatBranchOutline`, `ChatBranchTreeView`) lists
+every question as a tree — a question asked again opens a level, the branch shown is marked — and opens the
+one chosen where it was left. Branch summaries are not implemented yet.
+Session interchange (NH10, `AgentSessionArchive`): a native, versioned JSON Lines archive
+(`kurn.agent-session` v1) — a header, one line per entry (encoded directly, so integers keep their exact
+form) and namespaced host records kept opaque; unknown entries, record types and header fields survive a
+round trip. Only LF separates records (`AgentJSONLLines` reads any chunking; U+2028/U+2029 are ordinary
+characters). Reading rejects a missing or repeated header, another format or version, untyped lines,
+payloads past the line/total/entry/depth limits, entries of another session and broken graphs; `copy(into:)`
+moves the graph to a new identity. The app (`SwiftDataAgentSessionStore+Archive`,
+`MeetingChatViewModel+Archive`, `ChatConversationMenu`) exports a conversation with its document revisions
+(`kurn.artifact-revision`, exact stored bytes) and title (`kurn.conversation`), never run records, queued
+input or receipts, through the share sheet as a protected temporary `.jsonl`. Records and header fields of
+another host are kept as `.archived` recovery records on import and exported again unchanged (one past the
+1 MiB recovery-record limit is left out and counted in the log). Import is a new conversation
+in the current chat: revision IDs are rebased and checked against their bytes, every revision a branch
+shows must be present, and nothing is written unless the whole archive holds; a restore keeps the archived
+identity only when no conversation has it. "Export as…" writes the branch shown for a reader
+(`ChatConversationMarkdown`) as Markdown, or as Word or HTML through `DocumentExport` and the meeting
+export's renderers; the HTML is one self-contained page with every text escaped, no script, no external
+resource and no link. The pi JSONL v3 subset is not implemented.
+Context edits (`AgentContextEdit`, `agent.context-edit.v1`) change only what later runs replay: removing
+an assistant message removes the results of its calls, a removed tool result becomes a stub so its call
+keeps a result, and the log, the shown conversation and recorded usage are unchanged. A later edit can
+include a message again (`restoredMessageIDs`), so what is left out is the net of every edit in order.
+`ChatReplayHistory` applies them before the newest checkpoint. In the chat, a saved question's menu offers
+"Leave out of later answers" / "Include in later answers" (`MeetingChatViewModel.setLeftOut`,
+`SwiftDataAgentSessionStore.editContext`): the edit names the question and its answer turn, the whole
+exchange stops being replayed (run or plain text alike), and the question is marked as left out.
+Tools declare an effect (`AgentTool.Effect`: `read`, `write`, `destructive`); a destructive tool asks the
+harness's `confirm` closure before it runs unless its owner sets `requiresConfirmation: false`. A declined
+confirmation, or a tool result with `AgentToolOutput.terminatesRun` (pi's `terminate`, encoded only when set
+so older outputs keep their bytes), ends the run after its batch as `AgentRunStopReason.terminated`: the
+batch's remaining calls get skipped results, no further request is sent, nothing is wrapped up, the outcome
+has no final text (the turn's text was narration beside the calls) and it is not recorded as a limit (`runTerminated` diagnostic). In the chat, `read_document` is a read,
+`create_document`/`append_to_document` are writes and `update_document`, which replaces a body, is destructive
+(`ChatDocumentTools.effect(of:)`): `HarnessChatService.confirmChange` (default no) is the view model's
+`ChatChangeConfirmation`, a sheet (`ChatChangeConfirmationSheet`) showing the document, any new title and the
+replacement text, answered only by its own buttons; a stopped run answers no. "Change declined" ends the run
+with the question retryable. A document card offers Undo (`MeetingChatViewModel.undoLastChange`) while no
+reply runs: each presentation state records, for every document revision it shows, the revision that one
+replaced on this branch (`HarnessPresentationState.predecessors`: set when a write introduces a newer version,
+carried forward by later states, absent when nothing was replaced, rebased with the revision IDs by copies and
+imports, which also copy the revisions it names). `SwiftDataAgentSessionStore.undoLastChange` reads the shown
+state's link (`previousVersion(of:in:)`), so a reused revision two branches reached from different versions
+still undoes to its own branch's, and the earlier revision is found even though a document effect rewrites its
+question as a sibling; it saves that revision again as a new version (`ChatDocumentEdit.restore`), so the change
+undone stays saved and can itself be restored.
+A tool call is shown while the model writes it (`AgentRunSnapshot.streamingToolCalls`): its arguments, which
+the Anthropic, Responses and Chat Completions streams send in pieces, are read best effort by
+`AgentPartialJSON` (the longest prefix ending on a whole value, open containers closed, a string value cut
+off kept as far as it got, a key without a value, an unfinished number or literal and a half escape left
+out) from their first 8,000 scalars, so a title or a query appears before the call ends. Each becomes a
+running tool step with a stable identity; the chat shows them after the live reply's steps
+(`MeetingChatViewModel.writingSteps`) until the call starts, the message ends or the run settles. Display
+only: the call that runs is always the complete arguments, validated as usual.
+`AgentLimits.wrapUpOnLimit` runs one extra turn after a turn/tool-call limit with
+`NativeHarness.wrapUpInstruction` appended and `AgentTurnRequest.allowsToolCalls` false
+(tools stay declared; the wire formats send `tool_choice: none` / Gemini mode `NONE`, and
+calls returned anyway are dropped), so the run ends with an answer from what was gathered.
+A wrap-up without text leaves no answer; one cut off reports `.outputLimit`; it never runs
+past the cost limit.
+Chat plans from `AgentWorkload` through the harness's `AgentBudgetPlanner`, not a
+source-count-only extension in the app. `LibraryChatSourceReader` supplies only the
+frozen authorized IDs and allowed source parts to `ChatWorkloadEstimator`. UTF-8
+volume and the transcript's item limit give a conservative estimated page count.
+Initial budgets range from 10–48 turns and 20–192 tool calls. The harness may add
+eight turns/32 calls only after at least two distinct successful progress calls,
+with progress in the last eight calls. Identical canonical arguments do not count
+again. Read pages, item pages and committed document mutations report numeric
+progress. Absolute ceilings are 64 turns/256 calls; explicit fixed limits keep
+fixed behavior. A configured cost estimator/cost limit still stops the runtime
+before an extension. `budgetExtended`/`budgetExtensionDenied` diagnostics record
+the decision, current/hard limits, distinct progress and idle calls. `AgentRunState`
+owns this bookkeeping; it contains no Kurn domain types. The prompt still steers
+multi-meeting questions to listing, search and summaries first.
+These estimates and limits do not guarantee a provider's hard context
+or billing cap. `AgentMessage` and `JSONValue` are Codable for future persistence.
+Output-token truncation finishes with `.outputLimit` and discards tool calls. Vendor streams
+must include a terminal event before a turn response can be used.
+`AgentHarness/Wire/` builds Anthropic Messages, OpenAI Responses/Chat Completions and Gemini
+GenerateContent requests and accumulates their SSE data payloads. The app's three
+cloud text providers conform to `AgentModel` through the existing bounded SSE
+transport, with chat timeouts and no retry after streaming starts. OpenAI-compatible
+custom endpoints follow the existing chat request shape.
+All official OpenAI text calls use `/v1/responses` with `store: false` only when the
+built-in provider ID and HTTPS `api.openai.com` origin (default/443 port) both match;
+compatible endpoints stay on Chat Completions. `OpenAIResponsesText` (KurnCore)
+shares that selection check and maps buffered text/summary requests and responses,
+including JSON-schema/JSON-object formats to `text.format`; streaming reuses the
+harness accumulator. Summary/wiki, correction, topic analysis and
+auto-tagging all follow this route. Existing GPT-5 chat/agent low reasoning effort
+maps to `reasoning.effort`; summary effort remains unspecified. Audio, speech and
+model-list APIs are unchanged. Transport timeouts/retry policy remain per route.
+Gemini call IDs are synthesized when absent; optional call metadata retains wire IDs and thought
+signatures for replay. `ProviderFactory.agentModel(for:model:)` returns nil for
+on-device and transcription-only providers, so callers can retain the chat fallback.
+Apple's provider does not conform. App adapters import `AgentHarness` explicitly;
+there is no re-export through KurnCore. The loop is inspired
+by pi-agent-core's design only; no third-party implementation code was copied.
+
+### Harness recovery and presentation reads
+
+`HarnessStoreSalvage` reads and validates entries, artifact revisions and recovery
+metadata independently. An unreadable component adds its own warning without hiding
+intact siblings; retained records are recovery data, not a validated active path.
+Pre-conversion copies are labeled separately. A decodable legacy artifact array is
+validated per document, so an invalid item cannot hide intact neighbors. Component labels
+and decode warnings use the seven app localizations. Recovery never mutates the source store.
+Live session reads remain strict and use the nearest presentation-state ancestor of
+the selected leaf, allowing checkpoint leaves without selecting a sibling's state.
+Migration preserves `updatedAt`; new presentation writes update it atomically, including
+the first write, and restore it if saving fails. Harness rows assign only their parent;
+SwiftData maintains inverse collections.
 
 ### Where documentation lives
 
 This file is the architecture and conventions reference; `README.md` describes
 what the app does; `SECURITY_MODEL.md` is the threat model security scans
 rerank findings against (keep its component names stable). `docs/` holds only documents with a lasting job:
+`docs/architecture.md` (the module/layer/flow map, pointing back here for depth),
+`docs/contracts/` (the native-harness contract and its machine-checked catalog),
 `docs/roadmap.md` (the single list of open work — nothing shipped is described
 there), `docs/pipeline-evaluation.md` (the recorded accuracy history),
 `docs/supported-languages.md`, and the two release checklists
@@ -79,6 +578,7 @@ swiftlint lint --config .swiftlint.yml
 # Xcode-free checks that also run in CI (work on Linux)
 python3 Tools/check_static_policy.py
 (cd Packages/KurnCore && swift test)
+(cd Packages/AgentHarness && swift test)
 ```
 
 If `xcodebuild`/SwiftLint can't find SourceKit, point the toolchain at Xcode:
@@ -152,11 +652,12 @@ store-metadata checks), `static-policy` (`Tools/check_static_policy.py`, Linux),
 `unit-tests` (`KurnTests` + `KurnSwiftDataTests` on a macOS simulator),
 `ui-accessibility-tests` (`KurnUITests` minus the screenshot suite, run as two
 `ui-tests` shards — `main` and `flows` — on separate runners and reported as
-this one check) and `kurncore-linux` (`swift test` for `Packages/KurnCore`). The `release` job
+this one check) and `kurncore-linux` (a matrix running `swift test` and exporting
+coverage separately for `Packages/KurnCore` and `Packages/AgentHarness`). The `release` job
 needs all six. The weekly/on-demand `reliability-hardening.yml` adds a Thread
 Sanitizer run over the concurrency-sensitive suites, a Release-configuration
-test run and a UI-test flake measurement. The three test jobs also upload
-lcov coverage to Codecov (flags `unittests`/`uitests`/`kurncore`, via
+test run and a UI-test flake measurement. The test jobs also upload
+lcov coverage to Codecov (flags `unittests`/`uitests`/`kurncore`/`agentharness`, via
 `.github/actions/upload-xcode-coverage`, which converts the `.xcresult`
 coverage archive with `Tools/xccov_to_lcov.py`, and `llvm-cov export` on
 Linux; the README
@@ -165,17 +666,18 @@ badge reads the `main` total). Codecov itself stays informational
 the Codecov upload fatal — the gate below is ours, so a Codecov outage never
 blocks a merge. `codecov.yml` declares one component per
 layer (`Kurn/Infrastructure`, `Providers`, `Models`, `Services`, `Application`, `ViewModels`,
-`Views`, KurnCore) and ignores `KurnWatch`, `KurnLiveActivityExtension`,
+`Views`, KurnCore, AgentHarness) and ignores `KurnWatch`, `KurnLiveActivityExtension`,
 `Kurn/AppIntents` and `Kurn/DebugSupport` until a job executes them;
 `Tools/coverage_report.py` renders the per-layer table into the job summary.
 Every in-scope layer is above the 80% target; the remaining file-level gaps
 are listed in `docs/roadmap.md`.
 
-**Coverage gate (target: 80%).** `coverage-gate` unions the three lcov
-reports with `Tools/coverage_gate.py` and fails a PR on either of two checks,
+**Coverage gate (target: 80%).** `coverage-gate` unions the lcov reports
+(app unit tests, both UI shards and both Swift packages) with
+`Tools/coverage_gate.py` and fails a PR on either of two checks,
 both restricted to the files `Tools/coverage_scope.json` puts in scope — app
 logic (`Kurn/` minus `Views/`, `ContentView.swift`, `DebugSupport/`,
-`AppIntents/`) and KurnCore's sources:
+`AppIntents/`) and both Foundation-only packages' sources:
 
 - **Patch:** the executable in-scope lines a PR adds must be ≥ 80% covered.
   Untested new logic is the failure this exists to catch; write the test in
@@ -214,6 +716,7 @@ How coverage was raised to target, and how to keep it there:
   model or the microphone.
 - **A test that only touches KurnCore types lives in `Packages/KurnCore/Tests`**,
   not `KurnTests`, so it runs on Linux next to the code it tests.
+  Harness-only tests similarly live in `Packages/AgentHarness/Tests`.
 - **Never construct `AVSpeechSynthesizer` or `AVAudioPlayer` in a test**: on the
   CI simulator they hang and take the whole test process down
   (`ReadAloudEngineTests` records why).
@@ -224,9 +727,8 @@ How coverage was raised to target, and how to keep it there:
 
 To verify a change through CI:
 
-- Push the change to its branch and open (or update) a PR targeting `main` — the
-  `pull_request` trigger runs the workflow. Pushing to a feature branch alone
-  does **not** trigger CI; only `push` to `main` and PRs to `main` do.
+- Push the change to its branch and open (or update) a PR targeting `main`.
+  Pushing to a feature branch alone does not trigger CI.
 - Read the run's outcome with the GitHub Actions tooling/API: fetch the
   `unit-tests` (or `ui-accessibility-tests`) job logs and grep for `error:`
   (compile failures), `recorded an issue` / `** TEST FAILED **` (test
@@ -235,6 +737,21 @@ To verify a change through CI:
 - Iterate against CI: each fix can surface the next latent error (the Swift
   build stops at the first error), so expect several rounds. State plainly that
   results are pending/observed from CI rather than asserting local success.
+
+### Live provider qualification
+
+`.github/workflows/live-provider-smoke.yml` (`workflow_dispatch` only, since it spends API credit) runs
+`LiveProviderSmokeTests` with `KURN_LIVE_SMOKE=1` and the `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/`GEMINI_API_KEY`
+secrets: one agent run per vendor whose key is set, through the app's own clients and `NativeHarness`, with a
+tool whose answer carries an offset the model cannot guess, so a pass proves the tool round trip. Models come
+from the workflow's inputs or the providers' defaults. It prints `[live-smoke]` lines (time to the first
+streamed block of any kind, to the first visible reply text and to the end, tool calls, stop reason, tokens) and
+runs `ChatSessionScaleTests`, which opens a conversation of a thousand saved entries (`[session-scale]`: write,
+projection and open times, the open read through a context that has never seen it; that suite also runs in
+every CI). The same job counts the build's Swift concurrency warnings (the app and the
+packages build in the Swift 6 language mode, where a visible data race is an error). No line carries a
+prompt, an answer, a key or tool arguments, and no threshold is invented for the times: they are compared
+between runs, like the pipeline evaluation.
 
 ### Measuring accuracy (WER / DER)
 
@@ -420,7 +937,7 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
     runner as much as the UI, which is why it is not a view model.
 - **ViewModels/** — `@MainActor @Observable` state for one kind of screen:
   `SummaryViewModel` (generate/translate summaries), `RecorderViewModel`,
-  `MeetingChatViewModel`, `DocumentGenerationViewModel`, …
+  `MeetingChatViewModel`, …
 - **Views/** — SwiftUI screens, plus the UIKit glue that hosts them
   (`SecurityCoverWindow`).
 - **Infrastructure/** — settings, errors, logging, keychain, export, extensions,
@@ -1055,9 +1572,11 @@ transcript.
   ≤ 0.45, near-exact for words of ≤ 3 letters), of two adjacent words joined
   ("cuber netes" → "Kubernetes"), part of a word split apart, or one of the
   grounded terms. "by Friday" appended to a sentence is rejected even when the
-  guardrail's 35% budget would allow it. No accuracy claim is made for the
-  stage until a `correction: only` pipeline-eval run is recorded in
-  `docs/pipeline-evaluation.md`.
+  guardrail's 35% budget would allow it. Measured on 2026-11-05
+  (`docs/pipeline-evaluation.md`) on Nemotron Unified, where no confidence
+  means every segment is sent: no measurable gain over the corrector it
+  replaced (English still +0.54pp worse than no correction, Portuguese
+  −0.38pp), so make no accuracy claim for the stage.
 - **`TranscriptCorrectionGuardrail`** bounds how far a proposed correction may
   drift before it is rejected: `maxWordChangeRatio` 0.35, `maxLengthRatio` 1.5,
   `minLengthRatio` 0.6 — a plausible spelling fix, not a paraphrase, invention,
@@ -1431,7 +1950,7 @@ unavailable there), so `TranscriptionScheduler.pipelineUsesCoreML` covers it too
 
 #### FluidAudio on-device models and download consent
 
-FluidAudio is pinned to 0.18.0. Its `Diarizer`, `NemoTextProcessing` and `TTS`
+FluidAudio is pinned to 0.18.3. 0.18.2 made Pyannote's turns overlap by default (`exclusiveSegments` false); `FluidAudioPyannoteConfiguration` pins it back to true, so fusion keeps receiving one speaker per instant. Its `Diarizer`, `NemoTextProcessing` and `TTS`
 traits are selected explicitly on the Xcode package reference, matching the
 upstream defaults. Without explicit selection Xcode can compile 0.18 without
 its diarization API, leaving `OfflineDiarizerManager` and related types missing.
@@ -1599,8 +2118,8 @@ is not a durable word-timing transcript.
 
 ### Providers (`Providers/`)
 
-`LLMProvider` (`Sendable`) abstracts text generation — `summarize`, `chat`,
-`streamChat` — for every backend, cloud or local. Cloud speech-to-text is the
+`LLMProvider` (`Sendable`) abstracts text generation — `summarize`, `streamSummary`,
+`chat` — for every backend, cloud or local. Cloud speech-to-text is the
 separate `TranscriptionProvider` (`transcribe`), so each vendor conforms to
 what it actually serves: OpenAI-compatible endpoints to both, ElevenLabs only
 to `TranscriptionProvider`, Anthropic, Gemini and on-device only to
@@ -1737,14 +2256,14 @@ raises the output budget/timeout (8192 tokens, 300s) so long transcripts don't
 truncate mid-JSON or time out; a truncated response surfaces as
 `AppError.summaryTruncated` instead of a confusing decode error.
 
-**The single-pass budget is per model, in tokens** (`ContextBudget`, KurnCore).
+**The single-pass budget is per model, in tokens** (`ContextBudget`, Application/Generation).
 It used to be a fixed 80k characters for every cloud model — sized for the
 smallest window any vendor had, so a two-hour meeting always went through lossy
 staged notes, and wrong by a factor of four for Chinese, where a character is
 about a token. `ContextBudget.resolve(provider:model:)` takes the window the
 provider's `/models` listing reported (Gemini `inputTokenLimit`, Groq
 `context_window`, OpenRouter `context_length`, remembered by
-`ModelContextWindowStore`), else KurnCore's `ModelContextWindows` table by
+`ModelContextWindowStore`), else AgentHarness's `ModelContextWindows` table by
 model family, else `ContextBudget.conservative` (the old thresholds); Apple's
 on-device model always gets `ContextBudget.onDevice`. From a window it reserves
 the output budget, prompt overhead and a 20% margin, and caps any single
@@ -1754,9 +2273,9 @@ A wrong window is safe by construction: a provider rejecting the input as too
 long (`AppError.isContextOverflow` — 413, or a 400/422 whose message names
 the context) sends the same work down the staged path with the conservative
 budget, or rethrows when that would not split anything. The same budget and
-fallback drive per-meeting chat, the library synthesis and generated
-documents, each of which takes a `ContextBudget.Resolver` at construction so
-tests can force either path.
+fallback drive the wiki (through `SummaryService`); the services take a
+`ContextBudget.Resolver` at construction so tests can force either path. The
+agent chat plans against the model's window instead (see "Agent harness").
 
 **Summary requests stream.** `SummaryService` calls `LLMProvider.streamSummary`
 for the single pass, every map block and the reduce: the same Markdown contract
@@ -2046,13 +2565,13 @@ rules statically, alongside the layer rules described under "Architecture"
 the check), and `DebugSupport/` holds the debug-only fault
 injection hooks the recovery tests use.
 
-### Semantic search & chat (`Services/Embedding/`, `Services/SemanticSearchService.swift`, `Services/MeetingChatService.swift`)
+### Semantic search & chat (`Services/Embedding/`, `Services/SemanticSearchService.swift`, `Services/HarnessChatService.swift`)
 
-On-device semantic search over transcripts plus a retrieval-augmented "chat with
-your meetings", built with **no new external dependency**: embeddings come from
-Apple's `NaturalLanguage` framework (`NLContextualEmbedding`, multilingual,
-loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern as
-`FluidAudioModelStore`), and chat reuses the existing cloud `LLMProvider` stack.
+On-device semantic search over transcripts plus "chat with your meetings", built
+with **no new external dependency**: embeddings come from Apple's `NaturalLanguage`
+framework (`NLContextualEmbedding`, multilingual, loaded once via the
+`EmbeddingModelStore` actor — same coalesced-load pattern as
+`FluidAudioModelStore`), and chat is the agent harness over the cloud providers.
 
 - **Indexing.** After a transcript is persisted, `TranscriptChunker` splits it
   into short passages (absolute meeting timestamps + dominant speaker),
@@ -2070,29 +2589,22 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
   chunk vectors by cosine similarity (`vDSP` dot product on unit-normalized
   vectors). `MeetingsListView` runs a debounced hybrid pass: instant substring
   matching plus semantically-relevant meetings the substring pass missed.
-- **Chat.** `LLMProvider` gained a plain-text `chat(systemPrompt:messages:)`
-  (implemented for OpenAI/Anthropic/Google) alongside
-  `summarize`. `MeetingChatService` has two grounding strategies: **per-meeting**
-  (`answerAboutMeeting`) sends the **whole transcript** as context — a single
-  meeting almost always fits the single-pass budget (the model's `ContextBudget`),
-  which is far more accurate than retrieving a few passages; only over-budget
-  meetings fall back to retrieval. **Library-wide** (`answerAcrossLibrary`) and
-  the long-meeting fallback use a retrieval pipeline: LLM query rewrite → hybrid
-  dense (`NLContextualEmbedding` cosine) + lexical (BM25) retrieval fused with
-  Reciprocal Rank Fusion (`SemanticSearchService.hybridSearch`) → LLM rerank →
-  grounded answer. All prompts cite `[mm:ss]` and reply in the transcript
-  language. `MeetingChatViewModel` + `MeetingChatView` drive the conversation,
-  surfaced as a per-meeting Chat tab (`MeetingDetailView`) and a library-wide
-  "Ask" sheet (`MeetingsListView`); cited `[mm:ss]` timestamps are tappable and
+- **Chat.** `MeetingChatViewModel` + `MeetingChatView` drive an agent conversation
+  (`HarnessChatService`, see "Agent harness") whose source tools read transcripts,
+  summaries, wiki articles and attachments and search with
+  `SemanticSearchService.hybridSearch` (dense `NLContextualEmbedding` cosine + BM25,
+  fused with Reciprocal Rank Fusion). Replies cite `[m:ss]` and answer in the
+  question's language. It is surfaced as a per-meeting Chat tab (`MeetingDetailView`)
+  and a library-wide "Ask" sheet (`MeetingsListView`); cited timestamps are tappable and
   seek the transcript. Conversations are saved as `ChatSession`
   (`Models/ChatSession.swift`) — the same "reopen a past chat, start a new one,
   delete one" affordances Claude's own mobile app offers, via the history/new
   toolbar buttons on `MeetingChatView` and `Views/ChatSessionListView.swift`'s
-  history sheet. A session is created lazily, on the conversation's first
-  *successfully completed* exchange (`MeetingChatViewModel.persist()`) — a
-  cancelled/failed reply never reaches it (`dropPartialReply` removes those
-  turns first), and a chat opened and abandoned with nothing sent leaves no
-  row in history. Turns (including citations and token usage/cost) are
+  history sheet. A session is created when the conversation's first question is
+  sent: the question is saved before any request (the NH05 persistence barrier),
+  so a crash or suspension mid-reply never loses it. A cancelled/failed reply is
+  never saved (`dropPartialReply` removes those turns first), and a chat opened
+  and abandoned with nothing sent leaves no row in history. Turns (including steps, artifacts and token usage/cost) are
   JSON-encoded into `ChatSession.turnsData`, the same `Transcript.segmentsData`
   pattern; like every other `@Model`, it's encrypted at rest by
   `ModelStoreProtection` with the rest of the store. Scoped like the feature
@@ -2111,15 +2623,14 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
   `LegacyStoreAdoptionTests` stayed green (its fixture was written with the
   same live classes). `KurnSchemaV3` (1.2.0, adding `MeetingPhoto`) and
   `KurnSchemaV4` (1.3.0, adding `MeetingAttachment`) followed that recipe;
-  V4 is the current version, with V3 frozen in `KurnSchemaV3Models.swift`
-  (whose every entity `SchemaV3MigrationTests` writes and migrates). The next
-  model change therefore means: edit the live class, add `KurnSchemaV5`
-  listing the live classes, demote `KurnSchemaV4` to frozen copies in a
-  `KurnSchemaV4Models.swift`, add the stage, and bump
+  V5 (1.4.0) adds optional session scope/artifacts and generated-document artifact
+  provenance, with V4 frozen in `KurnSchemaV4Models.swift` and
+  `KurnSchemaV4LibraryModels.swift`. `SchemaV4MigrationTests` writes every V4 entity
+  and verifies migration and persisted harness state. The next model change means:
+  edit the live class, add a new schema listing live classes, freeze V5, add the stage, and bump
   `KurnModelGraph.currentSchemaVersion` (which backup metadata records). When
-  `wikiEnabled` is on, the library-wide path additionally grounds on the
-  condensed per-meeting articles — see "Derived artifacts" below for why that
-  answers synthesis and counting questions retrieval alone cannot.
+  `wikiEnabled` is on, the agent can also read the condensed per-meeting articles
+  (`read_wiki`) — see "Derived artifacts" below.
 
 ### Derived artifacts: wiki and documents
 
@@ -2133,19 +2644,11 @@ meeting: dense, factual, timestamped notes over the whole transcript —
 decisions, action items, numbers, names. `Meeting.wikiArticle` is one-to-one and
 `.cascade`, so it dies with its meeting.
 
-- **Why it exists is `MeetingChatSynthesis`**, not the reading experience. The
-  library-wide chat gives the model *both* groundings in one prompt: the
-  retrieved verbatim excerpts (for exact quotes and tappable `[mm:ss]`
-  citations) and the condensed articles of the meetings in play (for synthesis,
-  comparison and counting). A hybrid question — "what did we decide about X and
-  how did it evolve" — is then answered in a single pass instead of being routed
-  to one strategy or the other. Articles are 1–4 KB, so a handful of them plus
-  the excerpts fit the single-pass budget where whole transcripts never could.
-  Over budget — chiefly a global aggregate over a large library — the articles
-  are packed **whole, never split** into blocks and map-reduced in the same shape
-  as `SummaryService.mapReduce`, with the excerpts carried into the reduce so
-  citations survive. It is also readable from the meeting's detail screen
-  (`MeetingWikiView`) for transparency.
+- **Why it exists is synthesis across meetings.** A 1–4 KB article condenses a
+  whole meeting, so the agent's `read_wiki` tool lets it compare, count and trace a
+  decision across many meetings without reading every transcript, then cite the
+  transcript for exact quotes. It is also readable from the meeting's detail screen
+  (`MeetingWikiView`).
 - **`WikiService` delegates rather than reimplements.** It calls `SummaryService`
   with that service's internal `notesTemplate` — the same "capture every
   decision, action item, number, name, with `[mm:ss]`" format the summary's map
@@ -2160,20 +2663,27 @@ decisions, action items, numbers, names. `Meeting.wikiArticle` is one-to-one and
 - Gated by `AppSettings.wikiEnabled`, **off by default** — it makes a paid cloud
   LLM call per transcription.
 
-**`GeneratedDocument`** (`Models/GeneratedDocument.swift`) is free-form Markdown
-synthesized from one or more transcripts against a user's prompt, surfaced by
-`DocumentsListView` / `DocumentCreateView` / `DocumentDetailView`.
+**`GeneratedDocument`** (`Models/GeneratedDocument.swift`) is a saved agent artifact.
+The Documents library's plus button opens library chat. Ask the agent for a
+document, report, or minutes; document tools create versioned workspace artifacts.
+Ordinary assistant replies cannot be saved as documents.
 
-- Sources are chosen by `DocumentSourceKind` — `.transcripts`, `.tags`, or
-  `.folders`. `DocumentSourceResolver` (`Models/`) holds that resolution,
-  including folder traversal, as pure logic so the SwiftUI view never owns the
-  domain rule about which meetings a tag or folder selection stands for.
+- `ChatArtifactCard` previews the latest workspace version, including from older
+  turns, and offers Markdown copy and Markdown/Word/HTML export through the same
+  `DocumentExport` adapter used by `DocumentDetailView`.
+- `ChatArtifactStore` owns save/update decisions and source snapshots resolved
+  through `SourceScopeResolver`. A newer artifact updates the same saved document;
+  an up-to-date artifact is marked saved, and deleting it enables saving again.
+  Provenance records the session, artifact and version. Optional per-artifact turn
+  metadata preserves the generating question/model through retries and reopening;
+  older conversations leave an unknown model empty rather than inventing it.
 - **Source labels and meeting ids are snapshots.** Deleting a meeting, retagging
   it, or moving it between folders must not retroactively damage a document that
   was already generated, so the document keeps its own copy of what it was built
   from rather than a live relationship.
-- `DocumentGenerationService` map/reduces long selections, so picking a folder
-  never silently truncates the meetings that happen to sort last.
+- Chat artifacts persist independently of reply completion. Failed/limited runs
+  retain artifact references and provenance on the pending question, including
+  across retries. There is no separate one-shot document generation flow.
 
 ### Attached documents (PDFs)
 
@@ -2623,3 +3133,149 @@ enforced by lint and by a CI audit test, not just convention:
   modifier). Both rules are `severity: error` in `.swiftlint.yml` and fail CI,
   not just warn — check this before pushing UI changes, not after `lint-and-validate`
   fails.
+
+
+### Awaited runtime persistence and initial session owner
+
+AgentHarness's `NativeHarness` can install awaited message and usage commits. Canonical user
+messages precede model IO; assistant finals precede tool effects; results precede the next
+request. Audit failures and synthetic blocked results use the same message sink. A failed
+commit throws and prevents dependent work. `AgentRunHandle` separates producer completion
+from observation lifetime: `start` has disposable events (`.bounded`, the newest 128, or
+`.complete` for a reducer that cannot tolerate a gap) and explicit cancellation, while
+`result()` waits for producer termination. The legacy `run` API retains its existing
+stream-consumer cancellation semantics.
+
+`AgentSession` is Foundation-only run ownership infrastructure; the chat runs each reply through
+one (see "A run's model history is durable" below). It reserves busy state before store awaits, persists run/message/usage/end entries,
+and awaits producer termination plus terminal persistence before releasing ownership. A
+terminal-save retry never reruns inference/effects and recognizes an identical committed
+entry after a lost acknowledgement. Persistence failure is explicit and blocks new prompts;
+message/usage failures require host recovery. Store adapters must implement atomic checked
+append groups. One retained owner per session and authorized history projection are host
+responsibilities; constructing an owner never resumes a saved run. `AgentSessionAppendMode.branch`
+chains a run's entries from the leaf at run start without moving the selected leaf — the shape the
+chat's run branches use. Each append is built
+against the snapshot it commits on; a conflict (another writer committed first) rebuilds it on the
+new snapshot, up to `conflictAttempts` (4) tries, and the terminal entry keeps one append identity
+across retries so a lost acknowledgement is recognized by ID and payload. `start` is `prompt` with
+the run's events (`AgentSessionRun`): it takes the host's own `runID` and extra run-start fields (the
+host's authorization; `runID` cannot be overridden), and its disposable stream ends only once the run
+has settled, throwing the run's failure — `AgentSessionOwnerError.persistenceFailed` for any history
+write that failed (a terminal entry that could not be saved after an answer included, ahead of any
+other failure), never the store's own error, and otherwise `CancellationError` after `abort()`. A run-start
+that cannot be saved fails the run without blocking the session, since nothing of it was written.
+`start(commandID:)` makes a command idempotent across processes: the ID is written into the run-start
+entry (`AgentSessionEntry.commandID`), and a start whose command is already in the log — checked on
+every snapshot an append attempt is built on, so a writer that committed in between is caught too —
+writes nothing, calls no model and ends with `AgentSessionOwnerError.duplicateCommand`. The chat's
+command is the question turn a run answers (`MeetingChatViewModel.send(commandID:)` can name another).
+`AgentRunProgress` projects a run's phase with its identities from its events — `preparing`,
+`streaming`, `executingTools`, `compacting` (between `compactionStarted` and its end, restoring the
+interrupted phase), `retryWaiting` (an output-limit retry until its request starts) and
+`finished` — with the current turn index, request identity, started-but-unfinished call IDs and the
+turn's registered invocations. It is presentation only and never orders persistence; there is no
+`waitingForUser` until a tool asks for confirmation. A retry's wait lasts across its `turnStarted`
+and any compaction until its request starts, and `finish()` closes a run that ended without
+`runFinished`. The chat keeps it as `MeetingChatViewModel.runProgress` (reset with the conversation),
+and `ChatRunPhase.following(_:)` derives the shown phase from it, beside its own `cancelling`.
+The chat does not read the event stream itself: `HarnessChatService.Run.snapshots` is
+`AgentRunSnapshots.coalescing(events)`, a reducer that drains the complete observation into
+`AgentRunSnapshot`s (streamed text, trace, progress, finished tool calls, outcome) and keeps only the
+newest for the view. A busy view skips intermediate snapshots instead of growing a queue, the last
+snapshot always arrives before the stream ends with the run's failure, and the view model finds the
+document tools finished since the last snapshot it saw by count. Ending observation stops the
+reducer, never the run.
+
+**Chat conversations are host-owned (NH05 host activation).** `ChatConversationHost`
+(`ViewModels/`, built by `AppComposition`, injected app-wide) retains one
+`MeetingChatViewModel` per scope — a meeting, or the library-wide Ask shared by the meetings
+list and documents — so `MeetingChatView` only resolves and renders it. A reply keeps running
+when its sheet or tab is dismissed (the view model used to cancel from `deinit`). At most
+`capacity` (4) conversations are kept, evicting the least recently opened idle one, never a
+running one; "Delete all data" awaits `closeAll()` before `LibraryEraser`. The run is the
+`HarnessChatService.Run` from `HarnessChatService.start` (complete observation, an
+`AgentSession` run once the conversation is saved): every exit aborts it and waits for it to settle
+first. `cancel()` only requests: the conversation stays busy in
+`ChatRunPhase.cancelling` until settled (`waitUntilSettled()`), the Stop button disables, and
+`send` refuses until then. `reset`/`load` fence the old run by generation; it still owns the
+busy state until it terminates. A run whose meeting or open session was deleted writes nothing
+(`persistOrThrow` throws `CancellationError`, which `persist` swallows), and `delete` refuses
+the open session while its run is active. A run holds a finite background-execution window
+(`BackgroundExecutionWindow`, `BackgroundActivity` in production, injected through
+`makeBackgroundWindow`). `BackgroundActivity` calls its owner's expiration handler once
+`BackgroundDeadline.windDownLead` (8 s) of background time remains, while the task is still
+held — the system's own expiration handler must end the task and is too late for async
+clean-up, so it is only the fallback. The chat cancels the run there like a user stop, and it
+settles as a retryable interruption (reliability code `background_expired`) inside the window,
+never frozen mid-request or mid-tool. That interruption is kept as `pendingForegroundResume` (the
+question, provider and model); on the next `.active` scene phase `KurnApp` calls
+`ChatConversationHost.resumeAfterForeground()`, which sends each such question again once
+(`background_resumed`) after its run has settled — only if it is still the unanswered retryable
+question with no error, and only if the stopped run committed no document change (a resumed run
+would call the tool again under a new invocation identity no receipt matches; such a question stays
+for the user's Retry, `background_resume_declined`). A user stop, a new question, `reset` or `load`
+(opening another saved conversation in the same scope) clear it; each scope keeps its own, so moving
+between meetings does not. The host does
+not evict a conversation that holds one. The resumed run starts over from the saved question; nothing
+of the stopped run is replayed. The transcription coordinator's background cancellation
+gets the same earlier, checkpointable moment.
+The composer's unsent text (A68) is `MeetingChatViewModel.draft`, not view state, so it outlives the
+view; a saved conversation keeps it as its `.draft` recovery record (`ChatDraftRecord`), written when the
+scene goes to the background (`ChatConversationHost.saveDrafts()`), when another conversation opens and
+before the host evicts the view model — never per keystroke. A reopened conversation puts it back; a
+question sent from the composer clears it (a resumed question leaves it); a new, unsaved conversation's draft
+lives in memory only, goes along ahead of an opened conversation's own draft, and keeps its view model from
+being evicted. A draft that cannot be saved is never dropped: it stays in the composer and the chat says so.
+
+**The question is a barrier, and every run leaves a record.** `send` saves the conversation
+with the new question before any request; if that save fails nothing is sent and the question
+stays retryable. A `ChatRunRecord` (`Infrastructure/Agent/`, an `AgentRecoveryRecord` of kind
+`.run` in the session) is written `.running` right after, and `.ended` when the run settles.
+`ChatRunRecovery.sweep`, one of `AppComposition`'s launch sweeps, marks every record still
+`.running` as `.interrupted` (reliability code `run_interrupted`): no run is live when a store
+opens, the saved question already reopens as the retryable one, and committed document effects
+keep their own receipts. It never re-sends or resumes anything. Evidence is closed rather than
+deleted: any run's branch that nothing ended — a dead process's, or a run that settled without
+saving its own end entry — gets the `agent.run-end.v1` it is missing (`ChatRunBranch.closeIfOpen`,
+`end` `interrupted` or `persistenceFailed`, reliability code `run_branch_closed`), as the last entry
+of that branch, without moving the selected leaf. In process, a run that failed on a history write
+retries its own end entry once (`AgentSession.retrySettlement`) before it settles. A reopened conversation whose
+retryable question is one of those (`ChatRunRecovery.interruptedQuestionIDs`) says so above
+Retry (`retryableQuestionWasInterrupted`, `chat.run.interrupted`), so an unanswered question left
+by a crash reads differently from one the user stopped. It also shows what that run had done:
+`ChatRunRecovery.restoringInterruptedRun` rebuilds the run's steps and usage from its canonical
+branch with AgentHarness's `AgentRunTrace.restoring(run:from:)` and puts them under the retryable
+question when it has none of its own. Only committed entries are shown — a restored tool call has
+no output summary (that is a live event, never saved), a call without a saved result reads as
+failed, and there is no stop step without a saved end. Restoring writes nothing and never re-runs
+anything; a later save of the conversation keeps the shown steps on the question, as it does a
+stopped run's. The interruption is then resumed, once: `load` stages
+`MeetingChatViewModel.interruptedResume` when `ChatRunRecovery.resumableInterruptedRun` allows it
+(the run committed no document change, was not itself a resume and was not resumed before), and
+`MeetingChatView` calls `resumeInterruptedRun(provider:model:)` with the provider and model the chat
+uses now, as Retry would. The resume runs under the durable command
+`ChatRunBranch.resumeCommand(for:)` (`resume-<runID>`), so it never repeats in this process or after
+another launch (reliability code `interrupted_resumed`); a run that changed a document is left for
+the user's Retry. Both resumes live in `MeetingChatViewModel+Resume.swift`.
+
+**A run's model history is durable, on its own branch, written by `AgentSession`.** Each chat run
+is started through a per-run `AgentSession` owner in `.branch` mode (`ChatRunBranch`,
+`Infrastructure/Agent/`; `HarnessChatService.start(owner:runID:)`), with the run's `ChatRunRecord`
+ID as its `runID`. The owner is installed as the harness's message and usage sinks, so the question,
+each assistant turn with its tool calls, each tool result and each request's usage are committed to
+the session before the work that depends on them. The branch opens with `agent.run-start.v1`
+carrying the run's `ChatRunAuthorization` (effective scope, the meeting IDs it resolved to, the
+`provider:model`) as a host start field, written before any model IO, and closes with
+`agent.run-end.v1` (how it ended plus the harness stop reason). Its entries chain from the leaf at
+run start (the accepted question) but never move the selected leaf: the presentation path,
+`SwiftDataAgentSessionStore.projection` and the compatibility writer's prefix diff see none of them.
+A presentation or effect write that lands between an owner append's load and commit is a revision
+conflict, and the append is rebuilt on the new snapshot. The chat reads the owner's event stream,
+which ends only once the run has settled; a stop is `abort()` plus waiting for settlement. A failed
+history write ends the stream with `AgentSessionOwnerError.persistenceFailed`, which fails the run
+(question retryable, `run_transcript_write_failed`) and shows `chat.storage.run_failed` — saying
+nothing more was sent — instead of the store's own error text (`MeetingChatViewModel.presentedError`);
+a run whose session was deleted under it ends as a cancellation. One owner per run is safe because the
+view model admits one run at a time and a retry starts a new branch. The next run replays these
+branches as canonical history (see "Agent harness", `ChatReplayHistory`).

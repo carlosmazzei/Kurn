@@ -1,0 +1,139 @@
+{
+  "artifacts" : [
+    {
+      "id" : "00000000-0000-0000-0000-000000000501",
+      "markdown" : "# Decisões\n\nFirst Second Third",
+      "title" : "Relatório 🧭",
+      "version" : 3
+    }
+  ],
+  "baselineCommit" : "6ec656b93c6cf59cbc3dc32f9bd08e1abb1517ed",
+  "excludedMeetingID" : "00000000-0000-0000-0000-000000000102",
+  "fixtureVersion" : 1,
+  "meetingID" : "00000000-0000-0000-0000-000000000101",
+  "scope" : {
+    "kind" : "meetings",
+    "partOverrides" : [
+      "00000000-0000-0000-0000-000000000101",
+      [
+        "transcript"
+      ],
+      "00000000-0000-0000-0000-000000000102",
+      [
+
+      ]
+    ],
+    "parts" : [
+      "summary",
+      "attachments"
+    ],
+    "selectedIDs" : [
+      "00000000-0000-0000-0000-000000000101",
+      "00000000-0000-0000-0000-000000000102"
+    ]
+  },
+  "turns" : [
+    {
+      "citations" : [
+
+      ],
+      "id" : "00000000-0000-0000-0000-000000000201",
+      "role" : "user",
+      "text" : "Pergunta anterior"
+    },
+    {
+      "artifacts" : [
+        {
+          "id" : "00000000-0000-0000-0000-000000000501",
+          "title" : "Relatório 🧭",
+          "version" : 3
+        }
+      ],
+      "citations" : [
+        {
+          "meetingID" : "00000000-0000-0000-0000-000000000102",
+          "meetingTitle" : "Excluded",
+          "recordingID" : "00000000-0000-0000-0000-000000000102",
+          "speakerLabel" : "Speaker",
+          "start" : 12,
+          "text" : "EXCLUDED LEGACY CITATION"
+        }
+      ],
+      "costUSD" : 0.002,
+      "elapsedSeconds" : 1.25,
+      "id" : "00000000-0000-0000-0000-000000000202",
+      "role" : "assistant",
+      "steps" : [
+        {
+          "contextResolution" : {
+            "catalogVersion" : "2026-11-08",
+            "contextWindowTokens" : 1050000,
+            "id" : "00000000-0000-0000-0000-000000000401",
+            "isCached" : false,
+            "limitKind" : "combined",
+            "maxOutputTokens" : 128000,
+            "modelID" : "gpt-6.1-terra",
+            "reason" : "catalogMatch",
+            "resolvedAt" : 721692800.125,
+            "source" : "fixed_table"
+          },
+          "id" : "2373E4B1-9F49-4EBF-890E-0E74FC855782",
+          "kind" : "context",
+          "status" : "finished"
+        },
+        {
+          "arguments" : {
+            "query" : "decisão 🧭"
+          },
+          "callID" : "call-1",
+          "id" : "895E12B3-3022-490B-8391-E34CDDBC6A1E",
+          "kind" : "tool",
+          "outputSummary" : "Read fixture facts",
+          "status" : "finished",
+          "toolName" : "lookup"
+        },
+        {
+          "diagnostic" : {
+            "kind" : "requestStarted",
+            "metrics" : {
+              "contextSafetyTokens" : 8232,
+              "contextTokens" : 54879,
+              "maxOutputTokens" : 128000
+            },
+            "recordedAt" : 721692800.125,
+            "resolutionID" : "00000000-0000-0000-0000-000000000401",
+            "runID" : "00000000-0000-0000-0000-000000000402",
+            "sequence" : 7
+          },
+          "id" : "43896F3A-4E00-4579-B263-5EE8B5CCDFB5",
+          "kind" : "diagnostic",
+          "status" : "finished"
+        },
+        {
+          "id" : "7F626015-F47B-4104-8F43-262088EDE20A",
+          "kind" : "stop",
+          "status" : "finished",
+          "stopReason" : "completed"
+        }
+      ],
+      "text" : "Resposta anterior [0:12]",
+      "usage" : {
+        "completionTokens" : 45,
+        "promptTokens" : 123
+      }
+    },
+    {
+      "id" : "00000000-0000-0000-0000-000000000203",
+      "role" : "user",
+      "steps" : [
+        {
+          "id" : "00000000-0000-0000-0000-000000000204",
+          "kind" : "stop",
+          "status" : "finished",
+          "stopReason" : "outputLimit"
+        }
+      ],
+      "text" : "Gerar documento"
+    }
+  ]
+}

@@ -57,11 +57,7 @@ struct ProgressVocabularyTests {
         #expect(TranscriptionPhase.correcting(progress: 5).fractionComplete == 1)
     }
 
-    @Test func everyChatAndPostTranscriptionPhaseHasALabelAndIcon() {
-        let chat: [ChatPhase] = [.rewritingQuery, .retrieving, .reranking, .synthesizing, .answering]
-        #expect(chat.allSatisfy { !$0.displayName.isEmpty && !$0.systemImage.isEmpty })
-        #expect(Set(chat.map(\.systemImage)).count == chat.count)
-
+    @Test func everyPostTranscriptionPhaseHasADistinctLabel() {
         let post: [PostTranscriptionPhase] = [.generatingTitle, .indexing, .generatingWiki]
         #expect(Set(post.map(\.displayName)).count == post.count)
     }

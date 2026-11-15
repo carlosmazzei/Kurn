@@ -2,49 +2,85 @@
 //  MeetingChatView.swift
 //  Kurn
 //
-//  "Chat with your meetings": a grounded Q&A over transcripts. Used two ways —
-//  as a tab inside a single meeting (`meeting` non-nil), and as a library-wide
-//  "Ask" sheet from the meetings list (`meeting` nil, searching every indexed
-//  chunk). Answers come from the configured summary LLM provider, grounded in
-//  on-device retrieved passages; tapping a citation calls `onJump`.
+//  "Chat with your meetings": an agent that answers from the selected sources with
+//  tools. Used two ways — as a tab inside a single meeting (`meeting` non-nil), and
+//  as a library-wide "Ask" sheet from the meetings list (`meeting` nil). Answers
+//  come from the configured summary provider, which must be a cloud provider with
+//  agent support; tapping a cited timestamp calls `onJumpToTime`.
 //
 
+import AgentHarness
 import Combine
+import KurnCore
 import SwiftData
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct MeetingChatView: View {
     /// The meeting to chat about, or `nil` to ask across the whole library.
     let meeting: Meeting?
-    /// Invoked when the user taps a retrieval citation (host decides where to jump).
-    var onJump: ((SemanticSearchService.Hit) -> Void)?
-    /// Invoked when the user taps a cited `[mm:ss]` in a full-context answer;
-    /// the host seeks that absolute meeting time. Per-meeting scope only.
+    /// Invoked when the user taps a cited `[m:ss]` in an answer; the host seeks that absolute
+    /// meeting time. Per-meeting scope only.
     var onJumpToTime: ((TimeInterval) -> Void)?
+
+    /// The app-wide owner of conversations (NH05): a run outlives this view. Optional only so a
+    /// view built outside the app environment still works, with a conversation of its own.
+    @Environment(ChatConversationHost.self) private var conversations: ChatConversationHost?
+    @State private var detached = MeetingChatViewModel()
+
+    var body: some View {
+        MeetingChatConversationView(meeting: meeting, onJumpToTime: onJumpToTime,
+                                    vm: conversations?.conversation(for: meeting?.id) ?? detached)
+    }
+}
+
+/// The conversation itself, rendering whichever retained view model `MeetingChatView` resolved.
+struct MeetingChatConversationView: View {
+    let meeting: Meeting?
+    var onJumpToTime: ((TimeInterval) -> Void)?
+    @Bindable var vm: MeetingChatViewModel
 
     @Environment(AppSettings.self) private var settings
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @State private var vm = MeetingChatViewModel()
-    @State private var input = ""
+    /// The composer's text, held by the view model so it outlives this view and the process (A68).
+    private var input: String {
+        get { vm.draft }
+        nonmutating set { vm.draft = newValue }
+    }
     @FocusState private var inputFocused: Bool
-    /// Anchor for the "thinking for Ns" live timer in `respondingRow`, reset
-    /// each time a new reply starts.
-    @State private var respondingStartedAt = Date()
     @State private var showingHistory = false
+    @State private var showingSources = false
+    @Query(sort: \Meeting.createdAt, order: .reverse) private var sourceMeetings: [Meeting]
+    @Query(sort: \Tag.name) private var sourceTags: [Tag]
+    @Query(sort: \Folder.name) private var sourceFolders: [Folder]
     /// Measured height of the floating composer card. The transcript scrolls
     /// beneath it (see `conversation`), so scrolling to the latest message has
     /// to clear this much on top of the bottom safe area.
     @State private var composerHeight: CGFloat = 0
+    /// Whether the reader is at the end of the conversation (NH08): turns added while they read
+    /// older messages do not move them.
+    @State private var scrollFollowing = ChatScrollFollowing()
+    /// Set by `send`, so the reader's own question is always brought into view.
+    @State private var sentQuestion = false
+    /// The question being labelled, and the label being typed (NH09).
+    @State private var labelTarget: UUID?
+    @State private var labelText = ""
+    /// A conversation file being shared, and the archive picker (NH10).
+    @State private var shareItem: ShareItem?
+    @State private var showingImporter = false
 
     var body: some View {
         VStack(spacing: 0) {
+            if !usesHarness {
+                ChatArtifactProviderNotice()
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+            }
             if !settings.semanticSearchEnabled {
                 disabledState
-            } else if !hasIndex {
-                emptyIndexState
             } else {
                 conversation
             }
@@ -67,19 +103,50 @@ struct MeetingChatView: View {
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { composerHeight = $0 }
         }
         .errorAlert($vm.error)
+        .chatChangeConfirmation(vm.changeConfirmation)
+        // Typing a label needs a text field, which only the system alert offers.
+        .alert(NSLocalizedString("chat.branch.label", comment: "Label this question"),
+               isPresented: Binding(get: { labelTarget != nil }, set: { if !$0 { labelTarget = nil } })) {
+            TextField(NSLocalizedString("chat.branch.label_placeholder", comment: "Label text"), text: $labelText)
+            Button(NSLocalizedString("common.save", comment: "Save")) {
+                if let target = labelTarget { vm.label(turnID: target, as: labelText) }
+                labelTarget = nil
+            }
+            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) { labelTarget = nil }
+        }
         .toolbar { historyToolbar }
         .sheet(isPresented: $showingHistory) {
             ChatSessionListView(
                 sessions: vm.pastSessions(),
                 currentSessionID: vm.currentSessionID,
                 onSelect: { vm.load(session: $0) },
-                onDelete: { vm.delete($0) }
+                onDelete: { vm.delete($0) },
+                onRename: { vm.rename($0, to: $1) }
             )
+        }
+        .sheet(item: $shareItem) { ActivityView(items: $0.urls) }
+        .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.data]) { result in
+            if case .success(let url) = result { vm.importConversation(from: url) }
+        }
+        .sheet(isPresented: $showingSources) {
+            ChatSourceSheet(meeting: meeting, scope: Binding(get: { vm.scope }, set: { vm.updateScope($0) }))
         }
         // Wiring the persistence scope is cheap and idempotent, so redoing it
         // on every appearance (rather than a one-shot `.task`) needs no extra
         // state to guard against `meeting`/`modelContext` changing under it.
-        .onAppear { vm.configure(meeting: meeting, modelContext: modelContext) }
+        .onAppear {
+            vm.configure(meeting: meeting, modelContext: modelContext)
+            takeRestoredDraft()
+        }
+        // Queued input a stop or a failed run did not answer comes back into the composer (NH08).
+        .onChange(of: vm.restoredDraft) { _, _ in takeRestoredDraft() }
+        // A reopened conversation a dead process interrupted is resumed once, with the provider
+        // and model the chat uses now (`MeetingChatViewModel.resumeInterruptedRun`).
+        .onChange(of: vm.interruptedResume?.runID) { _, runID in
+            guard runID != nil, canChat, sourceValidation == nil else { return }
+            let provider = settings.aiProvider
+            vm.resumeInterruptedRun(provider: provider, model: settings.summaryModel(for: provider))
+        }
     }
 
     /// "New conversation" and "History" — mirrors Claude's own chat history
@@ -88,6 +155,20 @@ struct MeetingChatView: View {
     /// is currently off or unindexed.
     @ToolbarContentBuilder
     private var historyToolbar: some ToolbarContent {
+        if usesHarness {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { showingSources = true } label: {
+                    Label(sourceSummary, systemImage: "slider.horizontal.3")
+                        .font(.caption)
+                        .lineLimit(1)
+                        .frame(maxWidth: 180)
+                        .frame(minHeight: 44)
+                }
+                .disabled(vm.isResponding)
+                .accessibilityLabel(NSLocalizedString("chat.sources.title", comment: "Sources") + ": " + sourceSummary)
+                .accessibilityIdentifier("chat.sources.open")
+            }
+        }
         ToolbarItemGroup(placement: .topBarTrailing) {
             Button {
                 showingHistory = true
@@ -95,6 +176,7 @@ struct MeetingChatView: View {
                 Image(systemName: "clock.arrow.circlepath")
             }
             .accessibilityLabel(NSLocalizedString("chat.history.button", comment: "Open chat history"))
+            ChatConversationMenu(vm: vm, shareItem: $shareItem, showingImporter: $showingImporter)
             Button {
                 vm.reset()
             } label: {
@@ -125,14 +207,36 @@ struct MeetingChatView: View {
                 LazyVStack(alignment: .leading, spacing: 14) {
                     if vm.turns.isEmpty { starterHint }
                     ForEach(vm.turns) { turn in
-                        turnRow(turn).id(turn.id)
+                        MeetingChatTurnView(turn: turn, isStreaming: isStreaming(turn), isMeetingScope: meeting != nil,
+                                            meetingTitles: Dictionary(uniqueKeysWithValues: sourceMeetings.map { ($0.id, $0.title) }),
+                                            documentTitles: Dictionary(uniqueKeysWithValues: vm.artifacts.map { ($0.id, $0.title) }),
+                                            artifacts: vm.artifacts, artifactSession: vm.artifactSession,
+                                            onJumpToTime: onJumpToTime, branch: branchActions(for: turn), undoAction: vm.undoAction,
+                                            writingSteps: isStreaming(turn) ? vm.writingSteps : [])
+                            .id(turn.id)
                     }
-                    // Once the reply starts streaming, its growing text bubble
-                    // (rendered by `turnRow`, with a cursor) replaces this row —
-                    // showing both at once would say "thinking" next to an
-                    // answer that's already appearing.
-                    if vm.isResponding && vm.turns.last?.role != .assistant { respondingRow }
-                    if let question = vm.retryableQuestion { retryRow(question: question) }
+                    if let usage = vm.branches.usageSummary, !vm.isResponding {
+                        Text(usage)
+                            .font(Theme.caption2)
+                            .foregroundStyle(Theme.textTertiary)
+                            .accessibilityIdentifier("chat.branch.usage")
+                    }
+                    if vm.isResponding { respondingRow }
+                    if let question = vm.retryableQuestion {
+                        if vm.retryableQuestionWasInterrupted {
+                            Text(NSLocalizedString("chat.run.interrupted", comment: "A reply cut off when the app closed"))
+                                .font(Theme.footnote)
+                                .foregroundStyle(Theme.textSecondary)
+                                .accessibilityIdentifier("chat.run_interrupted")
+                        } else if vm.replyWasStopped {
+                            // The stop is confirmed only once the run settled.
+                            Text(NSLocalizedString("chat.run.stopped", comment: "The person stopped this reply"))
+                                .font(Theme.footnote)
+                                .foregroundStyle(Theme.textSecondary)
+                                .accessibilityIdentifier("chat.run_stopped")
+                        }
+                        retryRow(question: question)
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
@@ -170,16 +274,22 @@ struct MeetingChatView: View {
                     .onTapGesture { dismissKeyboard() }
             )
             .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
+            .onScrollGeometryChange(for: ChatScrollFollowing.self) { geometry in
+                var following = ChatScrollFollowing()
+                following.observe(contentOffsetY: geometry.contentOffset.y, visibleHeight: geometry.containerSize.height,
+                                  contentHeight: geometry.contentSize.height)
+                return following
+            } action: { _, following in scrollFollowing = following }
             .onChange(of: vm.turns.count) { _, _ in
                 guard let last = vm.turns.last else { return }
+                let ownQuestion = sentQuestion && last.role == .user
+                sentQuestion = false
+                guard scrollFollowing.follows(newTurnIsOwnQuestion: ownQuestion) else { return }
                 if reduceMotion {
                     proxy.scrollTo(last.id, anchor: .bottom)
                 } else {
                     withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
                 }
-            }
-            .onChange(of: vm.isResponding) { _, isResponding in
-                if isResponding { respondingStartedAt = Date() }
             }
             // Claude's own composer floats over the transcript instead of
             // pushing it up: the keyboard and the composer read as a layer in
@@ -194,137 +304,24 @@ struct MeetingChatView: View {
         }
     }
 
-    @ViewBuilder
-    private func turnRow(_ turn: MeetingChatViewModel.Turn) -> some View {
-        switch turn.role {
-        case .user:
-            HStack {
-                Spacer(minLength: 40)
-                Text(turn.text)
-                    .textSelection(.enabled)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            }
-        case .assistant, .system:
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .lastTextBaseline, spacing: 4) {
-                    // Claude/ChatGPT-style "not yet confirmed" cue: while a
-                    // reply is streaming in, its text is plain (not
-                    // Markdown-rendered) and reads as provisional — italic
-                    // and dimmed. Rendering plain text while streaming keeps
-                    // each delta cheap to apply (no re-parsing the whole
-                    // growing string into blocks on every fragment), which is
-                    // what makes the answer actually appear incrementally
-                    // rather than in occasional bursts; the instant it's the
-                    // finished answer, it swaps to full Markdown at full
-                    // weight/opacity.
-                    if isStreaming(turn) {
-                        Text(turn.text)
-                            .italic()
-                            .opacity(0.7)
-                        StreamingCursor()
-                    } else {
-                        MarkdownText(turn.text)
-                    }
-                }
-                .foregroundStyle(Theme.textPrimary)
-                .textSelection(.enabled)
-                .kurnAnimation(.easeInOut(duration: 0.2), value: isStreaming(turn))
-                .padding(.horizontal, 14).padding(.vertical, 10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Theme.separator, lineWidth: 1)
-                )
-                if !turn.citations.isEmpty {
-                    citations(turn.citations)
-                } else if meeting != nil {
-                    // Full-context answer: no retrieval hits, so make the [mm:ss]
-                    // timestamps the model cited tappable.
-                    timestampChips(MeetingChatService.citedTimestamps(in: turn.text))
-                }
-                usageCaption(turn)
-            }
-        }
-    }
-
-    /// Token count, estimated cost, and generation time for a finished reply
-    /// — shown only once the answer is confirmed (never mid-stream) and only
-    /// when the provider actually reported usage.
-    @ViewBuilder
-    private func usageCaption(_ turn: MeetingChatViewModel.Turn) -> some View {
-        if !isStreaming(turn), let usage = turn.usage {
-            Text(Self.usageCaptionText(usage: usage, costUSD: turn.costUSD, elapsedSeconds: turn.elapsedSeconds))
-                .font(Theme.caption2)
-                .foregroundStyle(Theme.textTertiary)
-        }
-    }
-
-    private static func usageCaptionText(usage: TokenUsage, costUSD: Double?, elapsedSeconds: TimeInterval?) -> String {
-        var parts = [String(format: NSLocalizedString("chat.usage.tokens", comment: "Token count"), usage.totalTokens)]
-        if let costUSD {
-            parts.append(String(format: NSLocalizedString("chat.usage.cost", comment: "Estimated cost"), costUSD))
-        }
-        if let elapsedSeconds {
-            parts.append(String(format: NSLocalizedString("chat.usage.duration", comment: "Generation duration"), elapsedSeconds))
-        }
-        return parts.joined(separator: " · ")
-    }
-
-    @ViewBuilder
-    private func timestampChips(_ times: [TimeInterval]) -> some View {
-        if !times.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(times, id: \.self) { time in
-                        Button { onJumpToTime?(time) } label: {
-                            HStack(spacing: 5) {
-                                Image(systemName: "clock").font(.caption2)
-                                    .accessibilityHidden(true)
-                                Text(time.clockDisplay).font(.system(.caption, design: .default, weight: .medium))
-                            }
-                            .padding(.horizontal, 10).padding(.vertical, 6)
-                            .background(Theme.fill, in: Capsule())
-                            .foregroundStyle(Theme.accent)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(onJumpToTime == nil)
-                    }
-                }
-            }
-        }
-    }
-
-    /// Citation chip text. In the library-wide ask the meeting title is shown so
-    /// a quote can be traced to its source meeting; per-meeting scope omits it.
-    private func citationLabel(for hit: SemanticSearchService.Hit) -> String {
-        let base = "\(hit.start.clockDisplay) · \(hit.speakerLabel)"
-        guard meeting == nil, !hit.meetingTitle.isEmpty else { return base }
-        return "\(hit.meetingTitle) · \(base)"
-    }
-
-    private func citations(_ hits: [SemanticSearchService.Hit]) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(hits) { hit in
-                    Button { onJump?(hit) } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "quote.opening").font(.caption2)
-                                .accessibilityHidden(true)
-                            Text(citationLabel(for: hit))
-                                .font(.system(.caption, design: .default, weight: .medium))
-                        }
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(Theme.fill, in: Capsule())
-                        .foregroundStyle(Theme.accent)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(onJump == nil)
-                }
-            }
-        }
+    /// The branch actions of a saved question (NH09); none for a reply or an unsaved question.
+    private func branchActions(for turn: MeetingChatViewModel.Turn) -> ChatTurnBranchActions? {
+        guard turn.role == .user, vm.branches.entryIDs[turn.id] != nil else { return nil }
+        return ChatTurnBranchActions(versions: vm.branches.alternatives[turn.id], label: vm.branches.labels[turn.id],
+                                     isEnabled: vm.canChangeBranch,
+                                     showVersion: { vm.showVersion(of: turn.id, offset: $0) },
+                                     fork: { vm.fork(from: turn.id) },
+                                     editLabel: {
+                                         labelText = vm.branches.labels[turn.id] ?? ""
+                                         labelTarget = turn.id
+                                     },
+                                     isLeftOut: vm.branches.leftOut.contains(turn.id),
+                                     setLeftOut: { vm.setLeftOut($0, question: turn.id) },
+                                     regenerate: { askAgain(turn.id, text: turn.text) },
+                                     edit: {
+                                         vm.beginEditing(turn.id)
+                                         inputFocused = true
+                                     })
     }
 
     /// Whether `turn` is the reply currently streaming in, so its bubble gets
@@ -333,15 +330,12 @@ struct MeetingChatView: View {
         vm.isResponding && turn.role == .assistant && turn.id == vm.turns.last?.id
     }
 
-    /// The "reasoning" row shown before any reply text has arrived. Mirrors
-    /// the current `ChatPhase` reported by `MeetingChatService` — rewriting
-    /// the question, searching, reranking, reading notes — so the wait reads
-    /// as visible work instead of an opaque spinner, the same idea as the
-    /// transcription progress phases. Also carries a Claude-style "breathing"
-    /// shimmer and a live elapsed-time readout, so a long wait still reads as
-    /// active work rather than a stall.
+    /// The live status line while the agent works (`ChatRunStatusLine`).
     private var respondingRow: some View {
-        ThinkingRow(phase: vm.currentPhase, detail: vm.currentPhaseDetail, startedAt: respondingStartedAt)
+        ChatRunStatusLine(phase: vm.phase, retryDelaySeconds: vm.runProgress.retryDelaySeconds,
+                          steps: vm.turns.last?.steps ?? [],
+                          outputTokens: vm.turns.last.flatMap { $0.role == .assistant ? $0.usage?.completionTokens : nil },
+                          startedAt: vm.runStartedAt)
     }
 
     /// Shown under an unanswered question — cancelled mid-stream, or failed
@@ -364,6 +358,7 @@ struct MeetingChatView: View {
             .background(Theme.fill, in: Capsule())
         }
         .buttonStyle(.plain)
+        .disabled(!canChat || sourceValidation != nil)
         .accessibilityIdentifier("chat.retry")
     }
 
@@ -391,9 +386,16 @@ struct MeetingChatView: View {
     /// a line with the button.
     private var composer: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if usesHarness, let sourceValidation { ChatSourceValidationView(validation: sourceValidation) }
+            if vm.editingQuestionID != nil { editingBanner }
+            if !vm.queued.isEmpty {
+                ChatQueuedInputView(queued: vm.queued,
+                                    edit: { item in Task { await vm.editQueued(item) } },
+                                    remove: { item in Task { await vm.removeQueued(item.id) } })
+            }
             TextField(
                 NSLocalizedString("chat.placeholder", comment: "Chat input placeholder"),
-                text: $input,
+                text: $vm.draft,
                 axis: .vertical
             )
             .lineLimit(1...5)
@@ -403,7 +405,7 @@ struct MeetingChatView: View {
             .disabled(!canChat)
 
             HStack(spacing: 10) {
-                modelChip
+                if canQueue { queueButtons } else { modelChip }
                 Spacer(minLength: 0)
                 sendOrStopButton
             }
@@ -417,25 +419,52 @@ struct MeetingChatView: View {
         .padding(.bottom, 8)
     }
 
-    /// Which model answers — the summary provider's model, since chat shares
-    /// it (see `sendQuestion`). Informational; the choice lives in Settings.
+    /// Shown while a saved question is being edited: sending asks it again in its place.
+    private var editingBanner: some View {
+        HStack(spacing: 8) {
+            Label(NSLocalizedString("chat.branch.editing", comment: "Editing a question"), systemImage: "pencil")
+                .font(.footnote)
+                .foregroundStyle(Theme.textSecondary)
+            Spacer(minLength: 0)
+            Button(NSLocalizedString("common.cancel", comment: "Cancel")) { vm.cancelEditing() }
+                .font(.footnote)
+                .accessibilityIdentifier("chat.edit.cancel")
+        }
+    }
+
+    /// While a reply runs, a typed message can steer it after its current step, or wait until
+    /// it finishes (NH08).
+    @ViewBuilder
+    private var queueButtons: some View {
+        Button(NSLocalizedString("chat.queue.steer", comment: "Steer the running reply")) { queueInput(.steering) }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("chat.queue.steer")
+        Button(NSLocalizedString("chat.queue.follow_up", comment: "Send after this task")) { queueInput(.followUp) }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("chat.queue.follow_up")
+    }
+
+    private var canQueue: Bool {
+        vm.isResponding && vm.phase != .cancelling && !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Queues the composer's text; it stays in the composer when the queue refuses it.
+    private func queueInput(_ kind: AgentInputQueue.Kind) {
+        let text = input
+        input = ""
+        Task { if !(await vm.queue(text, as: kind)) { input = text } }
+    }
+
+    private func takeRestoredDraft() {
+        guard let draft = vm.restoredDraft else { return }
+        vm.restoredDraft = nil
+        input = input.isEmpty ? draft : input + "\n\n" + draft
+    }
+
+    /// Which model answers and how hard it reasons, with the context in use; tapping it opens the
+    /// choice (`ChatModelChip`).
     private var modelChip: some View {
-        let provider = settings.aiProvider
-        let model = provider.kind == .appleOnDevice
-            ? NSLocalizedString("settings.on_device_model_name", comment: "Apple Intelligence")
-            : settings.summaryModel(for: provider)
-        return Text(model)
-            .font(.footnote)
-            .lineLimit(1)
-            .truncationMode(.middle)
-            .foregroundStyle(Theme.textSecondary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(Theme.fill, in: Capsule())
-            .accessibilityLabel(String(
-                format: NSLocalizedString("chat.model_chip", comment: "Model in use"),
-                model
-            ))
+        ChatModelChip(settings: settings, gauge: vm.contextGauge, isEnabled: usesHarness && !vm.isResponding)
     }
 
     @ViewBuilder
@@ -450,9 +479,14 @@ struct MeetingChatView: View {
                     .foregroundStyle(.white)
                     .frame(width: 36, height: 36)
                     .background(Theme.warning, in: Circle())
+                    .padding(4)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            // A stop is a request; the reply settles before the composer comes back.
+            .disabled(vm.phase == .cancelling)
             .accessibilityLabel(NSLocalizedString("chat.stop", comment: "Stop"))
+            .accessibilityIdentifier("chat.stop")
         } else {
             Button { send() } label: {
                 Image(systemName: "arrow.up")
@@ -460,6 +494,8 @@ struct MeetingChatView: View {
                     .foregroundStyle(canSend ? .white : Theme.textTertiary)
                     .frame(width: 36, height: 36)
                     .background(canSend ? Theme.accent : Theme.fill, in: Circle())
+                    .padding(4)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(!canSend)
@@ -479,15 +515,6 @@ struct MeetingChatView: View {
         .accessibilityIdentifier("chat.disabled_state")
     }
 
-    private var emptyIndexState: some View {
-        infoState(
-            icon: "text.magnifyingglass",
-            title: NSLocalizedString("chat.no_index.title", comment: "Chat no index title"),
-            subtitle: NSLocalizedString("chat.no_index.subtitle", comment: "Chat no index subtitle")
-        )
-        .accessibilityIdentifier("chat.empty_state")
-    }
-
     private func infoState(icon: String, title: String, subtitle: String) -> some View {
         VStack(spacing: 12) {
             Image(systemName: icon).font(.largeTitle).foregroundStyle(Theme.textTertiary)
@@ -503,24 +530,40 @@ struct MeetingChatView: View {
 
     // MARK: - State & actions
 
-    /// Whether any indexed passages exist for the current scope.
-    private var hasIndex: Bool {
-        if let meeting { return !meeting.semanticChunks.isEmpty }
-        return (try? modelContext.fetchCount(FetchDescriptor<SemanticChunk>())) ?? 0 > 0
+    private var canChat: Bool {
+        ChatSourcePresentation.canChat(enabled: settings.semanticSearchEnabled, usesHarness: usesHarness)
     }
-
-    private var canChat: Bool { settings.semanticSearchEnabled && hasIndex }
     private var canSend: Bool {
-        canChat && !vm.isResponding && !input.trimmingCharacters(in: .whitespaces).isEmpty
+        canChat && !vm.isResponding && !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && sourceValidation == nil
     }
 
-    /// Max characters of a meeting's summary passed to the library chat as an
-    /// overview, so overviews stay a connective aid without dominating the prompt.
-    private static let summaryContextLimit = 1_500
+    /// Chat runs only on providers with agent support; on-device shows the cloud-provider notice.
+    private var usesHarness: Bool { settings.aiProvider.kind.supportsAgentChat }
+
+    private var resolvedMeetingIDs: Set<UUID> {
+        Set(SourceScopeResolver.resolve(vm.scope, meetings: sourceMeetings, tags: sourceTags, folders: sourceFolders).meetings.map(\.id))
+    }
+
+    private var sourceValidation: ChatSourceScopeEditor.Validation? {
+        ChatSourcePresentation.validation(vm.scope, resolvedMeetingIDs: resolvedMeetingIDs, wikiEnabled: settings.wikiEnabled)
+    }
+
+    private var sourceSummary: String {
+        ChatSourcePresentation.summary(vm.scope, resolvedMeetingIDs: resolvedMeetingIDs, wikiEnabled: settings.wikiEnabled) {
+            NSLocalizedString($0, comment: "Chat sources")
+        }
+    }
 
     private func send() {
-        sendQuestion(input)
-        input = ""
+        sentQuestion = true
+        // A question being edited is asked again in its place; if that fails, the edit stays.
+        if let editing = vm.editingQuestionID {
+            if askAgain(editing, text: input) { input = "" }
+        } else {
+            sendQuestion(input)
+            input = ""
+        }
         dismissKeyboard()
     }
 
@@ -545,68 +588,15 @@ struct MeetingChatView: View {
     }
 
     private func sendQuestion(_ question: String) {
+        guard canChat, sourceValidation == nil else { return }
         let provider = settings.aiProvider
-        let model = settings.summaryModel(for: provider)
-        vm.send(
-            question: question,
-            transcriptText: meetingTranscriptText(),
-            candidates: candidates(),
-            summariesByMeeting: summariesByMeeting(),
-            articlesByMeeting: articlesByMeeting(),
-            provider: provider,
-            model: model
-        )
+        vm.send(question: question, provider: provider, model: settings.summaryModel(for: provider))
     }
 
-    /// Condensed wiki articles for the library-wide ask (meetingID → snapshot).
-    /// Empty for single-meeting scope and when the wiki feature is off; the chat
-    /// service grounds on these alongside the retrieved excerpts, and degrades to
-    /// excerpts only when the map is empty. Built here on the main actor.
-    private func articlesByMeeting() -> [UUID: WikiArticleSnapshot] {
-        guard meeting == nil, settings.wikiEnabled else { return [:] }
-        let articles = (try? modelContext.fetch(FetchDescriptor<WikiArticle>())) ?? []
-        var result: [UUID: WikiArticleSnapshot] = [:]
-        for article in articles {
-            guard let meetingID = article.meeting?.id else { continue }
-            result[meetingID] = article.snapshot
-        }
-        return result
-    }
-
-    /// Per-meeting summary overviews for the library-wide ask (meetingID →
-    /// condensed markdown). Empty for single-meeting scope, which grounds on the
-    /// full transcript instead. Built here on the main actor; the service only
-    /// renders the ones whose meeting shows up in the retrieved excerpts.
-    private func summariesByMeeting() -> [UUID: String] {
-        guard meeting == nil else { return [:] }
-        let meetings = (try? modelContext.fetch(FetchDescriptor<Meeting>())) ?? []
-        var result: [UUID: String] = [:]
-        for item in meetings {
-            guard let summary = item.latestSummary else { continue }
-            let markdown = SummaryService.markdownText(from: summary.sections)
-            guard !markdown.isEmpty else { continue }
-            result[item.id] = String(markdown.prefix(Self.summaryContextLimit))
-        }
-        return result
-    }
-
-    /// Snapshot the chunks to search over: this meeting's, or every meeting's
-    /// for a library-wide ask. Built here on the main actor.
-    private func candidates() -> [SemanticSearchService.Candidate] {
-        if let meeting {
-            return meeting.semanticChunks.map(\.searchCandidate)
-        }
-        let all = (try? modelContext.fetch(FetchDescriptor<SemanticChunk>())) ?? []
-        return all.map(\.searchCandidate)
-    }
-
-    /// The whole meeting transcript as `[mm:ss] Speaker: text` lines, plus
-    /// the text of its attached documents, for full-context grounding. Nil
-    /// for the library-wide ask (no single meeting).
-    private func meetingTranscriptText() -> String? {
-        guard let meeting else { return nil }
-        let text = meeting.assembledContextText()
-        return text.isEmpty ? nil : text
+    @discardableResult
+    private func askAgain(_ turnID: UUID, text: String) -> Bool {
+        guard canChat, sourceValidation == nil else { return false }
+        let provider = settings.aiProvider
+        return vm.askAgain(turnID, text: text, provider: provider, model: settings.summaryModel(for: provider))
     }
 }
-

@@ -8,7 +8,7 @@ Kurn is local-first: it records meetings, transcribes, diarizes and summarizes o
 
 Trust boundaries:
 1. **Device sandbox ↔ other apps / OS surfaces** — share sheet (PDF document type), `onOpenURL`, App Intents, Lock Screen / Dynamic Island controls, WatchConnectivity, iCloud KVS.
-2. **App ↔ network** — opt-in cloud transcription (Whisper-compatible: OpenAI, Groq, ElevenLabs, custom endpoint) and cloud LLMs (OpenAI, Anthropic, Google, Groq, custom OpenAI-compatible endpoint); on-device model downloads (whisper.cpp, FluidAudio, Sherpa-ONNX, embeddings).
+2. **App ↔ network** — opt-in cloud transcription (Whisper-compatible: OpenAI, Groq, ElevenLabs, custom endpoint) and cloud LLMs (OpenAI, Anthropic, Google, Groq, custom OpenAI-compatible endpoint); on-device model downloads (whisper.cpp, FluidAudio, Sherpa-ONNX, embeddings); the daily remote model catalog check (`ModelCatalogUpdater`, a header-less GET of `catalog/model-catalog-v1.json` from this repository's default branch, only while a cloud provider is in use).
 3. **Untrusted content ↔ LLM prompts** — transcripts, imported PDFs, OCR'd photos and provider responses flow into summary/chat/wiki/document/correction prompts and are rendered as Markdown.
 4. **Repo contributors (PRs) ↔ CI/release secrets** — App Store Connect API key, `fastlane match` signing repo credentials, Codecov token, provider API keys used by evaluation workflows.
 
@@ -20,7 +20,7 @@ Trust boundaries:
 | **Storage & Credentials** | `Kurn/Infrastructure/` (`KeychainManager`, `CredentialStore`, `ModelStore*`, `RecordingProtection`, `RecordingQuarantine`/`Trash`/`Recovery`, `MeetingExport*`, `PDFExportRenderer`, `LogExport`, `AppLog`, `CrashReporting/`, `CloudSettingsSync`, `TemplateSyncMerger`, `LibraryEraser`, `KurnSchema*`), `Kurn/Models/`, `Kurn/Application/MeetingLibrary.swift` |
 | **Recording Surfaces** | `Kurn/Services/Audio*`, `Recording*` (`RecordingCommandRouter`, `RecordingLauncher`, `RecordingSink`, `RecordingSurfacePayloads`), `CaptureJournal*`, `PhoneSessionController.swift`, `LockScreenRecordingController.swift`, `Kurn/AppIntents/`, `KurnLiveActivityExtension/`, `KurnWatch/` |
 | **Content Import** | `Kurn/Application/IncomingFileInbox.swift`, `MeetingAttachmentImporter.swift`, `Kurn/Services/PDFTextExtractor.swift`, `PhotoTextRecognizer.swift`, `PhotoCaptureController.swift`, `AttachmentFileStore.swift`, `PhotoFileStore.swift` |
-| **Cloud Providers** | `Kurn/Providers/` (`ProviderURLPolicy`, `ProviderHTTPPolicy`/`Transport`/`Streaming`, `ProviderResponseParsing`, each `*Provider`), `WhisperBackgroundUploader.swift`, `Kurn/Services/Speech/CloudSpeechEngine.swift`, LLM features: `SummaryService`, `MeetingChatService*`, `WikiService`, `DocumentGenerationService`, `AutoTaggingService`, `Pipeline/LLMTranscriptCorrector.swift`, `Kurn/Application/*Coordinator.swift` |
+| **Cloud Providers** | `Kurn/Providers/` (`ProviderURLPolicy`, `ProviderHTTPPolicy`/`Transport`/`Streaming`, `ProviderResponseParsing`, each `*Provider`, `ModelCatalogUpdater`), `catalog/`, `WhisperBackgroundUploader.swift`, `Kurn/Services/Speech/CloudSpeechEngine.swift`, LLM features: `SummaryService`, `WikiService`, `HarnessChatService`, `AutoTaggingService`, `Pipeline/LLMTranscriptCorrector.swift`, `Kurn/Application/*Coordinator.swift` |
 | **On-device Models** | `ModelFileDownloader.swift`, `ModelVerification.swift`, `ModelStore.swift`, `*ModelDownloader.swift`, `FluidAudio*`, `SherpaOnnx*`, `Kurn/Services/Embedding/`, `Packages/WhisperCpp` (prebuilt XCFramework binary target), `ModelDownloadConsent*` |
 | **KurnCore** | `Packages/KurnCore/` (pure-Foundation logic: export, pipeline types, provider types, policies) |
 | **CI & Release** | `.github/workflows/` (`swift.yml`, `screenshots.yml`, `app-store-submit.yml`, `accessibility-labels.yml`, `reliability-hardening.yml`, `marketing-screenshots.yml`), `.github/actions/`, `fastlane/`, `scripts/` |
@@ -33,7 +33,7 @@ Trust boundaries:
 - **App Intents, Control widget, Live Activity buttons** (`StartRecordingIntent`, `RecordingControlIntent`): reachable from Lock Screen without unlocking the app.
 - **WatchConnectivity** messages (`PhoneSessionController.session(_:didReceiveMessage:)`): paired Watch app.
 - **iCloud KVS** (`CloudSettingsSync`): the user's other devices on the same Apple ID (templates/settings).
-- **Network responses**: cloud providers, user-configured custom endpoints, model-download hosts (and anyone on-path if TLS/redirect policy is weak).
+- **Network responses**: cloud providers, user-configured custom endpoints, model-download hosts, the remote model catalog (and anyone on-path if TLS/redirect policy is weak). Anyone who can merge to this repository's default branch can change the catalog.
 - **GitHub PRs** → `swift.yml` (`pull_request` to `main`, `contents: read`); tag pushes → release jobs with protected `release` environment.
 
 ## Assets and sensitivity
@@ -57,6 +57,7 @@ Owner: meeting content and provider API keys matter **equally** and are top prio
 - Keychain with this-device-only accessibility; keys never in UserDefaults/iCloud.
 - `ProviderURLPolicy`: base-URL validation, unsafe-path rejection, same-origin redirect policy.
 - Model downloads: SHA-256 verification at install (`ModelFileDownloader.verify`, `ModelVerification`), explicit download consent.
+- Remote model catalog: read strictly (`ModelCatalogDocument`: one format and schema, bounded size, model count, IDs and numeric ranges; refused whole otherwise), never older than the bundled catalogs or the one applied, never dated in the future; it can change only context-window, capability and cost estimates, never an endpoint, key or what is sent.
 - Cloud features off by default; `LSSupportsOpeningDocumentsInPlace = false`; Inbox copies deleted after decision.
 - CI: `permissions: contents: read` default, `persist-credentials: false`, SHA-pinned actions, protected `release` environment requiring admin approval.
 

@@ -31,9 +31,9 @@ extension ProviderHTTPTests {
     @Test func openAIStreamSummaryParsesTheStreamedJSON() async throws {
         MockURLProtocol.enqueue([
             .success(status: 200, body: sseBody([
-                #"{"choices":[{"delta":{"content":"\#(Self.escapedHalves.0)"}}]}"#,
-                #"{"choices":[{"delta":{"content":"\#(Self.escapedHalves.1)"}}]}"#,
-                #"{"choices":[{"delta":{},"finish_reason":"stop"}]}"#
+                #"{"type":"response.output_text.delta","delta":"\#(Self.escapedHalves.0)"}"#,
+                #"{"type":"response.output_text.delta","delta":"\#(Self.escapedHalves.1)"}"#,
+                #"{"type":"response.completed","response":{}}"#
             ]), headers: [:])
         ])
         let provider = OpenAIProvider(apiKey: "secret", model: "gpt-test", session: MockURLProtocol.session())
@@ -46,16 +46,20 @@ extension ProviderHTTPTests {
         #expect(received.value == Self.summaryJSON)
         let request = try #require(MockURLProtocol.lastRequest)
         #expect(request.timeoutInterval == LLMHTTP.summaryTimeout)
+        #expect(request.url?.path == "/v1/responses")
         let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
         #expect(body?["stream"] as? Bool == true)
         // The reply is Markdown: no JSON mode.
         #expect(body?["response_format"] == nil)
+        #expect(body?["store"] as? Bool == false)
+        #expect(body?["text"] == nil)
+        #expect(body?["instructions"] as? String == "sys")
     }
 
     @Test func openAIStreamSummaryCutOffByTheTokenCapIsTruncation() async {
         MockURLProtocol.enqueue([
             .success(status: 200, body: sseBody([
-                #"{"choices":[{"delta":{"content":"{\"sections\":[{\"ti"},"finish_reason":"length"}]}"#
+                #"{"type":"response.incomplete","response":{"incomplete_details":{"reason":"max_output_tokens"}}}"#
             ]), headers: [:])
         ])
         let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
@@ -138,7 +142,7 @@ extension ProviderHTTPTests {
 
     @Test func anEmptyStreamedSummaryIsADecodingError() async {
         MockURLProtocol.enqueue([
-            .success(status: 200, body: sseBody([#"{"choices":[{"delta":{},"finish_reason":"stop"}]}"#]), headers: [:])
+            .success(status: 200, body: sseBody([#"{"type":"response.completed","response":{}}"#]), headers: [:])
         ])
         let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
         do {

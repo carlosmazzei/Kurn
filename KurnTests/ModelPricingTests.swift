@@ -7,6 +7,7 @@
 //  family entry) and the "unrecognized model reports no estimate" contract.
 //
 
+import AgentHarness
 import Testing
 @testable import Kurn
 
@@ -49,5 +50,28 @@ struct ModelPricingTests {
         let singleCost = try? #require(ModelPricing.estimatedCostUSD(model: "claude-3-5-sonnet", usage: single))
         let doubleCost = try? #require(ModelPricing.estimatedCostUSD(model: "claude-3-5-sonnet", usage: double))
         #expect(doubleCost == singleCost.map { $0 * 2 })
+    }
+
+    /// Cached input is priced at the cache's own rate: a read at the vendor's discount, an
+    /// Anthropic cache write at its surcharge, and the rest of the input at the full rate.
+    @Test func cacheReadsAndWritesArePricedAtTheirOwnRates() throws {
+        let plain = try #require(ModelPricing.estimatedCostUSD(model: "claude-3-5-sonnet",
+                                                               usage: AgentUsage(inputTokens: 1_000_000, outputTokens: 0)))
+        let cached = try #require(ModelPricing.estimatedCostUSD(model: "claude-3-5-sonnet", usage: AgentUsage(
+            inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 600_000, cacheWriteTokens: 200_000)))
+        // 200k uncached at $3/M, 600k read at 10% and 200k written at 125%.
+        #expect(abs(plain - 3) < 1e-9)
+        #expect(abs(cached - (0.6 + 0.18 + 0.75)) < 1e-9)
+
+        // OpenAI and Gemini discount reads and charge no write surcharge.
+        let gpt = try #require(ModelPricing.estimatedCostUSD(model: "gpt-5", usage: AgentUsage(
+            inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 1_000_000)))
+        #expect(abs(gpt - 0.125) < 1e-9)
+        // A model without cache pricing charges cached input as input, and counts never exceed it.
+        let llama = try #require(ModelPricing.estimatedCostUSD(model: "llama-3.3-70b", usage: AgentUsage(
+            inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 2_000_000)))
+        #expect(abs(llama - 0.59) < 1e-9)
+        // The summary's plain token count is the same price as an uncached agent request.
+        #expect(ModelPricing.estimatedCostUSD(model: "claude-3-5-sonnet", usage: TokenUsage(promptTokens: 1_000_000, completionTokens: 0)) == plain)
     }
 }

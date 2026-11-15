@@ -7,6 +7,7 @@
 //  "do we have a key?" check so call sites get a clear `AppError.noAPIKey`.
 //
 
+import AgentHarness
 import Foundation
 import KurnCore
 
@@ -19,6 +20,32 @@ enum ProviderFactory {
     /// The production resolver: `summaryProvider(for:model:)`, which reads the
     /// Keychain and builds the vendor's client.
     static let liveLLM: LLMResolver = { try summaryProvider(for: $0, model: $1) }
+
+    /// Nil means callers should keep using the existing chat pipeline.
+    /// `reasoning` gives the chat's level for this provider and model (`ChatReasoningPreference`); it
+    /// is asked for each request, after the run has refreshed the model's metadata.
+    static func agentModel(for provider: AIProvider, model: String,
+                           reasoning: @escaping @Sendable () -> AgentReasoningLevel? = { nil }) throws -> (any AgentModel)? {
+        guard provider.kind.supportsAgentChat,
+              try summaryProvider(for: provider, model: model) is any AgentModel else { return nil }
+        // Credentials are resolved for every request, compaction included (NH07).
+        return try AgentPerRequestModel {
+            guard let client = try summaryProvider(for: provider, model: model) as? any AgentModel else {
+                throw AppError.noAPIKey(provider: provider.displayName)
+            }
+            return applying(reasoning(), to: client)
+        }
+    }
+
+    /// The client with the chat's reasoning level set; a client that cannot take one is unchanged.
+    static func applying(_ reasoning: AgentReasoningLevel?, to client: any AgentModel) -> any AgentModel {
+        switch client {
+        case var openAI as OpenAIProvider: openAI.reasoning = reasoning; return openAI
+        case var anthropic as AnthropicProvider: anthropic.reasoning = reasoning; return anthropic
+        case var google as GoogleProvider: google.reasoning = reasoning; return google
+        default: return client
+        }
+    }
 
     /// Whether a provider can be used right now (a stored key, or the
     /// on-device model available). Coordinators that skip work for an

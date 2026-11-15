@@ -80,7 +80,9 @@ enum LogExport {
     /// `RecordingProtection` applied, cleaned up by `ActivityView` once shared).
     static func temporaryFile(hoursBack: Int = 24) throws -> URL {
         let entries = try fetchRecentEntries(hoursBack: hoursBack)
-        let text = formatText(entries: entries, generatedAt: Date())
+        var text = formatText(entries: entries, generatedAt: Date())
+        text += "\n# Harness trace (JSONL)\n"
+        text += (try? HarnessTraceStore.shared.exportJSONL()) ?? "Harness trace unavailable.\n"
         return try MeetingExport.temporaryFile(markdown: text, suggestedName: "kurn-logs-\(Date().timeIntervalSince1970)")
     }
 }

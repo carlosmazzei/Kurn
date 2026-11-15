@@ -7,11 +7,14 @@
 //  unsupported and cloud transcription always routes through OpenAI Whisper.
 //
 
+import AgentHarness
 import Foundation
 import KurnCore
 
 struct AnthropicProvider: LLMProvider {
     let provider: AIProvider
+    /// The chat's chosen reasoning level for agent turns (`ChatReasoningPreference`); nil keeps the default.
+    var reasoning: AgentReasoningLevel?
 
     private let apiKey: String
     private let session: URLSession
@@ -132,60 +135,6 @@ struct AnthropicProvider: LLMProvider {
         )
     }
 
-    // MARK: - Chat (Messages API, streaming)
-
-    @discardableResult
-    func streamChat(
-        systemPrompt: String,
-        messages: [ChatMessage],
-        options: TextGenerationOptions,
-        onDelta: @escaping @Sendable (String) -> Void
-    ) async throws -> TokenUsage? {
-        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
-
-        let wire = messages
-            .filter { $0.role != .system }
-            .map { ["role": $0.role.rawValue, "content": $0.content] }
-        let request = try makeRequest(
-            timeout: options.timeout,
-            body: [
-                "model": model,
-                "max_tokens": options.maxOutputTokens,
-                "system": systemPrompt,
-                "messages": wire,
-                "stream": true
-            ]
-        )
-
-        let accumulator = StreamingAccumulator()
-        let usage = UsageAccumulator()
-        try await LLMHTTP.streamSSE(
-            request,
-            session: session,
-            policy: .interactive(totalDeadline: options.timeout)
-        ) { payload in
-            guard let event = try Self.decodeEvent(from: payload) else { return }
-            // `message_start` carries the prompt's input_tokens up front;
-            // `message_delta` reports the cumulative output_tokens once the
-            // generation is done — different events, so each is applied to
-            // the accumulator independently rather than requiring both.
-            if let inputTokens = event.message?.usage?.inputTokens {
-                usage.set(promptTokens: inputTokens)
-            }
-            if let outputTokens = event.usage?.outputTokens {
-                usage.set(completionTokens: outputTokens)
-            }
-            guard event.type == "content_block_delta", event.delta?.type == "text_delta",
-                  let delta = event.delta?.text, !delta.isEmpty else { return }
-            accumulator.append(delta)
-            onDelta(delta)
-        }
-        guard accumulator.receivedText else {
-            throw AppError.decodingError("empty Anthropic response")
-        }
-        return usage.value
-    }
-
     /// One decoded SSE event. Anthropic's stream carries several event types
     /// (`message_start`, `content_block_delta`, `message_delta`,
     /// `message_stop`, `ping`, …); callers pick out the fields they need. A
@@ -220,6 +169,25 @@ struct AnthropicProvider: LLMProvider {
             .filter { $0.type == "text" }
             .compactMap { $0.text }
             .joined()
+    }
+}
+
+extension AnthropicProvider: AgentModel {
+    var descriptor: AgentModelDescriptor? { AgentModelDescriptor(api: "anthropic", model: model) }
+    func streamTurn(
+        _ request: AgentTurnRequest,
+        onEvent: @escaping @Sendable (AgentModelEvent) -> Void
+    ) async throws -> AgentTurnResponse {
+        try await AgentModelBoundary.perform(onEvent: onEvent, classifyFailure: { LLMHTTP.agentStreamFailure($0) }, prepare: {
+            try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+            var httpRequest = try makeRequest(timeout: LLMHTTP.chatTimeout, body: [:])
+            let projection = AgentWireFormat.anthropic.requestProjection(request, model: model, reasoning: reasoning)
+            if projection.adjustment.hasChanges { onEvent(.replayAdjusted(projection.adjustment)) }
+            httpRequest.httpBody = Data(try projection.body.encodedString().utf8)
+            return httpRequest
+        }, stream: { prepared in
+            try await LLMHTTP.streamAgent(prepared, session: session, format: .anthropic, identity: request.identity, onEvent: onEvent)
+        })
     }
 }
 
@@ -259,21 +227,7 @@ private struct StreamEvent: Decodable {
     struct ErrorInfo: Decodable {
         let message: String
     }
-    struct Usage: Decodable {
-        let inputTokens: Int?
-        let outputTokens: Int?
-
-        enum CodingKeys: String, CodingKey {
-            case inputTokens = "input_tokens"
-            case outputTokens = "output_tokens"
-        }
-    }
-    struct MessageInfo: Decodable {
-        let usage: Usage?
-    }
     let type: String
     let delta: Delta?
     let error: ErrorInfo?
-    let message: MessageInfo?
-    let usage: Usage?
 }

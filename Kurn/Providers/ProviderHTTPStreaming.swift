@@ -2,13 +2,13 @@
 //  ProviderHTTPStreaming.swift
 //  Kurn
 //
-//  Server-Sent-Events streaming transport for `LLMProvider.streamChat`, held
+//  Server-Sent-Events streaming transport for `LLMProvider.streamSummary`, held
 //  to the same resilience contract `ProviderHTTPTransport.swift` gives every
 //  other request: origin-locked redirects, a total deadline, and a
 //  cumulative response-size cap. `BoundedSSEDataDelegate.execute` is one
 //  structured `withTaskCancellationHandler` call awaited directly in the
 //  caller's task — the same shape `BoundedHTTPDataDelegate.execute` uses —
-//  so cancelling the task that called `streamChat` cancels the in-flight
+//  so cancelling the task that called `streamSummary` cancels the in-flight
 //  request instead of leaving it running in an orphaned background task.
 //
 //  A stream is never retried once it has delivered a payload: retrying a
@@ -37,6 +37,7 @@ extension LLMHTTP {
         policy: HTTPPolicy,
         clock: some MonotonicSleepClock = SystemClock(),
         retriesBeforeFirstPayload: Bool = false,
+        onRetryAfter: (@Sendable (TimeInterval) -> Void)? = nil,
         onPayload: @escaping @Sendable (String) throws -> Void
     ) async throws {
         guard let approvedURL = request.url else { throw AppError.invalidProviderURL }
@@ -64,7 +65,12 @@ extension LLMHTTP {
                       let delay = retryDelayBeforeFirstPayload(
                         after: error, attempt: attempt, retryAfter: delegate.retryAfter, policy: policy
                       ),
-                      delay < deadlineAt - clock.now else { throw error }
+                      delay < deadlineAt - clock.now else {
+                    // A caller that owns its own retries learns the server's wait for a
+                    // rejected attempt that delivered nothing.
+                    if !delegate.deliveredPayload, let retryAfter = delegate.retryAfter { onRetryAfter?(retryAfter) }
+                    throw error
+                }
                 let seconds = String(format: "%.2f", delay)
                 AppLog.transcription.atInfo.info(
                     "http: stream retrying after \(seconds, privacy: .public)s (attempt \(attempt + 2, privacy: .public)/\(maxAttempts, privacy: .public), code=\(error.publicLogCode, privacy: .public))"
@@ -139,11 +145,9 @@ extension LLMHTTP {
     }
 }
 
-/// Thread-safe accumulator for streamed text. `LLMProvider.streamChat`
-/// conformers (tracking whether any visible text arrived) and
-/// `MeetingChatService.streamAnswer` (building the final answer) both fold
-/// delta callbacks — delivered from a URLSession delegate queue — into one
-/// running value; Swift 6 requires that folding go through something the
+/// Thread-safe accumulator for streamed text. `LLMProvider.streamSummary`
+/// conformers fold delta callbacks — delivered from a URLSession delegate queue —
+/// into one running value; Swift 6 requires that folding go through something the
 /// compiler can see is safe to share across the `@Sendable` closure boundary.
 final class StreamingAccumulator: @unchecked Sendable {
     private let lock = NSLock()
@@ -172,35 +176,6 @@ final class FinishReasonRecorder: @unchecked Sendable {
     }
 
     var value: String? { lock.withLock { reason } }
-}
-
-/// Thread-safe accumulator for the token usage a streaming response reports —
-/// usually once, in a final chunk or event distinct from the text deltas
-/// themselves (OpenAI's last `data:` line, Anthropic's `message_delta`
-/// event, Gemini's per-chunk `usageMetadata`). Same shape as
-/// `StreamingAccumulator` and for the same reason: usage callbacks arrive
-/// from a URLSession delegate queue, so folding them into one value needs
-/// something the compiler can see is safe across the `@Sendable` closure
-/// boundary. `set` overwrites only the fields it's given, since some vendors
-/// report prompt and completion counts in separate events.
-final class UsageAccumulator: @unchecked Sendable {
-    private let lock = NSLock()
-    private var promptTokens: Int?
-    private var completionTokens: Int?
-
-    func set(promptTokens: Int? = nil, completionTokens: Int? = nil) {
-        lock.withLock {
-            if let promptTokens { self.promptTokens = promptTokens }
-            if let completionTokens { self.completionTokens = completionTokens }
-        }
-    }
-
-    var value: TokenUsage? {
-        lock.withLock {
-            guard promptTokens != nil || completionTokens != nil else { return nil }
-            return TokenUsage(promptTokens: promptTokens ?? 0, completionTokens: completionTokens ?? 0)
-        }
-    }
 }
 
 /// Drives one streaming request and incrementally parses its

@@ -1,0 +1,92 @@
+{
+  "artifacts" : [
+    {
+      "id" : "00000000-0000-0000-0000-000000000501",
+      "markdown" : "# Decisões\n\nFirst Second Third",
+      "title" : "Relatório 🧭",
+      "version" : 3
+    }
+  ],
+  "baselineCommit" : "6ec656b93c6cf59cbc3dc32f9bd08e1abb1517ed",
+  "fixtureVersion" : 1,
+  "legacyWikiScope" : {
+    "includeWikis" : true,
+    "kind" : "library",
+    "selectedIDs" : [
+
+    ]
+  },
+  "references" : [
+    {
+      "id" : "00000000-0000-0000-0000-000000000501",
+      "title" : "Initial report",
+      "version" : 1
+    },
+    {
+      "id" : "00000000-0000-0000-0000-000000000501",
+      "title" : "Relatório 🧭",
+      "version" : 3
+    }
+  ],
+  "scopes" : [
+    {
+      "kind" : "meetings",
+      "partOverrides" : [
+        "00000000-0000-0000-0000-000000000101",
+        [
+          "transcript"
+        ],
+        "00000000-0000-0000-0000-000000000102",
+        [
+
+        ]
+      ],
+      "parts" : [
+        "summary",
+        "attachments"
+      ],
+      "selectedIDs" : [
+        "00000000-0000-0000-0000-000000000101",
+        "00000000-0000-0000-0000-000000000102"
+      ]
+    },
+    {
+      "kind" : "library",
+      "partOverrides" : [
+
+      ],
+      "parts" : [
+        "summary",
+        "transcript",
+        "attachments"
+      ],
+      "selectedIDs" : [
+
+      ]
+    },
+    {
+      "kind" : "tags",
+      "partOverrides" : [
+
+      ],
+      "parts" : [
+        "transcript"
+      ],
+      "selectedIDs" : [
+        "00000000-0000-0000-0000-000000000101"
+      ]
+    },
+    {
+      "kind" : "folders",
+      "partOverrides" : [
+
+      ],
+      "parts" : [
+        "summary"
+      ],
+      "selectedIDs" : [
+        "00000000-0000-0000-0000-000000000102"
+      ]
+    }
+  ]
+}

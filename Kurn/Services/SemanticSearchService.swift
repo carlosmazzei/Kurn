@@ -21,7 +21,7 @@ struct SemanticSearchService {
     }
 
     /// A main-actor snapshot of one `SemanticChunk`, safe to rank off-main.
-    struct Candidate: Sendable {
+    struct Candidate: Codable, Sendable {
         var chunkID: UUID
         var meetingID: UUID
         var recordingID: UUID
@@ -196,9 +196,7 @@ struct SemanticSearchService {
         return score.map { (index: $0.key, score: $0.value) }.sorted { $0.score > $1.score }
     }
 
-    /// Keep at most `maxPerMeeting` hits from any one meeting, preserving global
-    /// rank order. Used by the library-wide chat to diversify the pool before
-    /// reranking so one highly-relevant meeting can't crowd out the rest.
+    /// Keep at most `maxPerMeeting` hits from any one meeting, preserving global rank order.
     static func diversify(_ hits: [Hit], maxPerMeeting: Int) -> [Hit] {
         guard maxPerMeeting > 0 else { return [] }
         var counts: [UUID: Int] = [:]

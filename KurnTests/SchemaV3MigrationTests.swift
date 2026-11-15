@@ -175,10 +175,10 @@ struct SchemaV3MigrationTests {
         #expect(meeting.assembledContextText().contains("=== 📄 Document: Agenda.pdf ===\nBudget"))
     }
 
-    @Test func theCurrentSchemaIsV4AndAddsOnlyTheAttachmentEntity() {
-        #expect(KurnModelGraph.currentSchemaVersion == Schema.Version(1, 3, 0))
+    @Test func v4AddsOnlyTheAttachmentEntityAndIsFrozen() {
+        #expect(KurnSchemaV4.versionIdentifier == Schema.Version(1, 3, 0))
         let frozen = Set(Schema(KurnSchemaV3.models).entities.map(\.name))
-        let current = Set(KurnModelGraph.schema.entities.map(\.name))
+        let current = Set(Schema(KurnSchemaV4.models).entities.map(\.name))
         #expect(current.subtracting(frozen) == ["MeetingAttachment"])
         let liveIdentifiers = Set(KurnSchemaV4.models.map { ObjectIdentifier($0) })
         #expect(KurnSchemaV3.models.allSatisfy { !liveIdentifiers.contains(ObjectIdentifier($0)) })

@@ -1,0 +1,118 @@
+{
+  "fixtureVersion": 1,
+  "contractVersion": 1,
+  "messages": [
+    {
+      "content": {
+        "_0": {
+          "contractVersion": 1,
+          "id": "legacy-user",
+          "role": "user",
+          "blocks": [
+            {
+              "id": "text",
+              "content": {
+                "text": {
+                  "_0": "Decisão 🧭"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "content": {
+        "_0": {
+          "contractVersion": 1,
+          "id": "assistant",
+          "timestampMilliseconds": 1700000000125,
+          "role": "assistant",
+          "identity": {
+            "api": "anthropic",
+            "model": "test",
+            "requestID": "request",
+            "responseID": "response"
+          },
+          "blocks": [
+            {
+              "id": "call",
+              "content": {
+                "toolCall": {
+                  "_0": {
+                    "id": "provider-call",
+                    "name": "lookup",
+                    "arguments": null,
+                    "rawArguments": "{invalid",
+                    "namespace": "bundled",
+                    "invocationID": "invocation"
+                  },
+                  "complete": false
+                }
+              }
+            }
+          ],
+          "stopReason": {
+            "maxTokens": {}
+          }
+        }
+      }
+    },
+    {
+      "tool": {
+        "_0": {
+          "contractVersion": 1,
+          "id": "result",
+          "timestampMilliseconds": 1700000000126,
+          "invocation": {
+            "id": "invocation",
+            "requestID": "request",
+            "callID": "provider-call",
+            "toolName": "lookup",
+            "namespace": "bundled"
+          },
+          "blocks": [
+            {
+              "id": "text",
+              "content": {
+                "text": {
+                  "_0": "Blocked"
+                }
+              }
+            }
+          ],
+          "isError": true,
+          "syntheticReason": "outputLimit",
+          "details": {
+            "opaque": {
+              "preserve": [
+                true,
+                "value"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "content": {
+        "_0": {
+          "contractVersion": 1,
+          "id": "failure",
+          "timestampMilliseconds": 1700000000127,
+          "role": "assistant",
+          "identity": {
+            "requestID": "failed-request"
+          },
+          "blocks": [],
+          "stopReason": {
+            "aborted": {}
+          },
+          "providerMetadata": {
+            "failure": "cancelled"
+          }
+        }
+      }
+    }
+  ]
+}

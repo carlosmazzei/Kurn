@@ -27,7 +27,7 @@ public struct OperationID: Hashable, Sendable, Codable, CustomStringConvertible 
     public let value: String
 
     /// Generates a fresh id, matching the `String(UUID().uuidString.prefix(8))`
-    /// convention several call sites (e.g. `DocumentGenerationService`) already
+    /// convention several call sites already
     /// use for their own ad hoc `runID`.
     public init() {
         value = String(UUID().uuidString.prefix(8))

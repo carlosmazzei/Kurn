@@ -98,22 +98,6 @@ struct WikiArticleTests {
         #expect(coordinator.bulkOperation == nil)
     }
 
-    @Test func snapshotCarriesMeetingIdentityAndBody() throws {
-        let context = makeContext()
-        let meeting = Meeting(title: "Raw")
-        meeting.aiTitle = "Q3 Review"
-        context.insert(meeting)
-        let art = article(for: meeting, hash: "h1", generator: "g1")
-        context.insert(art)
-        try context.save()
-
-        let snapshot = art.snapshot
-        #expect(snapshot.meetingID == meeting.id)
-        #expect(snapshot.title == "Q3 Review")
-        #expect(snapshot.date == meeting.createdAt)
-        #expect(snapshot.bodyMarkdown.contains("shipped v2"))
-    }
-
     @Test func assembledTranscriptTextIsEmptyWithoutTranscripts() {
         let meeting = Meeting(title: "Empty")
         #expect(meeting.assembledTranscriptText().isEmpty)

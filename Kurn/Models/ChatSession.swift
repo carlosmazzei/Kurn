@@ -12,11 +12,12 @@
 //  else — the same rule `SemanticChunk`/`WikiArticle` follow.
 //
 //  `MeetingChatViewModel` owns reading and writing it: a conversation is
-//  created lazily, on its first successfully completed exchange, so a chat the
+//  created lazily, on its first completed exchange, document mutation or interrupted-run trace, so a chat the
 //  user opens and abandons without sending anything never leaves an empty row
 //  in the history list.
 //
 
+import AgentHarness
 import Foundation
 import KurnCore
 import SwiftData
@@ -43,6 +44,22 @@ final class ChatSession {
     /// meetings, so corruption must read as corruption, never as silently
     /// empty history.
     var turnsData: Data
+    var scopeData: Data?
+    var artifactsData: Data?
+    var canonicalVersion: Int?
+    var canonicalLeafID: String?
+    var canonicalOrdinal: Int = 0
+    var canonicalRevision: Int = 0
+    /// Exact pre-conversion bytes are retained independently of the rebuildable UI cache.
+    var legacyTurnsData: Data?
+    var legacyScopeData: Data?
+    var legacyArtifactsData: Data?
+    @Relationship(deleteRule: .cascade, inverse: \HarnessSessionEntry.session)
+    var harnessEntries: [HarnessSessionEntry] = []
+    @Relationship(deleteRule: .cascade, inverse: \HarnessArtifactRevision.session)
+    var harnessRevisions: [HarnessArtifactRevision] = []
+    @Relationship(deleteRule: .cascade, inverse: \HarnessSessionRecord.session)
+    var harnessRecords: [HarnessSessionRecord] = []
 
     init(meeting: Meeting?, title: String, createdAt: Date = Date()) {
         self.id = UUID()
@@ -59,8 +76,7 @@ final class ChatSession {
     }
 
     /// A short label from a conversation's first question: first line,
-    /// trimmed and capped, mirroring
-    /// `DocumentGenerationService.extractTitle`'s fallback shape so a history
+    /// trimmed and capped, so a history
     /// row reads as a label rather than the whole question.
     static func title(from question: String) -> String {
         let firstLine = question
@@ -78,24 +94,10 @@ struct PersistedChatTurn: Codable {
     var id: UUID
     var role: ChatMessage.Role
     var text: String
-    var citations: [PersistedCitation]
     var usage: TokenUsage?
     var costUSD: Double?
     var elapsedSeconds: TimeInterval?
-}
-
-/// A citation snapshot rather than a live `SemanticSearchService.Hit` —
-/// reopening a session must keep reading correctly even after the source
-/// chunk is deleted or the meeting re-indexed, the same reasoning
-/// `GeneratedDocument` snapshots its sources for. Keeps `recordingID` (unlike
-/// `Hit`'s `chunkID`/`score`, which only matter during retrieval ranking) so
-/// tapping a citation in a restored conversation can still jump to the
-/// cited moment.
-struct PersistedCitation: Codable {
-    var meetingID: UUID
-    var recordingID: UUID
-    var meetingTitle: String
-    var start: TimeInterval
-    var speakerLabel: String
-    var text: String
+    var steps: [AgentRunStep]? = nil
+    var artifacts: [ChatArtifactReference]? = nil
+    var artifactOrigins: [UUID: ChatArtifactOrigin]? = nil
 }
