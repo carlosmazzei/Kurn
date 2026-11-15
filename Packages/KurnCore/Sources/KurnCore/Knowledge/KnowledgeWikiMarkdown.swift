@@ -41,7 +41,7 @@ enum KnowledgeWikiMarkdown {
         let date = ISO8601DateFormatter().string(from: fact.source.recordedAt)
         lines.append("  Valid interval: [\(start), \(end)); learned: \(date). Assertion: \(fact.id.uuidString.lowercased()).")
         for evidence in fact.source.evidence {
-            lines.append("  \(text(evidence.attributedSpeaker)): \(text(evidence.quote)) " + citations([evidence]))
+            lines.append("  Claim attributed to \(text(evidence.attributedSpeaker)) · quote: \(text(evidence.quote)) " + citations([evidence]))
         }
         return lines.joined(separator: "\n")
     }

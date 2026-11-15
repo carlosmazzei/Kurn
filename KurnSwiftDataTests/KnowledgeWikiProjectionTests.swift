@@ -52,8 +52,8 @@ struct KnowledgeWikiProjectionTests {
                 "modality": "reported", "polarity": "negative", "claimKind": "internalStatusReport", "authorityStatus": "attributed",
                 "confidence": "medium", "attributedToSegmentID": anchor,
                 "validFrom": ["text": "2026-11", "precision": "month"],
-                "evidence": [["segmentIDs": [anchor], "quote": segment.text]]]],
-            "events": [], "examinedSegmentIDs": [anchor]]
+                "evidence": source.segments.map { ["segmentIDs": [$0.id.uuidString.lowercased()], "quote": $0.text] }]],
+            "events": [], "examinedSegmentIDs": source.segments.map { $0.id.uuidString.lowercased() }]
         let document = try JSONDecoder().decode(KnowledgeExtraction.self, from: JSONSerialization.data(withJSONObject: wire))
         let result = KnowledgeExtractionService.Result(transcriptFingerprint: try #require(source.fingerprint), strategy: .fullContext,
             passes: [document], examinedSegmentIDs: [anchor], targetedPassCount: 0)
@@ -299,6 +299,22 @@ struct KnowledgeWikiProjectionTests {
         evidence.isAvailable = false
         try context.save()
         #expect(try await publish(f).pages.isEmpty)
+    }
+
+    @Test func attributionMayBelongToOneOfSeveralIndependentCitations() async throws {
+        let f = try fixture()
+        let transcript = try #require(f.meetings[0].recordings.first?.transcript)
+        transcript.segments += [TranscriptSegment(speakerLabel: "Speaker 2", startTime: 2, endTime: 4,
+            text: "The dependency remains uncertain.")]
+        try f.context.save()
+        try await compile(f)
+        let projected = try await publish(f)
+        let evidence = try #require(projected.snapshot.facts.first?.source.evidence)
+        #expect(evidence.count == 2)
+        #expect(evidence.allSatisfy { $0.attributedSpeaker == "Speaker 1" })
+        #expect(projected.pages[0].markdown.contains("Claim attributed to Speaker 1"))
+        #expect(projected.pages[0].markdown.contains("The dependency remains uncertain"))
+        #expect(try await read(f) == projected)
     }
 }
 }

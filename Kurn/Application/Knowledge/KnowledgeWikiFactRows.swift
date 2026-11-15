@@ -41,7 +41,7 @@ enum KnowledgeWikiFactRows {
         let revision = try KnowledgeTranscriptRevision(segments: recording.segments, language: recording.language)
         let speaker = recording.segments.first { $0.id.uuidString.lowercased() == origin.attribution }?.speakerLabel
         guard let speaker else { throw KnowledgeWikiStoreError.invalidCanonical }
-        return try rows.sorted {
+        let result = try rows.sorted {
             if $0.startMs != $1.startMs { return $0.startMs < $1.startMs }
             if $0.endMs != $1.endMs { return $0.endMs < $1.endMs }
             return $0.id.uuidString < $1.id.uuidString
@@ -51,11 +51,14 @@ enum KnowledgeWikiFactRows {
             let anchors = try KnowledgeEntityResolutionRows.decode([String].self, row.segmentIDsData)
             let claim = KnowledgeEvidenceClaim(segmentIDs: anchors, quote: row.quote, startMs: row.startMs, endMs: row.endMs)
             guard let checked = revision.resolve(claim, transcriptFingerprint: row.transcriptFingerprint),
-                  anchors.contains(origin.attribution), row.quoteHash == KnowledgeStoreRows.digest(Data(checked.normalizedQuote.utf8)) else {
+                  row.quoteHash == KnowledgeStoreRows.digest(Data(checked.normalizedQuote.utf8)) else {
                 throw KnowledgeWikiStoreError.invalidCanonical
             }
             return KnowledgeWikiSnapshot.Evidence(id: row.id, recordingID: origin.recordingID, segmentIDs: anchors,
                 quote: row.quote, startMs: row.startMs, endMs: row.endMs, attributedSpeaker: speaker)
         }
+        // The attribution anchor belongs to the assertion's combined evidence,
+        // not necessarily every citation (the extraction contract permits this).
+        return result.contains { $0.segmentIDs.contains(origin.attribution) } ? result : []
     }
 }
