@@ -452,5 +452,62 @@ struct KnowledgeStoreTests {
         }
     }
 
+    @Test func queuedCompilationRequiresItsLeaseAndCommitsProvenanceAtomically() async throws {
+        let f = try fixture()
+        let token = try await snapshot(f)
+        let work = try KnowledgeQueuedWork.extraction(snapshot: token, provider: .appleOnDevice, model: "synthetic-local")
+        let record = try await f.store.enqueue(work, explicitRetry: false, restartCompleted: false)
+        let claimed = try await f.store.claimJob(id: record.id)
+        let handle = try #require(claimed)
+        var commit = try request(token, version: work.pipelineVersion)
+        commit.generation = work.generation
+        let auth = f.auth
+        let unleased = commit
+        await #expect(throws: KnowledgeStoreError.invalidJob) {
+            try await f.store.commit(unleased, authorization: { auth })
+        }
+        commit.lease = handle
+        let leased = commit
+        await #expect(throws: KnowledgeStoreError.staleRevision) {
+            try await f.store.commit(leased, authorization: { auth }, beforeSave: { throw KnowledgeStoreError.staleRevision })
+        }
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeAssertion>()) == 0)
+        #expect(try await f.store.jobState(id: record.id) == .running)
+        let receipt = try await f.store.commit(leased, authorization: { auth })
+        #expect(receipt.jobID == record.id)
+        try await f.store.finishJob(handle) // Does not overwrite succeeded canonical provenance.
+        let read = ModelContext(f.container)
+        let job = try #require(read.fetch(FetchDescriptor<KnowledgeJob>()).first)
+        let bytes = try #require(job.checkpointData)
+        #expect(JSONStorage.decodeAuthoritative(KnowledgeCommitProvenance.self, from: bytes).decodedValue != nil)
+        try await f.store.eraseJobs(kind: .extraction, createdBefore: .distantFuture)
+        #expect(try await f.store.jobState(id: record.id) == .succeeded)
+    }
+
+    @Test func erasedOrReclaimedQueuedCompilationCannotPublishThroughAnOldLease() async throws {
+        let f = try fixture()
+        let token = try await snapshot(f)
+        let work = try KnowledgeQueuedWork.extraction(snapshot: token, provider: .appleOnDevice, model: "synthetic-local")
+        let record = try await f.store.enqueue(work, explicitRetry: false, restartCompleted: false)
+        let claimed = try await f.store.claimJob(id: record.id)
+        let handle = try #require(claimed)
+        var commit = try request(token, version: work.pipelineVersion)
+        commit.generation = work.generation
+        commit.lease = handle
+        let leased = commit
+        let auth = f.auth
+        try await f.store.recoverJob(id: record.id, outputCommitted: false)
+        await #expect(throws: KnowledgeQueueError.staleLease) {
+            try await f.store.commit(leased, authorization: { auth })
+        }
+        try await f.store.eraseJobs(kind: .extraction, createdBefore: .distantFuture)
+        await #expect(throws: KnowledgeQueueError.staleLease) {
+            try await f.store.commit(leased, authorization: { auth })
+        }
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeJob>()) == 0)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeAssertion>()) == 0)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeRevision>()) == 0)
+    }
+
 }
 }

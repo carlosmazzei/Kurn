@@ -32,6 +32,7 @@ struct AppEnvironment {
     let semanticIndex: SemanticIndexCoordinator
     let wiki: WikiCoordinator
     let knowledgeJobs: KnowledgeJobQueue
+    let knowledge: KnowledgeCompilationCoordinator
     /// The live recording session, app-wide so the recorder can be minimized
     /// while the rest of the app stays usable.
     let recordingSession: RecordingSessionController
@@ -83,12 +84,14 @@ final class AppComposition {
         let semanticIndex = SemanticIndexCoordinator(modelContext: context, appSettings: settings)
         let jobs = KnowledgeJobQueue(container: container, foreground: false)
         let wiki = WikiCoordinator(modelContext: context, appSettings: settings, jobQueue: jobs)
+        let knowledge = KnowledgeCompilationCoordinator(queue: jobs, settings: settings)
         let reviewPrompt = ReviewPromptCoordinator()
         let transcription = TranscriptionCoordinator(
             modelContext: context,
             appSettings: settings,
             semanticIndexCoordinator: semanticIndex,
             wikiCoordinator: wiki,
+            knowledgeCoordinator: knowledge,
             reviewPrompt: reviewPrompt
         )
         return AppEnvironment(
@@ -99,6 +102,7 @@ final class AppComposition {
             semanticIndex: semanticIndex,
             wiki: wiki,
             knowledgeJobs: jobs,
+            knowledge: knowledge,
             recordingSession: RecordingSessionController(modelContext: context, settings: settings, onActivityChanged: { jobs.setRecording($0) }),
             reviewPrompt: reviewPrompt,
             chatConversations: ChatConversationHost()

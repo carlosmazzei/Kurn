@@ -126,6 +126,7 @@ final class TranscriptionCoordinator {
     /// App-wide wiki coordinator. A finished transcription refreshes the
     /// meeting's condensed wiki article through it (opt-in). `nil` only in tests.
     let wikiCoordinator: WikiCoordinator?
+    let knowledgeCoordinator: KnowledgeCompilationCoordinator?
     /// Told about each finished transcript, to time the App Store rating
     /// request. `nil` only in tests.
     let reviewPrompt: ReviewPromptCoordinator?
@@ -135,6 +136,7 @@ final class TranscriptionCoordinator {
         appSettings: AppSettings? = nil,
         semanticIndexCoordinator: SemanticIndexCoordinator? = nil,
         wikiCoordinator: WikiCoordinator? = nil,
+        knowledgeCoordinator: KnowledgeCompilationCoordinator? = nil,
         reviewPrompt: ReviewPromptCoordinator? = nil,
         aiTitleCoordinator: AITitleCoordinator = AITitleCoordinator(),
         transcriptionService: TranscriptionService = TranscriptionService()
@@ -143,6 +145,7 @@ final class TranscriptionCoordinator {
         self.appSettings = appSettings
         self.semanticIndexCoordinator = semanticIndexCoordinator
         self.wikiCoordinator = wikiCoordinator
+        self.knowledgeCoordinator = knowledgeCoordinator
         self.reviewPrompt = reviewPrompt
         self.aiTitleCoordinator = aiTitleCoordinator
         self.transcriptionService = transcriptionService
@@ -511,6 +514,10 @@ final class TranscriptionCoordinator {
                let wikiCoordinator = self.wikiCoordinator {
                 self.postTranscriptionPhases[recordingID] = .generatingWiki
                 await wikiCoordinator.generate(meeting)
+            }
+            guard !Task.isCancelled else { return }
+            if settings.knowledgeEnabled, let knowledgeCoordinator = self.knowledgeCoordinator {
+                await knowledgeCoordinator.compile(meetingID: meetingID)
             }
         }
     }

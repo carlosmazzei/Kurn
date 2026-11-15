@@ -17,6 +17,7 @@ struct KnowledgeQueuedWork: Codable, Sendable, Equatable {
     /// Distinguishes a rebuilt output from the matching article that predated it.
     let priorArticleVersion: String?
     let generation: String
+    var compilation: KnowledgeCompilationWork?
 
     // swiftlint:disable:next function_parameter_count
     static func article(meetingID: UUID, generator: String, provider: AIProvider, model: String,
@@ -31,9 +32,27 @@ struct KnowledgeQueuedWork: Codable, Sendable, Equatable {
             sourceFingerprint: fingerprint, force: force, explicitlyRequested: explicit, priorArticleVersion: priorArticleVersion, generation: generation)
     }
 
+    static func extraction(snapshot: KnowledgeStoreSnapshot, provider: AIProvider, model: String,
+                           rebuildGeneration: String? = nil) throws -> Self {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let configuration = try encoder.encode(provider)
+        let generation = KnowledgeStoreRows.digest(try encoder.encode([
+            KnowledgeStoreRows.digest(configuration), model, snapshot.policyRevisionKey, rebuildGeneration ?? "", "UTC"
+        ]))
+        let identity = try KnowledgeCompilationIdentity(scope: snapshot.scope, meetingID: snapshot.meetingID,
+            transcriptFingerprint: snapshot.transcriptFingerprint, extractorVersion: KnowledgeCompilationWork.extractorVersion,
+            generation: generation)
+        return Self(key: try identity.idempotencyKey(), kind: .extraction, meetingID: snapshot.meetingID,
+            pipelineVersion: identity.extractorVersion, provider: provider, model: model, sourceFingerprint: snapshot.transcriptFingerprint,
+            force: rebuildGeneration != nil, explicitlyRequested: false, priorArticleVersion: nil, generation: generation,
+            compilation: KnowledgeCompilationWork(scope: snapshot.scope, policyRevisionKey: snapshot.policyRevisionKey, timeZone: "UTC"))
+    }
+
     func regenerated() -> Self {
         Self(key: key + ":\(UUID().uuidString)", kind: kind, meetingID: meetingID, pipelineVersion: pipelineVersion,
-            provider: provider, model: model, sourceFingerprint: sourceFingerprint, force: force, explicitlyRequested: explicitlyRequested, priorArticleVersion: priorArticleVersion, generation: generation)
+            provider: provider, model: model, sourceFingerprint: sourceFingerprint, force: force, explicitlyRequested: explicitlyRequested,
+            priorArticleVersion: priorArticleVersion, generation: generation, compilation: compilation)
     }
 }
 
@@ -74,9 +93,11 @@ struct KnowledgeJobDeferred: Error {
         case featureDisabled = "feature_disabled"
         case providerUnavailable = "provider_unavailable"
         case providerBlocked = "provider_blocked"
+        case policyDenied = "policy_denied"
+        case cloudReviewRequired = "cloud_review_required"
         case background, recording
     }
     let reason: Reason
 }
 
-enum KnowledgeWorkObsolete: String, Error { case sourceChanged = "source_changed", providerChanged = "provider_changed", sourceDeleted = "source_deleted" }
+enum KnowledgeWorkObsolete: String, Error { case sourceChanged = "source_changed", providerChanged = "provider_changed", sourceDeleted = "source_deleted", policyChanged = "policy_changed" }

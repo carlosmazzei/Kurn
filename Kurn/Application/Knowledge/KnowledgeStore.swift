@@ -35,6 +35,14 @@ actor KnowledgeStore {
         return try KnowledgeStoreRows.commit(request, auth: auth, container: modelContainer, beforeSave: beforeSave)
     }
 
+    func compilationReplay(_ work: KnowledgeQueuedWork,
+                           authorization: @Sendable () async -> KnowledgeExtractionAuthorization) async throws -> KnowledgeCommitReceipt? {
+        let auth = await authorization()
+        try Task.checkCancellation()
+        guard auth.decision(for: work.provider).isAllowed else { throw KnowledgeStoreError.policyDenied }
+        return try KnowledgeStoreRows.replay(work, auth: auth, container: modelContainer)
+    }
+
     func pendingProjection() throws -> KnowledgeCommitReceipt? {
         let context = ModelContext(modelContainer)
         var descriptor = FetchDescriptor<KnowledgeRevision>(predicate: #Predicate { $0.projectionPending },
