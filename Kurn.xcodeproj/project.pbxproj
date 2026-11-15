@@ -15,6 +15,7 @@
 		2AE0000000000000000000A1 /* KurnCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2AE0000000000000000000A2 /* KurnCore */; };
 		2AF0000000000000000000A1 /* AgentHarness in Frameworks */ = {isa = PBXBuildFile; productRef = 2AF0000000000000000000A2 /* AgentHarness */; };
 		2AF0000000000000000000B1 /* AgentHarness in Frameworks */ = {isa = PBXBuildFile; productRef = 2AF0000000000000000000B2 /* AgentHarness */; };
+		2AF0000000000000000000C1 /* AgentHarness in Frameworks */ = {isa = PBXBuildFile; productRef = 2AF0000000000000000000C2 /* AgentHarness */; };
 		2AE0000000000000000000B1 /* KurnCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2AE0000000000000000000B2 /* KurnCore */; };
 		2AE0000000000000000000C1 /* KurnCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2AE0000000000000000000C2 /* KurnCore */; };
 		AA1000000000000000000131 /* KurnLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A1 /* KurnLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -202,6 +203,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2AE0000000000000000000C1 /* KurnCore in Frameworks */,
+				2AF0000000000000000000C1 /* AgentHarness in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -396,6 +398,7 @@
 			name = KurnSwiftDataTests;
 			packageProductDependencies = (
 				2AE0000000000000000000C2 /* KurnCore */,
+				2AF0000000000000000000C2 /* AgentHarness */,
 			);
 			productName = KurnSwiftDataTests;
 			productReference = AA40000000000000000000A1 /* KurnSwiftDataTests.xctest */;
@@ -1207,6 +1210,10 @@
 			productName = AgentHarness;
 		};
 		2AF0000000000000000000B2 /* AgentHarness */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AgentHarness;
+		};
+		2AF0000000000000000000C2 /* AgentHarness */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AgentHarness;
 		};

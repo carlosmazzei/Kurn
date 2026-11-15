@@ -9,10 +9,12 @@
 //  types, which still run concurrently *with each other*).
 //
 //  Kept as defence in depth, not as a fix for anything currently known to
-//  be broken. Every test below opens a real `ModelContainer`, and a
+//  be broken. Most suites below open a real `ModelContainer`, and a
 //  container's lifetime is process-wide state; serializing them keeps that
 //  churn from overlapping, which makes any future failure here reproducible
-//  and attributable instead of order-dependent.
+//  and attributable instead of order-dependent. Scheduling-sensitive actor
+//  gate tests share this isolated process so the general suite cannot starve
+//  their concurrent child tasks; their deadlines and assertions stay intact.
 //
 //  Historical note, because it cost several days. CI repeatedly crashed
 //  here with:
