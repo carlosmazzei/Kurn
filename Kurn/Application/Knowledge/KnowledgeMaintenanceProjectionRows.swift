@@ -15,6 +15,9 @@ enum KnowledgeMaintenanceProjectionRows {
                 input.projection = .stale
                 return // No old-policy or excluded-source identifiers/counts.
             }
+            guard stored.pages.compactMap(\.narrative).allSatisfy({ $0.version == 1 }) else {
+                throw KnowledgeMaintenanceError.unsupportedArtifact
+            }
             guard let wiki else { input.projection = .unreadable; return }
             let expected = try KnowledgeWikiProjector.project(wiki)
             let byID = Dictionary(uniqueKeysWithValues: expected.map { ($0.entity.id, $0) })

@@ -277,6 +277,17 @@ struct KnowledgeMaintenanceTests {
         await #expect(throws: KnowledgeWikiStoreError.unreadableProjection) {
             try await f.store.wikiProjection(meetingIDs: f.ids, scope: "workspace", authorization: { auth })
         }
+        // The same misplaced narrative with a future schema must be refused
+        // before interpreting its page binding as ordinary corruption.
+        pages[0]["narrative"] = ["version": 2, "entityID": stored.pages[1].entity.id.uuidString,
+            "paragraphs": [["text": "Synthetic future claim.", "assertionIDs": [try #require(stored.snapshot.facts.first?.id).uuidString]]]]
+        raw["pages"] = pages
+        let future = try JSONDecoder().decode(KnowledgeWikiProjection.self, from: JSONSerialization.data(withJSONObject: raw))
+        let bytes = try KnowledgeStoreRows.authoritativeData(future)
+        row.checkpointData = bytes
+        try context.save()
+        await #expect(throws: KnowledgeMaintenanceError.unsupportedArtifact) { try await report(f) }
+        #expect(try job(.projection, in: ModelContext(f.container)).checkpointData == bytes)
     }
 
     @Test func mergedCandidateWithoutReviewIDIsOmittedAndReturnsAfterUndo() async throws {
