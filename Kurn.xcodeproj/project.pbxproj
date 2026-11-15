@@ -1183,7 +1183,7 @@
 			repositoryURL = "https://github.com/FluidInference/FluidAudio.git";
 			requirement = {
 				kind = exactVersion;
-				version = 0.18.2;
+				version = 0.18.3;
 			};
 			traits = (
 				Diarizer,
