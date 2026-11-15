@@ -2,10 +2,10 @@ name: iOS CI
 
 on:
   push:
-    # main gets a run of its own after every merge so Codecov has a base report to compare
-    # its PRs against (without one, every PR comment shows "?"). An integration branch that
-    # needs the same is added here while it lives and removed when it lands on main.
-    branches: [ "main" ]
+    # main and the Knowledge Engine integration branch get a run of their own after every
+    # merge so Codecov has a base report to compare their PRs against (without one, every PR
+    # comment shows "?"). Drop the integration branch from this list when it lands on main.
+    branches: [ "main", "feature/knowledge-compiler" ]
     tags: [ "v*.*.*" ]
   # Every pull request runs CI, whatever branch it targets, so work stacked on an
   # integration branch is verified before it is merged there.

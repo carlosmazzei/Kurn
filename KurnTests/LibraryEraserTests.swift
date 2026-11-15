@@ -3,10 +3,10 @@
 //  KurnTests
 //
 //  "Delete All Data" must leave no meeting-derived content behind — not the
-//  library-wide chats and generated documents no meeting cascade reaches, and
-//  not the recovery copies (trash, quarantine, journal, store backups) that
-//  hold audio or whole copies of the store — while keeping tags, folders and
-//  smart folders.
+//  library-wide chats, generated documents and knowledge no meeting cascade
+//  reaches, and not the recovery copies (trash, quarantine, journal, store
+//  backups) that hold audio or whole copies of the store — while keeping tags,
+//  folders and smart folders.
 //
 
 import Foundation
@@ -41,6 +41,9 @@ struct LibraryEraserTests {
         #expect(try context.fetchCount(FetchDescriptor<HarnessSessionEntry>()) == 0)
         #expect(try context.fetchCount(FetchDescriptor<HarnessArtifactRevision>()) == 0)
         #expect(try context.fetchCount(FetchDescriptor<HarnessSessionRecord>()) == 0)
+        for type in KnowledgeTestRows.modelTypes {
+            #expect(try KnowledgeTestRows.count(type, in: context) == 0, "\(type) survived the erase")
+        }
 
         #expect(try context.fetchCount(FetchDescriptor<Kurn.Tag>()) == 1)
         #expect(try context.fetchCount(FetchDescriptor<Folder>()) == 1)
@@ -160,6 +163,8 @@ struct LibraryEraserTests {
             sourceKind: .transcripts, sourceNames: [meeting.title], sourceMeetingIDs: [meeting.id],
             generatorModelIdentifier: "test"
         ))
+        // Knowledge relates to the meeting by ID only, and quotes its transcript.
+        KnowledgeTestRows.insertOneOfEach(meetingID: meeting.id, in: context)
     }
 
     private func withTempDirectories(_ body: (_ appSupport: URL, _ recordings: URL) throws -> Void) throws {

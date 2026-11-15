@@ -167,6 +167,6 @@ struct SchemaV5MigrationTests {
         #expect(!oldChat.attributes.contains { $0.name == "canonicalVersion" || $0.name == "legacyTurnsData" })
         #expect(!old.entities.contains { $0.name == "HarnessSessionEntry" })
         #expect(Set(KurnModelGraph.schema.entities.map(\.name)).isSuperset(of: old.entities.map(\.name)))
-        #expect(KurnModelGraph.currentSchemaVersion == Schema.Version(1, 5, 0))
+        #expect(KurnSchemaV6.versionIdentifier == Schema.Version(1, 5, 0))
     }
 }
