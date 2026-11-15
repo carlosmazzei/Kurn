@@ -146,6 +146,10 @@ struct KurnApp: App {
                 settings: composition.settings
             )
         })
+        KnowledgeBackgroundScheduler.register {
+            guard let container = bootCoordinator.container else { return nil }
+            return composition.environment(for: container).knowledgeJobs
+        }
         #endif
 
         _recoveryViewModel = State(initialValue: ModelStoreRecoveryViewModel(
@@ -253,6 +257,7 @@ struct KurnApp: App {
         // the meantime — `.inactive` raises the privacy cover, which is what
         // the app-switcher snapshot captures.
         if phase == .background {
+            environment.knowledgeJobs.setForeground(false)
             accessGate.lock()
             // Unsent chat text survives the process (A68).
             environment.chatConversations.saveDrafts()
@@ -262,12 +267,14 @@ struct KurnApp: App {
             TranscriptionScheduler.scheduleIfWorkRemains(
                 container: environment.modelContainer, settings: settings
             )
+            Task { await KnowledgeBackgroundScheduler.scheduleIfWorkRemains(queue: environment.knowledgeJobs) }
             #endif
         }
         // Resume transcriptions interrupted by backgrounding or a process
         // death. `.pending` recordings carry a checkpoint, so each continues
         // from its last completed chunk.
         if phase == .active {
+            environment.knowledgeJobs.setForeground(true)
             // A chat reply the background wind-down stopped resumes once (NH05).
             Task { await environment.chatConversations.resumeAfterForeground() }
             // Reviewed model capacities and prices published between releases; daily at most,

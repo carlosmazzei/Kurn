@@ -32,6 +32,7 @@ final class RecordingSessionController {
     /// session means it is minimized to the mini bar.
     private(set) var isExpanded = false
 
+    private let onActivityChanged: @MainActor (Bool) -> Void
     private let modelContext: ModelContext
     private let makeViewModel: @MainActor (Meeting, ModelContext) -> RecorderViewModel
     private let prepare: @MainActor (RecorderViewModel) async -> Void
@@ -47,8 +48,10 @@ final class RecordingSessionController {
         modelContext: ModelContext,
         settings: AppSettings,
         makeViewModel: (@MainActor (Meeting, ModelContext) -> RecorderViewModel)? = nil,
-        prepare: @escaping @MainActor (RecorderViewModel) async -> Void = { await $0.prepareToRecord() }
+        prepare: @escaping @MainActor (RecorderViewModel) async -> Void = { await $0.prepareToRecord() },
+        onActivityChanged: @escaping @MainActor (Bool) -> Void = { _ in }
     ) {
+        self.onActivityChanged = onActivityChanged
         self.modelContext = modelContext
         if let makeViewModel {
             self.makeViewModel = makeViewModel
@@ -91,6 +94,7 @@ final class RecordingSessionController {
             isExpanded = true
             return false
         }
+        onActivityChanged(true)
         let viewModel = makeViewModel(meeting, modelContext)
         self.meeting = meeting
         self.viewModel = viewModel
@@ -152,6 +156,7 @@ final class RecordingSessionController {
         viewModel = nil
         meeting = nil
         isExpanded = false
+        onActivityChanged(false)
     }
 
     private static func defaultViewModel(

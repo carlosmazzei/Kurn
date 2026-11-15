@@ -2,16 +2,12 @@
 //  WikiCoordinator.swift
 //  Kurn
 //
-//  Owns building and persisting each meeting's LLM-generated wiki article. Mirrors
-//  `SemanticIndexCoordinator`: transcription completion generates the just-finished
-//  meeting's article, and a launch/foreground backfill sweeps meetings that have no
-//  article yet (or one from a different provider/model). All SwiftData reads/writes
-//  happen here on the main actor; the LLM call runs off-main in `WikiService`.
-//
-//  Unlike the on-device semantic index, wiki generation makes CLOUD LLM calls, so
-//  it is OPT-IN (`AppSettings.wikiEnabled`, off by default), gated on an available
-//  API key, generation is skipped when the transcript hasn't changed, and the
-//  backfill processes only a small batch per foreground activation to bound cost.
+//  Observable facade and article producer for the durable KnowledgeJobQueue.
+//  Single, automatic and bulk requests share admission, resource reservations,
+//  checkpoint/retry semantics and recording/scene lifecycle handling. Existing
+//  wiki consent stays independent of the disabled-by-default canonical engine.
+//  Reads and article publication use the UI context; job persistence uses the
+//  queue's one writer. Recovery recognizes a saved article before any paid retry.
 //
 
 import Foundation
@@ -38,6 +34,8 @@ final class WikiCoordinator {
         case rebuildAll
     }
 
+    let jobQueue: KnowledgeJobQueue
+    private var clearedGeneration = ""
     private let modelContext: ModelContext
     private let wikiService: WikiService
     private let isProviderUsable: ProviderFactory.UsabilityCheck
@@ -83,13 +81,22 @@ final class WikiCoordinator {
         appSettings: AppSettings? = nil,
         providerCircuitBreaker: ProviderCircuitBreaker = .shared,
         wikiService: WikiService = WikiService(),
-        isProviderUsable: @escaping ProviderFactory.UsabilityCheck = ProviderFactory.liveUsability
+        isProviderUsable: @escaping ProviderFactory.UsabilityCheck = ProviderFactory.liveUsability,
+        jobQueue: KnowledgeJobQueue? = nil
     ) {
         self.modelContext = modelContext
         self.appSettings = appSettings
         self.providerCircuitBreaker = providerCircuitBreaker
         self.wikiService = wikiService
         self.isProviderUsable = isProviderUsable
+        let queue = jobQueue ?? KnowledgeJobQueue(container: modelContext.container)
+        self.jobQueue = queue
+        queue.register(kind: .meetingArticle, recovery: { [weak self] work in
+            try self?.hasCommitted(work) ?? false
+        }, handler: { [weak self] handle in
+            guard let self else { throw CancellationError() }
+            try await self.performQueued(handle)
+        })
     }
 
     // MARK: - Single meeting
@@ -105,90 +112,123 @@ final class WikiCoordinator {
         force: Bool = false
     ) async -> GenerationOutcome {
         let meetingID = meeting.id
-        guard !generatingMeetingIDs.contains(meetingID), let settings = appSettings else {
-            return .skipped
-        }
-
+        if trigger == .explicit { lastError = nil }
+        guard !generatingMeetingIDs.contains(meetingID), let settings = appSettings,
+              settings.wikiEnabled || trigger == .explicit else { return .skipped }
         let provider = settings.aiProvider
-        guard await providerCircuitBreaker.allows(providerID: provider.id, trigger: trigger) else {
-            AppLog.transcription.atInfo.info("wiki: provider circuit blocked automatic generation")
-            return .skipped
-        }
         let model = settings.summaryModel(for: provider)
         let generator = Self.generatorIdentifier(provider: provider, model: model)
-
         let text = meeting.assembledContextText()
         guard !text.isEmpty else { return .skipped }
         let hash = Self.contentHash(text)
-        if !force, let existing = meeting.wikiArticle,
-           existing.sourceContentHash == hash, existing.generatorModelIdentifier == generator {
-            return .skipped // already up to date
-        }
-
+        if !force, let article = meeting.wikiArticle,
+           article.sourceContentHash == hash, article.generatorModelIdentifier == generator { return .skipped }
         generatingMeetingIDs.insert(meetingID)
         defer { generatingMeetingIDs.remove(meetingID) }
+        do {
+            let work = try KnowledgeQueuedWork.article(meetingID: meetingID, generator: generator, provider: provider,
+                model: model, fingerprint: hash, force: force, explicit: trigger == .explicit, generation: clearedGeneration)
+            let outcome = try await jobQueue.submit(work, explicit: trigger == .explicit, restartCompleted: true)
+            switch outcome {
+            case .completed: return .generated
+            case .deferred: return .skipped
+            case .failed: return .failed
+            }
+        } catch {
+            if trigger == .explicit, lastError == nil { lastError = (error as? AppError) ?? .wikiGenerationFailed(error.localizedDescription) }
+            return .failed
+        }
+    }
 
-        let title = meeting.aiTitle ?? meeting.title
-        // A checkpoint from an earlier interrupted staged run (H4), shared
-        // with summary generation since both delegate the map stage to the
-        // same `SummaryService.notesTemplate` — see `SummaryMapCheckpoint`'s
-        // header. A structurally invalid one is treated the same as none.
-        let resumeCheckpoint = meeting.summaryMapCheckpoint.flatMap { $0.isStructurallyValid ? $0 : nil }
+    private func performQueued(_ handle: KnowledgeJobHandle) async throws {
+        let work = handle.work
+        guard let settings = appSettings, settings.wikiEnabled || work.explicitlyRequested else {
+            throw KnowledgeJobDeferred(reason: .featureDisabled)
+        }
+        guard settings.aiProvider == work.provider, settings.summaryModel(for: work.provider) == work.model else {
+            throw KnowledgeWorkObsolete.providerChanged
+        }
+        let requestedMeetingID = work.meetingID
+        guard let meeting = try modelContext.fetch(FetchDescriptor<Meeting>(predicate: #Predicate { $0.id == requestedMeetingID })).first else {
+            throw KnowledgeWorkObsolete.sourceDeleted
+        }
+        let text = meeting.assembledContextText()
+        guard Self.contentHash(text) == work.sourceFingerprint else { throw KnowledgeWorkObsolete.sourceChanged }
+        guard jobQueue.mayPublish(handle) else { throw CancellationError() }
+        if !work.force, let article = meeting.wikiArticle,
+           article.sourceContentHash == work.sourceFingerprint, article.generatorModelIdentifier == work.pipelineVersion { return }
+        guard await providerCircuitBreaker.allows(providerID: work.provider.id, trigger: handle.isExplicit ? .explicit : .automatic) else {
+            throw KnowledgeJobDeferred(reason: .providerBlocked)
+        }
+        guard handle.isExplicit || isProviderUsable(work.provider) else { throw KnowledgeJobDeferred(reason: .providerUnavailable) }
+        let data = try await jobQueue.progress(handle)
+        let checkpoint: SummaryMapCheckpoint?
+        if let data {
+            let decoded = JSONStorage.decodeAuthoritative(SummaryMapCheckpoint.self, from: data)
+            guard let progress = decoded.decodedValue, progress.isStructurallyValid else { throw KnowledgeQueueError.unreadableCheckpoint }
+            checkpoint = progress
+        } else {
+            checkpoint = meeting.summaryMapCheckpoint.flatMap { $0.isStructurallyValid ? $0 : nil }
+        }
+        let meetingID = meeting.id
+        generatingMeetingIDs.insert(meetingID)
+        defer { generatingMeetingIDs.remove(meetingID) }
         let runID = OperationID()
         let startedAt = Date()
         do {
-            let markdown = try await wikiService.generate(
-                transcriptText: text, meetingTitle: title, provider: provider, model: model,
-                resume: resumeCheckpoint,
-                onMapStageCompleted: { [weak self] checkpoint in
-                    try await self?.storeSummaryMapCheckpointDurably(checkpoint, forMeetingID: meetingID)
-                }
-            )
+            let markdown = try await wikiService.generate(transcriptText: text, meetingTitle: meeting.aiTitle ?? meeting.title,
+                provider: work.provider, model: work.model, resume: checkpoint, onMapStageCompleted: { [weak self] checkpoint in
+                    guard let self else { throw CancellationError() }
+                    let bytes = try KnowledgeStoreRows.authoritativeData(checkpoint)
+                    try await self.jobQueue.checkpoint(bytes, for: handle)
+                })
             try Task.checkCancellation()
-            guard !markdown.isEmpty, !Task.isCancelled else { return .skipped }
-            // The staged run (if any) is fully done, so the checkpoint that
-            // got it here no longer describes work still owed (H4).
-            // `replaceArticle` below persists this alongside the new article.
-            meeting.summaryMapCheckpoint = nil
-            replaceArticle(
-                of: meeting, markdown: markdown, hash: hash,
-                generator: generator, title: title, date: meeting.createdAt
-            )
-            await providerCircuitBreaker.recordSuccess(providerID: provider.id)
-            AppLog.transcription.atNotice.notice("wiki: generated meeting \(meetingID, privacy: .public)")
-            ReliabilityLog.record(ReliabilityEvent(
-                operationID: runID, operation: "wiki_generation",
-                outcome: .succeeded, elapsedSeconds: Date().timeIntervalSince(startedAt)
-            ))
-            return .generated
-        } catch is CancellationError {
-            // Leave any existing article in place; a later pass retries.
-            ReliabilityLog.record(ReliabilityEvent(
-                operationID: runID, operation: "wiki_generation",
-                outcome: .cancelled, elapsedSeconds: Date().timeIntervalSince(startedAt)
-            ))
-            return .skipped
-        } catch {
-            await providerCircuitBreaker.recordFailure(
-                providerID: provider.id,
-                failure: ProviderCircuitFailure(error: error)
-            )
-            let code = (error as? AppError)?.logCode ?? "unexpected"
-            AppLog.transcription.atError.error("wiki: failed for meeting \(meetingID, privacy: .public) code=\(code, privacy: .public)")
-            ReliabilityLog.record(ReliabilityEvent(
-                operationID: runID, operation: "wiki_generation",
-                outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt), code: code
-            ))
-            // Only an explicit, user-initiated run surfaces its failure —
-            // an automatic background attempt stays silent-but-logged, the
-            // same "best-effort, never a user-facing error" contract
-            // `TranscriptionCoordinator.generateAITitle` documents for its own
-            // automatic path.
-            if trigger == .explicit {
-                lastError = (error as? AppError) ?? .wikiGenerationFailed(error.localizedDescription)
+            guard jobQueue.mayPublish(handle) else { throw CancellationError() }
+            guard settings.aiProvider == work.provider, settings.summaryModel(for: work.provider) == work.model else {
+                throw KnowledgeWorkObsolete.providerChanged
             }
-            return .failed
+            guard settings.wikiEnabled || work.explicitlyRequested else { throw KnowledgeJobDeferred(reason: .featureDisabled) }
+            let currentMeeting = try modelContext.fetch(FetchDescriptor<Meeting>(predicate: #Predicate { $0.id == requestedMeetingID })).first
+            guard let currentMeeting, Self.contentHash(currentMeeting.assembledContextText()) == work.sourceFingerprint else {
+                throw KnowledgeWorkObsolete.sourceChanged
+            }
+            guard !markdown.isEmpty else { throw AppError.wikiGenerationFailed(NSLocalizedString("error.provider_response_empty", comment: "Empty provider response")) }
+            try replaceArticle(of: currentMeeting, markdown: markdown, hash: work.sourceFingerprint, generator: work.pipelineVersion,
+                title: currentMeeting.aiTitle ?? currentMeeting.title, date: currentMeeting.createdAt)
+            await providerCircuitBreaker.recordSuccess(providerID: work.provider.id)
+            ReliabilityLog.record(ReliabilityEvent(operationID: runID, operation: "wiki_generation", outcome: .succeeded,
+                elapsedSeconds: Date().timeIntervalSince(startedAt)))
+        } catch is CancellationError {
+            if work.provider.kind != .appleOnDevice {
+                await providerCircuitBreaker.recordFailure(providerID: work.provider.id, failure: .ambiguous)
+            }
+            throw CancellationError()
+        } catch KnowledgeQueueError.staleLease {
+            throw KnowledgeWorkObsolete.sourceDeleted
+        } catch let obsolete as KnowledgeWorkObsolete {
+            throw obsolete
+        } catch let deferred as KnowledgeJobDeferred {
+            throw deferred
+        } catch {
+            if case AppError.persistenceFailed = error {} else {
+                await providerCircuitBreaker.recordFailure(providerID: work.provider.id, failure: ProviderCircuitFailure(error: error))
+            }
+            let code = (error as? AppError)?.logCode ?? "unexpected"
+            ReliabilityLog.record(ReliabilityEvent(operationID: runID, operation: "wiki_generation", outcome: .failed,
+                elapsedSeconds: Date().timeIntervalSince(startedAt), code: code))
+            if handle.isExplicit { lastError = (error as? AppError) ?? .wikiGenerationFailed(error.localizedDescription) }
+            throw error
         }
+    }
+
+    private func hasCommitted(_ work: KnowledgeQueuedWork) throws -> Bool {
+        let context = ModelContext(modelContext.container)
+        let meetingID = work.meetingID
+        guard let meeting = try context.fetch(FetchDescriptor<Meeting>(predicate: #Predicate { $0.id == meetingID })).first,
+              let article = meeting.wikiArticle else { return false }
+        return !article.bodyMarkdown.isEmpty && article.sourceContentHash == work.sourceFingerprint
+            && article.generatorModelIdentifier == work.pipelineVersion
+            && Self.contentHash(meeting.assembledContextText()) == work.sourceFingerprint
     }
 
     // MARK: - Backfill / maintenance
@@ -218,6 +258,8 @@ final class WikiCoordinator {
 
     /// Delete every wiki article (Settings → Clear wiki).
     func clearWiki() {
+        clearedGeneration = UUID().uuidString
+        jobQueue.cancel(kind: .meetingArticle)
         let all = (try? modelContext.fetch(FetchDescriptor<WikiArticle>())) ?? []
         for article in all {
             article.meeting?.wikiArticle = nil
@@ -313,64 +355,50 @@ final class WikiCoordinator {
     /// deleting and inserting a second article for the same meeting in one
     /// context turn can trip SwiftData's relationship target check.
     private func replaceArticle(
-        of meeting: Meeting,
-        markdown: String,
-        hash: String,
-        generator: String,
-        title: String,
-        date: Date
-    ) {
+        of meeting: Meeting, markdown: String, hash: String, generator: String, title: String, date: Date
+    ) throws {
         if let existing = meeting.wikiArticle {
+            let oldMarkdown = existing.bodyMarkdown
+            let oldTitle = existing.meetingTitleSnapshot
+            let oldDate = existing.meetingDate
+            let oldHash = existing.sourceContentHash
+            let oldGenerator = existing.generatorModelIdentifier
+            let oldUpdatedAt = existing.updatedAt
             existing.bodyMarkdown = markdown
             existing.meetingTitleSnapshot = title
             existing.meetingDate = date
             existing.sourceContentHash = hash
             existing.generatorModelIdentifier = generator
             existing.updatedAt = Date()
-            persist()
+            do { try modelContext.save() } catch {
+                existing.bodyMarkdown = oldMarkdown
+                existing.meetingTitleSnapshot = oldTitle
+                existing.meetingDate = oldDate
+                existing.sourceContentHash = oldHash
+                existing.generatorModelIdentifier = oldGenerator
+                existing.updatedAt = oldUpdatedAt
+                throw AppError.persistenceFailed(error.localizedDescription)
+            }
             return
         }
-
-        let article = WikiArticle(
-            meeting: meeting,
-            bodyMarkdown: markdown,
-            meetingTitleSnapshot: title,
-            meetingDate: date,
-            sourceContentHash: hash,
-            generatorModelIdentifier: generator
-        )
+        let article = WikiArticle(meeting: meeting, bodyMarkdown: markdown, meetingTitleSnapshot: title,
+            meetingDate: date, sourceContentHash: hash, generatorModelIdentifier: generator)
         modelContext.insert(article)
-        persist()
+        do { try modelContext.save() } catch {
+            meeting.wikiArticle = nil
+            article.meeting = nil
+            modelContext.delete(article)
+            throw AppError.persistenceFailed(error.localizedDescription)
+        }
     }
 
     private func persist() {
         do {
             try modelContext.save()
         } catch {
+            lastError = .persistenceFailed(error.localizedDescription)
             AppLog.persistence.atError.error("wiki: persist failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
         }
     }
 
-    /// Persist a staged wiki run's map-stage progress so an interruption
-    /// resumes from the last completed block instead of re-condensing — for
-    /// a cloud provider, re-paying for — every block from the start (H4).
-    /// Throws (rather than merely logging, as `persist()` above does) so a
-    /// save failure gates forward progress: `SummaryMapRunner` awaits this
-    /// before starting the next block, and a thrown error stops the run at
-    /// the last durably-committed one — the same contract
-    /// `SummaryViewModel`'s own `storeSummaryMapCheckpointDurably` has.
-    ///
-    /// Takes the meeting's id rather than the `Meeting` itself: `Meeting`
-    /// isn't `Sendable`, and this is called from the `@Sendable` closure
-    /// `generate` hands to `WikiService.generate`.
-    private func storeSummaryMapCheckpointDurably(_ checkpoint: SummaryMapCheckpoint, forMeetingID meetingID: UUID) throws {
-        let descriptor = FetchDescriptor<Meeting>(predicate: #Predicate { $0.id == meetingID })
-        guard let meeting = try? modelContext.fetch(descriptor).first else { return }
-        meeting.summaryMapCheckpoint = checkpoint
-        do {
-            try modelContext.save()
-        } catch {
-            throw AppError.persistenceFailed(error.localizedDescription)
-        }
-    }
 }

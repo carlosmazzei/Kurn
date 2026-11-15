@@ -96,7 +96,11 @@ struct MeetingLibrary {
         let fileNames = meeting.recordings.map(\.fileName)
             + meeting.recordings.flatMap { $0.photos.map(\.fileName) }
             + meeting.attachments.map(\.fileName)
-        try journaledDelete(fileNames: fileNames) { context.delete(meeting) }
+        let jobs = try wikiJobs(for: [meeting.id])
+        try journaledDelete(fileNames: fileNames) {
+            for job in jobs { context.delete(job) }
+            context.delete(meeting)
+        }
     }
 
     /// Deletes several meetings as one journaled operation: one save commits
@@ -109,9 +113,21 @@ struct MeetingLibrary {
         let fileNames = recordings.map(\.fileName)
             + recordings.flatMap { $0.photos.map(\.fileName) }
             + meetings.flatMap { $0.attachments.map(\.fileName) }
+        let jobs = try wikiJobs(for: Set(meetings.map(\.id)))
         try journaledDelete(fileNames: fileNames) {
+            for job in jobs { context.delete(job) }
             for meeting in meetings { context.delete(meeting) }
         }
+    }
+
+    /// Operational wiki checkpoints no longer cascade from Meeting. Fetch
+    /// before moving any files; deletion shares the journal's model commit.
+    private func wikiJobs(for meetingIDs: Set<UUID>) throws(AppError) -> [KnowledgeJob] {
+        let kind = KnowledgeJobKind.meetingArticle.rawValue
+        do {
+            return try context.fetch(FetchDescriptor<KnowledgeJob>(predicate: #Predicate { $0.kindRaw == kind }))
+                .filter { $0.meetingID.map(meetingIDs.contains) ?? false }
+        } catch { throw .persistenceFailed(error.localizedDescription) }
     }
 
     /// Deletes one recording segment, its audio and the photos taken during

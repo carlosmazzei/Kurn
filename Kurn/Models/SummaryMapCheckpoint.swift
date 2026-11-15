@@ -9,15 +9,15 @@
 //  app or losing the network mid-run meant redoing — and for a cloud provider,
 //  re-paying for — every block from the start (H4).
 //
-//  Summary and Wiki generation share this one checkpoint per meeting rather
-//  than each keeping their own: `WikiService.generate` delegates to
+//  Summary generation keeps this checkpoint per meeting. Wiki now writes its
+//  own durable KnowledgeJob checkpoint (K1.6a), but may seed from this legacy
+//  field when compatible: `WikiService.generate` delegates to
 //  `SummaryService.generate` with the same `notesTemplate` the summary map
 //  stage already uses, so for a given meeting the map stage produces
 //  byte-identical notes regardless of which artifact triggered it. A summary
-//  run and a wiki run racing on the same meeting can therefore share (or
-//  briefly overwrite) each other's progress with no correctness risk — the
-//  worst case is redoing one already-completed block, never spliced or
-//  incorrect notes. `GeneratedDocument` generation is deliberately not wired
+//  run can therefore seed a compatible wiki run without splicing or
+//  incorrect notes. New wiki progress never overwrites this field.
+//  `GeneratedDocument` generation is deliberately not wired
 //  to this: it can combine multiple meetings' text into one map-reduce run,
 //  which has no single `Meeting` to persist a checkpoint on.
 //

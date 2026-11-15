@@ -20,6 +20,14 @@ import Testing
 
 struct ResourceSchedulerTests {
 
+    @Test func localKnowledgeCannotOverlapHeavyASRButCloudCan() {
+        let local = ResourceWorkKind.knowledgeGeneration(onDevice: true).weight
+        let remote = ResourceWorkKind.knowledgeGeneration(onDevice: false).weight
+        let asr = ResourceWorkKind.transcription(.whisperCpp).weight
+        #expect(local + asr > ResourceScheduler.defaultTotalWeight)
+        #expect(remote + asr <= ResourceScheduler.defaultTotalWeight)
+    }
+
     // The queue-introspection tests use the DEBUG-only `waiterCountForTesting`
     // and are absent from the Release-configuration lane.
     #if DEBUG
