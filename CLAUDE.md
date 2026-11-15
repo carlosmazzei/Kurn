@@ -2876,10 +2876,10 @@ hold for every phase; code comments cite this section.
   from changed/removed recordings is marked unavailable across scopes and
   unsupported assertions are invalidated. Relations and events remain historical
   records tied to their assertion/revision; readers must filter through them.
-  The latest pending projection is durable across reopening. Acknowledging N
-  clears pending revisions through N only if N is still current, so a stale
-  worker cannot erase newer work. K2 must publish projections in that same
-  transaction before acknowledgement; this step does not publish pages/indexes.
+  The latest pending projection is durable across reopening. K2.1 publishes
+  pages and acknowledges covered revisions in the same transaction, requiring
+  the exact current canonical/source/policy snapshot. There is no standalone
+  acknowledgement API; a stale worker cannot erase newer work.
   No schema migration or cloud processing is enabled by this boundary.
 - **Durable article scheduling (K1.6a).** `KnowledgeJobQueue` is owned by
   `AppEnvironment`, shared by the wiki facade and future canonical producer.
@@ -3029,6 +3029,50 @@ Where the checkout makes the specification bend:
 | Export bundle (JSONL, Markdown, GraphML) | Meeting export via share sheet (`MeetingExport`, `DocumentExport`) | Knowledge export is disabled by default, has no generic share sheet in the corporate mode, and lands last (K6) after the egress audit |
 | Settings → Knowledge with provider, scope, backfill | Settings → Wiki (`WikiSettingsView`) with `wikiEnabled` and bulk missing/rebuild | Settings → Wiki becomes Settings → Knowledge: the meeting wiki keeps its own toggle and consent, Knowledge adds its own; neither implies the other |
 | `ProcessingPolicy`, `KnowledgeWorkspace`, `KnowledgeContext` (§20.1) | Provider consent is per feature (`wikiEnabled`, `correctionEnabled`, …); the provider circuit breaker gates automatic calls | One workspace in `mode=privateCorporate`; `KnowledgeProcessingPolicy` (KurnCore, pure) evaluates destination × operation × classification and is checked before retrieval, prompt assembly, egress and export. Folders are not ACLs |
+
+### Global wiki projection (K2.1)
+
+`KnowledgeWikiProjector` in KurnCore builds deterministic structured entity
+pages from host-checked assertions. Redirects group views without rewriting
+fact or evidence IDs; incoming relationships preserve their direction. Every
+claim retains modality, negation, authority, confidence, review state,
+attribution, valid-time precision and transaction time. It makes no temporal
+state inference or last-mention-wins choice; that remains K3. Sections and
+entries have stable ordering. Markdown escapes all untrusted text and emits
+only host-owned `entity:`/`evidence:` links, with no registered URL scheme.
+
+`KnowledgeStore.wikiProjectionSnapshot` requires an explicit allowed meeting-ID
+set (currently at most 16), live feature/policy authorization for local page
+processing, and every persisted context policy. It binds assertions to exact
+succeeded compilation provenance in the requested scope/current policy,
+revalidates evidence against current transcript bytes, and resolves attribution
+through the original segment. Retracted/rejected/unsupported claims and
+redirects outside the selected origins do not contribute pages, names or IDs.
+Scope strings are not ACLs. Candidate-discovery caps are not projection caps:
+entity origin proofs traverse authorized history. Projection bounds are 2,048
+entities, 4,096 active source assertions, 16,384 evidence items and an 8 MiB
+stored envelope; exceeding them is an explicit refusal, never silent truncation.
+
+`publishWikiProjection` re-reads and compares all inputs, rebuilds pages, and
+atomically saves a versioned checksummed projection in a succeeded `.projection`
+job's `checkpointData` in the existing protected store. Its stable key covers
+scope and selected source IDs. Only revisions whose complete source/scope
+dependencies are covered are acknowledged; unrelated and unrecognized work
+stays pending. Human merge/undo coverage is checked against its retained audit.
+Invalid output or save failure preserves the previous valid pages and outbox;
+unreadable/future payloads are never overwritten. Reads recheck authorization,
+policy, source tokens, canonical revision and canonical content before returning
+a cached page; stale caches return nil. No provider is needed to build/read.
+
+Optional local narrative output is a versioned list of plain-text paragraphs
+with assertion IDs. Each paragraph needs unique citations belonging to that
+page; the host renders their evidence links. Missing/foreign/future/oversized
+output is refused for the whole publication. This checks citation integrity,
+not semantic entailment. Narratives stay visibly separate from attributed
+claims and never become canonical evidence. This backend performs no model
+calls or egress, enables no cloud processing, and changes neither schema nor
+navigation. Provider execution, automatic projection admission and the reading
+UI will be composed by the later K2 host/UI work; these APIs are not model tools.
 
 ### Attached documents (PDFs)
 
