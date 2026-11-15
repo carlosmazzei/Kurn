@@ -14,6 +14,16 @@ enum KnowledgeWikiProjectionRows {
     }
 
     static func payload(_ row: KnowledgeJob) throws -> KnowledgeWikiProjection {
+        let value = try envelope(row)
+        guard value.pages == (try KnowledgeWikiProjector.project(value.snapshot, narratives: value.pages.compactMap(\.narrative))) else {
+            throw KnowledgeWikiStoreError.unreadableProjection
+        }
+        return value
+    }
+
+    /// Maintenance may inspect well-formed but structurally broken pages. The
+    /// normal read/publication path still requires complete page validation.
+    static func envelope(_ row: KnowledgeJob) throws -> KnowledgeWikiProjection {
         guard row.kindRaw == KnowledgeJobKind.projection.rawValue, row.stateRaw == KnowledgeJobState.succeeded.rawValue,
               row.pipelineVersion == pipeline, row.meetingID == nil, let bytes = row.checkpointData else {
             throw KnowledgeWikiStoreError.unreadableProjection
@@ -24,8 +34,7 @@ enum KnowledgeWikiProjectionRows {
         guard let value = result.decodedValue else { throw KnowledgeWikiStoreError.unreadableProjection }
         guard value.version == 1 else { throw KnowledgeWikiStoreError.unsupportedProjection }
         guard !value.sources.isEmpty, Set(value.sources.map(\.meetingID)).count == value.sources.count,
-              row.idempotencyKey == (try key(scope: value.scope, meetingIDs: Set(value.sources.map(\.meetingID)))),
-              value.pages == (try KnowledgeWikiProjector.project(value.snapshot, narratives: value.pages.compactMap(\.narrative))) else {
+              row.idempotencyKey == (try key(scope: value.scope, meetingIDs: Set(value.sources.map(\.meetingID)))) else {
             throw KnowledgeWikiStoreError.unreadableProjection
         }
         return value

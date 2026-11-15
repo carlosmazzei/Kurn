@@ -3077,6 +3077,46 @@ calls or egress, enables no cloud processing, and changes neither schema nor
 navigation. Provider execution, automatic projection admission and the reading
 UI will be composed by the later K2 host/UI work; these APIs are not model tools.
 
+### Knowledge maintenance lint (K2.2)
+
+`KnowledgeMaintenanceLinter` in KurnCore returns the v1 Codable maintenance
+schema: stable deduplicated finding IDs, closed codes/recommendations, canonical
+revision, completeness and per-recording segment examination counts. These are
+measured coverage counts, not semantic recall/precision. Broken entity/evidence
+links identify only the readable source page; unknown targets never appear in
+reports. Stale caches are not inspected for old IDs or counts. Duplicate identity
+candidates stay suggestions for human review, with reversed/repeated pairs folded
+into one finding. Recommendations never execute merges, deletion or repairs.
+
+`KnowledgeStore.maintenanceReport` is a host-only read API with fresh contexts and
+no awaits after authorization. The shared `KnowledgeSourceAuthorization` (also
+available as `KnowledgeWikiAuthorization`) checks the local `.semanticLint`
+operation independently of `.pageNarrative`, plus the explicit source-ID ACL,
+feature flag, inherited classification and persisted context policies. It reads
+only the requested scope's source-bound compilations. The latest canonical job
+in that scope determines coverage; an old policy/fingerprint is an explicit gap.
+Invalid/duplicate/unknown examined anchors cannot count as complete coverage.
+Only current visible, unmerged entities without a readable evidence-backed claim
+are orphan candidates; historical identities retained by recompilation are not
+reported as garbage. Selected candidate subject envelopes and current source/
+policy/entity bindings are verified before reading review payloads.
+
+The report contains no names, quotes, prompts, Markdown or free-form error text.
+Canonical corruption produces an incomplete report and suppresses speculative
+identity/page details; unrecognized future selected schemas are refused without
+rewriting bytes. Unselected review subjects disclose no IDs, payloads or counts
+and cannot block this scope on their schema. Well-formed but broken projection
+pages can be diagnosed through the envelope-only reader; normal wiki reads still
+require full validation. No job/review/page/canonical/outbox state changes during
+inspection. Reports are freshly computed, never a cached authority for later
+reads or repair. The JSON maintenance contract does not change SwiftData schema.
+
+Limits fail explicitly rather than returning a clean truncated report: 16 source
+meetings, 4,096 succeeded jobs examined per source, existing wiki entity/fact/
+evidence limits, 1,024 recording coverage entries and 8,192 review rows/findings.
+This step enables no model calls, semantic LLM lint, egress, automatic scheduling,
+new navigation or maintenance UI; the latter remains K2.6–K2.7.
+
 ### Attached documents (PDFs)
 
 A meeting can carry PDFs as reference material for its summaries
