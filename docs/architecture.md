@@ -207,8 +207,13 @@ sequenceDiagram
 
 The app's side of the harness:
 
-- **Composition.** `HarnessChatService` resolves the model's context window and composes the
-  harness with Kurn's tools, prompts and pricing.
+- **Composition.** `HarnessChatService` resolves the model's context window and capabilities and
+  composes the harness with Kurn's tools, prompts and pricing. Capacities, capabilities and prices
+  come from the bundled catalogs, corrected between releases by the remote model catalog
+  (`catalog/model-catalog-v1.json`, applied by `ModelCatalogUpdater` only while a cloud provider is
+  in use).
+- **Effects.** Read tools run freely; replacing a document's body is destructive and asks first
+  (`ChatChangeConfirmation`). The document card can undo the last change.
 - **Tools.** `ChatSourceTools` are read-only and read only the sources the run's frozen
   authorization allows. `ChatDocumentTools` also write: they create, replace and append to the
   run's versioned document artifacts, which persist immediately with a receipt, even if the reply
