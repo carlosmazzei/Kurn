@@ -2801,6 +2801,29 @@ hold for every phase; code comments cite this section.
   fallback. There is no transcript history or new persisted field/migration.
   K1.5 must recapture the revision at commit and maintain stored evidence
   availability; this step provides the snapshot/resolution boundary only.
+- **Extraction contract (K1.4).** KurnCore's `KnowledgeExtraction.decode`
+  validates the complete version-1 Codable document before it can leave a pass:
+  known fields/vocabularies only, local unique references, predicate/object rules,
+  stated dates, original contiguous verbatim evidence, cited attribution anchors
+  and explicit examined-segment coverage. Models cannot set review state, confer
+  human confirmation, or emit merge/context-link operations. Events require a
+  supporting assertion with a compatible predicate. Replies are capped at 2 MB;
+  decoding errors expose fixed codes rather than content.
+  `Application/Knowledge/KnowledgeExtractionService` is value-in/value-out and
+  unwired: it accepts an injected `LLMProvider`, `ContextBudget` and live
+  authorization callback. Full context goes first when it fits; otherwise
+  segment-aligned blocks retain every anchor. Oversized individual segments fail
+  explicitly. One targeted round requests unexamined anchors; a remaining gap
+  fails the run. At most 64 extraction passes, each with one fresh repair on a
+  schema/validation error (never on transport failure); repair sends only the
+  original input and a fixed diagnostic, never echoes the bad reply. Validation
+  uses the full original transcript order even for noncontiguous targeted input,
+  preventing stitched evidence across omitted segments. Pass-local references
+  stay separate for K1.7 entity resolution. Policy/consent is re-evaluated before
+  constructing prompts and before each provider call, including repairs; output
+  records source fingerprint, strategy, examined anchors and targeted pass count.
+  This does not enable cloud processing, write canonical rows, or establish
+  semantic extraction accuracy: K0.4 benchmarking and K1.5 commit checks remain.
 - **Public material is synthetic.** The golden set
   (`Packages/KurnCore/Tests/KurnCoreTests/Fixtures/knowledge/`, format
   `kurn.knowledge-fixture` v1) holds fictional meetings in Portuguese and
