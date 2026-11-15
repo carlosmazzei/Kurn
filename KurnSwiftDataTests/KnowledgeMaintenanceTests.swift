@@ -289,6 +289,9 @@ struct KnowledgeMaintenanceTests {
         row.checkpointData = bytes
         try context.save()
         await #expect(throws: KnowledgeMaintenanceError.unsupportedArtifact) { try await report(f) }
+        var changedPolicy = f
+        changedPolicy.auth.policies[0].revision += 1
+        await #expect(throws: KnowledgeMaintenanceError.unsupportedArtifact) { try await report(changedPolicy) }
         #expect(try job(.projection, in: ModelContext(f.container)).checkpointData == bytes)
     }
 
