@@ -14,13 +14,15 @@
 //  contexts, forecasts that are not decisions) in both Portuguese and English.
 //  Organizations are fictional by rule: public fixtures never name a real one.
 //
-//  The vocabularies below are the specification's (v1.3, §5 and §20); the
-//  extraction contract will move them into KurnCore and this suite will read
-//  them from there.
+//  The vocabularies are KurnCore's (`KnowledgeVocabulary`, `KnowledgePredicate`,
+//  `KnowledgeTypedValue`), and every assertion is also run through the
+//  predicate registry and every citation through `KnowledgeEvidenceValidator`,
+//  the checks extraction output will have to pass.
 //
 
 import Foundation
 import Testing
+@testable import KurnCore
 
 struct KnowledgeFixture: Decodable {
     struct Segment: Decodable {
@@ -121,29 +123,16 @@ enum KnowledgeFixtureVocabulary {
         "reopen", "supersede", "units", "correctedTranscript", "promptInjection", "externalContexts",
         "forecastNotDecision"
     ]
-    static let entityKinds: Set = [
-        "topic", "project", "initiative", "person", "team", "organization", "system", "technology",
-        "decisionThread", "actionItem", "risk", "question", "metric"
-    ]
-    static let predicates: Set = [
-        "relatesTo", "partOf", "owns", "assignedTo", "dependsOn", "blocks", "supports", "opposes", "proposes",
-        "approves", "rejects", "supersedes", "contradicts", "resolves", "mentions", "reportsMetric", "hasStatus",
-        "dueOn", "presentedAt", "hostedBy", "attributedTo", "discusses", "evaluates", "references", "inspiredBy",
-        "adoptedIn", "challenges", "forecastFor"
-    ]
-    static let modalities: Set = ["reported", "proposed", "agreed", "disputed", "hypothetical", "observed", "inferred"]
-    static let polarities: Set = ["positive", "negative"]
-    static let claimKinds: Set = [
-        "analystForecast", "vendorClaim", "externalObservation", "researchFinding", "personalReflection",
-        "internalHypothesis", "internalProposal", "internalDecision", "internalStatusReport", "commitment",
-        "question", "unknown"
-    ]
-    static let contexts: Set = [
-        "internalMeeting", "conference", "conferenceSession", "executiveBriefing", "vendorDiscussion",
-        "executiveConversation", "workshop", "personalReflection", "other", "unknown"
-    ]
-    static let precisions: Set = ["instant", "day", "month", "unknown"]
-    static let valueTypes: Set = ["string", "number", "boolean", "date", "enum"]
+    // The closed vocabularies come from KurnCore, so the fixtures and the
+    // canonical layer cannot drift apart.
+    static let entityKinds = Set(KnowledgeEntityKind.allCases.map(\.rawValue))
+    static let predicates = Set(KnowledgePredicate.allCases.map(\.rawValue))
+    static let modalities = Set(KnowledgeModality.allCases.map(\.rawValue))
+    static let polarities = Set(KnowledgePolarity.allCases.map(\.rawValue))
+    static let claimKinds = Set(KnowledgeClaimKind.allCases.map(\.rawValue))
+    static let contexts = Set(KnowledgeContextKind.allCases.map(\.rawValue))
+    static let precisions = Set(KnowledgeTemporalPrecision.allCases.map(\.rawValue))
+    static let valueTypes = Set(KnowledgeValueType.allCases.map(\.rawValue))
 }
 
 struct KnowledgeFixtureTests {
@@ -408,6 +397,41 @@ struct KnowledgeFixtureTests {
             }
             if covers.contains("forecastNotDecision") {
                 #expect(fixture.expected.assertions.contains { $0.claimKind == "analystForecast" && $0.modality == "hypothetical" })
+            }
+        }
+    }
+
+    /// Each expected assertion is something the canonical layer would accept:
+    /// its shape fits the predicate registry, its value decodes as a typed
+    /// value, and every citation passes the host's evidence validator.
+    @Test func expectedAssertionsPassTheCanonicalChecks() throws {
+        for fixture in try Self.loadAll() {
+            let kinds = Dictionary(uniqueKeysWithValues: fixture.expected.entities.map { ($0.ref, $0.kind) })
+            let validators = Dictionary(uniqueKeysWithValues: fixture.sources.map { source in
+                (source.id, KnowledgeEvidenceValidator(segments: source.segments.map {
+                    KnowledgeSourceSegment(id: $0.id, startMs: $0.startMs, endMs: $0.endMs, text: $0.text)
+                }))
+            })
+            for assertion in fixture.expected.assertions {
+                let label = "\(fixture.id)/\(assertion.ref)"
+                let predicate = try #require(KnowledgePredicate(rawValue: assertion.predicate), "\(label): predicate")
+                let subject = try #require(kinds[assertion.subject].flatMap(KnowledgeEntityKind.init(rawValue:)), "\(label): subject")
+                let object = assertion.object.flatMap { kinds[$0] }.flatMap(KnowledgeEntityKind.init(rawValue:))
+                var valueType: KnowledgeValueType?
+                if let value = assertion.value {
+                    var wire: [String: String] = ["type": value.type, "value": value.value]
+                    wire["unit"] = value.unit
+                    wire["precision"] = value.precision
+                    let typed = try JSONDecoder().decode(KnowledgeTypedValue.self, from: JSONEncoder().encode(wire))
+                    valueType = typed.type
+                }
+                #expect(predicate.rule.violation(subjectKind: subject, objectKind: object, valueType: valueType) == nil,
+                        "\(label): shape does not fit \(predicate.rawValue)")
+                for evidence in assertion.evidence {
+                    let validator = try #require(validators[evidence.source], "\(label): source")
+                    let result = validator.validate(KnowledgeEvidenceClaim(segmentIDs: evidence.segmentIDs, quote: evidence.quote))
+                    #expect((try? result.get()) != nil, "\(label): evidence rejected")
+                }
             }
         }
     }
