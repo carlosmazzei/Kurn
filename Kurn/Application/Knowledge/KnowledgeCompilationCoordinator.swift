@@ -123,6 +123,31 @@ final class KnowledgeCompilationCoordinator {
     }
 
     private func perform(_ handle: KnowledgeJobHandle) async throws {
+        let runID = OperationID()
+        let started = Date()
+        do {
+            try await performCompilation(handle)
+            ReliabilityLog.record(ReliabilityEvent(operationID: runID, operation: "knowledge_compilation", outcome: .succeeded,
+                elapsedSeconds: Date().timeIntervalSince(started)))
+        } catch is CancellationError {
+            ReliabilityLog.record(ReliabilityEvent(operationID: runID, operation: "knowledge_compilation", outcome: .cancelled,
+                elapsedSeconds: Date().timeIntervalSince(started), code: "interrupted"))
+            throw CancellationError()
+        } catch let deferred as KnowledgeJobDeferred {
+            throw deferred
+        } catch let obsolete as KnowledgeWorkObsolete {
+            throw obsolete
+        } catch {
+            let code = (error as? AppError)?.logCode ?? (error as? KnowledgeStoreError)?.rawValue
+                ?? (error as? KnowledgeExtractionError)?.rawValue ?? (error as? KnowledgeExtractionServiceError)?.rawValue
+                ?? (error as? KnowledgeQueueError)?.rawValue ?? "compilation_failed"
+            ReliabilityLog.record(ReliabilityEvent(operationID: runID, operation: "knowledge_compilation", outcome: .failed,
+                elapsedSeconds: Date().timeIntervalSince(started), code: code))
+            throw error
+        }
+    }
+
+    private func performCompilation(_ handle: KnowledgeJobHandle) async throws {
         do {
             let snapshot = try await currentSource(handle)
             guard isProviderUsable(handle.work.provider) else { throw KnowledgeJobDeferred(reason: .providerUnavailable) }
@@ -154,6 +179,12 @@ final class KnowledgeCompilationCoordinator {
         } catch KnowledgeExtractionServiceError.policyDenied {
             _ = try await currentSource(handle) // Preserve the precise deferral/obsolescence reason.
             throw KnowledgeJobDeferred(reason: .policyDenied)
+        } catch KnowledgeStoreError.sourceChanged {
+            throw KnowledgeWorkObsolete.sourceChanged
+        } catch KnowledgeStoreError.policyChanged {
+            throw KnowledgeWorkObsolete.policyChanged
+        } catch KnowledgeQueueError.staleLease {
+            throw KnowledgeWorkObsolete.sourceDeleted
         } catch KnowledgeStoreError.sourceMissing {
             throw KnowledgeWorkObsolete.sourceDeleted
         } catch KnowledgeStoreError.policyDenied {

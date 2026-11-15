@@ -45,7 +45,7 @@ struct KnowledgeExtractionServiceTests {
         #expect(call.messages.count == 1)
         #expect(call.messages[0].role == .user)
         #expect(call.messages[0].content.contains("2026-11-15T10:00:00Z"))
-        #expect(call.options == .document)
+        #expect(call.options == .knowledgeExtraction(for: .openAI))
     }
 
     @Test func missingMiddleTriggersTargetedPassWithoutReprocessingTheWholeTranscript() async throws {
@@ -254,6 +254,44 @@ struct KnowledgeExtractionServiceTests {
             }
             #expect(llm.chatCalls.count == (count == 1 ? 1 : 2))
         }
+    }
+
+    @Test func localOutputCeilingPlansCoverageAndSplitsATruncatedJSONPass() async throws {
+        let source = segments(count: 4)
+        let llm = ScriptedLLMProvider(provider: .appleOnDevice, chat: { call, _ in
+            #expect(call.options.maxOutputTokens == 1_024)
+            #expect(call.options.requiresCompleteJSON)
+            let ids = try Self.inputIDs(call)
+            if ids.count > 2 {
+                // Simulate the adapter reaching its 1024-token ceiling midway
+                // through JSON. Use the adapter's actual truncation classifier.
+                try FoundationModelsProvider.requireCompleteJSON("{\"version\":1,\"entities\":[")
+            }
+            return try Self.emptyReply(ids: ids)
+        })
+        let local = KnowledgeExtractionAuthorization(featureEnabled: true, policies: [.defaultDeny()], sourceClassifications: [.internal])
+        let result = try await KnowledgeExtractionService().extract(segments: source, language: "en", context: context,
+            llm: llm, budget: budget, authorization: { local })
+        #expect(llm.chatCalls.count == 3)
+        #expect(result.strategy == .blocks)
+        #expect(result.passes.count == 2)
+        #expect(result.examinedSegmentIDs.count == 4)
+    }
+
+    @Test func localCoveragePlanningUsesTheEffective1024TokenOutputAllowance() async throws {
+        let source = segments(count: 100, text: "Yes.")
+        let llm = ScriptedLLMProvider(provider: .appleOnDevice, chat: { call, _ in
+            let reply = try Self.emptyReply(ids: Self.inputIDs(call))
+            #expect(call.options.maxOutputTokens == 1_024)
+            #expect(TokenEstimate.tokens(in: reply) < 512)
+            return reply
+        })
+        let local = KnowledgeExtractionAuthorization(featureEnabled: true, policies: [.defaultDeny()], sourceClassifications: [.internal])
+        let result = try await KnowledgeExtractionService().extract(segments: source, language: "en", context: context,
+            llm: llm, budget: ContextBudget(inputTokens: 100_000, mapBlockTokens: 75_000), authorization: { local })
+        #expect(result.strategy == .blocks)
+        #expect(result.examinedSegmentIDs.count == 100)
+        #expect(llm.chatCalls.count > 1)
     }
 
 }

@@ -56,16 +56,17 @@ struct KnowledgeExtractionService: Sendable {
             KnowledgeExtractionPrompt.Source(id: source.id, speaker: segment.speakerLabel,
                 startMs: source.startMs, endMs: source.endMs, text: source.text)
         }
-        let groups = try plan(sources, context: context, budget: budget)
+        let options = TextGenerationOptions.knowledgeExtraction(for: llm.provider)
+        let groups = try plan(sources, context: context, budget: budget, outputTokens: options.maxOutputTokens)
         let initial = try await runGroups(groups, context: context, revision: revision, llm: llm,
-            authorization: authorization, remainingPasses: 64)
+            authorization: authorization, remainingPasses: 64, options: options)
         let examined = Set(initial.documents.flatMap(\.examinedSegmentIDs))
         // Explicit coverage of all anchors implies start/middle/end coverage.
         // Apply the same input AND output planning to the one targeted round.
         let missing = sources.filter { !examined.contains($0.id) }
-        let targeted = try missing.isEmpty ? [] : plan(missing, context: context, budget: budget)
+        let targeted = try missing.isEmpty ? [] : plan(missing, context: context, budget: budget, outputTokens: options.maxOutputTokens)
         let recovery = try await runGroups(targeted, context: context, revision: revision, llm: llm,
-            authorization: authorization, remainingPasses: 64 - initial.attempts)
+            authorization: authorization, remainingPasses: 64 - initial.attempts, options: options)
         let passes = initial.documents + recovery.documents
         guard Set(passes.flatMap(\.examinedSegmentIDs)).count == sources.count else {
             throw KnowledgeExtractionServiceError.incompleteCoverage
@@ -77,16 +78,16 @@ struct KnowledgeExtractionService: Sendable {
 
     /// Reserve half the output allowance for assertions/evidence. UUID coverage
     /// alone must never consume the full response before any knowledge fits.
-    private func outputFits(_ sources: [KnowledgeExtractionPrompt.Source]) throws -> Bool {
+    private func outputFits(_ sources: [KnowledgeExtractionPrompt.Source], outputTokens: Int) throws -> Bool {
         let data = try JSONEncoder().encode(sources.map(\.id))
-        return TokenEstimate.tokens(in: String(decoding: data, as: UTF8.self)) + 100 <= TextGenerationOptions.document.maxOutputTokens / 2
+        return TokenEstimate.tokens(in: String(decoding: data, as: UTF8.self)) + 100 <= outputTokens / 2
     }
 
     private func plan(
-        _ sources: [KnowledgeExtractionPrompt.Source], context: KnowledgeExtractionContext, budget: ContextBudget
+        _ sources: [KnowledgeExtractionPrompt.Source], context: KnowledgeExtractionContext, budget: ContextBudget, outputTokens: Int
     ) throws -> [[KnowledgeExtractionPrompt.Source]] {
-        if budget.fits(try KnowledgeExtractionPrompt.input(sources, context: context)), try outputFits(sources) { return [sources] }
-        return try blocks(sources, context: context, budget: budget)
+        if budget.fits(try KnowledgeExtractionPrompt.input(sources, context: context)), try outputFits(sources, outputTokens: outputTokens) { return [sources] }
+        return try blocks(sources, context: context, budget: budget, outputTokens: outputTokens)
     }
 
     private struct Batch {
@@ -99,14 +100,14 @@ struct KnowledgeExtractionService: Sendable {
     private func runGroups(
         _ groups: [[KnowledgeExtractionPrompt.Source]], context: KnowledgeExtractionContext,
         revision: KnowledgeTranscriptRevision, llm: any LLMProvider,
-        authorization: @Sendable () async -> KnowledgeExtractionAuthorization, remainingPasses: Int
+        authorization: @Sendable () async -> KnowledgeExtractionAuthorization, remainingPasses: Int, options: TextGenerationOptions
     ) async throws -> Batch {
         guard groups.count <= remainingPasses else { throw KnowledgeExtractionServiceError.requestLimit }
         var result = Batch()
         for (index, group) in groups.enumerated() {
             result.attempts += 1
             do {
-                result.documents.append(try await run(group, context: context, revision: revision, llm: llm, authorization: authorization))
+                result.documents.append(try await run(group, context: context, revision: revision, llm: llm, authorization: authorization, options: options))
             } catch AppError.generationTruncated {
                 // One split only, preserving original anchors. A single huge
                 // segment or a second truncation fails explicitly, never loops.
@@ -118,7 +119,7 @@ struct KnowledgeExtractionService: Sendable {
                 let middle = group.count / 2
                 for half in [Array(group[..<middle]), Array(group[middle...])] {
                     result.attempts += 1
-                    result.documents.append(try await run(half, context: context, revision: revision, llm: llm, authorization: authorization))
+                    result.documents.append(try await run(half, context: context, revision: revision, llm: llm, authorization: authorization, options: options))
                 }
             }
         }
@@ -126,14 +127,14 @@ struct KnowledgeExtractionService: Sendable {
     }
 
     private func blocks(
-        _ sources: [KnowledgeExtractionPrompt.Source], context: KnowledgeExtractionContext, budget: ContextBudget
+        _ sources: [KnowledgeExtractionPrompt.Source], context: KnowledgeExtractionContext, budget: ContextBudget, outputTokens: Int
     ) throws -> [[KnowledgeExtractionPrompt.Source]] {
         let mapBudget = ContextBudget(inputTokens: budget.mapBlockTokens, mapBlockTokens: budget.mapBlockTokens)
         var groups: [[KnowledgeExtractionPrompt.Source]] = []
         var current: [KnowledgeExtractionPrompt.Source] = []
         for source in sources {
             let inputFits = mapBudget.fits(try KnowledgeExtractionPrompt.input(current + [source], context: context))
-            let coverageFits = try outputFits(current + [source])
+            let coverageFits = try outputFits(current + [source], outputTokens: outputTokens)
             if !inputFits || !coverageFits {
                 guard !current.isEmpty else { throw KnowledgeExtractionServiceError.segmentExceedsBudget }
                 groups.append(current)
@@ -153,7 +154,7 @@ struct KnowledgeExtractionService: Sendable {
     private func run(
         _ sources: [KnowledgeExtractionPrompt.Source], context: KnowledgeExtractionContext,
         revision: KnowledgeTranscriptRevision, llm: any LLMProvider,
-        authorization: @Sendable () async -> KnowledgeExtractionAuthorization
+        authorization: @Sendable () async -> KnowledgeExtractionAuthorization, options: TextGenerationOptions
     ) async throws -> KnowledgeExtraction {
         try Task.checkCancellation()
         try await authorize(llm, authorization)
@@ -166,7 +167,7 @@ struct KnowledgeExtractionService: Sendable {
             try Task.checkCancellation()
             try await authorize(llm, authorization)
             let reply = try await llm.chat(systemPrompt: system + diagnostic,
-                messages: [ChatMessage(role: .user, content: input)], options: .document)
+                messages: [ChatMessage(role: .user, content: input)], options: options)
             try Task.checkCancellation()
             do {
                 let document = try KnowledgeExtraction.decode(Data(reply.utf8), segments: revision.snapshot.sourceSegments)
