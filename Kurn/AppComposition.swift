@@ -31,6 +31,7 @@ struct AppEnvironment {
     let playbackEnhancement: PlaybackEnhancementViewModel
     let semanticIndex: SemanticIndexCoordinator
     let wiki: WikiCoordinator
+    let knowledgeJobs: KnowledgeJobQueue
     /// The live recording session, app-wide so the recorder can be minimized
     /// while the rest of the app stays usable.
     let recordingSession: RecordingSessionController
@@ -67,6 +68,7 @@ final class AppComposition {
         if let environment, environment.modelContainer === container {
             return environment
         }
+        environment?.knowledgeJobs.setForeground(false)
         let built = Self.makeEnvironment(container: container, settings: settings)
         Self.runLaunchSweeps(container: container, settings: settings)
         environment = built
@@ -79,7 +81,8 @@ final class AppComposition {
     static func makeEnvironment(container: ModelContainer, settings: AppSettings) -> AppEnvironment {
         let context = container.mainContext
         let semanticIndex = SemanticIndexCoordinator(modelContext: context, appSettings: settings)
-        let wiki = WikiCoordinator(modelContext: context, appSettings: settings)
+        let jobs = KnowledgeJobQueue(container: container, foreground: false)
+        let wiki = WikiCoordinator(modelContext: context, appSettings: settings, jobQueue: jobs)
         let reviewPrompt = ReviewPromptCoordinator()
         let transcription = TranscriptionCoordinator(
             modelContext: context,
@@ -95,7 +98,8 @@ final class AppComposition {
             playbackEnhancement: PlaybackEnhancementViewModel(modelContext: context),
             semanticIndex: semanticIndex,
             wiki: wiki,
-            recordingSession: RecordingSessionController(modelContext: context, settings: settings),
+            knowledgeJobs: jobs,
+            recordingSession: RecordingSessionController(modelContext: context, settings: settings, onActivityChanged: { jobs.setRecording($0) }),
             reviewPrompt: reviewPrompt,
             chatConversations: ChatConversationHost()
         )

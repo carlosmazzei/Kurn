@@ -2784,7 +2784,8 @@ hold for every phase; code comments cite this section.
   revision is the projection outbox while `projectionPending`. A meeting without a
   `SourceContextLink` is in context `unknown`, so the V6 → V7 stage is lightweight and
   writes nothing. `LibraryEraser` deletes all ten. `KnowledgeStore` (K1.5) is
-  their canonical writer; scheduling and the application wiring remain K1.6.
+  their canonical writer. K1.6a wires the shared queue and meeting articles;
+  K1.6b still needs to connect canonical extraction.
 - **Transcript revisions and anchors (K1.3).** KurnCore's
   `KnowledgeTranscriptSnapshot` freezes transcript array order and UUID anchors
   (lowercase strings), and produces versioned, length-prefixed UTF-8 canonical
@@ -2833,7 +2834,8 @@ hold for every phase; code comments cite this section.
   semantic extraction accuracy: K0.4 benchmarking and K1.6 scheduling remain.
 - **Canonical writer and projection outbox (K1.5).** `KnowledgeStore` is a
   `@ModelActor` over the existing protected container. The host must own one
-  writer per container and create it off-main when wiring the K1.6 queue; UI
+  writer per container; K1.6a's `KnowledgeStoreHost` constructs it off-main,
+  lazily and once for its queue; UI
   continues to read through its own context. Only Sendable source snapshots,
   encoded extraction documents and receipts cross its boundary. Each operation
   opens a fresh context, avoiding cached source bytes across commits.
@@ -2875,6 +2877,39 @@ hold for every phase; code comments cite this section.
   worker cannot erase newer work. K2 must publish projections in that same
   transaction before acknowledgement; this step does not publish pages/indexes.
   No schema migration or cloud processing is enabled by this boundary.
+- **Durable article scheduling (K1.6a).** `KnowledgeJobQueue` is owned by
+  `AppEnvironment`, shared by the wiki facade and future canonical producer.
+  Typed host intents and lease-checked, versioned checkpoints live in
+  `KnowledgeJob`, written through the environment's one `KnowledgeStoreHost`.
+  A stale worker cannot checkpoint or resurrect erased work. Deferrals do not
+  consume the failure limit; three genuine failures require manual retry.
+  `ResourceWorkKind.knowledgeGeneration` reserves 50 units locally or 5 remotely
+  (initial estimates); the reservation is released before completion is observed.
+  Recording-session start cancels admission/in-flight work before capture starts;
+  ending the session permits resume. Backgrounding pauses, foreground activation
+  resumes, and automatic admission is capped at five jobs per activation. Direct
+  user requests do not silently grant another automatic quota. Deferred original
+  user requests remain distinct from fresh permission to override a circuit.
+  A launched provider call interrupted remotely requires explicit retry; crashes
+  before resource admission can resume. Recovery checks for an already committed
+  article before repeating a call, covering a crash between article save and job
+  completion. Foreground resume remains authoritative. The optional
+  `ai.kurn.knowledge.processing` BG window admits on-device work only, checks
+  protected-data/store availability and expires cooperatively without late
+  publication or a model download. It never grants cloud background processing.
+  `WikiCoordinator` keeps its observable/menu/bulk API, consent and provider
+  circuit; it is now the queue's `meetingArticle` producer. Source and provider
+  configuration are rechecked before publication, failed article saves propagate,
+  and staged notes belong to the job checkpoint. The legacy meeting summary
+  checkpoint may seed a compatible wiki run but is never overwritten or cleared
+  by it. Clear Wiki erases article-job checkpoints; meeting deletion includes
+  article jobs in its journaled model commit. Late replies refetch the meeting
+  and cannot recreate deleted articles/jobs. Repeated forced requests coalesce
+  while unfinished; a completed rebuild allows a new generation.
+  This does **not** activate canonical extraction: K1.6b still must add its
+  producer, per-recording checkpoints and policy-backed rebuild identity. The
+  independent `knowledgeEnabled` flag remains off by default, and existing wiki
+  consent never authorizes compiling knowledge across meetings.
 - **Public material is synthetic.** The golden set
   (`Packages/KurnCore/Tests/KurnCoreTests/Fixtures/knowledge/`, format
   `kurn.knowledge-fixture` v1) holds fictional meetings in Portuguese and
