@@ -417,16 +417,15 @@ struct KnowledgeFixtureTests {
                 let predicate = try #require(KnowledgePredicate(rawValue: assertion.predicate), "\(label): predicate")
                 let subject = try #require(kinds[assertion.subject].flatMap(KnowledgeEntityKind.init(rawValue:)), "\(label): subject")
                 let object = assertion.object.flatMap { kinds[$0] }.flatMap(KnowledgeEntityKind.init(rawValue:))
-                var valueType: KnowledgeValueType?
+                var typed: KnowledgeTypedValue?
                 if let value = assertion.value {
                     var wire: [String: String] = ["type": value.type, "value": value.value]
                     wire["unit"] = value.unit
                     wire["precision"] = value.precision
-                    let typed = try JSONDecoder().decode(KnowledgeTypedValue.self, from: JSONEncoder().encode(wire))
-                    valueType = typed.type
+                    typed = try JSONDecoder().decode(KnowledgeTypedValue.self, from: JSONEncoder().encode(wire))
                 }
-                #expect(predicate.rule.violation(subjectKind: subject, objectKind: object, valueType: valueType) == nil,
-                        "\(label): shape does not fit \(predicate.rawValue)")
+                #expect(predicate.violation(subjectKind: subject, objectKind: object, value: typed) == nil,
+                        "\(label): shape or value does not fit \(predicate.rawValue)")
                 for evidence in assertion.evidence {
                     let validator = try #require(validators[evidence.source], "\(label): source")
                     let result = validator.validate(KnowledgeEvidenceClaim(segmentIDs: evidence.segmentIDs, quote: evidence.quote))

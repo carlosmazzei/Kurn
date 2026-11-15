@@ -82,3 +82,16 @@ public enum KnowledgeContextKind: String, Codable, Sendable, CaseIterable {
 public enum KnowledgeOrganizationRole: String, Codable, Sendable, CaseIterable {
     case owner, host, speakerAffiliation, vendor, analyst, partner, mentioned
 }
+
+/// The closed status vocabulary of `hasStatus` (spec §5.3). Decision:
+/// proposed → approved/rejected/deferred → superseded/revoked. Action:
+/// proposed → committed → inProgress → completed/cancelled, reopened
+/// explicitly. Risk: identified → mitigated/accepted/closed, reopened
+/// explicitly. Plus the general states a project or question reports.
+/// A status is a projection of events; absence of mention never changes it.
+public enum KnowledgeStatus: String, Codable, Sendable, CaseIterable {
+    case proposed, approved, rejected, deferred, superseded, revoked
+    case committed, inProgress, completed, cancelled, reopened
+    case identified, mitigated, accepted, closed
+    case open, blocked, revised, ready
+}

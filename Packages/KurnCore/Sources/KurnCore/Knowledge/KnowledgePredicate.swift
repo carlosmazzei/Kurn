@@ -28,6 +28,28 @@ public enum KnowledgePredicate: String, Codable, Sendable, CaseIterable {
     public var rule: KnowledgePredicateRule {
         KnowledgePredicateRule.rule(for: self)
     }
+
+    /// The closed set an enumeration value must belong to, when the predicate
+    /// has one (`hasStatus` takes `KnowledgeStatus`).
+    public var allowedEnumerations: Set<String>? {
+        self == .hasStatus ? Set(KnowledgeStatus.allCases.map(\.rawValue)) : nil
+    }
+
+    /// The full check of an assertion's shape: the rule's subject and object
+    /// constraints, then the value's closed vocabulary, if any.
+    public func violation(
+        subjectKind: KnowledgeEntityKind,
+        objectKind: KnowledgeEntityKind?,
+        value: KnowledgeTypedValue?
+    ) -> KnowledgeSchemaViolation? {
+        if let violation = rule.violation(subjectKind: subjectKind, objectKind: objectKind, valueType: value?.type) {
+            return violation
+        }
+        if case let .enumeration(text) = value, let allowed = allowedEnumerations, !allowed.contains(text) {
+            return .valueNotInVocabulary
+        }
+        return nil
+    }
 }
 
 /// What a predicate's object may be.
@@ -114,4 +136,5 @@ public enum KnowledgeSchemaViolation: String, Codable, Sendable, CaseIterable {
     case valueWhereEntityExpected = "value_where_entity_expected"
     case entityWhereValueExpected = "entity_where_value_expected"
     case missingObject = "missing_object"
+    case valueNotInVocabulary = "value_not_in_vocabulary"
 }

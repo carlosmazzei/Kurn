@@ -4,8 +4,10 @@
 //
 //  The host-side check every extracted citation passes before an assertion
 //  can be committed (spec §7.4): the cited segments exist in the transcript
-//  revision being compiled, are distinct, the quote is verbatim in their text
-//  under a conservative normalization, and any time range lies within them.
+//  revision being compiled, are distinct, contiguous and in transcript order
+//  (so a quote can never be stitched across a skipped "not" or a reordered
+//  line), the quote is verbatim in their text under a conservative
+//  normalization, and both ends of any time range fall inside a cited segment.
 //  A model's claim that its quote is exact is never trusted. Quote hashing
 //  needs a cryptographic digest, which is the app's job (CryptoKit); this
 //  type stays Foundation-only so it runs on Linux.
@@ -48,6 +50,7 @@ public enum KnowledgeEvidenceRejection: String, Codable, Sendable, CaseIterable,
     case noSegments = "no_segments"
     case unknownSegment = "unknown_segment"
     case repeatedSegment = "repeated_segment"
+    case segmentsNotContiguous = "segments_not_contiguous"
     case emptyQuote = "empty_quote"
     case quoteNotVerbatim = "quote_not_verbatim"
     case invertedTimeRange = "inverted_time_range"
@@ -65,18 +68,29 @@ public struct KnowledgeValidatedEvidence: Hashable, Sendable {
 
 public struct KnowledgeEvidenceValidator: Sendable {
     private let segments: [String: KnowledgeSourceSegment]
+    /// Each segment's position in the transcript.
+    private let positions: [String: Int]
 
+    /// `segments` in transcript order.
     public init(segments: [KnowledgeSourceSegment]) {
         self.segments = Dictionary(segments.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        self.positions = Dictionary(segments.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     public func validate(_ claim: KnowledgeEvidenceClaim) -> Result<KnowledgeValidatedEvidence, KnowledgeEvidenceRejection> {
         guard !claim.segmentIDs.isEmpty else { return .failure(.noSegments) }
         guard Set(claim.segmentIDs).count == claim.segmentIDs.count else { return .failure(.repeatedSegment) }
         var cited: [KnowledgeSourceSegment] = []
+        var order: [Int] = []
         for id in claim.segmentIDs {
-            guard let segment = segments[id] else { return .failure(.unknownSegment) }
+            guard let segment = segments[id], let position = positions[id] else { return .failure(.unknownSegment) }
             cited.append(segment)
+            order.append(position)
+        }
+        // Consecutive in the transcript and cited in its order: no gap a quote
+        // could jump, no reordering it could exploit.
+        guard zip(order, order.dropFirst()).allSatisfy({ $1 == $0 + 1 }) else {
+            return .failure(.segmentsNotContiguous)
         }
         let quote = Self.normalized(claim.quote)
         guard !quote.isEmpty else { return .failure(.emptyQuote) }
@@ -88,7 +102,11 @@ public struct KnowledgeEvidenceValidator: Sendable {
         let start = claim.startMs ?? lower
         let end = claim.endMs ?? upper
         guard start < end else { return .failure(.invertedTimeRange) }
-        guard start >= lower, end <= upper else { return .failure(.timeOutsideSegments) }
+        // The range may cross a pause between cited segments, but each end
+        // must be inside one of them — never wholly in a gap.
+        let startInside = cited.contains { start >= $0.startMs && start < $0.endMs }
+        let endInside = cited.contains { end > $0.startMs && end <= $0.endMs }
+        guard start >= lower, end <= upper, startInside, endInside else { return .failure(.timeOutsideSegments) }
         return .success(KnowledgeValidatedEvidence(segmentIDs: claim.segmentIDs, normalizedQuote: quote, startMs: start, endMs: end))
     }
 
