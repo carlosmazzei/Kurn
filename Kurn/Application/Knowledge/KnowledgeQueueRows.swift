@@ -63,9 +63,9 @@ enum KnowledgeQueueRows {
                         container: ModelContainer) throws -> KnowledgeQueuedRecord {
         let context = context(container)
         var requested = requested
-        // Repeated Rebuild taps while paused/waiting join the same unfinished
-        // forced article; only a completed rebuild starts a new generation.
-        if requested.kind == .meetingArticle && requested.force {
+        // Repeated requests while paused/waiting join the same unfinished
+        // article, including a fresh generation of an obsolete identity.
+        if requested.kind == .meetingArticle {
             let meetingID = requested.meetingID
             let kind = KnowledgeJobKind.meetingArticle.rawValue
             let candidates = try context.fetch(FetchDescriptor<KnowledgeJob>(predicate: #Predicate {
@@ -73,7 +73,7 @@ enum KnowledgeQueueRows {
             }))
             for candidate in candidates where ["pending", "running", "deferred"].contains(candidate.stateRaw) {
                 let old = try envelope(candidate).work
-                if old.force, old.provider == requested.provider, old.model == requested.model,
+                if old.force == requested.force, old.provider == requested.provider, old.model == requested.model,
                    old.pipelineVersion == requested.pipelineVersion, old.sourceFingerprint == requested.sourceFingerprint,
                    old.explicitlyRequested == requested.explicitlyRequested {
                     requested = old
@@ -87,7 +87,10 @@ enum KnowledgeQueueRows {
             guard KnowledgeJobState(rawValue: existing.stateRaw) != nil else { throw KnowledgeQueueError.unsupportedCheckpoint }
             guard existing.kindRaw == requested.kind.rawValue, existing.meetingID == requested.meetingID,
                   existing.pipelineVersion == requested.pipelineVersion else { throw KnowledgeQueueError.unreadableCheckpoint }
-            if existing.stateRaw == KnowledgeJobState.succeeded.rawValue, restartCompleted {
+            let obsoleteArticle = requested.kind == .meetingArticle
+                && existing.stateRaw == KnowledgeJobState.cancelled.rawValue
+                && ["source_changed", "provider_changed"].contains(existing.lastErrorCode ?? "")
+            if restartCompleted, existing.stateRaw == KnowledgeJobState.succeeded.rawValue || obsoleteArticle {
                 return try enqueue(requested.regenerated(), explicitRetry: explicitRetry, restartCompleted: false, container: container)
             }
             if explicitRetry, existing.stateRaw != KnowledgeJobState.running.rawValue,
