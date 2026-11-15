@@ -727,9 +727,8 @@ How coverage was raised to target, and how to keep it there:
 
 To verify a change through CI:
 
-- Push the change to its branch and open (or update) a PR targeting `main` or
-  the integration branches allowed by `.github/workflows/swift.yml` (including
-  `feature/native-harness`). Pushing to a feature branch alone does not trigger CI.
+- Push the change to its branch and open (or update) a PR targeting `main`.
+  Pushing to a feature branch alone does not trigger CI.
 - Read the run's outcome with the GitHub Actions tooling/API: fetch the
   `unit-tests` (or `ui-accessibility-tests`) job logs and grep for `error:`
   (compile failures), `recorded an issue` / `** TEST FAILED **` (test

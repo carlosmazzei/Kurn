@@ -2,12 +2,12 @@ name: iOS CI
 
 on:
   push:
-    # The integration branch gets a run of its own after every merge so Codecov has a base
-    # report to compare its PRs against (without one, every PR comment shows "?").
-    branches: [ "main", "feature/native-harness" ]
+    # main gets a run of its own after every merge so Codecov has a base report to compare
+    # its PRs against (without one, every PR comment shows "?").
+    branches: [ "main" ]
     tags: [ "v*.*.*" ]
   pull_request:
-    branches: [ "main", "feature/native-harness", "devin/*-agent-chat-*" ]
+    branches: [ "main" ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ startsWith(github.ref, 'refs/tags/v') && 'release' || github.ref }}
