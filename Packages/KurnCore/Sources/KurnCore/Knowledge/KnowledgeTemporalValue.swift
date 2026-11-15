@@ -15,7 +15,7 @@ public enum KnowledgeTemporalPrecision: String, Codable, Sendable, CaseIterable 
     case instant, day, month, unknown
 }
 
-public struct KnowledgeTemporalValue: Hashable, Sendable {
+public struct KnowledgeTemporalValue: Hashable, Sendable, Codable {
     public let precision: KnowledgeTemporalPrecision
     public let year: Int
     public let month: Int
@@ -23,6 +23,24 @@ public struct KnowledgeTemporalValue: Hashable, Sendable {
     public let day: Int?
     /// Seconds since midnight UTC, present for `.instant`.
     public let secondOfDay: Int?
+
+    private enum CodingKeys: String, CodingKey { case text, precision }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let text = try container.decode(String.self, forKey: .text)
+        let precision = try container.decode(KnowledgeTemporalPrecision.self, forKey: .precision)
+        guard let value = Self(text: text, precision: precision) else {
+            throw DecodingError.dataCorruptedError(forKey: .text, in: container, debugDescription: "Invalid temporal value")
+        }
+        self = value
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(text, forKey: .text)
+        try container.encode(precision, forKey: .precision)
+    }
 
     /// Parses `text` written at `precision`. Returns nil for a malformed or
     /// impossible value (2026-02-30), or for `.unknown`, which has no text.

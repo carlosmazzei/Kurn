@@ -113,22 +113,6 @@ extension KnowledgeStoreRows {
         return try completedReceipt(job, identity: identity, current: current, in: context)
     }
 
-    static func acknowledgeProjection(upTo number: Int, container: ModelContainer) throws {
-        let context = ModelContext(container)
-        context.autosaveEnabled = false
-        do {
-            try context.transaction {
-                guard try KnowledgeStoreRows.latestRevision(in: context) == number else { throw KnowledgeStoreError.staleRevision }
-                let rows = try context.fetch(FetchDescriptor<KnowledgeRevision>(predicate: #Predicate { $0.projectionPending && $0.number <= number }))
-                for revision in rows { revision.projectionPending = false }
-                try context.save()
-            }
-        } catch {
-            context.rollback()
-            throw error
-        }
-    }
-
     static func receipt(_ revision: KnowledgeRevision, replay: Bool) -> KnowledgeCommitReceipt {
         KnowledgeCommitReceipt(revisionID: revision.id, number: revision.number, jobID: revision.jobID,
             assertionCount: revision.assertionCount, projectionPending: revision.projectionPending, isReplay: replay)

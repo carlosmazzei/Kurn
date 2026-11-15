@@ -288,10 +288,14 @@ struct KnowledgeStoreTests {
         let first = try await commit(request(snapshot(fixture)), fixture: fixture)
         let reopened = KnowledgeStore(modelContainer: fixture.container)
         #expect(try await reopened.pendingProjection()?.revisionID == first.revisionID)
+        let auth = KnowledgeWikiAuthorization(featureEnabled: true, meetingIDs: [fixture.meeting.id],
+            policies: fixture.auth.policies, sourceClassifications: [.internal])
+        let stale = try await reopened.wikiProjectionSnapshot(meetingIDs: auth.meetingIDs, scope: "workspace", authorization: { auth })
         let second = try await commit(request(snapshot(fixture), version: "v2"), fixture: fixture)
-        await #expect(throws: KnowledgeStoreError.staleRevision) { try await reopened.acknowledgeProjection(upTo: 1) }
+        await #expect(throws: KnowledgeWikiStoreError.staleSnapshot) { try await reopened.publishWikiProjection(stale, authorization: { auth }) }
         #expect(try await reopened.pendingProjection()?.number == second.number)
-        try await reopened.acknowledgeProjection(upTo: 2)
+        let current = try await reopened.wikiProjectionSnapshot(meetingIDs: auth.meetingIDs, scope: "workspace", authorization: { auth })
+        _ = try await reopened.publishWikiProjection(current, authorization: { auth })
         #expect(try await fixture.store.pendingProjection() == nil)
         #expect(try ModelContext(fixture.container).fetch(FetchDescriptor<KnowledgeRevision>()).allSatisfy { !$0.projectionPending })
     }
@@ -349,16 +353,20 @@ struct KnowledgeStoreTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let url = directory.appendingPathComponent("test.store")
         let expected: KnowledgeCommitReceipt
+        let auth: KnowledgeWikiAuthorization
         do {
             let fixture = try fixture(storeURL: url)
             expected = try await commit(request(snapshot(fixture)), fixture: fixture)
+            auth = KnowledgeWikiAuthorization(featureEnabled: true, meetingIDs: [fixture.meeting.id],
+                policies: fixture.auth.policies, sourceClassifications: [.internal])
         }
         let schema = KurnModelGraph.schema
         let container = try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, url: url)])
         let writer = KnowledgeStore(modelContainer: container)
         let pending = try await writer.pendingProjection()
         #expect(pending?.revisionID == expected.revisionID)
-        try await writer.acknowledgeProjection(upTo: expected.number)
+        let token = try await writer.wikiProjectionSnapshot(meetingIDs: auth.meetingIDs, scope: "workspace", authorization: { auth })
+        _ = try await writer.publishWikiProjection(token, authorization: { auth })
         #expect(try await writer.pendingProjection() == nil)
     }
 

@@ -51,10 +51,4 @@ actor KnowledgeStore {
         return try context.fetch(descriptor).first.map { KnowledgeStoreRows.receipt($0, replay: false) }
     }
 
-    /// A projection of N covers all earlier revisions. A stale worker must not
-    /// clear the outbox after a newer canonical commit. K2 will publish page/
-    /// index writes in this same boundary before acknowledging it.
-    func acknowledgeProjection(upTo number: Int) throws {
-        try KnowledgeStoreRows.acknowledgeProjection(upTo: number, container: modelContainer)
-    }
 }
