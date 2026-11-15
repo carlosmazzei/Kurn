@@ -75,8 +75,8 @@ Historical unknown timestamps/API/model remain absent. NH03 introduces V6 indexe
 containers. V5's entire graph is frozen. Per-session conversion is atomic/idempotent,
 retains the original bytes and preserves unknown historical values. The UI uses the checked
 active-path projection; presentation caches are rebuildable and cannot override canonical reads.
-The compatibility writer records presentation changes as append-only branches. Detailed runtime
-message production/awaited barriers remain NH05; full canonical tool replay remains NH06. Keep fixture-version,
+The compatibility writer records presentation changes as append-only branches. Runtime message
+production with awaited barriers (NH05) and canonical tool replay (NH06) are described below. Keep fixture-version,
 contract-version, JSONStorage-envelope, SwiftData-schema and pi-JSONL versions distinct.
 
 `ChatSourceScope` persists meeting/tag/folder/library selection,
@@ -519,7 +519,7 @@ Gemini call IDs are synthesized when absent; optional call metadata retains wire
 signatures for replay. `ProviderFactory.agentModel(for:model:)` returns nil for
 on-device and transcription-only providers, so callers can retain the chat fallback.
 Apple's provider does not conform. App adapters import `AgentHarness` explicitly;
-there is no re-export through KurnCore and no agent UI yet. The loop is inspired
+there is no re-export through KurnCore. The loop is inspired
 by pi-agent-core's design only; no third-party implementation code was copied.
 
 ### Harness recovery and presentation reads
@@ -1951,7 +1951,7 @@ unavailable there), so `TranscriptionScheduler.pipelineUsesCoreML` covers it too
 
 #### FluidAudio on-device models and download consent
 
-FluidAudio is pinned to 0.18.2. 0.18.2 made Pyannote's turns overlap by default (`exclusiveSegments` false); `FluidAudioPyannoteConfiguration` pins it back to true, so fusion keeps receiving one speaker per instant. Its `Diarizer`, `NemoTextProcessing` and `TTS`
+FluidAudio is pinned to 0.18.3. 0.18.2 made Pyannote's turns overlap by default (`exclusiveSegments` false); `FluidAudioPyannoteConfiguration` pins it back to true, so fusion keeps receiving one speaker per instant. Its `Diarizer`, `NemoTextProcessing` and `TTS`
 traits are selected explicitly on the Xcode package reference, matching the
 upstream defaults. Without explicit selection Xcode can compile 0.18 without
 its diarization API, leaving `OfflineDiarizerManager` and related types missing.

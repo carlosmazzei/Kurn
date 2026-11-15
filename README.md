@@ -86,6 +86,16 @@ send data only to the configured provider.
 - Ask the agent in chat for a document, report, or minutes. Preview versioned
   artifacts, save them to Documents, update a saved document after a revision,
   or export Markdown, Word, and HTML. Ordinary chat replies are not documents.
+  Replacing a document's body asks first, and the document card can undo the
+  last change.
+- Work with a conversation the way a coding agent shows its work: the chat
+  streams the model's reasoning and each tool call (with its arguments as they
+  are written), lets you steer a running reply or queue a follow-up, regenerate
+  an answer or edit a question in place (each version stays reachable), fork or
+  duplicate a conversation, leave an exchange out of later answers, summarize
+  earlier messages on request, search saved conversations, and export or import
+  a conversation. Pick the model and reasoning level from the composer; a gauge
+  shows how much of the model's context the conversation uses.
 - Recognize returning voices: when a new speaker's voiceprint closely matches
   a named speaker from another meeting, Kurn suggests the name for
   confirmation — it never renames silently.
