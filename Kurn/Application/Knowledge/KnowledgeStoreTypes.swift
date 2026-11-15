@@ -69,6 +69,9 @@ enum KnowledgeStoreError: String, Error, Sendable {
     case staleRevision = "knowledge_stale_revision"
     case invalidCompilation = "knowledge_invalid_compilation"
     case incompleteCoverage = "knowledge_incomplete_coverage"
+    case obsoleteJob = "knowledge_obsolete_job"
+    case corruptedProvenance = "knowledge_corrupted_provenance"
+    case unsupportedProvenanceVersion = "knowledge_unsupported_provenance_version"
     case invalidJob = "knowledge_invalid_job"
     case cancelledJob = "knowledge_cancelled_job"
 }

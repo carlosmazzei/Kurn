@@ -107,10 +107,10 @@ struct KnowledgeStoreTests {
         #expect(relation.assertionID == assertion.id)
         #expect(event.assertionID == assertion.id)
         #expect(job.stateRaw == "succeeded")
-        let provenance = try JSONDecoder().decode(KnowledgeCommitProvenance.self, from: #require(job.checkpointData))
+        let provenance = try #require(JSONStorage.decodeAuthoritative(KnowledgeCommitProvenance.self, from: #require(job.checkpointData)).decodedValue)
         #expect(provenance.recordings[0].passes[0].attributionAnchors[assertion.id.uuidString.lowercased()]
             == token.recordings[0].segments[0].id.uuidString.lowercased())
-        let coverage = try JSONDecoder().decode([KnowledgeCommitProvenance.Coverage].self, from: #require(job.coverageData))
+        let coverage = try #require(JSONStorage.decodeAuthoritative([KnowledgeCommitProvenance.Coverage].self, from: #require(job.coverageData)).decodedValue)
         #expect(coverage[0].recordingID == evidence.recordingID)
     }
 
@@ -373,6 +373,69 @@ struct KnowledgeStoreTests {
         }
         try fixture.context.save()
         await #expect(throws: KnowledgeStoreError.ambiguousContext) { try await snapshot(fixture) }
+    }
+
+
+    @Test func restoringAnOlderSourceRequiresANewGenerationInsteadOfReplayingRetractedKnowledge() async throws {
+        let fixture = try fixture()
+        let transcript = try #require(fixture.meeting.recordings.first?.transcript)
+        let originalSegments = transcript.segments
+        let original = try await request(snapshot(fixture))
+        _ = try await commit(original, fixture: fixture)
+        var changed = originalSegments
+        changed[0].text += " Revised."
+        transcript.segments = changed
+        try fixture.context.save()
+        _ = try await commit(request(snapshot(fixture)), fixture: fixture)
+        transcript.segments = originalSegments
+        try fixture.context.save()
+        let restored = try await snapshot(fixture)
+        #expect(restored.transcriptFingerprint == original.snapshot.transcriptFingerprint)
+        await #expect(throws: KnowledgeStoreError.obsoleteJob) { try await commit(request(restored), fixture: fixture) }
+        let rebuilt = try await commit(request(restored, version: "extractor-v1:generation-2"), fixture: fixture)
+        #expect(rebuilt.number == 3)
+        #expect(rebuilt.projectionPending)
+        let context = ModelContext(fixture.container)
+        let active = try context.fetch(FetchDescriptor<KnowledgeAssertion>()).filter { $0.retractedAt == nil }
+        #expect(active.count == 1)
+        #expect(active[0].revisionID == rebuilt.revisionID)
+        let available = try context.fetch(FetchDescriptor<KnowledgeEvidence>()).filter(\.isAvailable)
+        #expect(available.count == 1)
+        #expect(available[0].assertionID == active[0].id)
+        #expect(try await fixture.store.pendingProjection()?.number == 3)
+    }
+
+    @Test func corruptedAndFutureProvenanceAreRefusedWithoutOverwritingTheirBytes() async throws {
+        for isCoverage in [false, true] {
+            for isFuture in [false, true] {
+                let fixture = try fixture()
+                let original = try await request(snapshot(fixture))
+                _ = try await commit(original, fixture: fixture)
+                let context = ModelContext(fixture.container)
+                let job = try #require(context.fetch(FetchDescriptor<KnowledgeJob>()).first)
+                let raw = try #require(isCoverage ? job.coverageData : job.checkpointData)
+                var envelope = try #require(JSONSerialization.jsonObject(with: raw) as? [String: Any])
+                if isFuture {
+                    envelope["version"] = 999
+                } else {
+                    let encodedPayload = try #require(envelope["payload"] as? String)
+                    let payload = try #require(Data(base64Encoded: encodedPayload))
+                    let recordingID = original.snapshot.recordings[0].id.uuidString
+                    let modified = String(decoding: payload, as: UTF8.self).replacingOccurrences(of: recordingID, with: UUID().uuidString)
+                    #expect(Data(modified.utf8) != payload)
+                    envelope["payload"] = Data(modified.utf8).base64EncodedString()
+                }
+                let unreadable = try JSONSerialization.data(withJSONObject: envelope)
+                if isCoverage { job.coverageData = unreadable } else { job.checkpointData = unreadable }
+                try context.save()
+                let expected: KnowledgeStoreError = isFuture ? .unsupportedProvenanceVersion : .corruptedProvenance
+                await #expect(throws: expected) { try await commit(original, fixture: fixture) }
+                let read = ModelContext(fixture.container)
+                let preserved = try #require(read.fetch(FetchDescriptor<KnowledgeJob>()).first)
+                #expect((isCoverage ? preserved.coverageData : preserved.checkpointData) == unreadable)
+                #expect(try read.fetchCount(FetchDescriptor<KnowledgeRevision>()) == 1)
+            }
+        }
     }
 
 }

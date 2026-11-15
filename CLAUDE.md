@@ -2851,12 +2851,16 @@ hold for every phase; code comments cite this section.
   revision and canonical revision are rechecked before mutation. The canonical
   graph, succeeded job, retained attribution/ref-map provenance, coverage and
   `KnowledgeRevision.projectionPending` outbox are saved together; failures roll
-  back all rows and retractions. The injected `beforeSave` seam proves rollback.
+  back all rows and retractions. Provenance and coverage use `JSONStorage`
+  authoritative envelopes with checksums; unreadable/future job data is refused
+  without overwriting its bytes. The injected `beforeSave` seam proves rollback.
   KurnCore's `KnowledgeCompilationIdentity` encodes an unambiguous, reversible
   job key over scope, meeting ID, meeting source fingerprint, extractor version
   and extraction schema version (independent of SwiftData's schema version).
-  Completed retries return the original receipt even after another canonical
-  commit or writer recreation. Changed source or policy is never a replay;
+  Completed retries return the original receipt even after an unrelated
+  canonical commit or writer recreation. A later compilation in the same scope
+  makes the earlier job obsolete: restoring A after A → B cannot replay retracted
+  A as current knowledge; it fails explicitly and requires a new generation. Changed source or policy is never a replay;
   a completed key under an earlier policy revision is refused and requires an
   explicit rebuild/generation change. Cancelled jobs cannot be committed.
   Recompilation retracts previous machine assertions in its own scope, retaining
