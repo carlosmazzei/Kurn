@@ -7,6 +7,8 @@ import Testing
 extension SwiftDataConcurrencySensitiveTests {
 @MainActor
 struct KnowledgeJobQueueTests {
+    @MainActor private final class EraseFailure { var enabled = true }
+
     private func container() throws -> ModelContainer {
         let schema = Schema([KnowledgeJob.self])
         return try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)])
@@ -266,9 +268,9 @@ struct KnowledgeJobQueueTests {
 
     @Test func failedClearRetriesOnANewRequestAndKeepsTheOriginalCutoff() async throws {
         let container = try container()
-        var fail = true
+        let fault = EraseFailure()
         let queue = KnowledgeJobQueue(container: container, foreground: false, eraseJobs: { store, kind, cutoff in
-            if fail { throw KnowledgeQueueError.persistenceFailed }
+            if fault.enabled { throw KnowledgeQueueError.persistenceFailed }
             try await store.eraseJobs(kind: kind, createdBefore: cutoff)
         })
         var calls = 0
@@ -278,7 +280,7 @@ struct KnowledgeJobQueueTests {
         await queue.waitUntilIdle()
         #expect(queue.lastFailureCode == "queue_cancel_failed")
         #expect(calls == 0)
-        fail = false
+        fault.enabled = false
         _ = try await queue.submit(work(), explicit: true)
         queue.setForeground(true)
         await queue.waitUntilIdle()
