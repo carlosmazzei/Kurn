@@ -15,6 +15,7 @@ enum KnowledgeReviewRows {
             sortBy: [SortDescriptor(\KnowledgeReview.createdAt, order: .reverse), SortDescriptor(\KnowledgeReview.id)])
         descriptor.fetchLimit = 256
         var candidates: [KnowledgeReviewRead.Candidate] = []
+        var dismissed: [KnowledgeReviewRead.Candidate] = []
         var merges: [KnowledgeReviewRead.Merge] = []
         let allowedIDs = Set(pool.rows.keys)
         var scanned = 0
@@ -43,10 +44,11 @@ enum KnowledgeReviewRows {
                     guard pool.rows[source.id]?.mergedIntoID == nil, pool.rows[target.id]?.mergedIntoID == nil else { continue }
                     do { _ = try KnowledgeEntityOriginRows.prove(Set(subjects), sources: sources, in: context) }
                     catch KnowledgeEntityStoreError.scopeDenied { continue }
-                    if candidates.count < 128 {
-                        candidates.append(.init(id: row.id, source: source, target: target,
-                            isDismissed: row.stateRaw == KnowledgeReviewItemState.dismissed.rawValue))
-                    } else { truncated = true }
+                    let item = KnowledgeReviewRead.Candidate(id: row.id, source: source, target: target, isDismissed: state == .dismissed)
+                    if item.isDismissed {
+                        if dismissed.count < 128 { dismissed.append(item) } else { truncated = true }
+                    } else if candidates.count < 128 { candidates.append(item) }
+                    else { truncated = true }
                 } else if let audit = payload.merge {
                     guard audit.scope == snapshot.scope, Set(audit.origins.map(\.meetingID)).isSubset(of: meetingIDs) else { continue }
                     _ = try KnowledgeEntityMergeRows.checkedAudit(row, payload: payload, in: context)
@@ -62,7 +64,7 @@ enum KnowledgeReviewRows {
         }
         let warnings = try warnings(sources: sources, in: context)
         let canMutate = (try? auth.authorize(classifications: sources.map(\.contextClassification), operation: .extraction)) != nil
-        return KnowledgeReviewRead(snapshot: snapshot, candidates: Array(candidates.prefix(128)), merges: Array(merges.prefix(128)),
+        return KnowledgeReviewRead(snapshot: snapshot, candidates: candidates + dismissed, merges: merges,
             warnings: warnings.items, evidenceUnavailable: warnings.unavailable,
             isTruncated: truncated, allowsMutation: canMutate)
     }

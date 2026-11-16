@@ -550,4 +550,22 @@ extension SwiftDataConcurrencySensitiveTests.KnowledgeEntityResolutionTests {
         let dismissed = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
         #expect(dismissed.candidates.first?.isDismissed == true)
     }
+
+    @Test func dismissedHistoryDoesNotConsumeOpenCandidateCapacity() async throws {
+        let f = try await fixture(copies: 2)
+        let auth = reviewAuthorization(f)
+        let edit = ModelContext(f.container)
+        edit.autosaveEnabled = false
+        let candidate = try #require(edit.fetch(FetchDescriptor<KnowledgeReview>()).first)
+        for _ in 0..<128 {
+            let historical = KnowledgeReview(kind: .mergeCandidate, subjectIDsData: candidate.subjectIDsData, payloadData: candidate.payloadData)
+            historical.stateRaw = KnowledgeReviewItemState.dismissed.rawValue
+            edit.insert(historical)
+        }
+        try edit.save()
+        let read = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
+        #expect(read.candidates.filter { !$0.isDismissed }.map(\.id) == [candidate.id])
+        #expect(read.candidates.filter(\.isDismissed).count == 128)
+        #expect(!read.isTruncated)
+    }
 }

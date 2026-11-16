@@ -3300,8 +3300,8 @@ The scoped Knowledge reader opens Review from its native toolbar. It shares
 that explicit 1–16 meeting selection, and never enumerates a library-wide inbox.
 `KnowledgeReviewRows` authorizes `.semanticLint`, proves entity origin bindings
 before showing candidate names/history, and validates canonical passages in a
-fresh context. Discovery pages through reviews in batches of 256, caps authorized candidate/history
-results at 128 each, and labels incomplete scans (16,384-row budget) rather than
+fresh context. Discovery pages through reviews in batches of 256, caps open, dismissed and merge-history
+results independently at 128 each, and labels incomplete scans (16,384-row budget) rather than
 blocking a selection on unrelated history. Reads
 never insert reviews, acknowledge jobs, repair citations or mutate identities.
 Unknown schemas fail closed. Missing, changed or invalid evidence produces an
