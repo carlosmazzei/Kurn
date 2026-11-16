@@ -102,6 +102,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         app.buttons["root.destination.ask"].tap()
         XCTAssertTrue(app.buttons["chat.send"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["chat.send"].isEnabled)
+        XCTAssertLessThanOrEqual(app.buttons["chat.send"].frame.maxY, app.buttons["root.destination.ask"].frame.minY)
         assertRootBarFits(app)
         capture(app, named: "knowledge-navigation-ask-prototype")
         let documents = app.buttons["root.destination.documents"]
