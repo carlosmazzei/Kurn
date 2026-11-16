@@ -10,6 +10,7 @@ struct KnowledgeSearchResultsView: View {
         switch state {
         case .idle, .loading:
             ProgressView(NSLocalizedString("detail.knowledge.loading", comment: "Loading"))
+                .accessibilityIdentifier("knowledge.search.loading")
         case .limited:
             ContentUnavailableView(KnowledgeBrowserCopy.text("search_limit_title"), systemImage: "magnifyingglass",
                 description: Text(KnowledgeBrowserCopy.text("search_limit_detail")))

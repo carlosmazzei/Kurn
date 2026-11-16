@@ -16,6 +16,7 @@ struct KnowledgeBrowserView: View {
     @State private var model = KnowledgeBrowserViewModel()
     @State private var searchModel = KnowledgeSearchViewModel()
     @State private var searchQuery = ""
+    @State private var searchRevision = 0
     @FocusState private var searchFocused: Bool
     @State private var path: [KnowledgeBrowserRoute] = []
     @State private var refresh = 0
@@ -32,7 +33,7 @@ struct KnowledgeBrowserView: View {
     private var requestKey: String {
         meetingIDs.map(\.uuidString).sorted().joined(separator: ",") + ":\(path):\(refresh)"
     }
-    private var searchKey: String { "\(requestKey):\(settings.semanticSearchEnabled):\(searchQuery)" }
+    private var searchKey: String { "\(requestKey):\(settings.semanticSearchEnabled):\(searchRevision)" }
     private var state: KnowledgeBrowserLoadState {
         settings.knowledgeEnabled ? model.presentation(meetingIDs: meetingIDs, selection: selection) : .unavailable
     }
@@ -43,6 +44,13 @@ struct KnowledgeBrowserView: View {
         ZStack {
             NavigationStack(path: $path) {
                 destination(nil)
+                    // Keep the search controller installed while canonical
+                    // content reloads; conditional registration can tear down
+                    // its owner while a query task is still in flight.
+                    .searchable(text: $searchQuery, placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: Text(KnowledgeBrowserCopy.text("search_prompt")))
+                    .searchFocused($searchFocused)
+                    .onSubmit(of: .search) { searchFocused = false }
                     .navigationDestination(for: KnowledgeBrowserRoute.self) { destination($0) }
                     .toolbar {
                         if let onChooseSources {
@@ -81,7 +89,12 @@ struct KnowledgeBrowserView: View {
             guard playRequest > 0 else { return }
             await model.playEvidence(isEnabled: { settings.knowledgeEnabled }, reader: read)
         }
-        .onChange(of: searchQuery) { _, _ in searchModel.invalidate() }
+        .onChange(of: searchQuery) { _, _ in
+            // Bump after invalidation, rather than racing an input-keyed task
+            // against onChange and leaving its completed results cleared.
+            searchModel.invalidate()
+            searchRevision += 1
+        }
         .onChange(of: settings.semanticSearchEnabled) { _, _ in invalidateAndRefresh() }
         .onChange(of: path) { _, _ in searchFocused = false; invalidateAndRefresh() }
         .onChange(of: settings.knowledgeEnabled) { _, _ in invalidateAndRefresh() }
@@ -110,6 +123,7 @@ struct KnowledgeBrowserView: View {
             switch state {
             case .idle, .loading:
                 ProgressView(NSLocalizedString("detail.knowledge.loading", comment: "Loading"))
+                    .accessibilityIdentifier("knowledge.browser.loading")
             case .unavailable:
                 KnowledgeBrowserUnavailable()
             case let .loaded(read):
@@ -134,10 +148,6 @@ struct KnowledgeBrowserView: View {
                         state: searchModel.presentation(query: searchQuery, meetingIDs: meetingIDs), scopeCount: meetingIDs.count)
                 }
             }
-            .searchable(text: $searchQuery, placement: .navigationBarDrawer(displayMode: .always),
-                prompt: Text(KnowledgeBrowserCopy.text("search_prompt")))
-            .searchFocused($searchFocused)
-            .onSubmit(of: .search) { searchFocused = false }
         case let .entity(id):
             if let page = read.pages.first(where: { $0.entity.id == id }) {
                 KnowledgeEntityPageView(page: page, meetingTitles: read.meetingTitles)
