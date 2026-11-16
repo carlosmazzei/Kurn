@@ -2,8 +2,8 @@
 //  MeetingDetailView.swift
 //  Kurn
 //
-//  The hub for a single meeting, organized into three tabs (Recordings,
-//  Transcript, Summary) per the iOS design. Recordings can be played and
+//  The hub for one meeting, with Recordings / Transcript / Summary / Chat
+//  and the independently enabled Knowledge mode. Recordings can be played and
 //  transcribed; the transcript is speaker-filterable; the summary is generated
 //  by the configured AI provider. Sharing exports a structured Markdown file.
 //
@@ -43,27 +43,7 @@ struct MeetingDetailView: View {
     /// a recording is already running minimized).
     @Environment(RecordingSessionController.self) private var recordingSession
 
-    enum Tab: Hashable, CaseIterable {
-        case recordings, transcript, summary, chat
-
-        var systemImage: String {
-            switch self {
-            case .recordings: return "mic"
-            case .transcript: return "text.alignleft"
-            case .summary: return "sparkles"
-            case .chat: return "bubble.left.and.text.bubble.right"
-            }
-        }
-
-        var title: String {
-            switch self {
-            case .recordings: return NSLocalizedString("tab.recordings", comment: "Recordings tab")
-            case .transcript: return NSLocalizedString("tab.transcript", comment: "Transcript tab")
-            case .summary: return NSLocalizedString("tab.summary", comment: "Summary tab")
-            case .chat: return NSLocalizedString("tab.chat", comment: "Chat tab")
-            }
-        }
-    }
+    typealias Tab = MeetingDetailMode
 
     @State var player = AudioPlayerService()
     /// Optional passthroughs, so a preview or test host without the
@@ -97,6 +77,8 @@ struct MeetingDetailView: View {
         )
     }
     @State private var tab: Tab = .recordings
+    @State private var meetingKnowledge = MeetingKnowledgeViewModel()
+    @State private var knowledgeRefresh = 0
 
     /// Drives the full-screen photo viewer from the Recordings tab's photo
     /// strip — shown there independently of the Transcript tab's inline
@@ -109,9 +91,7 @@ struct MeetingDetailView: View {
     @State var attachments = MeetingAttachmentsViewModel()
     /// Not `private` — `MeetingDetailToolbar.swift` needs it.
     @State var showingEdit = false
-    /// Presents the generated article without adding a fifth item to the compact
-    /// meeting section picker. The wiki is supporting material rather than a
-    /// primary workflow, so it lives in the overflow menu. Not `private` —
+    /// Retains the article sheet shortcut alongside the opt-in inline content. Not `private` —
     /// `MeetingDetailToolbar.swift` needs it.
     @State var showingWiki = false
     /// Opened from a transcription failure the large-transfer policy caused,
@@ -166,9 +146,18 @@ struct MeetingDetailView: View {
         .background((tab == .chat ? Color(uiColor: .systemBackground) : Theme.background).ignoresSafeArea())
         .navigationTitle(meeting.title)
         .navigationBarTitleDisplayMode(.inline)
+        .background {
+            if settings.knowledgeEnabled {
+                MeetingKnowledgeRefreshDriver(meetingID: meeting.id, model: meetingKnowledge, refreshID: knowledgeRefresh)
+            }
+        }
+        .onChange(of: settings.knowledgeEnabled) { _, enabled in
+            meetingKnowledge.invalidate()
+            if !enabled, tab == .knowledge { tab = .recordings }
+        }
         .toolbar { toolbarContent }
         .modelDownloadAlerts(downloads, settings: settings) { showingNetworkSettings = true }
-        .onDisappear { player.stop() }
+        .onDisappear { player.stop(); meetingKnowledge.invalidate() }
         .readAloudCoordination(player: player, meetingID: meeting.id, isRecording: recordingSession.isActive)
         .errorAlert(Binding(get: { enhancement.error }, set: { enhancement.error = $0 }))
         .sheet(isPresented: $showingEdit) {
@@ -310,6 +299,12 @@ struct MeetingDetailView: View {
             Text(displayLanguage.displayName)
                 .font(Theme.footnote)
                 .foregroundStyle(Theme.textSecondary)
+            if settings.knowledgeEnabled {
+                Text(meetingKnowledge.header(for: meeting.id))
+                    .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("knowledge.header")
+            }
             if !meeting.tags.isEmpty {
                 TagChipsView(tags: meeting.tags)
             }
@@ -365,6 +360,14 @@ struct MeetingDetailView: View {
             }
         case .chat:
             MeetingChatView(meeting: meeting, onJumpToTime: jumpToTime)
+        case .knowledge:
+            if settings.knowledgeEnabled {
+                MeetingKnowledgeView(meeting: meeting, state: meetingKnowledge.presentation(for: meeting.id), isGeneratingArticle: isGeneratingWiki,
+                    canGenerateArticle: canGenerateWiki && settings.aiProvider.kind == .appleOnDevice, onRefresh: {
+                        meetingKnowledge.invalidate()
+                        knowledgeRefresh += 1
+                    })
+            }
         }
     }
 
@@ -460,12 +463,12 @@ struct MeetingDetailView: View {
 
     // MARK: - Section picker
 
-    /// The four sections are view modes of one meeting, not top-level
+    /// These are view modes of one meeting, not top-level
     /// destinations, so they get a segmented control rather than a bottom bar —
     /// which also leaves the bottom edge free for the Chat tab's composer.
     private var sectionPicker: some View {
         Picker(NSLocalizedString("detail.section", comment: "Meeting section"), selection: $tab) {
-            ForEach(Tab.allCases, id: \.self) { value in
+            ForEach(Tab.visible(knowledgeEnabled: settings.knowledgeEnabled), id: \.self) { value in
                 Image(systemName: value.systemImage)
                     .accessibilityLabel(value.title)
                     .accessibilityIdentifier("tab.\(value)")

@@ -1346,3 +1346,26 @@
 "chat.branch.tree" = "Tutti i rami";
 "chat.context.compact_next" = "Riassumi prima i messaggi precedenti";
 "chat.draft.save_failed" = "Non è stato possibile salvare il testo non inviato. È ancora nel campo del messaggio.";
+
+/* Meeting knowledge contributions (K2.3). */
+"tab.knowledge" = "Conoscenza";
+"detail.knowledge.counts" = "Entità: %ld · Affermazioni: %ld · Passaggi: %ld";
+"detail.knowledge.contributions" = "Contributi di questa riunione";
+"detail.knowledge.refresh" = "Aggiorna";
+"detail.knowledge.notes" = "Note della riunione";
+"detail.knowledge.notes_empty" = "Genera note sintetiche dalla trascrizione di questa riunione.";
+"detail.knowledge.loading" = "Caricamento dei contributi…";
+"detail.knowledge.unavailable" = "Conoscenza non disponibile";
+"detail.knowledge.unavailable_detail" = "L’accesso o i dati di origine potrebbero essere cambiati. Aggiorna per riprovare.";
+"detail.knowledge.empty" = "Nessun contributo ancora";
+"detail.knowledge.empty_detail" = "I contributi appaiono dopo l’elaborazione della conoscenza di questa riunione.";
+"detail.knowledge.claim_count" = "Affermazioni: %ld";
+"detail.knowledge.negated" = "Affermazione negata";
+"detail.knowledge.attribution" = "Attribuito a %@";
+"knowledge.modality.reported" = "Riferito";
+"knowledge.modality.proposed" = "Proposto";
+"knowledge.modality.agreed" = "Concordato";
+"knowledge.modality.disputed" = "Contestato";
+"knowledge.modality.hypothetical" = "Ipotetico";
+"knowledge.modality.observed" = "Osservato";
+"knowledge.modality.inferred" = "Inferito";

@@ -83,6 +83,12 @@ final class KnowledgeCompilationCoordinator {
             ?? KnowledgeExtractionAuthorization(featureEnabled: false, policies: [], sourceClassifications: [])
     }
 
+    func meetingReadAuthorization(meetingID: UUID) -> KnowledgeSourceAuthorization {
+        let auth = authorization()
+        return KnowledgeSourceAuthorization(featureEnabled: auth.featureEnabled && settings.knowledgeEnabled,
+            meetingIDs: [meetingID], policies: auth.policies, sourceClassifications: auth.sourceClassifications)
+    }
+
     private func hostAuthorization(provider: AIProvider, model: String) throws -> KnowledgeExtractionAuthorization {
         guard settings.knowledgeEnabled else { throw KnowledgeJobDeferred(reason: .featureDisabled) }
         guard settings.aiProvider == provider, settings.summaryModel(for: provider) == model else { throw KnowledgeWorkObsolete.providerChanged }

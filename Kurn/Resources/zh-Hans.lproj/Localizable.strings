@@ -1346,3 +1346,26 @@
 "chat.branch.tree" = "所有分支";
 "chat.context.compact_next" = "先总结之前的消息";
 "chat.draft.save_failed" = "未能保存未发送的文本，它仍在消息框中。";
+
+/* Meeting knowledge contributions (K2.3). */
+"tab.knowledge" = "知识";
+"detail.knowledge.counts" = "实体：%ld · 陈述：%ld · 片段：%ld";
+"detail.knowledge.contributions" = "本次会议的贡献";
+"detail.knowledge.refresh" = "刷新";
+"detail.knowledge.notes" = "会议笔记";
+"detail.knowledge.notes_empty" = "根据本次会议的转录生成精简笔记。";
+"detail.knowledge.loading" = "正在加载贡献…";
+"detail.knowledge.unavailable" = "知识暂不可用";
+"detail.knowledge.unavailable_detail" = "访问权限或源数据可能已更改。请刷新后重试。";
+"detail.knowledge.empty" = "暂无贡献";
+"detail.knowledge.empty_detail" = "处理本次会议的知识后，将在此显示贡献。";
+"detail.knowledge.claim_count" = "陈述：%ld";
+"detail.knowledge.negated" = "否定陈述";
+"detail.knowledge.attribution" = "归属于 %@";
+"knowledge.modality.reported" = "已报告";
+"knowledge.modality.proposed" = "已提议";
+"knowledge.modality.agreed" = "已达成一致";
+"knowledge.modality.disputed" = "存在争议";
+"knowledge.modality.hypothetical" = "假设";
+"knowledge.modality.observed" = "已观察";
+"knowledge.modality.inferred" = "推断";

@@ -219,6 +219,7 @@ struct KurnApp: App {
                 .environment(appEnvironment.playbackEnhancement)
                 .environment(appEnvironment.semanticIndex)
                 .environment(appEnvironment.wiki)
+                .environment(appEnvironment.knowledge)
                 .environment(appEnvironment.recordingSession)
                 .environment(appEnvironment.reviewPrompt)
                 .environment(appEnvironment.chatConversations)
@@ -375,6 +376,9 @@ struct KurnApp: App {
                 configurations: [configuration]
             )
             ScreenshotSeedData.seed(into: container.mainContext)
+            if ProcessInfo.processInfo.arguments.contains("UI-Testing-KnowledgeFixture") {
+                try KnowledgeMeetingSeed.seed(container: container)
+            }
             return container
         }
         // UI-test-only synthetic failure injection, so `KurnUITests` can
