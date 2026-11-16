@@ -3213,7 +3213,11 @@ reserve a separate slot for this action. `KnowledgeRootNavigationView` uses
 system-glass groups for the destination capsule and the recorder, without
 overlapping their hit targets. Labels give way to icons below 360 points or
 at accessibility text sizes; localized accessibility names and selected traits
-remain available. The root bar steps aside for the keyboard.
+remain available. Each tab reserves the measured bar height within its host,
+so chat composers, source-audio controls and mini bars stay above it even
+inside a pushed navigation stack. An inset outside TabView does not reach
+those UIKit-hosted stacks. The root bar and its reserved space step aside
+for the keyboard.
 Bulk Export/Delete move to the upper selection-actions menu, so no bottom
 meetings toolbar overlaps the root tabs. Library scope, structured filters,
 sorting and picked rows retain their existing state and action boundaries when
@@ -3462,8 +3466,9 @@ toolbar would be the wrong control**:
   a root `.safeAreaInset`, since it has to float over every screen's own
   toolbar rather than belong to one),
   the four-destination root bar plus a separate prominent recorder (a native
-  tab bar has no adjacent action slot; both use system glass in a single
-  safe-area inset, and the underlying tab stacks retain state), and
+  tab bar has no adjacent action slot; both use system glass, with measured
+  space reserved inside each tab host so pushed screens/composers do not
+  overlap the root controls, and the underlying tab stacks retain state), and
   `MeetingChatView`'s composer (an input surface: an inset glass card laid
   over the transcript with `.overlay(alignment: .bottom)` rather than a
   `.safeAreaBar`, so the conversation keeps scrolling beneath both the card
