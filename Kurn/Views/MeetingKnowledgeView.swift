@@ -91,18 +91,21 @@ private struct MeetingContributionView: View {
             Text(verbatim: contribution.name)
                 .font(Theme.headline)
                 .accessibilityAddTraits(.isHeader)
-            Text(String(format: NSLocalizedString("detail.knowledge.claim_count", comment: "Claim count"), contribution.facts.count))
+            Text(String(format: NSLocalizedString("detail.knowledge.claim_count", comment: "Claim count"), contribution.entries.count))
                 .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
-            ForEach(contribution.facts, id: \.id) { fact in
+            ForEach(contribution.entries, id: \.fact.id) { entry in
                 VStack(alignment: .leading, spacing: 8) {
+                    Text(verbatim: MeetingKnowledgeClaimPresentation.text(entry))
+                        .font(Theme.bodyEmphasized)
+                        .accessibilityIdentifier("knowledge.claim")
                     HStack {
-                        Text(NSLocalizedString("knowledge.modality." + fact.qualifiers.modality.rawValue, comment: "Claim modality"))
-                        if fact.qualifiers.polarity == .negative {
+                        Text(NSLocalizedString("knowledge.modality." + entry.fact.qualifiers.modality.rawValue, comment: "Claim modality"))
+                        if entry.fact.qualifiers.polarity == .negative {
                             Text(NSLocalizedString("detail.knowledge.negated", comment: "Negated claim"))
                         }
                     }
                     .font(Theme.caption2Emphasized).foregroundStyle(Theme.textSecondary)
-                    ForEach(fact.source.evidence, id: \.id) { evidence in
+                    ForEach(entry.fact.source.evidence, id: \.id) { evidence in
                         Text(String(format: NSLocalizedString("detail.knowledge.attribution", comment: "Claim attribution"), evidence.attributedSpeaker))
                             .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
                         Text(verbatim: evidence.quote)

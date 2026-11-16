@@ -26,11 +26,11 @@ struct MeetingKnowledgeViewModelTests {
         let data = try read()
         #expect(data.contributions.count == 1)
         #expect(data.assertionCount == 1)
-        #expect(data.evidenceCount == 1)
-        #expect(data.contributions[0].facts[0].qualifiers.polarity == .negative)
-        #expect(data.contributions[0].facts[0].source.evidence[0].attributedSpeaker == "Speaker 1")
+        #expect(data.passageCount == 1)
+        #expect(data.contributions[0].entries[0].fact.qualifiers.polarity == .negative)
+        #expect(data.contributions[0].entries[0].fact.source.evidence[0].attributedSpeaker == "Speaker 1")
         #expect(!data.summary.isEmpty)
-        let wiki = KnowledgeWikiSnapshot(revision: 1, entities: [], facts: data.contributions[0].facts)
+        let wiki = KnowledgeWikiSnapshot(revision: 1, entities: [], facts: data.contributions[0].entries.map(\.fact))
         #expect(throws: KnowledgeWikiStoreError.scopeDenied) { try MeetingKnowledgeRead(meetingID: UUID(), wiki: wiki) }
     }
 
@@ -50,7 +50,7 @@ struct MeetingKnowledgeViewModelTests {
 
     @Test func relationalContributionsDoNotDoubleCountClaimsOrPassages() throws {
         let base = try read()
-        let original = base.contributions[0].facts[0]
+        let original = base.contributions[0].entries[0].fact
         let other = UUID()
         let fact = KnowledgeWikiSnapshot.Fact(id: original.id, subjectID: original.subjectID, predicate: .dependsOn, objectID: other,
             qualifiers: original.qualifiers, source: original.source)
@@ -58,9 +58,38 @@ struct MeetingKnowledgeViewModelTests {
             entities: [.init(id: fact.subjectID, kind: .project, name: "Example portal"), .init(id: other, kind: .project, name: "Example service")],
             facts: [fact]))
         #expect(result.contributions.count == 2)
-        #expect(result.contributions.allSatisfy { $0.facts.count == 1 })
+        #expect(result.contributions.allSatisfy { $0.entries.count == 1 })
         #expect(result.assertionCount == 1)
-        #expect(result.evidenceCount == 1)
+        #expect(result.passageCount == 1)
+        let first = MeetingKnowledgeClaimPresentation.text(result.contributions[0].entries[0])
+        let second = MeetingKnowledgeClaimPresentation.text(result.contributions[1].entries[0])
+        #expect(first == second)
+        let subject = try #require(first.range(of: "Example portal"))
+        let object = try #require(first.range(of: "Example service"))
+        #expect(subject.lowerBound < object.lowerBound)
+    }
+
+    @Test func passageCountsUseCitationIdentityAndRemainRecordingScoped() throws {
+        let base = try read()
+        let original = base.contributions[0].entries[0].fact
+        let quote = original.source.evidence[0]
+        for sameRecording in [true, false] {
+            let duplicate = KnowledgeWikiSnapshot.Evidence(id: UUID(), recordingID: sameRecording ? quote.recordingID : UUID(),
+                segmentIDs: quote.segmentIDs, quote: quote.quote, startMs: quote.startMs, endMs: quote.endMs,
+                attributedSpeaker: quote.attributedSpeaker)
+            let fact = KnowledgeWikiSnapshot.Fact(id: UUID(), subjectID: original.subjectID, predicate: original.predicate, value: original.value,
+                qualifiers: original.qualifiers, source: .init(meetingID: base.meetingID, recordedAt: original.source.recordedAt, evidence: [duplicate]))
+            let result = try MeetingKnowledgeRead(meetingID: base.meetingID, wiki: .init(revision: 2,
+                entities: [.init(id: original.subjectID, kind: .project, name: "Example portal")], facts: [original, fact]))
+            #expect(result.assertionCount == 2)
+            #expect(result.passageCount == (sameRecording ? 1 : 2))
+        }
+        #expect(MeetingKnowledgeClaimPresentation.valueText(.string("Literal [text]")) == "Literal [text]")
+        let month = try #require(KnowledgeTemporalValue(text: "2026-11", precision: .month))
+        #expect(MeetingKnowledgeClaimPresentation.valueText(.date(month)) == "2026-11")
+        #expect(!MeetingKnowledgeClaimPresentation.valueText(.number(3, unit: "ms")).isEmpty)
+        #expect(!MeetingKnowledgeClaimPresentation.valueText(.boolean(false)).isEmpty)
+        #expect(!MeetingKnowledgeClaimPresentation.valueText(.enumeration("open")).isEmpty)
     }
 
     @Test func invalidatedOrSupersededReadsCannotResurfaceContributions() async throws {

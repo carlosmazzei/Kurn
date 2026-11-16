@@ -3132,8 +3132,11 @@ policy, reads the canonical snapshot and computes contributions without a
 provider, extraction, projection publication, outbox acknowledgement or writes.
 The DTO rejects foreign-meeting assertions; redirect-aware entity contributions
 retain original claim IDs, evidence, attribution, modality and negation. Header
-counts deduplicate claims/passages rather than adding their repeated appearances
-on both sides of a relation. Generated episodic notes are separate from those
+counts deduplicate claims by assertion ID and passages by recording, ordered
+anchors, time bounds and normalized quote. Distinct evidence-link UUIDs for the
+same passage do not inflate its count; identical passages in different recordings
+remain distinct. Structured claims show subject, localized predicate and object/
+value in their original direction, separately from the quoted evidence. Generated episodic notes are separate from those
 source-backed contributions and never become evidence.
 
 `MeetingKnowledgeViewModel` clears old data before each read, rejects stale
