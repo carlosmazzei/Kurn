@@ -1,5 +1,7 @@
 import Foundation
 import KurnCore
+import Observation
+import Synchronization
 import Testing
 @testable import Kurn
 
@@ -146,6 +148,19 @@ struct KnowledgeSearchTests {
         #expect(await embedder.count == 0)
     }
 
+    @Test func maskedPresentationStillObservesThePendingQueryState() async throws {
+        let read = try fixture(), model = KnowledgeSearchViewModel(), probe = SearchObservationProbe()
+        withObservationTracking {
+            #expect(model.presentation(query: "Orion", meetingIDs: read.meetingIDs) == .idle)
+        } onChange: { probe.mark() }
+        await model.search(query: "Orion", meetingIDs: read.meetingIDs, useSemantic: false, isEnabled: { true }, reader: { read })
+        #expect(probe.changed)
+        guard case let .loaded(hits) = model.presentation(query: "Orion", meetingIDs: read.meetingIDs) else {
+            Issue.record("Pending query never became visible"); return
+        }
+        #expect(hits.contains { $0.kind == .alias })
+    }
+
     @Test func anAlreadyCancelledRequestCannotClearANewerCompletedQuery() async throws {
         let read = try fixture(), model = KnowledgeSearchViewModel()
         await model.search(query: "Orion", meetingIDs: read.meetingIDs, useSemantic: false, isEnabled: { true }, reader: { read })
@@ -194,4 +209,10 @@ private actor SearchGate {
         await withCheckedContinuation { startWaiters.append($0) }
     }
     func release() { continuation?.resume(); continuation = nil }
+}
+
+private final class SearchObservationProbe: Sendable {
+    private let storage = Mutex(false)
+    func mark() { storage.withLock { $0 = true } }
+    var changed: Bool { storage.withLock { $0 } }
 }

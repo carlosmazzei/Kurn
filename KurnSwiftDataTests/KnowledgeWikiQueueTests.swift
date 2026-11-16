@@ -79,7 +79,9 @@ struct KnowledgeWikiQueueTests {
         let deadline = ContinuousClock.now.advanced(by: .seconds(15))
         while !(await gate.started) {
             guard ContinuousClock.now < deadline else { throw KnowledgeQueueError.workFailed }
-            await Task.yield()
+            // The queue drains at utility priority. A runnable main-actor
+            // yield loop can starve it; suspend without relaxing the deadline.
+            try await Task.sleep(for: .milliseconds(5))
         }
     }
 
