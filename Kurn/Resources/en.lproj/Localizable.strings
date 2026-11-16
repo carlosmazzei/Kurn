@@ -1445,4 +1445,9 @@
 "knowledge.browser.stop" = "Stop playback";
 "knowledge.browser.meetings" = "Meetings";
 "knowledge.browser.ask" = "Ask";
-"knowledge.browser.ask_prototype" = "Ask is not available in this preview.";
+
+// Four root destinations and source selection
+"meetings.options" = "List options";
+"meetings.selection.actions" = "Selection actions";
+"knowledge.browser.choose_sources" = "Choose meetings";
+"knowledge.browser.choose_sources_detail" = "Choose up to 16 meetings to browse their knowledge.";

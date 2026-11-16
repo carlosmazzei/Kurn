@@ -3201,17 +3201,39 @@ no native text-copy/export actions that would bypass the corporate export policy
 The fake audio adapter tests these boundaries without opening the
 simulator's audio session; real playback remains a physical-device check.
 
-`KnowledgeNavigationPrototype` is compiled only in DEBUG and is reachable only
-with all three synthetic UI-test arguments (`UI-Testing-Screenshots`,
-`UI-Testing-KnowledgeFixture`, `UI-Testing-KnowledgeNavigationPrototype`). It
-captures the proposed Meetings / Knowledge / Ask root; Knowledge Home reads the
-synthetic source and Ask is visibly a preview placeholder, not a new agent entry.
-Production root navigation remains unchanged pending the K0.5 review. The iPhone
-CI previews cover the prototype and entity/source/evidence/transcript journey;
-the wider layout and global source-selection UX still need navigation review.
-`MeetingKnowledgeUITests` retains the existing default-on-demand fixtures and
-adds the journey/audit and preview captures to `ui-review-previews`. All new
-copy is localized in the seven app languages.
+The navigation review selected four destinations: Meetings / Knowledge / Ask /
+Documents. `KnowledgeRootNavigationView` is active under `knowledgeEnabled` and
+keeps a separate stack per tab. Meetings' upper options menu contains Library,
+Filters, Sort and Select; Settings and Record remain direct upper actions.
+Bulk Export/Delete move to the upper selection-actions menu, so no bottom
+meetings toolbar overlaps the root tabs. Library scope, structured filters,
+sorting and picked rows retain their existing state and action boundaries when
+switching tabs. The feature-off compact stack/regular sidebar stays available.
+
+Ask reuses `MeetingChatView(meeting: nil)` and the app-owned library conversation;
+provider/source validation, history, draft and artifact behavior are unchanged.
+It is reachable even with semantic search off, while a provider without agent
+support still disables the composer. Documents uses `DocumentsListView` and its
+existing artifact detail/create flows. No chat/provider capability is enabled
+by navigation. Each visible tab hosts the recording mini bar above its safe
+area; the meetings list skips its own host in this layout to avoid duplication.
+
+`KnowledgeLibraryDestination` starts without an inferred library source scope.
+Its picker requires an explicit selection of up to 16 meetings and disables
+additional unchecked rows at that bound. Done applies the draft; Cancel keeps
+the current scope. Changing scope recreates the reader and clears old routes,
+content and playback. Every read still uses the existing live host/context
+policy checks; the picker never turns an accessible meeting title into a grant
+for canonical knowledge. Scope is session-local, not a persisted authorization.
+
+`KnowledgeNavigationPrototype` is a DEBUG-only deterministic launch of that same
+layout, with the synthetic meeting preselected for captures. Ask and Documents
+are real destinations rather than preview placeholders. `MeetingKnowledgeUITests`
+checks all four tabs, artifact access, upper list controls, retained filters/
+bucket/selection across tab changes, and explicit Knowledge source selection.
+CI exports the captures as `ui-review-previews`; copy is localized in seven
+languages. Wider-layout and physical-device recording/audio checks remain part
+of release validation.
 
 ### Attached documents (PDFs)
 

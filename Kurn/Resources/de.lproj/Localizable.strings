@@ -1445,4 +1445,9 @@
 "knowledge.browser.stop" = "Wiedergabe stoppen";
 "knowledge.browser.meetings" = "Besprechungen";
 "knowledge.browser.ask" = "Fragen";
-"knowledge.browser.ask_prototype" = "Fragen sind in dieser Vorschau nicht verfügbar.";
+
+// Four root destinations and source selection
+"meetings.options" = "Listenoptionen";
+"meetings.selection.actions" = "Auswahlaktionen";
+"knowledge.browser.choose_sources" = "Besprechungen auswählen";
+"knowledge.browser.choose_sources_detail" = "Wähle bis zu 16 Besprechungen aus, um deren Wissen zu lesen.";

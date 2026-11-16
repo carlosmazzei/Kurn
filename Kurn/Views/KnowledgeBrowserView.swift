@@ -8,6 +8,7 @@ import SwiftUI
 struct KnowledgeBrowserView: View {
     let meetingIDs: Set<UUID>
     let showsDone: Bool
+    let onChooseSources: (() -> Void)?
     @Environment(KnowledgeCompilationCoordinator.self) private var coordinator
     @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
@@ -17,9 +18,10 @@ struct KnowledgeBrowserView: View {
     @State private var refresh = 0
     @State private var playRequest = 0
 
-    init(meetingIDs: Set<UUID>, initialEntityID: UUID? = nil, showsDone: Bool = true) {
+    init(meetingIDs: Set<UUID>, initialEntityID: UUID? = nil, showsDone: Bool = true, onChooseSources: (() -> Void)? = nil) {
         self.meetingIDs = meetingIDs
         self.showsDone = showsDone
+        self.onChooseSources = onChooseSources
         _path = State(initialValue: initialEntityID.map { [.entity($0)] } ?? [])
     }
 
@@ -39,6 +41,14 @@ struct KnowledgeBrowserView: View {
                 destination(nil)
                     .navigationDestination(for: KnowledgeBrowserRoute.self) { destination($0) }
                     .toolbar {
+                        if let onChooseSources {
+                            ToolbarItem(placement: .topBarLeading) {
+                                Button(action: onChooseSources) {
+                                    Label(KnowledgeBrowserCopy.text("choose_sources"), systemImage: "checklist")
+                                }
+                                .accessibilityIdentifier("knowledge.chooseSources")
+                            }
+                        }
                         ToolbarItem(placement: .primaryAction) {
                             Button { invalidateAndRefresh() } label: { Label(KnowledgeBrowserCopy.text("refresh"), systemImage: "arrow.clockwise") }
                                 .accessibilityIdentifier("knowledge.browser.refresh")

@@ -2,10 +2,10 @@
 //  MeetingsListToolbar.swift
 //  Kurn
 //
-//  The meetings list's native toolbar. Library scope, filters and Ask share one
-//  Liquid Glass group at the bottom; a `ToolbarSpacer` splits the record button
-//  off into a group of its own, so the primary action reads as separate from the
-//  browsing controls instead of being a floating button drawn over a fake bar.
+//  In the four-destination root, Library / Filters / Sort / Select share the
+//  upper options menu; Settings and Record remain direct upper actions. No
+//  bottom toolbar competes with the root tab bar. The feature-off layout keeps
+//  the existing standalone toolbar placements.
 //
 //  This lives in its own file because `MeetingsListView.swift` is already close
 //  to the SwiftLint file-length limit. The members it reaches for are therefore
@@ -29,6 +29,34 @@ extension MeetingsListView {
 
     @ToolbarContentBuilder
     var browsingToolbar: some ToolbarContent {
+        if usesRootTabs {
+            rootBrowsingToolbar
+        } else {
+            legacyBrowsingToolbar
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var rootBrowsingToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+                libraryButton
+                filterButton
+                sortMenu
+                selectButton
+            } label: {
+                Label(NSLocalizedString("meetings.options", comment: "List options"), systemImage: "ellipsis.circle")
+            }
+            .accessibilityValue(selectionTitle)
+            .accessibilityIdentifier("meetings.options")
+        }
+        ToolbarItem(placement: .topBarTrailing) { settingsButton }
+        ToolbarSpacer(.fixed, placement: .topBarTrailing)
+        ToolbarItem(placement: .topBarTrailing) { recordButton.labelStyle(.iconOnly) }
+    }
+
+    @ToolbarContentBuilder
+    private var legacyBrowsingToolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) { selectButton }
         ToolbarItem(placement: .topBarTrailing) { sortMenu }
         // Splits the shared glass background so sorting and settings read as
@@ -51,7 +79,7 @@ extension MeetingsListView {
         // Everything above shares one glass capsule; the flexible spacer pushes
         // the record button to the trailing edge *and* gives it its own.
         ToolbarSpacer(.flexible, placement: .bottomBar)
-        ToolbarItem(placement: .bottomBar) { recordButton }
+        ToolbarItem(placement: .bottomBar) { recordButton.labelStyle(.titleAndIcon) }
     }
 
     // MARK: - Primary action
@@ -76,7 +104,6 @@ extension MeetingsListView {
                 )
             }
         }
-        .labelStyle(.titleAndIcon)
         .tint(Theme.accent)
         .buttonStyle(.glassProminent)
         .accessibilityHint(recordingSession.isActive
@@ -111,7 +138,7 @@ extension MeetingsListView {
     /// what they're looking at.
     var libraryButton: some View {
         Button { showingSidebar = true } label: {
-            Label(selectionTitle, systemImage: selectionSystemImage)
+            Label(usesRootTabs ? NSLocalizedString("meetings.bucket", comment: "Library") : selectionTitle, systemImage: selectionSystemImage)
         }
         .labelStyle(.titleAndIcon)
         .accessibilityLabel(NSLocalizedString("meetings.bucket", comment: "Library"))
@@ -124,7 +151,8 @@ extension MeetingsListView {
     var filterButton: some View {
         Button { showingFilterBar = true } label: {
             if filter.isActive {
-                Label("\(filter.activeCount)", systemImage: "line.3.horizontal.decrease")
+                Label(usesRootTabs ? "\(NSLocalizedString("filter.title", comment: "Filters")) (\(filter.activeCount))" : "\(filter.activeCount)",
+                    systemImage: "line.3.horizontal.decrease")
                     .labelStyle(.titleAndIcon)
             } else {
                 Label(
@@ -135,6 +163,8 @@ extension MeetingsListView {
         }
         .tint(filter.isActive ? Theme.accent : nil)
         .accessibilityLabel(NSLocalizedString("filter.title", comment: "Filters"))
+        .accessibilityValue(filter.isActive ? "\(filter.activeCount)" : "")
+        .accessibilityIdentifier("meetings.filters")
     }
 
     var askButton: some View {
