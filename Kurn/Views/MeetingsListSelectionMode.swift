@@ -79,30 +79,46 @@ extension MeetingsListView {
                 .accessibilityIdentifier("meetings.selection.done")
         }
 
-        ToolbarItem(placement: .bottomBar) {
-            Button { showingBulkExport = true } label: {
-                Label(
-                    NSLocalizedString("meetings.selection.export", comment: "Export"),
-                    systemImage: "square.and.arrow.up"
-                )
+        if usesRootTabs {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    exportSelectionButton
+                    deleteSelectionButton
+                } label: {
+                    Label(NSLocalizedString("meetings.selection.actions", comment: "Selection actions"), systemImage: "ellipsis.circle")
+                }
+                .accessibilityIdentifier("meetings.selection.actions")
             }
-            .labelStyle(.titleAndIcon)
-            .disabled(selectedMeetings.isEmpty)
-            .accessibilityIdentifier("meetings.selection.export")
+        } else {
+            ToolbarItem(placement: .bottomBar) { exportSelectionButton }
+            ToolbarSpacer(.flexible, placement: .bottomBar)
+            ToolbarItem(placement: .bottomBar) { deleteSelectionButton }
         }
-        ToolbarSpacer(.flexible, placement: .bottomBar)
-        ToolbarItem(placement: .bottomBar) {
-            Button(role: .destructive) { pendingBulkDelete = true } label: {
-                Label(
-                    NSLocalizedString("common.delete", comment: "Delete"),
-                    systemImage: "trash"
-                )
-            }
-            .labelStyle(.titleAndIcon)
-            .tint(Theme.accent)
-            .disabled(selectedMeetings.isEmpty)
-            .accessibilityIdentifier("meetings.selection.delete")
+    }
+
+    private var exportSelectionButton: some View {
+        Button { showingBulkExport = true } label: {
+            Label(
+                NSLocalizedString("meetings.selection.export", comment: "Export"),
+                systemImage: "square.and.arrow.up"
+            )
         }
+        .labelStyle(.titleAndIcon)
+        .disabled(selectedMeetings.isEmpty)
+        .accessibilityIdentifier("meetings.selection.export")
+    }
+
+    private var deleteSelectionButton: some View {
+        Button(role: .destructive) { pendingBulkDelete = true } label: {
+            Label(
+                NSLocalizedString("common.delete", comment: "Delete"),
+                systemImage: "trash"
+            )
+        }
+        .labelStyle(.titleAndIcon)
+        .tint(Theme.accent)
+        .disabled(selectedMeetings.isEmpty)
+        .accessibilityIdentifier("meetings.selection.delete")
     }
 }
 

@@ -1445,4 +1445,9 @@
 "knowledge.browser.stop" = "停止播放";
 "knowledge.browser.meetings" = "会议";
 "knowledge.browser.ask" = "提问";
-"knowledge.browser.ask_prototype" = "此预览中暂不可提问。";
+
+// Four root destinations and source selection
+"meetings.options" = "列表选项";
+"meetings.selection.actions" = "选择操作";
+"knowledge.browser.choose_sources" = "选择会议";
+"knowledge.browser.choose_sources_detail" = "最多选择 16 场会议以浏览其知识。";

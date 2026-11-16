@@ -93,14 +93,96 @@ final class MeetingKnowledgeUITests: XCTestCase {
     func testKnowledgeRootNavigationPrototype() throws {
         continueAfterFailure = false
         let app = launch(prototype: true)
+        XCTAssertEqual(app.tabBars.buttons.count, 4)
         XCTAssertTrue(app.buttons["knowledge.browser.entity"].firstMatch.waitForExistence(timeout: 15))
         capture(app, named: "knowledge-navigation-home-prototype")
         app.tabBars.buttons["Meetings"].tap()
         XCTAssertTrue(app.buttons["meetingCard"].firstMatch.waitForExistence(timeout: 10))
         capture(app, named: "knowledge-navigation-meetings-prototype")
         app.tabBars.buttons["Ask"].tap()
-        XCTAssertTrue(app.staticTexts["Ask is not available in this preview."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["chat.send"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["chat.send"].isEnabled)
         capture(app, named: "knowledge-navigation-ask-prototype")
+        app.tabBars.buttons["Documents"].tap()
+        XCTAssertTrue(app.buttons["documents.new"].waitForExistence(timeout: 10))
+        let document = app.buttons["documents.open"].firstMatch
+        XCTAssertTrue(document.waitForExistence(timeout: 10))
+        capture(app, named: "knowledge-navigation-documents")
+        document.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Example portal artifact")).firstMatch.waitForExistence(timeout: 10))
+        capture(app, named: "knowledge-navigation-artifact")
+    }
+
+    func testMeetingMenusAndSelectionSurviveRootTabChanges() throws {
+        continueAfterFailure = false
+        let app = launch()
+        let options = app.buttons["meetings.options"]
+        XCTAssertTrue(options.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars.buttons["meetings.record"].exists)
+        options.tap()
+        XCTAssertTrue(app.buttons["meetings.library"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["meetings.filters"].exists)
+        XCTAssertTrue(app.buttons["meetings.select"].exists)
+        XCTAssertTrue(app.buttons["Sort"].exists)
+        capture(app, named: "knowledge-navigation-list-options")
+        app.buttons["meetings.library"].tap()
+        let favorites = app.buttons["library.bucket.favorites"]
+        XCTAssertTrue(favorites.waitForExistence(timeout: 10))
+        favorites.tap()
+        XCTAssertTrue(options.waitForExistence(timeout: 10))
+        options.tap()
+        app.buttons["meetings.filters"].tap()
+        let week = app.segmentedControls.buttons["This week"]
+        XCTAssertTrue(week.waitForExistence(timeout: 10))
+        week.tap()
+        app.navigationBars.buttons["Done"].tap()
+        options.tap()
+        app.buttons["meetings.select"].tap()
+        let done = app.buttons["meetings.selection.done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 10))
+        app.buttons["meetingCard"].firstMatch.tap()
+        app.buttons["meetings.selection.actions"].tap()
+        XCTAssertTrue(app.buttons["meetings.selection.export"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["meetings.selection.export"].isEnabled)
+        XCTAssertTrue(app.buttons["meetings.selection.delete"].exists)
+        capture(app, named: "knowledge-navigation-selection-actions")
+        // Dismiss outside the two top-right menu rows, without choosing an action.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.5)).tap()
+        app.tabBars.buttons["Ask"].tap()
+        XCTAssertTrue(app.buttons["chat.send"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Meetings"].tap()
+        XCTAssertTrue(done.waitForExistence(timeout: 10))
+        done.tap()
+        options.tap()
+        app.buttons["meetings.library"].tap()
+        XCTAssertTrue(favorites.waitForExistence(timeout: 10))
+        XCTAssertTrue(favorites.isSelected)
+        app.navigationBars.buttons["Done"].tap()
+        options.tap()
+        app.buttons["meetings.filters"].tap()
+        XCTAssertTrue(week.waitForExistence(timeout: 10))
+        XCTAssertTrue(week.isSelected)
+    }
+
+    func testKnowledgeHomeUsesExplicitSourceSelection() throws {
+        continueAfterFailure = false
+        let app = launch()
+        app.tabBars.buttons["Knowledge"].tap()
+        let choose = app.buttons["knowledge.chooseSources"]
+        XCTAssertTrue(choose.waitForExistence(timeout: 10))
+        choose.tap()
+        let source = app.buttons["knowledge.sourceMeeting"].firstMatch
+        XCTAssertTrue(source.waitForExistence(timeout: 10))
+        source.tap()
+        app.buttons["knowledge.sources.done"].tap()
+        XCTAssertTrue(app.buttons["knowledge.browser.entity"].firstMatch.waitForExistence(timeout: 10))
+        capture(app, named: "knowledge-navigation-selected-sources")
+        choose.tap()
+        XCTAssertTrue(source.waitForExistence(timeout: 10))
+        source.tap()
+        app.navigationBars.buttons["Cancel"].tap()
+        XCTAssertTrue(app.buttons["knowledge.browser.entity"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Selected meetings: 1")).firstMatch.exists)
     }
 
     private func capture(_ app: XCUIApplication, named name: String) {

@@ -65,6 +65,8 @@ struct MeetingsListView: View {
     /// there updates this list without a sheet round-trip. On compact width
     /// `ContentView` still owns the state, just with no sidebar column reading it.
     @Binding var selection: LibrarySelection
+    /// Root tabs own navigation and the mini bar; this list keeps its control state.
+    var usesRootTabs = false
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @State var showingSidebar = false
     @State var showingFilterBar = false
@@ -336,7 +338,7 @@ struct MeetingsListView: View {
         )
         .textInputAutocapitalization(.never)
         .toolbar { listToolbar }
-        .hostsRecordingMiniBar()
+        .hostsRecordingMiniBar(when: !usesRootTabs)
         .sheet(isPresented: $showingSettings) {
             NavigationStack { SettingsView() }
         }

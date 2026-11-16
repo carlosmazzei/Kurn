@@ -2,23 +2,12 @@
 //  ContentView.swift
 //  Kurn
 //
-//  Root navigation. On compact width (iPhone, or iPad in a narrow Split View)
-//  a single NavigationStack hosts the meetings list and the app's other
-//  sections, with the folder/library picker reached through a sheet
-//  (`FolderSidebarView`, opened from the toolbar). On regular width (iPad,
-//  Mac Catalyst) a NavigationSplitView instead shows that same picker as a
-//  persistent sidebar column next to the meetings list: the app is declared
-//  universal, and a full-screen sheet wasted the width iPad has. `selection` moved up to this
-//  view specifically so the same `Binding<LibrarySelection>` can drive both
-//  `FolderSidebarView` (sidebar or sheet) and `MeetingsListView`'s own
-//  filtering without a sheet round-trip on regular width. Settings is
-//  presented as a sheet either way. The recorder and its minimized mini bar
-//  are attached here (`recordingSessionPresenter()`), above both layouts, so
-//  a recording stays reachable from every screen. A PDF shared into the app
-//  from another one is offered here too (`AttachToMeetingView`), above both
-//  layouts, for the user to pick the meeting it belongs to. The App Store
-//  rating prompt (`reviewPromptPresenter()`) is attached at the same level,
-//  so it can follow a finished transcript or summary on any screen.
+//  With Knowledge enabled, the reviewed root has Meetings / Knowledge / Ask /
+//  Documents, each retaining its own navigation stack. Meetings owns its
+//  library/filter/sort/selection controls in the upper menu. With the feature
+//  disabled, the existing compact stack / regular-width sidebar remains.
+//  Recording presentation, review prompts and incoming-file handling stay
+//  above both layouts so navigation cannot orphan an active recording.
 //
 
 import SwiftData
@@ -28,6 +17,7 @@ struct ContentView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.modelContext) private var modelContext
     @Environment(IncomingFileInbox.self) private var incomingFiles
+    @Environment(AppSettings.self) private var settings
     @State private var selection: LibrarySelection = .allMeetings
 
     var body: some View {
@@ -37,9 +27,9 @@ struct ContentView: View {
                ProcessInfo.processInfo.arguments.contains("UI-Testing-KnowledgeFixture"),
                ProcessInfo.processInfo.arguments.contains("UI-Testing-Screenshots") {
                 KnowledgeNavigationPrototype()
-            } else { meetingsNavigation }
+            } else { appNavigation }
             #else
-            meetingsNavigation
+            appNavigation
             #endif
         }
         .recordingSessionPresenter()
@@ -52,6 +42,12 @@ struct ContentView: View {
                 incomingFiles.finish()
             }
         }
+    }
+
+    @ViewBuilder
+    private var appNavigation: some View {
+        if settings.knowledgeEnabled { KnowledgeRootNavigationView() }
+        else { meetingsNavigation }
     }
 
     private var meetingsNavigation: some View {

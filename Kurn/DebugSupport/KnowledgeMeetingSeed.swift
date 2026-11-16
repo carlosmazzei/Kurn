@@ -29,6 +29,9 @@ enum KnowledgeMeetingSeed {
             generatorModelIdentifier: "synthetic-local")
         context.insert(article)
         meeting.wikiArticle = article
+        context.insert(GeneratedDocument(title: "Example portal notes",
+            bodyMarkdown: "Example portal artifact retained from the library chat.", userPrompt: "Create synthetic notes",
+            sourceKind: .transcripts, sourceNames: [meeting.title], sourceMeetingIDs: [meeting.id], generatorModelIdentifier: "synthetic-local"))
         try context.save()
         let auth = KnowledgeExtractionAuthorization(featureEnabled: true,
             policies: [.defaultDeny(id: KnowledgeCompilationCoordinator.localPolicyID)], sourceClassifications: [.internal])

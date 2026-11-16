@@ -42,6 +42,7 @@ struct DocumentsListView: View {
                         documentRow(document)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("documents.open")
                     .swipeActions {
                         Button(role: .destructive) { pendingDelete = document } label: {
                             Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")

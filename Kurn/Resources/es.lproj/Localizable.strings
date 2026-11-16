@@ -1445,4 +1445,9 @@
 "knowledge.browser.stop" = "Detener reproducción";
 "knowledge.browser.meetings" = "Reuniones";
 "knowledge.browser.ask" = "Preguntar";
-"knowledge.browser.ask_prototype" = "Las preguntas no están disponibles en esta vista previa.";
+
+// Four root destinations and source selection
+"meetings.options" = "Opciones de la lista";
+"meetings.selection.actions" = "Acciones de selección";
+"knowledge.browser.choose_sources" = "Elegir reuniones";
+"knowledge.browser.choose_sources_detail" = "Elige hasta 16 reuniones para consultar su conocimiento.";
