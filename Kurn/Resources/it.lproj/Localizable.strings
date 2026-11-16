@@ -1464,7 +1464,7 @@
 "knowledge.review.title" = "Revisione";
 "knowledge.review.intro" = "Esamina le riunioni selezionate. Le possibili corrispondenze di identità richiedono una tua decisione; gli avvisi restano consultabili.";
 "knowledge.review.read_only" = "La tua politica consente solo la consultazione.";
-"knowledge.review.limited" = "Questa vista è limitata. Seleziona meno riunioni per esaminare più elementi.";
+"knowledge.review.limited" = "Alcuni elementi non vengono mostrati perché questa vista ha un limite di dimensione.";
 "knowledge.review.decision_failed" = "Impossibile salvare la decisione. È mostrato lo stato attuale; controllalo prima di riprovare.";
 "knowledge.review.evidence_unavailable" = "Non è stato possibile convalidare alcune evidenze canoniche. Il contenuto è nascosto; esamina la fonte o ricompilala.";
 "knowledge.review.identities" = "Identità candidate";

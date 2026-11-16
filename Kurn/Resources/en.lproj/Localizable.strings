@@ -1464,7 +1464,7 @@
 "knowledge.review.title" = "Review";
 "knowledge.review.intro" = "Review the selected meetings. Identity matches need your decision; source warnings remain available for inspection.";
 "knowledge.review.read_only" = "Your policy permits viewing only.";
-"knowledge.review.limited" = "This view is bounded. Select fewer meetings to inspect more items.";
+"knowledge.review.limited" = "Some items are not shown because this view has a size limit.";
 "knowledge.review.decision_failed" = "The decision could not be saved. The latest state is shown; review it before trying again.";
 "knowledge.review.evidence_unavailable" = "Some canonical evidence could not be validated. Its content is hidden; inspect the source or compile it again.";
 "knowledge.review.identities" = "Identity candidates";

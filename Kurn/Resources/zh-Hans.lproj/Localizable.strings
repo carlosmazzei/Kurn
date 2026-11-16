@@ -1464,7 +1464,7 @@
 "knowledge.review.title" = "审核";
 "knowledge.review.intro" = "审核所选会议。身份匹配候选需要你决定；来源提示可供检查。";
 "knowledge.review.read_only" = "你的策略仅允许查看。";
-"knowledge.review.limited" = "此视图有数量限制。请选择更少的会议以检查更多项目。";
+"knowledge.review.limited" = "此视图有数量限制，因此未显示部分项目。";
 "knowledge.review.decision_failed" = "无法保存决定。当前显示最新状态；请检查后重试。";
 "knowledge.review.evidence_unavailable" = "部分规范证据无法验证，其内容已隐藏。请检查来源或重新编译。";
 "knowledge.review.identities" = "身份候选";

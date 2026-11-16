@@ -3300,7 +3300,9 @@ The scoped Knowledge reader opens Review from its native toolbar. It shares
 that explicit 1–16 meeting selection, and never enumerates a library-wide inbox.
 `KnowledgeReviewRows` authorizes `.semanticLint`, proves entity origin bindings
 before showing candidate names/history, and validates canonical passages in a
-fresh context. Discovery is bounded and incomplete results are labeled. Reads
+fresh context. Discovery pages through reviews in batches of 256, caps authorized candidate/history
+results at 128 each, and labels incomplete scans (16,384-row budget) rather than
+blocking a selection on unrelated history. Reads
 never insert reviews, acknowledge jobs, repair citations or mutate identities.
 Unknown schemas fail closed. Missing, changed or invalid evidence produces an
 inspection notice with no unvalidated quote or payload.
@@ -3313,6 +3315,8 @@ extraction-policy grant, and derives merge endpoints from the authorized review
 rather than accepting UI-supplied names/IDs. Merge and undo retain the K1.7 origin,
 redirect-graph, incoming-member and audit validation. Dismiss/reopen updates the
 existing review and canonical revision atomically; a failed save rolls back both.
+Review-only revisions are saved with `projectionPending = false`; they change
+no canonical page inputs and must not create an outbox entry with no source audit.
 The view never changes SwiftData directly. No model/provider or automatic identity
 linking path is added, including for people; experimental match weights are not
 presented as calibrated confidence.

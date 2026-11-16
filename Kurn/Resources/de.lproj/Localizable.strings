@@ -1464,7 +1464,7 @@
 "knowledge.review.title" = "Prüfung";
 "knowledge.review.intro" = "Prüfe die ausgewählten Besprechungen. Mögliche Identitätsübereinstimmungen benötigen deine Entscheidung; Quellenhinweise bleiben einsehbar.";
 "knowledge.review.read_only" = "Deine Richtlinie erlaubt nur das Anzeigen.";
-"knowledge.review.limited" = "Diese Ansicht ist begrenzt. Wähle weniger Besprechungen, um mehr Einträge zu prüfen.";
+"knowledge.review.limited" = "Einige Einträge werden wegen der Größenbegrenzung dieser Ansicht nicht angezeigt.";
 "knowledge.review.decision_failed" = "Die Entscheidung konnte nicht gespeichert werden. Der aktuelle Stand wird angezeigt; prüfe ihn vor einem erneuten Versuch.";
 "knowledge.review.evidence_unavailable" = "Einige kanonische Belege konnten nicht bestätigt werden. Ihr Inhalt ist ausgeblendet; prüfe die Quelle oder kompiliere sie erneut.";
 "knowledge.review.identities" = "Identitätskandidaten";
