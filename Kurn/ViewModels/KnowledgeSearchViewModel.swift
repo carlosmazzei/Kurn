@@ -29,6 +29,9 @@ final class KnowledgeSearchViewModel {
                 searcher: Searcher = { query, read, dense, authorize in
                     try await KnowledgeSearchService().search(query: query, corpus: read.searchCorpus, useSemantic: dense, authorizeEmbedding: authorize)
                 }) async {
+        // A superseded task may reach the actor after its replacement has
+        // already completed. Cancellation must precede every state mutation.
+        guard !Task.isCancelled else { return }
         invalidate()
         self.query = query
         self.meetingIDs = meetingIDs

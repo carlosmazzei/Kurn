@@ -146,6 +146,22 @@ struct KnowledgeSearchTests {
         #expect(await embedder.count == 0)
     }
 
+    @Test func anAlreadyCancelledRequestCannotClearANewerCompletedQuery() async throws {
+        let read = try fixture(), model = KnowledgeSearchViewModel()
+        await model.search(query: "Orion", meetingIDs: read.meetingIDs, useSemantic: false, isEnabled: { true }, reader: { read })
+        guard case .loaded = model.state else { Issue.record("New query unavailable"); return }
+        let expected = model.state
+        let cancelled = Task { @MainActor in
+            await model.search(query: "superseded", meetingIDs: read.meetingIDs, useSemantic: false, isEnabled: { true }, reader: {
+                Issue.record("Cancelled request reached the reader"); return read
+            })
+        }
+        cancelled.cancel()
+        await cancelled.value
+        #expect(model.state == expected)
+        #expect(model.presentation(query: "Orion", meetingIDs: read.meetingIDs) == expected)
+    }
+
     @Test func invalidatedSuspendedSearchCannotReplaceANewerQuery() async throws {
         let read = try fixture(), model = KnowledgeSearchViewModel()
         let gate = SearchGate()
