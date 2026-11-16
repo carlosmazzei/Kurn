@@ -22,6 +22,7 @@ struct KnowledgeReviewInboxView: View {
     private var state: KnowledgeReviewLoadState {
         settings.knowledgeEnabled ? model.presentation(meetingIDs: meetingIDs) : .unavailable
     }
+    private var loadKey: String { meetingIDs.map(\.uuidString).sorted().joined(separator: ":") + ":\(refresh)" }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -49,7 +50,7 @@ struct KnowledgeReviewInboxView: View {
         .sheet(item: $evidence) { route in
             KnowledgeBrowserView(meetingIDs: meetingIDs, initialEvidenceSelection: route.selection)
         }
-        .task(id: refresh) {
+        .task(id: loadKey) {
             if refresh > 0 { do { try await Task.sleep(for: .milliseconds(150)) } catch { return } }
             await model.load(meetingIDs: meetingIDs, isEnabled: { settings.knowledgeEnabled }, reader: read)
         }
@@ -61,6 +62,7 @@ struct KnowledgeReviewInboxView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave).receive(on: RunLoop.main)) { _ in reload() }
         .onChange(of: settings.knowledgeEnabled) { _, _ in reload() }
+        .onChange(of: meetingIDs) { _, _ in path = []; reload() }
         .onChange(of: phase) { _, value in if value == .active { reload() } else { clear() } }
         .onDisappear { model.invalidate() }
     }

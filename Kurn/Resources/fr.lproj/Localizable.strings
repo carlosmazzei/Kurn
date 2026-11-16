@@ -1464,7 +1464,7 @@
 "knowledge.review.title" = "Révision";
 "knowledge.review.intro" = "Examinez les réunions sélectionnées. Les correspondances d’identité nécessitent votre décision ; les avertissements restent consultables.";
 "knowledge.review.read_only" = "Votre politique autorise uniquement la consultation.";
-"knowledge.review.limited" = "Cette vue est limitée. Sélectionnez moins de réunions pour examiner davantage d’éléments.";
+"knowledge.review.limited" = "Certains éléments ne sont pas affichés car cette vue est limitée.";
 "knowledge.review.decision_failed" = "La décision n’a pas pu être enregistrée. L’état actuel est affiché ; vérifiez-le avant de réessayer.";
 "knowledge.review.evidence_unavailable" = "Certaines preuves canoniques n’ont pas pu être validées. Leur contenu est masqué ; examinez la source ou recompilez-la.";
 "knowledge.review.identities" = "Identités candidates";

@@ -422,6 +422,11 @@ extension SwiftDataConcurrencySensitiveTests.KnowledgeEntityResolutionTests {
         try await f.store.reviewDecision(.reopen(candidate.id), snapshot: dismissed.snapshot, authorization: { auth })
         let reopened = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
         #expect(reopened.candidates.first?.isDismissed == false)
+        let publication = try await f.store.wikiProjectionSnapshot(meetingIDs: auth.meetingIDs, scope: "workspace", authorization: { auth })
+        _ = try await f.store.publishWikiProjection(publication, authorization: { auth })
+        #expect(try await f.store.pendingProjection() == nil)
+        let revisions = try ModelContext(f.container).fetch(FetchDescriptor<KnowledgeRevision>())
+        #expect(revisions.filter { $0.jobID == nil }.allSatisfy { !$0.projectionPending })
     }
 
     @Test func reviewMergeHistoryCanUndoWithoutChangingClaimsOrEvidence() async throws {
@@ -524,5 +529,25 @@ extension SwiftDataConcurrencySensitiveTests.KnowledgeEntityResolutionTests {
         await #expect(throws: KnowledgeEntityStoreError.staleSnapshot) {
             try await f.store.reviewDecision(.merge(candidate.id), snapshot: read.snapshot, authorization: { auth })
         }
+    }
+
+    @Test func reviewPagesPastLargeForeignHistoryWithoutBlockingScopedDecisions() async throws {
+        let f = try await fixture(copies: 2)
+        let auth = reviewAuthorization(f)
+        let edit = ModelContext(f.container)
+        edit.autosaveEnabled = false
+        let foreign = try KnowledgeStoreRows.authoritativeData([UUID(), UUID()])
+        for _ in 0..<8_193 {
+            let row = KnowledgeReview(kind: .mergeCandidate, subjectIDsData: foreign)
+            row.stateRaw = KnowledgeReviewItemState.resolved.rawValue
+            edit.insert(row)
+        }
+        try edit.save()
+        let read = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
+        #expect(read.candidates.count == 1 && read.merges.isEmpty && !read.isTruncated)
+        let candidate = try #require(read.candidates.first)
+        try await f.store.reviewDecision(.dismiss(candidate.id), snapshot: read.snapshot, authorization: { auth })
+        let dismissed = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
+        #expect(dismissed.candidates.first?.isDismissed == true)
     }
 }

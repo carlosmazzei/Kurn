@@ -59,7 +59,11 @@ extension KnowledgeStore {
                 }
                 row.stateRaw = dismissed ? KnowledgeReviewItemState.dismissed.rawValue : KnowledgeReviewItemState.open.rawValue
                 row.resolvedAt = dismissed ? Date() : nil
-                context.insert(KnowledgeRevision(number: snapshot.revision + 1, policyRevisionKey: snapshot.policyRevisionKey, assertionCount: 0))
+                let revision = KnowledgeRevision(number: snapshot.revision + 1, policyRevisionKey: snapshot.policyRevisionKey, assertionCount: 0)
+                // A review-only decision changes no page inputs. It is a
+                // concurrency stamp, not an unacknowledgeable projection job.
+                revision.projectionPending = false
+                context.insert(revision)
                 try Task.checkCancellation()
                 try beforeSave()
                 try context.save()
