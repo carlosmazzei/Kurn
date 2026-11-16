@@ -3248,6 +3248,44 @@ CI exports the captures as `ui-review-previews`; copy is localized in seven
 languages. Wider-layout and physical-device recording/audio checks remain part
 of release validation.
 
+### Knowledge local search (K2.5)
+
+Knowledge Home has an offline search field over the explicitly selected meetings.
+`KnowledgeSearchIndex` projects typed page, alias and assertion documents from the
+same freshly authorized, evidence-validated pages used by the reader. IDs retain
+those types; no fabricated recording IDs/timestamps are inserted into transcript
+`SemanticChunk`s. Canonical event indexing waits for K3's validated temporal read.
+The corpus is disposable memory, not a second persisted canonical/embedding store,
+so this stage changes no schema or migration. Limits are explicit: 16 meetings,
+8,192 documents, 8 MiB corpus, 256 query characters/1,024 UTF-8 bytes and 40 results.
+Oversized input fails closed, never silently indexes only a prefix.
+
+`HybridSearchRanking` in KurnCore supplies the same BM25/RRF engine to transcript
+retrieval and typed knowledge retrieval, with stable ties. Knowledge additionally
+folds case/accents and ranks literal/name matches, including Chinese substrings.
+Names, aliases, structured qualifiers and source quotes are searchable. Snippets
+are literal, bounded source quotes/aliases; they are not generated summaries or
+Markdown links, and offer no copy/export bypass. Pages/aliases open the scoped
+entity reader; assertions open freshly resolved evidence by canonical IDs.
+
+Lexical search works with semantic search disabled and without OS assets. Dense
+ranking requires the existing semantic-search opt-in, a separate `.embedding`
+policy grant and fresh authorization after resource admission. It uses only
+already installed NLContextualEmbedding assets (never `requestAssets`), on-device,
+under the shared scheduler. Dense work is all-or-nothing for corpora up to 128
+documents/128 KiB; larger corpora and unavailable/invalid vectors keep the entire
+lexical corpus. Vectors carry their document/revision and model identifier and
+are released with the request; no cloud or model-download path is introduced.
+
+`KnowledgeSearchViewModel` checks source scope, full content/revision and policy
+before work, again before embedding, and after asynchronous ranking before
+publication. It validates returned document bytes/IDs against the fresh corpus.
+Epochs and cancellation prevent old queries replacing newer results; query,
+source/store/policy, route, feature, semantic-setting and scene changes clear old
+results. Submission dismisses the keyboard while retaining the query. Seven
+languages cover the search prompt and result types; synthetic UI coverage checks
+alias → page and quote → evidence with semantic search off.
+
 ### Attached documents (PDFs)
 
 A meeting can carry PDFs as reference material for its summaries

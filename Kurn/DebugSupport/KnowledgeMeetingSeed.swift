@@ -39,7 +39,7 @@ enum KnowledgeMeetingSeed {
         let snapshot = try KnowledgeStoreRows.readSnapshot(meetingID: meeting.id, scope: "workspace", auth: auth, in: sourceContext)
         let anchor = segment.id.uuidString.lowercased()
         let wire: [String: Any] = ["version": 1,
-            "entities": [["ref": "e1", "kind": "project", "name": "Example portal", "aliases": []]],
+            "entities": [["ref": "e1", "kind": "project", "name": "Example portal", "aliases": ["Orion workspace"]]],
             "assertions": [["ref": "a1", "subject": "e1", "predicate": "hasStatus", "value": ["type": "enum", "value": "open"],
                 "modality": "reported", "polarity": "positive", "claimKind": "internalStatusReport", "authorityStatus": "attributed",
                 "confidence": "medium", "attributedToSegmentID": anchor,

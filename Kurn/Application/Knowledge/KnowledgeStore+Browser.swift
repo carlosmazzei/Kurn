@@ -23,7 +23,9 @@ extension KnowledgeStore {
         let evidence = try selection.map {
             try KnowledgeBrowserSourceRows.read($0, wiki: snapshot.wiki, sources: sources, titles: titles, in: context)
         }
-        return try KnowledgeBrowserRead(meetingIDs: meetingIDs, wiki: snapshot.wiki, meetingTitles: titles, selectedEvidence: evidence)
+        let allowsEmbedding = (try? auth.authorize(classifications: sources.map(\.contextClassification), operation: .embedding)) != nil
+        return try KnowledgeBrowserRead(meetingIDs: meetingIDs, wiki: snapshot.wiki, meetingTitles: titles, selectedEvidence: evidence,
+            policyRevisionKey: snapshot.policyRevisionKey, allowsEmbedding: allowsEmbedding)
     }
 }
 
