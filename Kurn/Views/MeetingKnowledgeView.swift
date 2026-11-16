@@ -118,6 +118,5 @@ private struct MeetingContributionView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
-        .accessibilityIdentifier("knowledge.contribution")
     }
 }
