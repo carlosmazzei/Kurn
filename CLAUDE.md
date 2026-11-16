@@ -3253,7 +3253,10 @@ of release validation.
 Knowledge Home has an offline search field over the explicitly selected meetings.
 `KnowledgeSearchIndex` projects typed page, alias and assertion documents from the
 same freshly authorized, evidence-validated pages used by the reader. IDs retain
-those types; no fabricated recording IDs/timestamps are inserted into transcript
+those types; assertion documents are per canonical evidence ID, so the matching
+snippet and opened passage always agree even for multi-citation claims. A pure
+`KnowledgeSearchCorpus` DTO keeps Services independent of the Application reader.
+No fabricated recording IDs/timestamps are inserted into transcript
 `SemanticChunk`s. Canonical event indexing waits for K3's validated temporal read.
 The corpus is disposable memory, not a second persisted canonical/embedding store,
 so this stage changes no schema or migration. Limits are explicit: 16 meetings,

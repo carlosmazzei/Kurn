@@ -39,6 +39,10 @@ struct KnowledgeBrowserRead: Equatable, Sendable {
     let policyRevisionKey: String
     let allowsEmbedding: Bool
 
+    var searchCorpus: KnowledgeSearchCorpus {
+        KnowledgeSearchCorpus(pages: pages, meetingIDs: meetingIDs, allowsEmbedding: allowsEmbedding)
+    }
+
     init(meetingIDs: Set<UUID>, wiki: KnowledgeWikiSnapshot, meetingTitles: [UUID: String],
          selectedEvidence: KnowledgeEvidenceRead? = nil, policyRevisionKey: String = "", allowsEmbedding: Bool = false) throws {
         guard !meetingIDs.isEmpty, meetingIDs.count <= 16, Set(meetingTitles.keys) == meetingIDs,

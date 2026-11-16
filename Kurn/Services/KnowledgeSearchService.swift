@@ -14,12 +14,12 @@ struct KnowledgeSearchService: Sendable {
 
     init(embedder: any TextEmbedding = InstalledTextEmbedder()) { self.embedder = embedder }
 
-    func search(query: String, read: KnowledgeBrowserRead, useSemantic: Bool,
+    func search(query: String, corpus: KnowledgeSearchCorpus, useSemantic: Bool,
                 authorizeEmbedding: @Sendable () async throws -> Bool = { false }) async throws -> [KnowledgeSearchDocument] {
-        let index = try KnowledgeSearchIndex(pages: read.pages, meetingIDs: read.meetingIDs)
+        let index = try KnowledgeSearchIndex(pages: corpus.pages, meetingIDs: corpus.meetingIDs)
         // Validate before any model work, including empty/oversized queries.
         let lexical = try index.search(query: query)
-        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, useSemantic, read.allowsEmbedding,
+        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, useSemantic, corpus.allowsEmbedding,
               !index.documents.isEmpty, index.documents.count <= 128,
               index.documents.reduce(0, { $0 + $1.text.utf8.count }) <= 131_072 else { return lexical }
         try Task.checkCancellation()
@@ -51,9 +51,9 @@ struct KnowledgeSearchService: Sendable {
         return try index.search(query: query, denseOrder: dense)
     }
 
-    static func validates(_ hits: [KnowledgeSearchDocument], in read: KnowledgeBrowserRead) async throws -> Bool {
+    static func validates(_ hits: [KnowledgeSearchDocument], in corpus: KnowledgeSearchCorpus) async throws -> Bool {
         guard hits.count <= 100, Set(hits.map(\.id)).count == hits.count else { return false }
-        let documents = try KnowledgeSearchIndex(pages: read.pages, meetingIDs: read.meetingIDs).documents
+        let documents = try KnowledgeSearchIndex(pages: corpus.pages, meetingIDs: corpus.meetingIDs).documents
         let allowed = Dictionary(uniqueKeysWithValues: documents.map { ($0.id, $0) })
         return hits.allSatisfy { allowed[$0.id] == $0 }
     }
