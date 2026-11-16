@@ -24,8 +24,9 @@ final class MeetingKnowledgeUITests: XCTestCase {
         XCTAssertTrue(mode.exists)
         mode.tap()
         let quote = app.staticTexts["knowledge.quote"].firstMatch
+        let content = app.descendants(matching: .any)["knowledge.content"].firstMatch
         _ = quote.waitForExistence(timeout: 5)
-        for _ in 0..<4 where !quote.isHittable { app.swipeUp() }
+        for _ in 0..<4 where !quote.isHittable { content.swipeUp() }
         XCTAssertTrue(quote.waitForExistence(timeout: 5))
     }
 
@@ -39,10 +40,11 @@ final class MeetingKnowledgeUITests: XCTestCase {
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
         capture(app, named: "knowledge-meeting-compact")
         let notes = app.descendants(matching: .any)["knowledge.notes"].firstMatch
-        for _ in 0..<4 where !notes.isHittable { app.swipeDown() }
+        let content = app.descendants(matching: .any)["knowledge.content"].firstMatch
+        for _ in 0..<4 where !notes.isHittable { content.swipeDown() }
         XCTAssertTrue(notes.exists)
         notes.tap()
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "The team reported")).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "The team reported")).firstMatch.waitForExistence(timeout: 5))
         capture(app, named: "knowledge-meeting-notes")
     }
 
@@ -52,8 +54,9 @@ final class MeetingKnowledgeUITests: XCTestCase {
         openKnowledge(app)
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
         capture(app, named: "knowledge-meeting-accessibility")
-        app.swipeDown()
-        app.swipeDown()
+        let content = app.descendants(matching: .any)["knowledge.content"].firstMatch
+        content.swipeDown()
+        content.swipeDown()
         capture(app, named: "knowledge-meeting-accessibility-overview")
     }
 
