@@ -3283,7 +3283,9 @@ are released with the request; no cloud or model-download path is introduced.
 `KnowledgeSearchViewModel` checks source scope, full content/revision and policy
 before work, again before embedding, and after asynchronous ranking before
 publication. It validates returned document bytes/IDs against the fresh corpus.
-Epochs and cancellation prevent old queries replacing newer results; query,
+Presentation always observes the state even when a different query/scope masks
+its content, so publication triggers a SwiftUI redraw. Epochs and cancellation
+prevent old queries replacing newer results; query,
 source/store/policy, route, feature, semantic-setting and scene changes clear old
 results. The search controller stays installed across canonical loading states;
 a query revision advances after invalidation so lifecycle/onChange ordering

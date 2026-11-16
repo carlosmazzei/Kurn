@@ -21,7 +21,11 @@ final class KnowledgeSearchViewModel {
     func invalidate() { requestID = UUID(); state = .idle }
 
     func presentation(query: String, meetingIDs: Set<UUID>) -> KnowledgeSearchState {
-        self.query == query && self.meetingIDs == meetingIDs ? state : .idle
+        // Always read the observable state, including when ignored scope/query
+        // discriminators mask it. Otherwise SwiftUI tracks no dependency and
+        // never redraws when the pending query publishes its results.
+        let snapshot = state
+        return self.query == query && self.meetingIDs == meetingIDs ? snapshot : .idle
     }
 
     func search(query: String, meetingIDs: Set<UUID>, useSemantic: Bool,
