@@ -3294,6 +3294,45 @@ while retaining the query. Seven
 languages cover the search prompt and result types; synthetic UI coverage checks
 alias → page and quote → evidence with semantic search off.
 
+### Knowledge review inbox (K2.6)
+
+The scoped Knowledge reader opens Review from its native toolbar. It shares
+that explicit 1–16 meeting selection, and never enumerates a library-wide inbox.
+`KnowledgeReviewRows` authorizes `.semanticLint`, proves entity origin bindings
+before showing candidate names/history, and validates canonical passages in a
+fresh context. Discovery is bounded and incomplete results are labeled. Reads
+never insert reviews, acknowledge jobs, repair citations or mutate identities.
+Unknown schemas fail closed. Missing, changed or invalid evidence produces an
+inspection notice with no unvalidated quote or payload.
+
+Candidates offer **Keep separate**, **Review again**, and a confirmed merge into
+the displayed target identity. History exposes the existing audited merge/undo
+boundary. `KnowledgeStore.reviewDecision` refetches the inbox, compares the exact
+source fingerprints, policy key and canonical revision, checks a separate local
+extraction-policy grant, and derives merge endpoints from the authorized review
+rather than accepting UI-supplied names/IDs. Merge and undo retain the K1.7 origin,
+redirect-graph, incoming-member and audit validation. Dismiss/reopen updates the
+existing review and canonical revision atomically; a failed save rolls back both.
+The view never changes SwiftData directly. No model/provider or automatic identity
+linking path is added, including for people; experimental match weights are not
+presented as calibrated confidence.
+
+`KnowledgeReviewProjection` generates deterministic inspection hints for exact
+opposing polarities with matching entity/predicate/value/modality/claim kind and
+compatible stated intervals, and for dates stated at month precision. It does
+not select a current truth, infer a day, or rewrite assertions. Dates absent from
+the source remain absent. Temporal/event reasoning and resolution follow K3.
+Source warning passages open an ID-only evidence route through the fresh reader.
+Expanded warning rows bound displayed claims/passages and label truncation.
+
+`KnowledgeReviewViewModel` refetches before publication and before a decision,
+rejects mismatched scopes/stale content, prevents duplicate decisions, and guards
+late completions with epochs/cancellation. Feature, store, source and scene changes
+invalidate visible content and cancel pending work. Seven languages cover the
+inbox, native merge confirmation and recoverable errors. Synthetic UI fixtures
+exercise keep-separate/reopen, merge/undo and warning → evidence without a model
+or network call; physical-device and wider-layout release checks remain open.
+
 ### Attached documents (PDFs)
 
 A meeting can carry PDFs as reference material for its summaries

@@ -1459,3 +1459,32 @@
 "knowledge.browser.search_assertion" = "Aussage";
 "knowledge.browser.search_limit_title" = "Suche eingrenzen";
 "knowledge.browser.search_limit_detail" = "Verkürze die Suchanfrage oder wähle weniger Besprechungen aus.";
+
+// Knowledge review inbox
+"knowledge.review.title" = "Prüfung";
+"knowledge.review.intro" = "Prüfe die ausgewählten Besprechungen. Mögliche Identitätsübereinstimmungen benötigen deine Entscheidung; Quellenhinweise bleiben einsehbar.";
+"knowledge.review.read_only" = "Deine Richtlinie erlaubt nur das Anzeigen.";
+"knowledge.review.limited" = "Diese Ansicht ist begrenzt. Wähle weniger Besprechungen, um mehr Einträge zu prüfen.";
+"knowledge.review.decision_failed" = "Die Entscheidung konnte nicht gespeichert werden. Der aktuelle Stand wird angezeigt; prüfe ihn vor einem erneuten Versuch.";
+"knowledge.review.evidence_unavailable" = "Einige kanonische Belege konnten nicht bestätigt werden. Ihr Inhalt ist ausgeblendet; prüfe die Quelle oder kompiliere sie erneut.";
+"knowledge.review.identities" = "Identitätskandidaten";
+"knowledge.review.none" = "Keine Einträge in diesem Abschnitt.";
+"knowledge.review.warnings" = "Quellenhinweise";
+"knowledge.review.conflict_detail" = "Diese Passagen enthalten gegensätzliche Aussagen. Prüfe die Daten und Quellen, bevor du eine Schlussfolgerung ziehst.";
+"knowledge.review.date_detail" = "Die Quelle nennt einen Monat statt eines genauen Tages. Die ursprüngliche Genauigkeit bleibt erhalten.";
+"knowledge.review.open_evidence" = "Quellpassage öffnen";
+"knowledge.review.conflict" = "Möglicher Konflikt";
+"knowledge.review.date" = "Datumsgenauigkeit prüfen";
+"knowledge.review.history" = "Verlauf";
+"knowledge.review.undone" = "Zusammenführung rückgängig gemacht";
+"knowledge.review.undo" = "Zusammenführung rückgängig machen";
+"knowledge.review.kept_separate" = "Getrennt beibehalten";
+"knowledge.review.possible_match" = "Mögliche Identitätsübereinstimmung";
+"knowledge.review.combine" = "Zusammenzuführende Identität";
+"knowledge.review.keep" = "Beizubehaltende Identität";
+"knowledge.review.merge_detail" = "Die Zusammenführung behält den Zielnamen bei. Aussagen und Passagen bleiben nachvollziehbar. Du kannst die Zusammenführung im Verlauf rückgängig machen.";
+"knowledge.review.reopen" = "Erneut prüfen";
+"knowledge.review.merge" = "Identitäten zusammenführen";
+"knowledge.review.dismiss" = "Getrennt lassen";
+"knowledge.review.confirm_title" = "Diese Identitäten zusammenführen?";
+"knowledge.review.confirm_detail" = "„%@“ als kanonische Identität beibehalten. Du kannst die Zusammenführung im Verlauf rückgängig machen.";

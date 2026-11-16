@@ -21,12 +21,15 @@ struct KnowledgeBrowserView: View {
     @State private var path: [KnowledgeBrowserRoute] = []
     @State private var refresh = 0
     @State private var playRequest = 0
+    @State private var showingReview = false
 
-    init(meetingIDs: Set<UUID>, initialEntityID: UUID? = nil, showsDone: Bool = true, onChooseSources: (() -> Void)? = nil) {
+    init(meetingIDs: Set<UUID>, initialEntityID: UUID? = nil, initialEvidenceSelection: KnowledgeEvidenceSelection? = nil,
+         showsDone: Bool = true, onChooseSources: (() -> Void)? = nil) {
         self.meetingIDs = meetingIDs
         self.showsDone = showsDone
         self.onChooseSources = onChooseSources
-        _path = State(initialValue: initialEntityID.map { [.entity($0)] } ?? [])
+        _path = State(initialValue: initialEvidenceSelection.map { [.evidence(assertionID: $0.assertionID, evidenceID: $0.evidenceID)] }
+            ?? initialEntityID.map { [.entity($0)] } ?? [])
     }
 
     private var selection: KnowledgeEvidenceSelection? { path.last?.evidenceSelection }
@@ -62,6 +65,10 @@ struct KnowledgeBrowserView: View {
                             }
                         }
                         ToolbarItem(placement: .primaryAction) {
+                            Button { showingReview = true } label: { Label(KnowledgeReviewCopy.text("title"), systemImage: "tray.full") }
+                                .accessibilityIdentifier("knowledge.review.open")
+                        }
+                        ToolbarItem(placement: .primaryAction) {
                             Button { invalidateAndRefresh() } label: { Label(KnowledgeBrowserCopy.text("refresh"), systemImage: "arrow.clockwise") }
                                 .accessibilityIdentifier("knowledge.browser.refresh")
                         }
@@ -73,6 +80,7 @@ struct KnowledgeBrowserView: View {
                     }
             }
         }
+        .sheet(isPresented: $showingReview) { KnowledgeReviewInboxView(meetingIDs: meetingIDs) }
         .task(id: requestKey) {
             if refresh > 0 {
                 do { try await Task.sleep(for: .milliseconds(150)) } catch { return }

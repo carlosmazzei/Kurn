@@ -27,7 +27,7 @@ struct KnowledgeEntityResolutionSnapshot: Sendable {
 
 /// A write proof has no names/candidate page, and remains available even when
 /// bounded discovery omits old entities. Live authorization is still mandatory.
-struct KnowledgeEntityMutationSnapshot: Sendable {
+struct KnowledgeEntityMutationSnapshot: Equatable, Sendable {
     let scope: String
     let revision: Int
     let policyRevisionKey: String

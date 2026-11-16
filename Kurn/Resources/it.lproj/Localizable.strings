@@ -1459,3 +1459,32 @@
 "knowledge.browser.search_assertion" = "Affermazione";
 "knowledge.browser.search_limit_title" = "Affina la ricerca";
 "knowledge.browser.search_limit_detail" = "Usa una ricerca più breve o seleziona meno riunioni.";
+
+// Knowledge review inbox
+"knowledge.review.title" = "Revisione";
+"knowledge.review.intro" = "Esamina le riunioni selezionate. Le possibili corrispondenze di identità richiedono una tua decisione; gli avvisi restano consultabili.";
+"knowledge.review.read_only" = "La tua politica consente solo la consultazione.";
+"knowledge.review.limited" = "Questa vista è limitata. Seleziona meno riunioni per esaminare più elementi.";
+"knowledge.review.decision_failed" = "Impossibile salvare la decisione. È mostrato lo stato attuale; controllalo prima di riprovare.";
+"knowledge.review.evidence_unavailable" = "Non è stato possibile convalidare alcune evidenze canoniche. Il contenuto è nascosto; esamina la fonte o ricompilala.";
+"knowledge.review.identities" = "Identità candidate";
+"knowledge.review.none" = "Nessun elemento in questa sezione.";
+"knowledge.review.warnings" = "Avvisi delle fonti";
+"knowledge.review.conflict_detail" = "Questi passaggi presentano affermazioni opposte. Verifica le date e le fonti prima di concludere.";
+"knowledge.review.date_detail" = "La fonte indica un mese, senza un giorno esatto. La precisione originale viene conservata.";
+"knowledge.review.open_evidence" = "Apri passaggio originale";
+"knowledge.review.conflict" = "Possibile conflitto";
+"knowledge.review.date" = "Precisione della data da verificare";
+"knowledge.review.history" = "Cronologia";
+"knowledge.review.undone" = "Unione annullata";
+"knowledge.review.undo" = "Annulla unione";
+"knowledge.review.kept_separate" = "Mantenute separate";
+"knowledge.review.possible_match" = "Possibile corrispondenza di identità";
+"knowledge.review.combine" = "Identità da unire";
+"knowledge.review.keep" = "Identità da mantenere";
+"knowledge.review.merge_detail" = "L’unione conserva il nome di destinazione. Affermazioni e passaggi restano tracciabili. Puoi annullare l’unione nella Cronologia.";
+"knowledge.review.reopen" = "Rivedi";
+"knowledge.review.merge" = "Unisci identità";
+"knowledge.review.dismiss" = "Mantieni separate";
+"knowledge.review.confirm_title" = "Unire queste identità?";
+"knowledge.review.confirm_detail" = "Mantieni “%@” come identità canonica. Puoi annullare questa unione nella Cronologia.";

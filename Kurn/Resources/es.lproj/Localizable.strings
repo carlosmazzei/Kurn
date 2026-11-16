@@ -1459,3 +1459,32 @@
 "knowledge.browser.search_assertion" = "Afirmación";
 "knowledge.browser.search_limit_title" = "Acota la búsqueda";
 "knowledge.browser.search_limit_detail" = "Usa una consulta más corta o selecciona menos reuniones.";
+
+// Knowledge review inbox
+"knowledge.review.title" = "Revisión";
+"knowledge.review.intro" = "Revisa las reuniones seleccionadas. Las posibles identidades iguales requieren tu decisión; los avisos de fuentes están disponibles para inspección.";
+"knowledge.review.read_only" = "Tu política solo permite consultar.";
+"knowledge.review.limited" = "Esta vista tiene límites. Selecciona menos reuniones para inspeccionar más elementos.";
+"knowledge.review.decision_failed" = "No se pudo guardar la decisión. Se muestra el estado actual; revísalo antes de reintentar.";
+"knowledge.review.evidence_unavailable" = "No se pudieron validar algunas evidencias canónicas. Su contenido está oculto; inspecciona la fuente o vuelve a compilar.";
+"knowledge.review.identities" = "Candidatos de identidad";
+"knowledge.review.none" = "No hay elementos en esta sección.";
+"knowledge.review.warnings" = "Avisos de fuentes";
+"knowledge.review.conflict_detail" = "Estos pasajes hacen afirmaciones opuestas. Comprueba sus fechas y fuentes antes de concluir.";
+"knowledge.review.date_detail" = "La fuente indica un mes, sin un día exacto. Se conserva la precisión original.";
+"knowledge.review.open_evidence" = "Abrir pasaje de origen";
+"knowledge.review.conflict" = "Posible conflicto";
+"knowledge.review.date" = "Revisar precisión de fecha";
+"knowledge.review.history" = "Historial";
+"knowledge.review.undone" = "Fusión deshecha";
+"knowledge.review.undo" = "Deshacer fusión";
+"knowledge.review.kept_separate" = "Mantenidas separadas";
+"knowledge.review.possible_match" = "Posible coincidencia de identidad";
+"knowledge.review.combine" = "Identidad para combinar";
+"knowledge.review.keep" = "Identidad para conservar";
+"knowledge.review.merge_detail" = "Combinar identidades conserva el nombre de destino. Las afirmaciones y los pasajes siguen siendo rastreables. Puedes deshacer la fusión en el Historial.";
+"knowledge.review.reopen" = "Revisar de nuevo";
+"knowledge.review.merge" = "Combinar identidades";
+"knowledge.review.dismiss" = "Mantener separadas";
+"knowledge.review.confirm_title" = "¿Combinar estas identidades?";
+"knowledge.review.confirm_detail" = "Conservar “%@” como identidad canónica. Puedes deshacer esta fusión en el Historial.";
