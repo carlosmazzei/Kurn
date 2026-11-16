@@ -24,9 +24,8 @@ final class MeetingKnowledgeUITests: XCTestCase {
         XCTAssertTrue(mode.exists)
         mode.tap()
         let quote = app.staticTexts["knowledge.quote"].firstMatch
-        if !quote.waitForExistence(timeout: 5) {
-            for _ in 0..<3 where !quote.exists { app.swipeUp() }
-        }
+        _ = quote.waitForExistence(timeout: 5)
+        for _ in 0..<4 where !quote.isHittable { app.swipeUp() }
         XCTAssertTrue(quote.waitForExistence(timeout: 5))
     }
 
@@ -40,6 +39,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
         capture(app, named: "knowledge-meeting-compact")
         let notes = app.descendants(matching: .any)["knowledge.notes"].firstMatch
+        for _ in 0..<4 where !notes.isHittable { app.swipeDown() }
         XCTAssertTrue(notes.exists)
         notes.tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "The team reported")).firstMatch.waitForExistence(timeout: 5))
@@ -52,6 +52,9 @@ final class MeetingKnowledgeUITests: XCTestCase {
         openKnowledge(app)
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
         capture(app, named: "knowledge-meeting-accessibility")
+        app.swipeDown()
+        app.swipeDown()
+        capture(app, named: "knowledge-meeting-accessibility-overview")
     }
 
     private func capture(_ app: XCUIApplication, named name: String) {

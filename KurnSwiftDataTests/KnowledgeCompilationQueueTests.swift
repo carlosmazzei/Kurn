@@ -115,7 +115,7 @@ struct KnowledgeCompilationQueueTests {
         f.settings.aiProviderID = AIProvider.openAI.id // Reading needs no cloud key/provider.
         let result = try await f.coordinator.readMeetingKnowledge(meetingID: f.meeting.id)
         #expect(result.assertionCount == 1)
-        #expect(result.evidenceCount == 1)
+        #expect(result.passageCount == 1)
         #expect(result.contributions.first?.name == "Example topic")
         #expect(await provider.calls == calls)
         let store = await f.queue.writer()
