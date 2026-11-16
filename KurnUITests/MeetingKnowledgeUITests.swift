@@ -26,7 +26,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         let quote = app.staticTexts["knowledge.quote"].firstMatch
         let content = app.descendants(matching: .any)["knowledge.content"].firstMatch
         _ = quote.waitForExistence(timeout: 5)
-        for _ in 0..<4 where !quote.isHittable { content.swipeUp() }
+        for _ in 0..<8 where !quote.isHittable { content.swipeUp() }
         XCTAssertTrue(quote.waitForExistence(timeout: 5))
     }
 

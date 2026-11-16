@@ -9,26 +9,43 @@ struct MeetingKnowledgeView: View {
     let onRefresh: () -> Void
     @Environment(KnowledgeCompilationCoordinator.self) private var coordinator
     @Environment(WikiCoordinator.self) private var wiki
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 if case .loaded = state { articleSection }
-                HStack {
-                    Text(NSLocalizedString("detail.knowledge.contributions", comment: "Meeting contributions"))
-                        .font(Theme.headline)
-                        .accessibilityAddTraits(.isHeader)
-                    Spacer()
-                    Button(action: onRefresh) {
-                        Label(NSLocalizedString("detail.knowledge.refresh", comment: "Refresh contributions"), systemImage: "arrow.clockwise")
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 12) {
+                        contributionsTitle
+                        refreshButton
                     }
-                    .accessibilityIdentifier("knowledge.refresh")
+                } else {
+                    HStack {
+                        contributionsTitle
+                        Spacer()
+                        refreshButton
+                    }
                 }
                 contributions
             }
             .padding(20)
         }
         .accessibilityIdentifier("knowledge.content")
+    }
+
+    private var contributionsTitle: some View {
+        Text(NSLocalizedString("detail.knowledge.contributions", comment: "Meeting contributions"))
+            .font(Theme.headline)
+            .accessibilityAddTraits(.isHeader)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var refreshButton: some View {
+        Button(action: onRefresh) {
+            Label(NSLocalizedString("detail.knowledge.refresh", comment: "Refresh contributions"), systemImage: "arrow.clockwise")
+        }
+        .accessibilityIdentifier("knowledge.refresh")
     }
 
     private var articleSection: some View {
