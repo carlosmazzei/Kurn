@@ -3285,7 +3285,10 @@ before work, again before embedding, and after asynchronous ranking before
 publication. It validates returned document bytes/IDs against the fresh corpus.
 Epochs and cancellation prevent old queries replacing newer results; query,
 source/store/policy, route, feature, semantic-setting and scene changes clear old
-results. Submission dismisses the keyboard while retaining the query. Seven
+results. The search controller stays installed across canonical loading states;
+a query revision advances after invalidation so lifecycle/onChange ordering
+cannot leave the results permanently loading. Submission dismisses the keyboard
+while retaining the query. Seven
 languages cover the search prompt and result types; synthetic UI coverage checks
 alias → page and quote → evidence with semantic search off.
 
