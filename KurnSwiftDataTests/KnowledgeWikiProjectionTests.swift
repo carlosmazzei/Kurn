@@ -105,6 +105,34 @@ struct KnowledgeWikiProjectionTests {
         #expect(try await f.store.pendingProjection()?.number == pending)
     }
 
+    @Test func searchReadsEmbeddingPermissionSeparatelyAndDropsInvalidatedDocuments() async throws {
+        var f = try fixture()
+        f.auth.policies[0].allowedOperations.remove(.embedding)
+        try await compile(f)
+        let auth = f.auth
+        let before = try await f.store.browserRead(meetingIDs: f.ids, authorization: { auth })
+        #expect(!before.allowsEmbedding)
+        #expect(!before.policyRevisionKey.isEmpty)
+        let initial = try KnowledgeSearchIndex(pages: before.pages, meetingIDs: f.ids)
+        #expect(try initial.search(query: "Portal").contains { $0.kind == .alias })
+        let jobs = try f.context.fetchCount(FetchDescriptor<KnowledgeJob>())
+        let transcript = try #require(f.meetings[0].recordings[0].transcript)
+        var segments = transcript.segments
+        segments[0].text = "The previously indexed source has changed."
+        transcript.segments = segments
+        try f.context.save()
+        let after = try await f.store.browserRead(meetingIDs: f.ids, authorization: { auth })
+        #expect(try KnowledgeSearchIndex(pages: after.pages, meetingIDs: f.ids).search(query: "Portal").isEmpty)
+        #expect(try f.context.fetchCount(FetchDescriptor<KnowledgeJob>()) == jobs)
+        var enabled = auth
+        enabled.policies[0].allowedOperations.insert(.embedding)
+        enabled.policies[0].revision += 1
+        let changedPolicy = enabled
+        let changed = try await f.store.browserRead(meetingIDs: f.ids, authorization: { changedPolicy })
+        #expect(changed.allowsEmbedding)
+        #expect(changed.policyRevisionKey != before.policyRevisionKey)
+    }
+
     @Test func browserRejectsUnselectedEvidenceAndRevokedSourceSets() async throws {
         let f = try fixture(count: 2)
         try await compile(f)

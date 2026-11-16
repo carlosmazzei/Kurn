@@ -1451,3 +1451,11 @@
 "meetings.selection.actions" = "Auswahlaktionen";
 "knowledge.browser.choose_sources" = "Besprechungen auswählen";
 "knowledge.browser.choose_sources_detail" = "Wähle bis zu 16 Besprechungen aus, um deren Wissen zu lesen.";
+
+/* Local, source-authorized Knowledge search. */
+"knowledge.browser.search_prompt" = "Namen, Aliasse und Aussagen suchen";
+"knowledge.browser.search_page" = "Seite";
+"knowledge.browser.search_alias" = "Alias";
+"knowledge.browser.search_assertion" = "Aussage";
+"knowledge.browser.search_limit_title" = "Suche eingrenzen";
+"knowledge.browser.search_limit_detail" = "Verkürze die Suchanfrage oder wähle weniger Besprechungen aus.";

@@ -195,6 +195,35 @@ final class MeetingKnowledgeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Selected meetings: 1")).firstMatch.exists)
     }
 
+    func testKnowledgeSearchFindsAliasesAndEvidenceWithoutSemanticSearch() throws {
+        continueAfterFailure = false
+        let app = launch(prototype: true)
+        let field = app.searchFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 15))
+        field.tap()
+        field.typeText("ORION\n")
+        let alias = app.buttons["knowledge.search.result.alias"].firstMatch
+        XCTAssertTrue(alias.waitForExistence(timeout: 10))
+        assertRootBarFits(app)
+        capture(app, named: "knowledge-search-alias")
+        alias.tap()
+        XCTAssertTrue(app.staticTexts["knowledge.browser.claim"].firstMatch.waitForExistence(timeout: 10))
+        let back = app.navigationBars.buttons.element(boundBy: 0)
+        XCTAssertTrue(back.waitForExistence(timeout: 5))
+        back.tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.tap()
+        let clear = field.buttons["Clear text"]
+        XCTAssertTrue(clear.waitForExistence(timeout: 5))
+        clear.tap()
+        field.typeText("review\n")
+        let claim = app.buttons["knowledge.search.result.assertion"].firstMatch
+        XCTAssertTrue(claim.waitForExistence(timeout: 10))
+        capture(app, named: "knowledge-search-claim")
+        claim.tap()
+        XCTAssertTrue(app.staticTexts["knowledge.browser.quote"].waitForExistence(timeout: 10))
+    }
+
     func testRootNavigationFitsAtAccessibilitySize() throws {
         continueAfterFailure = false
         let app = launch(largeType: true, prototype: true)

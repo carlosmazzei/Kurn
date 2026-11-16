@@ -3,8 +3,8 @@ import CoreData
 import KurnCore
 import SwiftUI
 
-/// A scoped reading stack. Production enters from a meeting; the proposed
-/// library-level root remains a DEBUG-only navigation review prototype.
+/// An explicitly scoped reader/search stack, shared by meeting entry and the
+/// reviewed Knowledge root. Navigation carries IDs, never cached search text.
 struct KnowledgeBrowserView: View {
     let meetingIDs: Set<UUID>
     let showsDone: Bool
@@ -14,6 +14,9 @@ struct KnowledgeBrowserView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var phase
     @State private var model = KnowledgeBrowserViewModel()
+    @State private var searchModel = KnowledgeSearchViewModel()
+    @State private var searchQuery = ""
+    @FocusState private var searchFocused: Bool
     @State private var path: [KnowledgeBrowserRoute] = []
     @State private var refresh = 0
     @State private var playRequest = 0
@@ -29,6 +32,7 @@ struct KnowledgeBrowserView: View {
     private var requestKey: String {
         meetingIDs.map(\.uuidString).sorted().joined(separator: ",") + ":\(path):\(refresh)"
     }
+    private var searchKey: String { "\(requestKey):\(settings.semanticSearchEnabled):\(searchQuery)" }
     private var state: KnowledgeBrowserLoadState {
         settings.knowledgeEnabled ? model.presentation(meetingIDs: meetingIDs, selection: selection) : .unavailable
     }
@@ -67,19 +71,27 @@ struct KnowledgeBrowserView: View {
             }
             await model.load(meetingIDs: meetingIDs, selection: selection, isEnabled: { settings.knowledgeEnabled }, reader: read)
         }
+        .task(id: searchKey) {
+            guard path.isEmpty else { searchModel.invalidate(); return }
+            do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
+            await searchModel.search(query: searchQuery, meetingIDs: meetingIDs, useSemantic: settings.semanticSearchEnabled,
+                isEnabled: { settings.knowledgeEnabled }, reader: { try await coordinator.readKnowledgeBrowser(meetingIDs: meetingIDs) })
+        }
         .task(id: playRequest) {
             guard playRequest > 0 else { return }
             await model.playEvidence(isEnabled: { settings.knowledgeEnabled }, reader: read)
         }
-        .onChange(of: path) { _, _ in invalidateAndRefresh() }
+        .onChange(of: searchQuery) { _, _ in searchModel.invalidate() }
+        .onChange(of: settings.semanticSearchEnabled) { _, _ in invalidateAndRefresh() }
+        .onChange(of: path) { _, _ in searchFocused = false; invalidateAndRefresh() }
         .onChange(of: settings.knowledgeEnabled) { _, _ in invalidateAndRefresh() }
         .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave).receive(on: RunLoop.main)) { _ in
             invalidateAndRefresh()
         }
         .onChange(of: phase) { _, phase in
-            if phase == .active { invalidateAndRefresh() } else { model.invalidate() }
+            if phase == .active { invalidateAndRefresh() } else { model.invalidate(); searchModel.invalidate() }
         }
-        .onDisappear { model.invalidate() }
+        .onDisappear { model.invalidate(); searchModel.invalidate() }
     }
 
     private func read() async throws -> KnowledgeBrowserRead {
@@ -88,6 +100,7 @@ struct KnowledgeBrowserView: View {
 
     private func invalidateAndRefresh() {
         model.invalidate()
+        searchModel.invalidate()
         refresh += 1
     }
 
@@ -113,7 +126,18 @@ struct KnowledgeBrowserView: View {
     private func loadedDestination(_ route: KnowledgeBrowserRoute?, read: KnowledgeBrowserRead) -> some View {
         switch route {
         case nil:
-            KnowledgeHomeView(read: read)
+            Group {
+                if searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    KnowledgeHomeView(read: read)
+                } else {
+                    KnowledgeSearchResultsView(query: searchQuery,
+                        state: searchModel.presentation(query: searchQuery, meetingIDs: meetingIDs), scopeCount: meetingIDs.count)
+                }
+            }
+            .searchable(text: $searchQuery, placement: .navigationBarDrawer(displayMode: .always),
+                prompt: Text(KnowledgeBrowserCopy.text("search_prompt")))
+            .searchFocused($searchFocused)
+            .onSubmit(of: .search) { searchFocused = false }
         case let .entity(id):
             if let page = read.pages.first(where: { $0.entity.id == id }) {
                 KnowledgeEntityPageView(page: page, meetingTitles: read.meetingTitles)

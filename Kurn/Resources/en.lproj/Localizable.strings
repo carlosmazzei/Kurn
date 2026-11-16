@@ -1451,3 +1451,11 @@
 "meetings.selection.actions" = "Selection actions";
 "knowledge.browser.choose_sources" = "Choose meetings";
 "knowledge.browser.choose_sources_detail" = "Choose up to 16 meetings to browse their knowledge.";
+
+/* Local, source-authorized Knowledge search. */
+"knowledge.browser.search_prompt" = "Search names, aliases and claims";
+"knowledge.browser.search_page" = "Page";
+"knowledge.browser.search_alias" = "Alias";
+"knowledge.browser.search_assertion" = "Claim";
+"knowledge.browser.search_limit_title" = "Refine your search";
+"knowledge.browser.search_limit_detail" = "Use a shorter query or select fewer meetings.";

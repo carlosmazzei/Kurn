@@ -1451,3 +1451,11 @@
 "meetings.selection.actions" = "Acciones de selección";
 "knowledge.browser.choose_sources" = "Elegir reuniones";
 "knowledge.browser.choose_sources_detail" = "Elige hasta 16 reuniones para consultar su conocimiento.";
+
+/* Local, source-authorized Knowledge search. */
+"knowledge.browser.search_prompt" = "Buscar nombres, alias y afirmaciones";
+"knowledge.browser.search_page" = "Página";
+"knowledge.browser.search_alias" = "Alias";
+"knowledge.browser.search_assertion" = "Afirmación";
+"knowledge.browser.search_limit_title" = "Acota la búsqueda";
+"knowledge.browser.search_limit_detail" = "Usa una consulta más corta o selecciona menos reuniones.";

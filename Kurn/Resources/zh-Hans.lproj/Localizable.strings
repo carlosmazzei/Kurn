@@ -1451,3 +1451,11 @@
 "meetings.selection.actions" = "选择操作";
 "knowledge.browser.choose_sources" = "选择会议";
 "knowledge.browser.choose_sources_detail" = "最多选择 16 场会议以浏览其知识。";
+
+/* Local, source-authorized Knowledge search. */
+"knowledge.browser.search_prompt" = "搜索名称、别名和论断";
+"knowledge.browser.search_page" = "页面";
+"knowledge.browser.search_alias" = "别名";
+"knowledge.browser.search_assertion" = "论断";
+"knowledge.browser.search_limit_title" = "缩小搜索范围";
+"knowledge.browser.search_limit_detail" = "请缩短搜索内容或减少所选会议。";

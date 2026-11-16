@@ -46,6 +46,25 @@ actor EmbeddingModelStore {
         return results
     }
 
+    /// Knowledge retrieval may use installed assets, but may never turn a
+    /// local search into a download. The non-Sendable model stays on this actor.
+    func embedUsingAvailableAssets(_ texts: [String]) throws -> [[Float]] {
+        try Task.checkCancellation()
+        if model == nil {
+            guard loadTask == nil, let available = NLContextualEmbedding(script: .latin), available.hasAvailableAssets else {
+                throw AppError.embeddingUnavailable(
+                    NSLocalizedString("error.embedding_no_assets", comment: "Assets unavailable"))
+            }
+            try available.load()
+            model = available
+        }
+        guard let model else { throw CancellationError() }
+        return try texts.map { text in
+            try Task.checkCancellation()
+            return try Self.vector(for: text, model: model)
+        }
+    }
+
     /// The loaded model, fetching the OS asset on first use if needed. Failures
     /// aren't cached — the next call retries.
     private func loadedModel() async throws -> NLContextualEmbedding {

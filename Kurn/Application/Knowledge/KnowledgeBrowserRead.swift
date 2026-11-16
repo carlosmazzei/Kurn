@@ -36,9 +36,11 @@ struct KnowledgeBrowserRead: Equatable, Sendable {
     let pages: [KnowledgeWikiPage]
     let meetingTitles: [UUID: String]
     let selectedEvidence: KnowledgeEvidenceRead?
+    let policyRevisionKey: String
+    let allowsEmbedding: Bool
 
     init(meetingIDs: Set<UUID>, wiki: KnowledgeWikiSnapshot, meetingTitles: [UUID: String],
-         selectedEvidence: KnowledgeEvidenceRead? = nil) throws {
+         selectedEvidence: KnowledgeEvidenceRead? = nil, policyRevisionKey: String = "", allowsEmbedding: Bool = false) throws {
         guard !meetingIDs.isEmpty, meetingIDs.count <= 16, Set(meetingTitles.keys) == meetingIDs,
               wiki.facts.allSatisfy({ meetingIDs.contains($0.source.meetingID) }) else { throw KnowledgeWikiStoreError.scopeDenied }
         let pages = try KnowledgeWikiProjector.project(wiki)
@@ -56,6 +58,8 @@ struct KnowledgeBrowserRead: Equatable, Sendable {
         }
         self.meetingTitles = meetingTitles
         self.selectedEvidence = selectedEvidence
+        self.policyRevisionKey = policyRevisionKey
+        self.allowsEmbedding = allowsEmbedding
     }
 }
 
