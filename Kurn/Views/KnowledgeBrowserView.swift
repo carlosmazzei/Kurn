@@ -7,8 +7,7 @@ import SwiftUI
 /// library-level root remains a DEBUG-only navigation review prototype.
 struct KnowledgeBrowserView: View {
     let meetingIDs: Set<UUID>
-    var initialEntityID: UUID?
-    var showsDone = true
+    let showsDone: Bool
     @Environment(KnowledgeCompilationCoordinator.self) private var coordinator
     @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
@@ -17,6 +16,12 @@ struct KnowledgeBrowserView: View {
     @State private var path: [KnowledgeBrowserRoute] = []
     @State private var refresh = 0
     @State private var playRequest = 0
+
+    init(meetingIDs: Set<UUID>, initialEntityID: UUID? = nil, showsDone: Bool = true) {
+        self.meetingIDs = meetingIDs
+        self.showsDone = showsDone
+        _path = State(initialValue: initialEntityID.map { [.entity($0)] } ?? [])
+    }
 
     private var selection: KnowledgeEvidenceSelection? { path.last?.evidenceSelection }
     private var requestKey: String {
@@ -27,20 +32,24 @@ struct KnowledgeBrowserView: View {
     }
 
     var body: some View {
-        NavigationStack(path: $path) {
-            destination(nil)
-                .navigationDestination(for: KnowledgeBrowserRoute.self) { destination($0) }
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button { invalidateAndRefresh() } label: { Label(KnowledgeBrowserCopy.text("refresh"), systemImage: "arrow.clockwise") }
-                            .accessibilityIdentifier("knowledge.browser.refresh")
-                    }
-                    if showsDone {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
+        // Keep read/audio lifecycle outside NavigationStack's destination
+        // lifecycle: pushing a page must not cancel the reader's owner.
+        ZStack {
+            NavigationStack(path: $path) {
+                destination(nil)
+                    .navigationDestination(for: KnowledgeBrowserRoute.self) { destination($0) }
+                    .toolbar {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button { invalidateAndRefresh() } label: { Label(KnowledgeBrowserCopy.text("refresh"), systemImage: "arrow.clockwise") }
+                                .accessibilityIdentifier("knowledge.browser.refresh")
+                        }
+                        if showsDone {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
+                            }
                         }
                     }
-                }
+            }
         }
         .task(id: requestKey) {
             if refresh > 0 {
@@ -52,10 +61,7 @@ struct KnowledgeBrowserView: View {
             guard playRequest > 0 else { return }
             await model.playEvidence(isEnabled: { settings.knowledgeEnabled }, reader: read)
         }
-        .onAppear {
-            if path.isEmpty, let initialEntityID { path = [.entity(initialEntityID)] }
-        }
-        .onChange(of: path) { _, _ in model.invalidate() }
+        .onChange(of: path) { _, _ in invalidateAndRefresh() }
         .onChange(of: settings.knowledgeEnabled) { _, _ in invalidateAndRefresh() }
         .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave).receive(on: RunLoop.main)) { _ in
             invalidateAndRefresh()
