@@ -103,8 +103,15 @@ final class MeetingKnowledgeUITests: XCTestCase {
         XCTAssertTrue(app.buttons["chat.send"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["chat.send"].isEnabled)
         capture(app, named: "knowledge-navigation-ask-prototype")
-        app.tabBars.buttons["Documents"].tap()
-        XCTAssertTrue(app.buttons["documents.new"].waitForExistence(timeout: 10))
+        let documents = app.tabBars.buttons["Documents"]
+        let newDocument = app.buttons["documents.new"]
+        // Match the flow suite's transition-confirmed tap: UIKit can drop a
+        // tab tap while the previous screen finishes its first layout.
+        for _ in 0..<2 {
+            documents.tap()
+            if newDocument.waitForExistence(timeout: 5) { break }
+        }
+        XCTAssertTrue(newDocument.exists)
         let document = app.buttons["documents.open"].firstMatch
         XCTAssertTrue(document.waitForExistence(timeout: 10))
         capture(app, named: "knowledge-navigation-documents")
