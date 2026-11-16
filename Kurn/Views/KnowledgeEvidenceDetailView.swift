@@ -8,7 +8,7 @@ struct KnowledgeEvidenceDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 KnowledgeClaimReadView(entry: source.entry)
-                Text(verbatim: source.evidence.quote).font(Theme.title3).textSelection(.enabled)
+                Text(verbatim: source.evidence.quote).font(Theme.title3)
                     .accessibilityIdentifier("knowledge.browser.quote")
                 Text(String(format: NSLocalizedString("detail.knowledge.attribution", comment: "Attribution"), source.evidence.attributedSpeaker))
                 Text(verbatim: source.meetingTitle).font(Theme.headline)
@@ -45,7 +45,7 @@ struct KnowledgeSourceTranscriptView: View {
                         ForEach(source.segments) { segment in
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(verbatim: segment.speakerLabel + " · " + segment.startTime.clockDisplay).font(Theme.footnoteEmphasized)
-                                Text(verbatim: segment.text).font(Theme.body).textSelection(.enabled)
+                                Text(verbatim: segment.text).font(Theme.body)
                                     .accessibilityIdentifier(isCited(segment) ? "knowledge.browser.citedSegment" : "knowledge.browser.segment")
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
