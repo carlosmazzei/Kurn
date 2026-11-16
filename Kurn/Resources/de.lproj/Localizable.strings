@@ -1422,3 +1422,27 @@
 "detail.knowledge.negative_claim" = "Verneint: %@";
 "knowledge.value.true" = "Wahr";
 "knowledge.value.false" = "Falsch";
+
+// Scoped knowledge reader
+"knowledge.browser.title" = "Wissen";
+"knowledge.browser.refresh" = "Aktualisieren";
+"knowledge.browser.page" = "Seitenbereich";
+"knowledge.browser.overview" = "Übersicht";
+"knowledge.browser.sources" = "Quellen";
+"knowledge.browser.scope" = "Ausgewählte Besprechungen: %ld";
+"knowledge.browser.evidence" = "Beleg";
+"knowledge.browser.transcript" = "Transkript";
+"knowledge.browser.valid_from" = "Gültig ab: %@";
+"knowledge.browser.valid_to" = "Gültig bis: %@";
+"knowledge.browser.section.claims" = "Aussagen";
+"knowledge.browser.section.decisions" = "Entscheidungen";
+"knowledge.browser.section.actions" = "Aufgaben";
+"knowledge.browser.section.risks" = "Risiken";
+"knowledge.browser.section.questions" = "Fragen";
+"knowledge.browser.section.metrics" = "Messwerte";
+"knowledge.browser.open_transcript" = "Transkript öffnen";
+"knowledge.browser.play" = "Ab dieser Passage abspielen";
+"knowledge.browser.stop" = "Wiedergabe stoppen";
+"knowledge.browser.meetings" = "Besprechungen";
+"knowledge.browser.ask" = "Fragen";
+"knowledge.browser.ask_prototype" = "Fragen sind in dieser Vorschau nicht verfügbar.";

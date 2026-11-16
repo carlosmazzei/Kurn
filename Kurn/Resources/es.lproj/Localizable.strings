@@ -1422,3 +1422,27 @@
 "detail.knowledge.negative_claim" = "Negación: %@";
 "knowledge.value.true" = "Verdadero";
 "knowledge.value.false" = "Falso";
+
+// Scoped knowledge reader
+"knowledge.browser.title" = "Conocimiento";
+"knowledge.browser.refresh" = "Actualizar";
+"knowledge.browser.page" = "Sección de la página";
+"knowledge.browser.overview" = "Resumen";
+"knowledge.browser.sources" = "Fuentes";
+"knowledge.browser.scope" = "Reuniones seleccionadas: %ld";
+"knowledge.browser.evidence" = "Evidencia";
+"knowledge.browser.transcript" = "Transcripción";
+"knowledge.browser.valid_from" = "Válido desde: %@";
+"knowledge.browser.valid_to" = "Válido hasta: %@";
+"knowledge.browser.section.claims" = "Afirmaciones";
+"knowledge.browser.section.decisions" = "Decisiones";
+"knowledge.browser.section.actions" = "Acciones";
+"knowledge.browser.section.risks" = "Riesgos";
+"knowledge.browser.section.questions" = "Preguntas";
+"knowledge.browser.section.metrics" = "Métricas";
+"knowledge.browser.open_transcript" = "Abrir transcripción";
+"knowledge.browser.play" = "Reproducir desde este pasaje";
+"knowledge.browser.stop" = "Detener reproducción";
+"knowledge.browser.meetings" = "Reuniones";
+"knowledge.browser.ask" = "Preguntar";
+"knowledge.browser.ask_prototype" = "Las preguntas no están disponibles en esta vista previa.";

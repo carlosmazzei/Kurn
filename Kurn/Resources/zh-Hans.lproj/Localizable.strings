@@ -1422,3 +1422,27 @@
 "detail.knowledge.negative_claim" = "否定：%@";
 "knowledge.value.true" = "真";
 "knowledge.value.false" = "假";
+
+// Scoped knowledge reader
+"knowledge.browser.title" = "知识";
+"knowledge.browser.refresh" = "刷新";
+"knowledge.browser.page" = "页面部分";
+"knowledge.browser.overview" = "概览";
+"knowledge.browser.sources" = "来源";
+"knowledge.browser.scope" = "已选会议：%ld";
+"knowledge.browser.evidence" = "证据";
+"knowledge.browser.transcript" = "转录";
+"knowledge.browser.valid_from" = "生效起始：%@";
+"knowledge.browser.valid_to" = "有效至：%@";
+"knowledge.browser.section.claims" = "陈述";
+"knowledge.browser.section.decisions" = "决策";
+"knowledge.browser.section.actions" = "行动";
+"knowledge.browser.section.risks" = "风险";
+"knowledge.browser.section.questions" = "问题";
+"knowledge.browser.section.metrics" = "指标";
+"knowledge.browser.open_transcript" = "打开转录";
+"knowledge.browser.play" = "从此段落开始播放";
+"knowledge.browser.stop" = "停止播放";
+"knowledge.browser.meetings" = "会议";
+"knowledge.browser.ask" = "提问";
+"knowledge.browser.ask_prototype" = "此预览中暂不可提问。";

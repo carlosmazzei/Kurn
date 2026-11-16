@@ -3164,6 +3164,51 @@ review. All seven app languages include the new labels; the existing default-off
 four-mode accessibility audit remains in place. Entity/evidence destinations,
 review/settings UI and the global Knowledge Home remain later K2 work.
 
+### Scoped Knowledge reader and navigation prototype (K2.4 / K0.5)
+
+Meeting contribution names open `KnowledgeBrowserView`, a separate scoped
+reading stack behind `knowledgeEnabled`. Knowledge Home lists entities from
+exactly the selected source IDs (currently 1–16); each entity has Overview and
+Sources, then evidence detail and a source transcript with the cited anchors
+highlighted. Routes hold UUIDs only. No model output or arbitrary URL creates
+a destination. Structured claims keep original relation direction, modality,
+negation and stated valid-time precision; quotations and source attribution
+remain separate. This is a current supported-assertion view, not a temporal
+state reducer (K3). The production meeting entry selects that meeting only;
+it never expands access to the rest of the library.
+
+`KnowledgeStore.browserRead` awaits live host authorization, then uses one fresh
+context with no intervening suspension: existing source/context policy checks,
+canonical provenance/evidence validation and redirect-origin proofs precede
+source titles and the selected recording's transcript/file reference. A missing,
+foreign, stale, rejected or unavailable citation refuses the destination. Home
+and pages do not preload transcript DTOs; only an explicitly selected evidence
+route receives its source transcript. Reads neither queue work, call a provider,
+publish/repair projections nor acknowledge the outbox. No new schema is needed.
+
+`KnowledgeBrowserViewModel` masks results for another source set or evidence
+selection, clears on reload and ignores invalidated/cancelled/superseded reads.
+Store saves are invalidation signals only, debounced before refetch. Route
+changes, closing the reader, feature revocation and scene deactivation stop
+playback and clear content; returning active revalidates. Audio is explicit,
+recording-relative, and checked against fresh evidence before setup and again
+after asynchronous player loading. Pending setup cannot resurrect revoked audio
+or overlap a newer setup. Source names are not passed into setup's Now Playing
+metadata. The fake audio adapter tests these boundaries without opening the
+simulator's audio session; real playback remains a physical-device check.
+
+`KnowledgeNavigationPrototype` is compiled only in DEBUG and is reachable only
+with all three synthetic UI-test arguments (`UI-Testing-Screenshots`,
+`UI-Testing-KnowledgeFixture`, `UI-Testing-KnowledgeNavigationPrototype`). It
+captures the proposed Meetings / Knowledge / Ask root; Knowledge Home reads the
+synthetic source and Ask is visibly a preview placeholder, not a new agent entry.
+Production root navigation remains unchanged pending the K0.5 review. The iPhone
+CI previews cover the prototype and entity/source/evidence/transcript journey;
+the wider layout and global source-selection UX still need navigation review.
+`MeetingKnowledgeUITests` retains the existing default-on-demand fixtures and
+adds the journey/audit and preview captures to `ui-review-previews`. All new
+copy is localized in the seven app languages.
+
 ### Attached documents (PDFs)
 
 A meeting can carry PDFs as reference material for its summaries

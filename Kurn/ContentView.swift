@@ -32,6 +32,30 @@ struct ContentView: View {
 
     var body: some View {
         Group {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("UI-Testing-KnowledgeNavigationPrototype"),
+               ProcessInfo.processInfo.arguments.contains("UI-Testing-KnowledgeFixture"),
+               ProcessInfo.processInfo.arguments.contains("UI-Testing-Screenshots") {
+                KnowledgeNavigationPrototype()
+            } else { meetingsNavigation }
+            #else
+            meetingsNavigation
+            #endif
+        }
+        .recordingSessionPresenter()
+        .reviewPromptPresenter()
+        .sheet(isPresented: Binding(
+            get: { incomingFiles.hasPendingFiles },
+            set: { if !$0 { incomingFiles.finish() } }
+        )) {
+            AttachToMeetingView(files: incomingFiles.pendingFiles, modelContext: modelContext) {
+                incomingFiles.finish()
+            }
+        }
+    }
+
+    private var meetingsNavigation: some View {
+        Group {
             if horizontalSizeClass == .regular {
                 NavigationSplitView {
                     FolderSidebarView(selection: $selection)
@@ -44,16 +68,6 @@ struct ContentView: View {
                 NavigationStack {
                     MeetingsListView(selection: $selection)
                 }
-            }
-        }
-        .recordingSessionPresenter()
-        .reviewPromptPresenter()
-        .sheet(isPresented: Binding(
-            get: { incomingFiles.hasPendingFiles },
-            set: { if !$0 { incomingFiles.finish() } }
-        )) {
-            AttachToMeetingView(files: incomingFiles.pendingFiles, modelContext: modelContext) {
-                incomingFiles.finish()
             }
         }
     }

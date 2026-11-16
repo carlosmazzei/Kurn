@@ -2,13 +2,14 @@ import XCTest
 
 @MainActor
 final class MeetingKnowledgeUITests: XCTestCase {
-    private func launch(largeType: Bool = false) -> XCUIApplication {
+    private func launch(largeType: Bool = false, prototype: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["UI-Testing-Screenshots", "UI-Testing-DisableAnimations", "UI-Testing-KnowledgeFixture",
             "-settings.knowledgeEnabled", "YES", "-settings.semanticSearchEnabled", "NO",
             "-settings.meetingsSortOrder", "dateNewest",
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         if largeType { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }
+        if prototype { app.launchArguments += ["UI-Testing-KnowledgeNavigationPrototype"] }
         app.launch()
         return app
     }
@@ -58,6 +59,46 @@ final class MeetingKnowledgeUITests: XCTestCase {
         content.swipeDown()
         content.swipeDown()
         capture(app, named: "knowledge-meeting-accessibility-overview")
+    }
+
+    func testEntityEvidenceAndTranscriptFromMeeting() throws {
+        continueAfterFailure = false
+        let app = launch()
+        openKnowledge(app)
+        let entity = app.buttons["knowledge.openEntity"].firstMatch
+        XCTAssertTrue(entity.waitForExistence(timeout: 10))
+        entity.tap()
+        let claim = app.staticTexts["knowledge.browser.claim"].firstMatch
+        XCTAssertTrue(claim.waitForExistence(timeout: 10))
+        XCTAssertTrue(claim.label.contains("Example portal"))
+        capture(app, named: "knowledge-entity-overview")
+        let sources = app.buttons["knowledge.browser.sources"]
+        XCTAssertTrue(sources.waitForExistence(timeout: 10))
+        sources.tap()
+        let evidence = app.buttons["knowledge.browser.evidence"].firstMatch
+        XCTAssertTrue(evidence.waitForExistence(timeout: 10))
+        capture(app, named: "knowledge-entity-sources")
+        evidence.tap()
+        XCTAssertTrue(app.staticTexts["knowledge.browser.quote"].waitForExistence(timeout: 10))
+        capture(app, named: "knowledge-evidence-detail")
+        app.buttons["knowledge.browser.openTranscript"].tap()
+        XCTAssertTrue(app.staticTexts["knowledge.browser.citedSegment"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["knowledge.browser.play"].exists)
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
+        capture(app, named: "knowledge-source-transcript")
+    }
+
+    func testKnowledgeRootNavigationPrototype() throws {
+        continueAfterFailure = false
+        let app = launch(prototype: true)
+        XCTAssertTrue(app.buttons["knowledge.browser.entity"].firstMatch.waitForExistence(timeout: 15))
+        capture(app, named: "knowledge-navigation-home-prototype")
+        app.tabBars.buttons["Meetings"].tap()
+        XCTAssertTrue(app.buttons["meetingCard"].firstMatch.waitForExistence(timeout: 10))
+        capture(app, named: "knowledge-navigation-meetings-prototype")
+        app.tabBars.buttons["Ask"].tap()
+        XCTAssertTrue(app.staticTexts["Ask is not available in this preview."].waitForExistence(timeout: 10))
+        capture(app, named: "knowledge-navigation-ask-prototype")
     }
 
     private func capture(_ app: XCUIApplication, named name: String) {
