@@ -33,17 +33,7 @@ extension KnowledgeStore {
                 _ = try KnowledgeEntityMergeRows.undo(operationID: id, snapshot: snapshot, auth: identityAuth,
                     container: modelContainer, beforeSave: beforeSave)
             case let .dismiss(id), let .reopen(id):
-                let dismiss = command == .dismiss(id)
-                guard fresh.candidates.contains(where: { $0.id == id && $0.isDismissed != dismiss }),
-                      let row = try context.fetch(FetchDescriptor<KnowledgeReview>(predicate: #Predicate { $0.id == id })).first else {
-                    throw KnowledgeEntityStoreError.invalidReview
-                }
-                row.stateRaw = dismiss ? KnowledgeReviewItemState.dismissed.rawValue : KnowledgeReviewItemState.open.rawValue
-                row.resolvedAt = dismiss ? Date() : nil
-                context.insert(KnowledgeRevision(number: snapshot.revision + 1, policyRevisionKey: snapshot.policyRevisionKey, assertionCount: 0))
-                try Task.checkCancellation()
-                try beforeSave()
-                try context.save()
+                try saveReviewState(id: id, dismissed: command == .dismiss(id), snapshot: snapshot, auth: auth, beforeSave: beforeSave)
             }
         } catch {
             context.rollback()
@@ -51,5 +41,29 @@ extension KnowledgeStore {
                 outcome: error is CancellationError ? .cancelled : .failed, code: (error as? KnowledgeEntityStoreError)?.rawValue ?? "review_decision_failed"))
             throw error
         }
+    }
+
+    private func saveReviewState(id: UUID, dismissed: Bool, snapshot: KnowledgeEntityMutationSnapshot,
+                                 auth: KnowledgeSourceAuthorization, beforeSave: @Sendable () throws -> Void) throws {
+        // Revalidate inside the write transaction using a fresh context, rather
+        // than saving objects materialized by an earlier inbox read.
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+        do {
+            try context.transaction {
+                let current = try KnowledgeReviewRows.read(meetingIDs: Set(snapshot.sources.map(\.meetingID)), auth: auth, in: context)
+                guard current.snapshot == snapshot, current.allowsMutation else { throw KnowledgeEntityStoreError.staleSnapshot }
+                guard current.candidates.contains(where: { $0.id == id && $0.isDismissed != dismissed }),
+                      let row = try context.fetch(FetchDescriptor<KnowledgeReview>(predicate: #Predicate { $0.id == id })).first else {
+                    throw KnowledgeEntityStoreError.invalidReview
+                }
+                row.stateRaw = dismissed ? KnowledgeReviewItemState.dismissed.rawValue : KnowledgeReviewItemState.open.rawValue
+                row.resolvedAt = dismissed ? Date() : nil
+                context.insert(KnowledgeRevision(number: snapshot.revision + 1, policyRevisionKey: snapshot.policyRevisionKey, assertionCount: 0))
+                try Task.checkCancellation()
+                try beforeSave()
+                try context.save()
+            }
+        } catch { context.rollback(); throw error }
     }
 }
