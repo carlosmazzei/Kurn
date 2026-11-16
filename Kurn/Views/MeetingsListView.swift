@@ -34,8 +34,6 @@ struct MeetingsListView: View {
     // not visible to an extension declared in another file.
     @Environment(\.modelContext) var modelContext
     @Environment(AppSettings.self) var settings
-    /// The app-wide recording session the record button starts or re-opens.
-    @Environment(RecordingSessionController.self) var recordingSession
     @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
     @Query private var folders: [Folder]
     @Query(sort: \SmartFolder.name) private var smartFolders: [SmartFolder]
