@@ -1,6 +1,7 @@
 import AgentHarness
 import Foundation
 import KurnCore
+import Synchronization
 
 actor ChatAgentModel: AgentModel {
     enum Failure: Error { case provider, exhausted }
@@ -28,10 +29,48 @@ actor ChatAgentModel: AgentModel {
         let response = responses[index]
         onEvent(.textDelta(response.text))
         if pauseAt == index {
-            do { try await Task.sleep(for: .seconds(60)) }
+            do { try await ChatAgentCancellationPause().wait() }
             catch { wasCancelled = true; throw error }
         }
         return response
+    }
+}
+
+/// A paused provider must remain pending until the test's cancellation action.
+/// A wall-clock sleep can expire while the general suite starves the main
+/// actor, turning a cancellation/recovery test into an unrelated success.
+final class ChatAgentCancellationPause: Sendable {
+    private struct Storage {
+        var continuation: CheckedContinuation<Void, Error>?
+        var cancelled = false
+    }
+    private let storage = Mutex(Storage())
+
+    var hasWaiter: Bool { storage.withLock { $0.continuation != nil } }
+
+    func wait() async throws {
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let cancelled = storage.withLock { value in
+                    if value.cancelled { return true }
+                    value.continuation = continuation
+                    return false
+                }
+                if cancelled { continuation.resume(throwing: CancellationError()) }
+            }
+        } onCancel: {
+            cancel()
+        }
+    }
+
+    func cancel() {
+        let continuation = storage.withLock { value in
+            value.cancelled = true
+            let result = value.continuation
+            value.continuation = nil
+            return result
+        }
+        continuation?.resume(throwing: CancellationError())
     }
 }
 
