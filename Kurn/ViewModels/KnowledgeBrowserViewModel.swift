@@ -2,17 +2,6 @@ import Foundation
 import Observation
 
 @MainActor
-protocol KnowledgeEvidenceAudio: AnyObject {
-    var isPlaying: Bool { get }
-    func load(fileName: String, title: String?, subtitle: String?, enhanced: Bool) async throws
-    func seek(to time: TimeInterval)
-    func play()
-    func stop()
-}
-
-extension AudioPlayerService: KnowledgeEvidenceAudio {}
-
-@MainActor
 @Observable
 final class KnowledgeBrowserViewModel {
     typealias Reader = @MainActor () async throws -> KnowledgeBrowserRead
@@ -21,7 +10,7 @@ final class KnowledgeBrowserViewModel {
     @ObservationIgnored private var requestID = UUID()
     @ObservationIgnored private let audio: any KnowledgeEvidenceAudio
 
-    init(audio: any KnowledgeEvidenceAudio = AudioPlayerService()) { self.audio = audio }
+    init(audio: any KnowledgeEvidenceAudio = KnowledgeEvidenceAudioPlayer()) { self.audio = audio }
 
     var isPlaying: Bool { audio.isPlaying }
 
@@ -66,8 +55,8 @@ final class KnowledgeBrowserViewModel {
             let before = try await reader()
             guard requestID == request, !Task.isCancelled, isEnabled(), before.meetingIDs == read.meetingIDs,
                   before.selectedEvidence == source else { refusePlayback(request: request); return }
-            // Audio setup may publish Now Playing metadata before it returns.
-            // Keep source names out of that surface until reauthorization.
+            // The adapter withholds transport registration during setup. Keep
+            // source names out of system metadata too.
             try await audio.load(fileName: source.fileName, title: nil, subtitle: nil, enhanced: false)
             let after = try await reader()
             guard requestID == request, !Task.isCancelled, isEnabled(), after.meetingIDs == read.meetingIDs,
