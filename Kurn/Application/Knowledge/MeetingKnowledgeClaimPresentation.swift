@@ -16,10 +16,18 @@ enum MeetingKnowledgeClaimPresentation {
     static func valueText(_ value: KnowledgeTypedValue) -> String {
         switch value {
         case let .string(text): text
-        case let .number(number, unit): number.formatted() + (unit.map { " " + $0 } ?? "")
+        case let .number(number, unit): numberText(number) + (unit.map { " " + $0 } ?? "")
         case let .boolean(flag): NSLocalizedString(flag ? "knowledge.value.true" : "knowledge.value.false", comment: "Boolean value")
         case let .date(date): date.text // Keep stated precision; never invent a day/instant.
         case let .enumeration(text): NSLocalizedString("knowledge.status." + text, comment: "Claim status")
         }
+    }
+
+    /// The default decimal format rounds to three places. Use the Double's
+    /// round-trip text, localizing only its separator, so tiny/non-integer
+    /// metrics cannot silently become zero or acquire a different value.
+    static func numberText(_ number: Double, locale: Locale = .current) -> String {
+        let text = number.rounded() == number && abs(number) < 1e15 ? String(Int64(number)) : String(number)
+        return text.replacingOccurrences(of: ".", with: locale.decimalSeparator ?? ".")
     }
 }

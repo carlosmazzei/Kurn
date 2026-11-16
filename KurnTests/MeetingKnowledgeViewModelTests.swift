@@ -109,6 +109,21 @@ struct MeetingKnowledgeViewModelTests {
         #expect(model.presentation(for: first.meetingID) == .idle)
     }
 
+    @Test func metricPresentationRetainsSmallAndLargeCanonicalValues() {
+        let english = Locale(identifier: "en_US_POSIX")
+        let portuguese = Locale(identifier: "pt_BR")
+        #expect(MeetingKnowledgeClaimPresentation.numberText(0.0001, locale: english) == "0.0001")
+        #expect(MeetingKnowledgeClaimPresentation.numberText(0.0001, locale: portuguese) == "0,0001")
+        #expect(MeetingKnowledgeClaimPresentation.numberText(3, locale: english) == "3")
+        for value in [0.0001, -0.000001, 1e-200, Double.leastNonzeroMagnitude, Double.greatestFiniteMagnitude, 1234567890.1234567] {
+            let text = MeetingKnowledgeClaimPresentation.numberText(value, locale: english)
+            #expect(Double(text) == value)
+            let displayed = MeetingKnowledgeClaimPresentation.valueText(.number(value, unit: "s"))
+            let parsed = displayed.replacingOccurrences(of: " s", with: "").replacingOccurrences(of: Locale.current.decimalSeparator ?? ".", with: ".")
+            #expect(Double(parsed) == value)
+        }
+    }
+
     @Test func revocationAndForeignMeetingResultsAreRefusedAfterAwait() async throws {
         let model = MeetingKnowledgeViewModel()
         let data = try read()
