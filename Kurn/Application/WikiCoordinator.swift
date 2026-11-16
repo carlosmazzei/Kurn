@@ -109,13 +109,15 @@ final class WikiCoordinator {
     func generate(
         _ meeting: Meeting,
         trigger: ProviderAutomationTrigger = .automatic,
-        force: Bool = false
+        force: Bool = false,
+        localOnly: Bool = false
     ) async -> GenerationOutcome {
         let meetingID = meeting.id
         if trigger == .explicit { lastError = nil }
         guard !generatingMeetingIDs.contains(meetingID), let settings = appSettings,
               settings.wikiEnabled || trigger == .explicit else { return .skipped }
         let provider = settings.aiProvider
+        guard !localOnly || provider.kind == .appleOnDevice else { return .skipped }
         let model = settings.summaryModel(for: provider)
         let generator = Self.generatorIdentifier(provider: provider, model: model)
         let text = meeting.assembledContextText()

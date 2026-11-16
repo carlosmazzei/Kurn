@@ -1346,3 +1346,26 @@
 "chat.branch.tree" = "All branches";
 "chat.context.compact_next" = "Summarize earlier messages first";
 "chat.draft.save_failed" = "Your unsent text could not be saved. It is still in the message field.";
+
+/* Meeting knowledge contributions (K2.3). */
+"tab.knowledge" = "Knowledge";
+"detail.knowledge.counts" = "Entities: %ld · Claims: %ld · Passages: %ld";
+"detail.knowledge.contributions" = "Contributions from this meeting";
+"detail.knowledge.refresh" = "Refresh";
+"detail.knowledge.notes" = "Meeting notes";
+"detail.knowledge.notes_empty" = "Generate condensed notes from this meeting’s transcript.";
+"detail.knowledge.loading" = "Loading contributions…";
+"detail.knowledge.unavailable" = "Knowledge is unavailable";
+"detail.knowledge.unavailable_detail" = "Access or source data may have changed. Refresh to try again.";
+"detail.knowledge.empty" = "No contributions yet";
+"detail.knowledge.empty_detail" = "Contributions appear after knowledge is processed for this meeting.";
+"detail.knowledge.claim_count" = "Claims: %ld";
+"detail.knowledge.negated" = "Negated claim";
+"detail.knowledge.attribution" = "Attributed to %@";
+"knowledge.modality.reported" = "Reported";
+"knowledge.modality.proposed" = "Proposed";
+"knowledge.modality.agreed" = "Agreed";
+"knowledge.modality.disputed" = "Disputed";
+"knowledge.modality.hypothetical" = "Hypothetical";
+"knowledge.modality.observed" = "Observed";
+"knowledge.modality.inferred" = "Inferred";

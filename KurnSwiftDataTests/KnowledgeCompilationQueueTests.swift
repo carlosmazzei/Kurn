@@ -107,6 +107,47 @@ struct KnowledgeCompilationQueueTests {
         }
     }
 
+    @Test func meetingContributionsReadOfflineWithoutGeneratingOrAcknowledgingWork() async throws {
+        let provider = Provider()
+        let f = try fixture(provider: provider)
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id) == .completed)
+        let calls = await provider.calls
+        f.settings.aiProviderID = AIProvider.openAI.id // Reading needs no cloud key/provider.
+        let result = try await f.coordinator.readMeetingKnowledge(meetingID: f.meeting.id)
+        #expect(result.assertionCount == 1)
+        #expect(result.evidenceCount == 1)
+        #expect(result.contributions.first?.name == "Example topic")
+        #expect(await provider.calls == calls)
+        let store = await f.queue.writer()
+        #expect(try await store.pendingProjection()?.number == 1)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeJob>()) == 1)
+        let wiki = WikiCoordinator(modelContext: f.container.mainContext, appSettings: f.settings, jobQueue: f.queue)
+        #expect(await f.coordinator.generateLocalMeetingNotes(f.meeting, wiki: wiki) == .skipped)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeJob>()) == 1)
+        f.policy.enabled = false
+        await #expect(throws: KnowledgeWikiStoreError.scopeDenied) { try await f.coordinator.readMeetingKnowledge(meetingID: f.meeting.id) }
+        f.policy.enabled = true
+        f.settings.knowledgeEnabled = false
+        await #expect(throws: KnowledgeWikiStoreError.scopeDenied) { try await f.coordinator.readMeetingKnowledge(meetingID: f.meeting.id) }
+    }
+
+    @Test func meetingReadDoesNotReuseChangedSourcesOrRevokedContexts() async throws {
+        let f = try fixture()
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id) == .completed)
+        #expect(try await f.coordinator.readMeetingKnowledge(meetingID: f.meeting.id).assertionCount == 1)
+        let transcript = try #require(f.meeting.recordings.first?.transcript)
+        var segments = transcript.segments
+        segments[0].text += " Updated."
+        transcript.segments = segments
+        try f.container.mainContext.save()
+        #expect(try await f.coordinator.readMeetingKnowledge(meetingID: f.meeting.id).assertionCount == 0)
+        let context = KnowledgeContext(kind: .internalMeeting, name: "Synthetic restricted context", policyID: UUID().uuidString)
+        f.container.mainContext.insert(context)
+        f.container.mainContext.insert(SourceContextLink(meetingID: f.meeting.id, contextID: context.id))
+        try f.container.mainContext.save()
+        await #expect(throws: KnowledgeWikiStoreError.scopeDenied) { try await f.coordinator.readMeetingKnowledge(meetingID: f.meeting.id) }
+    }
+
     @Test func canonicalCommitCompletesTheQueueRowAndRetainsProvenance() async throws {
         let provider = Provider()
         let f = try fixture(recordings: 2, provider: provider)

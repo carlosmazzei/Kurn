@@ -3117,6 +3117,50 @@ evidence limits, 1,024 recording coverage entries and 8,192 review rows/findings
 This step enables no model calls, semantic LLM lint, egress, automatic scheduling,
 new navigation or maintenance UI; the latter remains K2.6–K2.7.
 
+### Meeting detail Knowledge mode (K2.3)
+
+`MeetingDetailMode` is the meeting-local mode catalog. Recordings / Transcript /
+Summary / Chat remain available; the disabled-by-default `knowledgeEnabled`
+flag adds Knowledge between Summary and Chat. This does not change root
+navigation; the global navigation prototype/review gate remains K0.5.
+`MeetingWikiContent` is shared by the old sheet shortcut and the inline notes
+section, so article viewing/read-aloud remains one presentation path.
+
+`KnowledgeCompilationCoordinator.readMeetingKnowledge` authorizes exactly the
+route's meeting ID under live host/local page policy and persisted context
+policy, reads the canonical snapshot and computes contributions without a
+provider, extraction, projection publication, outbox acknowledgement or writes.
+The DTO rejects foreign-meeting assertions; redirect-aware entity contributions
+retain original claim IDs, evidence, attribution, modality and negation. Header
+counts deduplicate claims/passages rather than adding their repeated appearances
+on both sides of a relation. Generated episodic notes are separate from those
+source-backed contributions and never become evidence.
+
+`MeetingKnowledgeViewModel` clears old data before each read, rejects stale
+request completions, cancellation, feature revocation and foreign meeting
+results. Presentation is keyed to the current route even before its next task
+starts. `MeetingKnowledgeRefreshDriver` treats store saves as invalidation
+signals only (no models/notification payloads are read), debounces repeated saves,
+and refetches on foreground activation. Access denial/corruption shows generic
+unavailable copy without names, counts or raw errors. Disabling the flag hides
+the mode/header immediately and returns selection to Recordings.
+
+Inline article content/actions appear only after a current authorized read.
+Explicit inline generation revalidates the meeting and calls the existing wiki
+queue with `localOnly: true`; that admission checks the selected provider before
+assembling/queuing work, whose immutable provider remains local on recovery.
+Provider changes obsolete the work rather than switching destinations. Existing
+episodic wiki consent/legacy shortcuts remain independent. This step enables no
+canonical cloud processing or automatic generation.
+
+UI tests opt in through the ephemeral UserDefaults argument domain, seed a
+synthetic meeting through the real canonical commit boundary in an in-memory
+store, audit the new mode, and retain compact / inline-notes / accessibility-size
+screenshots. `ui-tests (main)` exports attachments as `ui-review-previews` for PR
+review. All seven app languages include the new labels; the existing default-off
+four-mode accessibility audit remains in place. Entity/evidence destinations,
+review/settings UI and the global Knowledge Home remain later K2 work.
+
 ### Attached documents (PDFs)
 
 A meeting can carry PDFs as reference material for its summaries
@@ -3338,7 +3382,8 @@ toolbar would be the wrong control**:
   over the transcript with `.overlay(alignment: .bottom)` rather than a
   `.safeAreaBar`, so the conversation keeps scrolling beneath both the card
   and the keyboard instead of stopping above them).
-- `MeetingDetailView`'s four sections are a segmented `Picker`, not a bottom
+- `MeetingDetailView` uses four sections, plus Knowledge when its independent
+  flag is enabled, in a segmented `Picker`, not a bottom
   bar: they're view modes of one meeting rather than top-level destinations, and
   a bottom bar there would collide with the Chat tab's composer.
 - Do not reintroduce `.background(.bar)`, hand-drawn `Divider` bar tops, or

@@ -283,6 +283,23 @@ jobs:
         with:
           artifact-name: ui-tests-${{ matrix.shard }}-failure-diagnostics
 
+      - name: Export UI review previews
+        if: always() && matrix.shard == 'main'
+        run: |
+          if [ -d "$RUNNER_TEMP/TestResults.xcresult" ]; then
+            xcrun xcresulttool export attachments \
+              --path "$RUNNER_TEMP/TestResults.xcresult" \
+              --output-path "$RUNNER_TEMP/ui-review-previews"
+          fi
+
+      - name: Upload UI review previews
+        if: always() && matrix.shard == 'main'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ui-review-previews
+          path: ${{ runner.temp }}/ui-review-previews
+          retention-days: 14
+
       - name: Export and upload coverage
         if: always()
         uses: ./.github/actions/upload-xcode-coverage
