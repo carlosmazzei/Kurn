@@ -3193,8 +3193,12 @@ changes, closing the reader, feature revocation and scene deactivation stop
 playback and clear content; returning active revalidates. Audio is explicit,
 recording-relative, and checked against fresh evidence before setup and again
 after asynchronous player loading. Pending setup cannot resurrect revoked audio
-or overlap a newer setup. Source names are not passed into setup's Now Playing
-metadata. The fake audio adapter tests these boundaries without opening the
+or overlap a newer setup. Setup defers remote transport registration until
+authorized playback. The adapter only releases an audio session it has acquired;
+opening/refreshing an idle reader cannot stop another consumer's shared session.
+Source names are not passed into setup's Now Playing metadata. The reader offers
+no native text-copy/export actions that would bypass the corporate export policy.
+The fake audio adapter tests these boundaries without opening the
 simulator's audio session; real playback remains a physical-device check.
 
 `KnowledgeNavigationPrototype` is compiled only in DEBUG and is reachable only

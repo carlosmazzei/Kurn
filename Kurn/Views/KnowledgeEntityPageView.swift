@@ -68,6 +68,5 @@ struct KnowledgeClaimReadView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .textSelection(.enabled)
     }
 }
