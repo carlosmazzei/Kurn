@@ -1459,3 +1459,32 @@
 "knowledge.browser.search_assertion" = "Afirmação";
 "knowledge.browser.search_limit_title" = "Refine sua busca";
 "knowledge.browser.search_limit_detail" = "Use uma consulta mais curta ou selecione menos reuniões.";
+
+// Knowledge review inbox
+"knowledge.review.title" = "Revisão";
+"knowledge.review.intro" = "Revise as reuniões selecionadas. Possíveis identidades iguais precisam da sua decisão; os avisos de fontes ficam disponíveis para inspeção.";
+"knowledge.review.read_only" = "Sua política permite apenas visualizar.";
+"knowledge.review.limited" = "Esta visualização tem limites. Selecione menos reuniões para inspecionar mais itens.";
+"knowledge.review.decision_failed" = "Não foi possível salvar a decisão. O estado atual está sendo exibido; revise antes de tentar novamente.";
+"knowledge.review.evidence_unavailable" = "Não foi possível validar algumas evidências canônicas. O conteúdo está oculto; inspecione a fonte ou compile novamente.";
+"knowledge.review.identities" = "Candidatos de identidade";
+"knowledge.review.none" = "Nenhum item nesta seção.";
+"knowledge.review.warnings" = "Avisos de fontes";
+"knowledge.review.conflict_detail" = "Estas passagens fazem afirmações opostas. Verifique as datas e as fontes antes de concluir.";
+"knowledge.review.date_detail" = "A fonte informa um mês, sem um dia exato. A precisão original é preservada.";
+"knowledge.review.open_evidence" = "Abrir passagem de origem";
+"knowledge.review.conflict" = "Possível conflito";
+"knowledge.review.date" = "Precisão da data para revisar";
+"knowledge.review.history" = "Histórico";
+"knowledge.review.undone" = "Merge desfeito";
+"knowledge.review.undo" = "Desfazer merge";
+"knowledge.review.kept_separate" = "Mantidas separadas";
+"knowledge.review.possible_match" = "Possível identidade igual";
+"knowledge.review.combine" = "Identidade a combinar";
+"knowledge.review.keep" = "Identidade a manter";
+"knowledge.review.merge_detail" = "Combinar identidades mantém o nome de destino. As afirmações e passagens continuam rastreáveis. O merge pode ser desfeito no Histórico.";
+"knowledge.review.reopen" = "Revisar novamente";
+"knowledge.review.merge" = "Combinar identidades";
+"knowledge.review.dismiss" = "Manter separadas";
+"knowledge.review.confirm_title" = "Combinar estas identidades?";
+"knowledge.review.confirm_detail" = "Manter “%@” como identidade canônica. Você pode desfazer este merge no Histórico.";

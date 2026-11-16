@@ -1459,3 +1459,32 @@
 "knowledge.browser.search_assertion" = "Claim";
 "knowledge.browser.search_limit_title" = "Refine your search";
 "knowledge.browser.search_limit_detail" = "Use a shorter query or select fewer meetings.";
+
+// Knowledge review inbox
+"knowledge.review.title" = "Review";
+"knowledge.review.intro" = "Review the selected meetings. Identity matches need your decision; source warnings remain available for inspection.";
+"knowledge.review.read_only" = "Your policy permits viewing only.";
+"knowledge.review.limited" = "This view is bounded. Select fewer meetings to inspect more items.";
+"knowledge.review.decision_failed" = "The decision could not be saved. The latest state is shown; review it before trying again.";
+"knowledge.review.evidence_unavailable" = "Some canonical evidence could not be validated. Its content is hidden; inspect the source or compile it again.";
+"knowledge.review.identities" = "Identity candidates";
+"knowledge.review.none" = "No items in this section.";
+"knowledge.review.warnings" = "Source warnings";
+"knowledge.review.conflict_detail" = "These passages make opposing claims. Check their dates and sources before drawing a conclusion.";
+"knowledge.review.date_detail" = "The source states a month rather than an exact day. The original precision is preserved.";
+"knowledge.review.open_evidence" = "Open source passage";
+"knowledge.review.conflict" = "Possible conflict";
+"knowledge.review.date" = "Date precision needs review";
+"knowledge.review.history" = "History";
+"knowledge.review.undone" = "Merge undone";
+"knowledge.review.undo" = "Undo merge";
+"knowledge.review.kept_separate" = "Kept separate";
+"knowledge.review.possible_match" = "Possible identity match";
+"knowledge.review.combine" = "Identity to combine";
+"knowledge.review.keep" = "Identity to keep";
+"knowledge.review.merge_detail" = "Combining identities keeps the target name. Source claims and passages stay traceable. The merge can be undone in History.";
+"knowledge.review.reopen" = "Review again";
+"knowledge.review.merge" = "Merge identities";
+"knowledge.review.dismiss" = "Keep separate";
+"knowledge.review.confirm_title" = "Merge these identities?";
+"knowledge.review.confirm_detail" = "Keep “%@” as the canonical identity. You can undo this merge in History.";

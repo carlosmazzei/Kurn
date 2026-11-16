@@ -1459,3 +1459,32 @@
 "knowledge.browser.search_assertion" = "Affirmation";
 "knowledge.browser.search_limit_title" = "Affinez votre recherche";
 "knowledge.browser.search_limit_detail" = "Raccourcissez la recherche ou sélectionnez moins de réunions.";
+
+// Knowledge review inbox
+"knowledge.review.title" = "Révision";
+"knowledge.review.intro" = "Examinez les réunions sélectionnées. Les correspondances d’identité nécessitent votre décision ; les avertissements restent consultables.";
+"knowledge.review.read_only" = "Votre politique autorise uniquement la consultation.";
+"knowledge.review.limited" = "Cette vue est limitée. Sélectionnez moins de réunions pour examiner davantage d’éléments.";
+"knowledge.review.decision_failed" = "La décision n’a pas pu être enregistrée. L’état actuel est affiché ; vérifiez-le avant de réessayer.";
+"knowledge.review.evidence_unavailable" = "Certaines preuves canoniques n’ont pas pu être validées. Leur contenu est masqué ; examinez la source ou recompilez-la.";
+"knowledge.review.identities" = "Identités candidates";
+"knowledge.review.none" = "Aucun élément dans cette section.";
+"knowledge.review.warnings" = "Avertissements des sources";
+"knowledge.review.conflict_detail" = "Ces passages présentent des affirmations opposées. Vérifiez leurs dates et leurs sources avant de conclure.";
+"knowledge.review.date_detail" = "La source indique un mois plutôt qu’un jour précis. La précision originale est conservée.";
+"knowledge.review.open_evidence" = "Ouvrir le passage source";
+"knowledge.review.conflict" = "Conflit possible";
+"knowledge.review.date" = "Précision de date à vérifier";
+"knowledge.review.history" = "Historique";
+"knowledge.review.undone" = "Fusion annulée";
+"knowledge.review.undo" = "Annuler la fusion";
+"knowledge.review.kept_separate" = "Identités conservées séparément";
+"knowledge.review.possible_match" = "Correspondance d’identité possible";
+"knowledge.review.combine" = "Identité à fusionner";
+"knowledge.review.keep" = "Identité à conserver";
+"knowledge.review.merge_detail" = "La fusion conserve le nom de destination. Les affirmations et passages restent traçables. La fusion peut être annulée dans l’Historique.";
+"knowledge.review.reopen" = "Réexaminer";
+"knowledge.review.merge" = "Fusionner les identités";
+"knowledge.review.dismiss" = "Conserver séparément";
+"knowledge.review.confirm_title" = "Fusionner ces identités ?";
+"knowledge.review.confirm_detail" = "Conserver « %@ » comme identité canonique. Vous pouvez annuler cette fusion dans l’Historique.";

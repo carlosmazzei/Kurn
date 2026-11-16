@@ -1459,3 +1459,32 @@
 "knowledge.browser.search_assertion" = "论断";
 "knowledge.browser.search_limit_title" = "缩小搜索范围";
 "knowledge.browser.search_limit_detail" = "请缩短搜索内容或减少所选会议。";
+
+// Knowledge review inbox
+"knowledge.review.title" = "审核";
+"knowledge.review.intro" = "审核所选会议。身份匹配候选需要你决定；来源提示可供检查。";
+"knowledge.review.read_only" = "你的策略仅允许查看。";
+"knowledge.review.limited" = "此视图有数量限制。请选择更少的会议以检查更多项目。";
+"knowledge.review.decision_failed" = "无法保存决定。当前显示最新状态；请检查后重试。";
+"knowledge.review.evidence_unavailable" = "部分规范证据无法验证，其内容已隐藏。请检查来源或重新编译。";
+"knowledge.review.identities" = "身份候选";
+"knowledge.review.none" = "此部分没有项目。";
+"knowledge.review.warnings" = "来源提示";
+"knowledge.review.conflict_detail" = "这些段落提出相反的说法。请检查日期和来源后再下结论。";
+"knowledge.review.date_detail" = "来源只明确了月份，没有具体日期。原始精度会保留。";
+"knowledge.review.open_evidence" = "打开来源段落";
+"knowledge.review.conflict" = "可能存在冲突";
+"knowledge.review.date" = "需要审核日期精度";
+"knowledge.review.history" = "历史记录";
+"knowledge.review.undone" = "已撤销合并";
+"knowledge.review.undo" = "撤销合并";
+"knowledge.review.kept_separate" = "保持独立";
+"knowledge.review.possible_match" = "可能的身份匹配";
+"knowledge.review.combine" = "要合并的身份";
+"knowledge.review.keep" = "要保留的身份";
+"knowledge.review.merge_detail" = "合并身份会保留目标名称。原始说法和段落仍可追溯。你可以在历史记录中撤销合并。";
+"knowledge.review.reopen" = "重新审核";
+"knowledge.review.merge" = "合并身份";
+"knowledge.review.dismiss" = "保持独立";
+"knowledge.review.confirm_title" = "合并这些身份？";
+"knowledge.review.confirm_detail" = "将“%@”保留为规范身份。你可以在历史记录中撤销此次合并。";

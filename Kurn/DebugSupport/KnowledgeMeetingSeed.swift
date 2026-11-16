@@ -16,11 +16,16 @@ enum KnowledgeMeetingSeed {
             ? (0..<12).map { TranscriptSegment(speakerLabel: "Speaker 2", startTime: Double($0) * 4, endTime: Double($0 + 1) * 4,
                 text: "Synthetic agenda passage \($0 + 1) before the portal update.") } : []
         let start = Double(prefix.count) * 4
-        let recording = Recording(meeting: meeting, fileName: "synthetic-knowledge.m4a", duration: start + 4, transcriptionStatus: .done)
+        let reviewFixture = ProcessInfo.processInfo.arguments.contains("UI-Testing-KnowledgeReviewFixture")
+        let recording = Recording(meeting: meeting, fileName: "synthetic-knowledge.m4a", duration: start + (reviewFixture ? 12 : 4), transcriptionStatus: .done)
         context.insert(recording)
         let segment = TranscriptSegment(speakerLabel: "Speaker 1", startTime: start, endTime: start + 4,
             text: "The Example portal remains open for review.")
-        let segments = prefix + [segment]
+        let extra: [TranscriptSegment] = reviewFixture ? [
+            .init(speakerLabel: "Speaker 2", startTime: start + 4, endTime: start + 8, text: "The Example portal is not open for review."),
+            .init(speakerLabel: "Speaker 1", startTime: start + 8, endTime: start + 12, text: "Target delivery is in November 2026.")
+        ] : []
+        let segments = prefix + [segment] + extra
         let transcript = Transcript(recording: recording, segments: segments, language: "en")
         context.insert(transcript)
         recording.transcript = transcript
@@ -38,13 +43,31 @@ enum KnowledgeMeetingSeed {
         let sourceContext = ModelContext(container)
         let snapshot = try KnowledgeStoreRows.readSnapshot(meetingID: meeting.id, scope: "workspace", auth: auth, in: sourceContext)
         let anchor = segment.id.uuidString.lowercased()
-        let wire: [String: Any] = ["version": 1,
+        var wire: [String: Any] = ["version": 1,
             "entities": [["ref": "e1", "kind": "project", "name": "Example portal", "aliases": ["Orion workspace"]]],
             "assertions": [["ref": "a1", "subject": "e1", "predicate": "hasStatus", "value": ["type": "enum", "value": "open"],
                 "modality": "reported", "polarity": "positive", "claimKind": "internalStatusReport", "authorityStatus": "attributed",
                 "confidence": "medium", "attributedToSegmentID": anchor,
                 "evidence": [["segmentIDs": [anchor], "quote": segment.text]]]], "events": [],
             "examinedSegmentIDs": segments.map { $0.id.uuidString.lowercased() }]
+        if reviewFixture {
+            wire["entities"] = [["ref": "e1", "kind": "project", "name": "Example portal", "aliases": ["Orion workspace"]],
+                ["ref": "e2", "kind": "project", "name": "Example portal", "aliases": ["Orion delivery"]]]
+            if let original = (wire["assertions"] as? [[String: Any]])?.first {
+                var duplicate = original
+                duplicate["ref"] = "a2"; duplicate["subject"] = "e2"
+                var opposing = original
+                opposing["ref"] = "a3"; opposing["polarity"] = "negative"
+                opposing["attributedToSegmentID"] = extra[0].id.uuidString.lowercased()
+                opposing["evidence"] = [["segmentIDs": [extra[0].id.uuidString.lowercased()], "quote": extra[0].text]]
+                var dated = original
+                dated["ref"] = "a4"; dated["predicate"] = "dueOn"
+                dated["value"] = ["type": "date", "value": "2026-11", "precision": "month"]
+                dated["attributedToSegmentID"] = extra[1].id.uuidString.lowercased()
+                dated["evidence"] = [["segmentIDs": [extra[1].id.uuidString.lowercased()], "quote": extra[1].text]]
+                wire["assertions"] = [original, duplicate, opposing, dated]
+            }
+        }
         let document = try JSONDecoder().decode(KnowledgeExtraction.self, from: JSONSerialization.data(withJSONObject: wire))
         guard let recordingSource = snapshot.recordings.first, let fingerprint = recordingSource.fingerprint else {
             throw KnowledgeStoreError.sourceMissing

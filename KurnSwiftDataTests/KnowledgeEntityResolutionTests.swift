@@ -398,3 +398,131 @@ private final class EntityMutationEventCapture: @unchecked Sendable {
     func record(_ event: ReliabilityEvent) { lock.withLock { values.append(event) } }
     var events: [ReliabilityEvent] { lock.withLock { values } }
 }
+
+extension SwiftDataConcurrencySensitiveTests.KnowledgeEntityResolutionTests {
+    private func reviewAuthorization(_ f: Fixture, indices: [Int]? = nil) -> KnowledgeSourceAuthorization {
+        .init(featureEnabled: true, meetingIDs: authorization(f, indices: indices).meetingIDs,
+            policies: f.auth.policies, sourceClassifications: [.internal])
+    }
+
+    @Test func reviewInboxIsReadOnlyAndDismissCanBeReopened() async throws {
+        let f = try await fixture(copies: 2)
+        let auth = reviewAuthorization(f)
+        let context = ModelContext(f.container)
+        let jobs = try context.fetchCount(FetchDescriptor<KnowledgeJob>())
+        let read = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
+        let candidate = try #require(read.candidates.first)
+        #expect(read.candidates.count == 1 && read.merges.isEmpty && !read.evidenceUnavailable)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeJob>()) == jobs)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeRevision>()) == read.snapshot.revision)
+        try await f.store.reviewDecision(.dismiss(candidate.id), snapshot: read.snapshot, authorization: { auth })
+        let dismissed = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
+        #expect(dismissed.candidates.first?.isDismissed == true)
+        #expect(dismissed.snapshot.revision == read.snapshot.revision + 1)
+        try await f.store.reviewDecision(.reopen(candidate.id), snapshot: dismissed.snapshot, authorization: { auth })
+        let reopened = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
+        #expect(reopened.candidates.first?.isDismissed == false)
+    }
+
+    @Test func reviewMergeHistoryCanUndoWithoutChangingClaimsOrEvidence() async throws {
+        let f = try await fixture(copies: 2)
+        let auth = reviewAuthorization(f)
+        let before = ModelContext(f.container)
+        let claims = Set(try before.fetch(FetchDescriptor<KnowledgeAssertion>()).map(\.id))
+        let evidence = Set(try before.fetch(FetchDescriptor<KnowledgeEvidence>()).map(\.id))
+        let read = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
+        let candidate = try #require(read.candidates.first)
+        try await f.store.reviewDecision(.merge(candidate.id), snapshot: read.snapshot, authorization: { auth })
+        let merged = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
+        let operation = try #require(merged.merges.first)
+        #expect(merged.candidates.isEmpty && !operation.isUndone)
+        try await f.store.reviewDecision(.undo(operation.id), snapshot: merged.snapshot, authorization: { auth })
+        let undone = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
+        #expect(undone.merges.first?.isUndone == true)
+        #expect(undone.candidates.first?.id == candidate.id)
+        let after = ModelContext(f.container)
+        #expect(Set(try after.fetch(FetchDescriptor<KnowledgeAssertion>()).map(\.id)) == claims)
+        #expect(Set(try after.fetch(FetchDescriptor<KnowledgeEvidence>()).map(\.id)) == evidence)
+    }
+
+    @Test func reviewDecisionRefusesStaleRevisionRevocationAndForeignCandidateIDs() async throws {
+        let f = try await fixture(names: ["Example Portal", "Example Portal"], copies: 2)
+        let all = reviewAuthorization(f)
+        let scoped = reviewAuthorization(f, indices: [0])
+        let broad = try await f.store.reviewInbox(meetingIDs: all.meetingIDs, authorization: { all })
+        let narrow = try await f.store.reviewInbox(meetingIDs: scoped.meetingIDs, authorization: { scoped })
+        #expect(narrow.candidates.count == 1)
+        let foreign = try #require(broad.candidates.first { item in !narrow.candidates.contains(where: { $0.id == item.id }) })
+        await #expect(throws: KnowledgeEntityStoreError.invalidReview) {
+            try await f.store.reviewDecision(.merge(foreign.id), snapshot: narrow.snapshot, authorization: { scoped })
+        }
+        let candidate = try #require(narrow.candidates.first)
+        try await f.store.reviewDecision(.dismiss(candidate.id), snapshot: narrow.snapshot, authorization: { scoped })
+        await #expect(throws: KnowledgeEntityStoreError.staleSnapshot) {
+            try await f.store.reviewDecision(.merge(candidate.id), snapshot: narrow.snapshot, authorization: { scoped })
+        }
+        var revoked = scoped
+        revoked.featureEnabled = false
+        let denied = revoked
+        await #expect(throws: (any Error).self) {
+            try await f.store.reviewInbox(meetingIDs: scoped.meetingIDs, authorization: { denied })
+        }
+    }
+
+    @Test func reviewSaveFailureRollsBackDecisionAndRevision() async throws {
+        let f = try await fixture(copies: 2)
+        let auth = reviewAuthorization(f)
+        let read = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
+        let candidate = try #require(read.candidates.first)
+        await #expect(throws: KnowledgeStoreError.invalidCompilation) {
+            try await f.store.reviewDecision(.dismiss(candidate.id), snapshot: read.snapshot, authorization: { auth },
+                beforeSave: { throw KnowledgeStoreError.invalidCompilation })
+        }
+        #expect(try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth }) == read)
+    }
+
+    @Test func invalidReviewEvidenceIsHiddenAndNotRepairedByReading() async throws {
+        let f = try await fixture(copies: 2)
+        let auth = reviewAuthorization(f)
+        let edit = ModelContext(f.container)
+        let evidence = try #require(edit.fetch(FetchDescriptor<KnowledgeEvidence>()).first)
+        evidence.quote = "PRIVATE_INVALID_CITATION"
+        try edit.save()
+        let read = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
+        #expect(read.evidenceUnavailable && read.warnings.isEmpty && read.candidates.count == 1)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<KnowledgeEvidence>()).contains { $0.quote == "PRIVATE_INVALID_CITATION" })
+    }
+
+    @Test func changedPolicyRefusesOldDecisionAndReadOnlyPolicyCannotMutate() async throws {
+        let f = try await fixture(copies: 2)
+        let auth = reviewAuthorization(f)
+        let read = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
+        let candidate = try #require(read.candidates.first)
+        var policy = try #require(auth.policies.first)
+        policy.revision += 1
+        policy.allowedOperations.remove(.extraction)
+        let denied = KnowledgeSourceAuthorization(featureEnabled: true, meetingIDs: auth.meetingIDs,
+            policies: [policy], sourceClassifications: [.internal])
+        let current = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { denied })
+        #expect(!current.allowsMutation && current.candidates.isEmpty && current.evidenceUnavailable)
+        await #expect(throws: KnowledgeEntityStoreError.staleSnapshot) {
+            try await f.store.reviewDecision(.merge(candidate.id), snapshot: read.snapshot, authorization: { denied })
+        }
+    }
+
+    @Test func changedSourceDropsCandidatesAndRefusesAnOldReviewDecision() async throws {
+        let f = try await fixture(copies: 2)
+        let auth = reviewAuthorization(f)
+        let read = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
+        let candidate = try #require(read.candidates.first)
+        let edit = ModelContext(f.container)
+        let transcript = try #require(edit.fetch(FetchDescriptor<Transcript>()).first)
+        transcript.segments = [.init(speakerLabel: "Speaker 1", startTime: 0, endTime: 2, text: "Example corrected source.")]
+        try edit.save()
+        let fresh = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
+        #expect(fresh.candidates.isEmpty && fresh.evidenceUnavailable && fresh.warnings.isEmpty)
+        await #expect(throws: KnowledgeEntityStoreError.staleSnapshot) {
+            try await f.store.reviewDecision(.merge(candidate.id), snapshot: read.snapshot, authorization: { auth })
+        }
+    }
+}

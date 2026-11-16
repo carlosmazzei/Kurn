@@ -2,7 +2,7 @@ import XCTest
 
 @MainActor
 final class MeetingKnowledgeUITests: XCTestCase {
-    private func launch(largeType: Bool = false, prototype: Bool = false, longTranscript: Bool = false) -> XCUIApplication {
+    private func launch(largeType: Bool = false, prototype: Bool = false, longTranscript: Bool = false, review: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["UI-Testing-Screenshots", "UI-Testing-DisableAnimations", "UI-Testing-KnowledgeFixture",
             "-settings.knowledgeEnabled", "YES", "-settings.semanticSearchEnabled", "NO",
@@ -11,6 +11,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         if largeType { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }
         if prototype { app.launchArguments += ["UI-Testing-KnowledgeNavigationPrototype"] }
         if longTranscript { app.launchArguments += ["UI-Testing-KnowledgeLongTranscript"] }
+        if review { app.launchArguments += ["UI-Testing-KnowledgeReviewFixture"] }
         app.launch()
         return app
     }
@@ -234,6 +235,58 @@ final class MeetingKnowledgeUITests: XCTestCase {
         app.buttons["root.destination.meetings"].tap()
         XCTAssertTrue(app.buttons["meetings.options"].waitForExistence(timeout: 10))
         assertRootBarFits(app)
+    }
+
+    func testReviewIdentityMergeAndUndoUseTheRealStore() throws {
+        continueAfterFailure = false
+        let app = launch(prototype: true, review: true)
+        let open = app.buttons["knowledge.review.open"]
+        XCTAssertTrue(open.waitForExistence(timeout: 15)); open.tap()
+        let candidate = app.buttons["knowledge.review.candidate"].firstMatch
+        XCTAssertTrue(candidate.waitForExistence(timeout: 10))
+        capture(app, named: "knowledge-review-inbox")
+        candidate.tap()
+        let merge = app.buttons["knowledge.review.merge"]
+        XCTAssertTrue(merge.waitForExistence(timeout: 5))
+        capture(app, named: "knowledge-review-identity")
+        merge.tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5))
+        app.alerts.buttons["Merge identities"].tap()
+        let undo = app.buttons["knowledge.review.undo"].firstMatch
+        XCTAssertTrue(undo.waitForExistence(timeout: 10))
+        let list = app.descendants(matching: .any)["knowledge.review.inbox"].firstMatch
+        for _ in 0..<5 where !undo.isHittable { list.swipeUp() }
+        capture(app, named: "knowledge-review-merge-history")
+        undo.tap()
+        XCTAssertTrue(candidate.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["knowledge.review.failed"].exists)
+    }
+
+    func testReviewCanKeepIdentitiesSeparateAndInspectConflictingEvidence() throws {
+        continueAfterFailure = false
+        let app = launch(prototype: true, review: true)
+        let open = app.buttons["knowledge.review.open"]
+        XCTAssertTrue(open.waitForExistence(timeout: 15)); open.tap()
+        let candidate = app.buttons["knowledge.review.candidate"].firstMatch
+        XCTAssertTrue(candidate.waitForExistence(timeout: 10)); candidate.tap()
+        app.buttons["knowledge.review.dismiss"].tap()
+        let dismissed = app.buttons["knowledge.review.dismissed"].firstMatch
+        XCTAssertTrue(dismissed.waitForExistence(timeout: 10))
+        let list = app.descendants(matching: .any)["knowledge.review.inbox"].firstMatch
+        for _ in 0..<5 where !dismissed.isHittable { list.swipeUp() }
+        dismissed.tap()
+        app.buttons["knowledge.review.reopen"].tap()
+        XCTAssertTrue(candidate.waitForExistence(timeout: 10))
+        let warning = app.buttons["knowledge.review.warning.conflict"]
+        XCTAssertTrue(warning.waitForExistence(timeout: 5))
+        for _ in 0..<5 where !warning.isHittable { list.swipeUp() }
+        warning.tap()
+        let evidence = app.buttons["knowledge.review.evidence"].firstMatch
+        XCTAssertTrue(evidence.waitForExistence(timeout: 5))
+        for _ in 0..<5 where !evidence.isHittable { list.swipeUp() }
+        capture(app, named: "knowledge-review-source-warning")
+        evidence.tap()
+        XCTAssertTrue(app.staticTexts["knowledge.browser.quote"].waitForExistence(timeout: 10))
     }
 
     /// Check actual hit targets and separation, not just that five controls
