@@ -415,18 +415,22 @@ extension SwiftDataConcurrencySensitiveTests.KnowledgeEntityResolutionTests {
         #expect(read.candidates.count == 1 && read.merges.isEmpty && !read.evidenceUnavailable)
         #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeJob>()) == jobs)
         #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeRevision>()) == read.snapshot.revision)
+        let initial = try await f.store.wikiProjectionSnapshot(meetingIDs: auth.meetingIDs, scope: "workspace", authorization: { auth })
+        let published = try await f.store.publishWikiProjection(initial, authorization: { auth })
         try await f.store.reviewDecision(.dismiss(candidate.id), snapshot: read.snapshot, authorization: { auth })
         let dismissed = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
         #expect(dismissed.candidates.first?.isDismissed == true)
-        #expect(dismissed.snapshot.revision == read.snapshot.revision + 1)
+        #expect(dismissed.snapshot.revision == read.snapshot.revision)
+        #expect(try await f.store.wikiProjection(meetingIDs: auth.meetingIDs, scope: "workspace", authorization: { auth }) == published)
         try await f.store.reviewDecision(.reopen(candidate.id), snapshot: dismissed.snapshot, authorization: { auth })
         let reopened = try await f.store.reviewInbox(meetingIDs: auth.meetingIDs, authorization: { auth })
         #expect(reopened.candidates.first?.isDismissed == false)
+        #expect(try await f.store.wikiProjection(meetingIDs: auth.meetingIDs, scope: "workspace", authorization: { auth }) == published)
         let publication = try await f.store.wikiProjectionSnapshot(meetingIDs: auth.meetingIDs, scope: "workspace", authorization: { auth })
         _ = try await f.store.publishWikiProjection(publication, authorization: { auth })
         #expect(try await f.store.pendingProjection() == nil)
         let revisions = try ModelContext(f.container).fetch(FetchDescriptor<KnowledgeRevision>())
-        #expect(revisions.filter { $0.jobID == nil }.allSatisfy { !$0.projectionPending })
+        #expect(revisions.count == read.snapshot.revision)
     }
 
     @Test func reviewMergeHistoryCanUndoWithoutChangingClaimsOrEvidence() async throws {
@@ -463,6 +467,10 @@ extension SwiftDataConcurrencySensitiveTests.KnowledgeEntityResolutionTests {
         }
         let candidate = try #require(narrow.candidates.first)
         try await f.store.reviewDecision(.dismiss(candidate.id), snapshot: narrow.snapshot, authorization: { scoped })
+        await #expect(throws: KnowledgeEntityStoreError.invalidReview) {
+            try await f.store.reviewDecision(.merge(candidate.id), snapshot: narrow.snapshot, authorization: { scoped })
+        }
+        try await f.store.reviewDecision(.merge(foreign.id), snapshot: broad.snapshot, authorization: { all })
         await #expect(throws: KnowledgeEntityStoreError.staleSnapshot) {
             try await f.store.reviewDecision(.merge(candidate.id), snapshot: narrow.snapshot, authorization: { scoped })
         }

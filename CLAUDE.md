@@ -3313,10 +3313,11 @@ boundary. `KnowledgeStore.reviewDecision` refetches the inbox, compares the exac
 source fingerprints, policy key and canonical revision, checks a separate local
 extraction-policy grant, and derives merge endpoints from the authorized review
 rather than accepting UI-supplied names/IDs. Merge and undo retain the K1.7 origin,
-redirect-graph, incoming-member and audit validation. Dismiss/reopen updates the
-existing review and canonical revision atomically; a failed save rolls back both.
-Review-only revisions are saved with `projectionPending = false`; they change
-no canonical page inputs and must not create an outbox entry with no source audit.
+redirect-graph, incoming-member and audit validation. Dismiss/reopen updates only the existing review state within a freshly
+validated transaction; a failed save rolls it back. These metadata-only decisions
+preserve the canonical revision, published pages and projection outbox. The
+command checks the current review state as well as source/policy/canonical proof;
+merges and undo still advance the canonical revision through their audited path.
 The view never changes SwiftData directly. No model/provider or automatic identity
 linking path is added, including for people; experimental match weights are not
 presented as calibrated confidence.
