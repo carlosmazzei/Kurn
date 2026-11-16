@@ -3,8 +3,8 @@
 //  Kurn
 //
 //  In the four-destination root, Library / Filters / Sort / Select share the
-//  upper options menu; Settings and Record remain direct upper actions. No
-//  bottom toolbar competes with the root tab bar. The feature-off layout keeps
+//  upper options menu; Settings remains a direct upper action. The root owns its
+//  bottom navigation and floating recorder. The feature-off layout keeps
 //  the existing standalone toolbar placements.
 //
 //  This lives in its own file because `MeetingsListView.swift` is already close
@@ -51,8 +51,6 @@ extension MeetingsListView {
             .accessibilityIdentifier("meetings.options")
         }
         ToolbarItem(placement: .topBarTrailing) { settingsButton }
-        ToolbarSpacer(.fixed, placement: .topBarTrailing)
-        ToolbarItem(placement: .topBarTrailing) { recordButton.labelStyle(.iconOnly) }
     }
 
     @ToolbarContentBuilder
@@ -84,52 +82,8 @@ extension MeetingsListView {
 
     // MARK: - Primary action
 
-    /// The record button, deliberately alone in its glass group and tinted with
-    /// the brand accent so it stays the loudest thing on screen. While a
-    /// recording runs minimized it says so and re-opens it, rather than
-    /// reading "Record" over an action that cannot start a second capture.
-    var recordButton: some View {
-        Button(action: startRecording) {
-            if recordingSession.isActive {
-                Label(
-                    recordingSession.isPaused
-                        ? NSLocalizedString("recorder.mini.paused", comment: "Mini recorder bar: paused")
-                        : NSLocalizedString("recorder.mini.recording", comment: "Mini recorder bar: recording"),
-                    systemImage: recordingSession.isPaused ? "pause.circle.fill" : "waveform"
-                )
-            } else {
-                Label(
-                    NSLocalizedString("meetings.record", comment: "Record"),
-                    systemImage: "record.circle.fill"
-                )
-            }
-        }
-        .tint(Theme.accent)
-        .buttonStyle(.glassProminent)
-        .accessibilityHint(recordingSession.isActive
-            ? NSLocalizedString("recorder.mini.hint", comment: "Opens the full recorder")
-            : "")
-        .accessibilityIdentifier("meetings.record")
-    }
-
-    /// Create the meeting the recorder will record into, then start the
-    /// session. While a recording is already running (minimized to the mini
-    /// bar) the button re-opens it instead of creating a second meeting. A
-    /// failed save surfaces through `saveError` and opens no recorder, since
-    /// there would be no committed meeting to record into.
-    func startRecording() {
-        guard !recordingSession.isActive else {
-            recordingSession.expand()
-            return
-        }
-        do throws(AppError) {
-            let meeting = try MeetingLibrary(context: modelContext)
-                .createMeeting(title: "", language: settings.defaultLanguage)
-            recordingSession.begin(meeting: meeting)
-        } catch {
-            saveError = error
-        }
-    }
+    /// The standalone layout and root navigation share the same recording action.
+    var recordButton: some View { RecordingActionButton() }
 
     // MARK: - Bottom bar
 

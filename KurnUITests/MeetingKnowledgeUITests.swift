@@ -93,17 +93,18 @@ final class MeetingKnowledgeUITests: XCTestCase {
     func testKnowledgeRootNavigationPrototype() throws {
         continueAfterFailure = false
         let app = launch(prototype: true)
-        XCTAssertEqual(app.tabBars.buttons.count, 4)
+        assertRootBarFits(app)
         XCTAssertTrue(app.buttons["knowledge.browser.entity"].firstMatch.waitForExistence(timeout: 15))
         capture(app, named: "knowledge-navigation-home-prototype")
-        app.tabBars.buttons["Meetings"].tap()
+        app.buttons["root.destination.meetings"].tap()
         XCTAssertTrue(app.buttons["meetingCard"].firstMatch.waitForExistence(timeout: 10))
         capture(app, named: "knowledge-navigation-meetings-prototype")
-        app.tabBars.buttons["Ask"].tap()
+        app.buttons["root.destination.ask"].tap()
         XCTAssertTrue(app.buttons["chat.send"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["chat.send"].isEnabled)
+        assertRootBarFits(app)
         capture(app, named: "knowledge-navigation-ask-prototype")
-        let documents = app.tabBars.buttons["Documents"]
+        let documents = app.buttons["root.destination.documents"]
         let newDocument = app.buttons["documents.new"]
         // Match the flow suite's transition-confirmed tap: UIKit can drop a
         // tab tap while the previous screen finishes its first layout.
@@ -125,7 +126,8 @@ final class MeetingKnowledgeUITests: XCTestCase {
         let app = launch()
         let options = app.buttons["meetings.options"]
         XCTAssertTrue(options.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.navigationBars.buttons["meetings.record"].exists)
+        assertRootBarFits(app)
+        XCTAssertFalse(app.navigationBars.buttons["meetings.record"].exists)
         options.tap()
         XCTAssertTrue(app.buttons["meetings.library"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["meetings.filters"].exists)
@@ -155,9 +157,9 @@ final class MeetingKnowledgeUITests: XCTestCase {
         capture(app, named: "knowledge-navigation-selection-actions")
         // Dismiss outside the two top-right menu rows, without choosing an action.
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.5)).tap()
-        app.tabBars.buttons["Ask"].tap()
+        app.buttons["root.destination.ask"].tap()
         XCTAssertTrue(app.buttons["chat.send"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Meetings"].tap()
+        app.buttons["root.destination.meetings"].tap()
         XCTAssertTrue(done.waitForExistence(timeout: 10))
         done.tap()
         options.tap()
@@ -174,7 +176,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
     func testKnowledgeHomeUsesExplicitSourceSelection() throws {
         continueAfterFailure = false
         let app = launch()
-        app.tabBars.buttons["Knowledge"].tap()
+        app.buttons["root.destination.knowledge"].tap()
         let choose = app.buttons["knowledge.chooseSources"]
         XCTAssertTrue(choose.waitForExistence(timeout: 10))
         choose.tap()
@@ -190,6 +192,37 @@ final class MeetingKnowledgeUITests: XCTestCase {
         app.navigationBars.buttons["Cancel"].tap()
         XCTAssertTrue(app.buttons["knowledge.browser.entity"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Selected meetings: 1")).firstMatch.exists)
+    }
+
+    func testRootNavigationFitsAtAccessibilitySize() throws {
+        continueAfterFailure = false
+        let app = launch(largeType: true, prototype: true)
+        XCTAssertTrue(app.buttons["knowledge.browser.entity"].firstMatch.waitForExistence(timeout: 15))
+        assertRootBarFits(app)
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
+        capture(app, named: "knowledge-navigation-floating-record-accessibility")
+        app.buttons["root.destination.meetings"].tap()
+        XCTAssertTrue(app.buttons["meetings.options"].waitForExistence(timeout: 10))
+        assertRootBarFits(app)
+    }
+
+    /// Check actual hit targets and separation, not just that five controls
+    /// exist. This catches a recorder drawn over a destination on small bars.
+    private func assertRootBarFits(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertEqual(app.tabBars.buttons.count, 0, file: file, line: line)
+        let record = app.buttons["meetings.record"]
+        XCTAssertTrue(record.waitForExistence(timeout: 10), file: file, line: line)
+        XCTAssertTrue(record.isHittable, file: file, line: line)
+        XCTAssertGreaterThanOrEqual(record.frame.width, 44, file: file, line: line)
+        XCTAssertGreaterThanOrEqual(record.frame.height, 44, file: file, line: line)
+        for destination in ["meetings", "knowledge", "ask", "documents"] {
+            let button = app.buttons["root.destination.\(destination)"]
+            XCTAssertTrue(button.isHittable, file: file, line: line)
+            XCTAssertGreaterThanOrEqual(button.frame.width, 44, file: file, line: line)
+            XCTAssertGreaterThanOrEqual(button.frame.height, 44, file: file, line: line)
+            XCTAssertLessThanOrEqual(button.frame.maxX, record.frame.minX, file: file, line: line)
+            XCTAssertEqual(button.frame.midY, record.frame.midY, accuracy: 4, file: file, line: line)
+        }
     }
 
     private func capture(_ app: XCUIApplication, named name: String) {

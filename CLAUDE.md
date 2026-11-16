@@ -3204,7 +3204,16 @@ simulator's audio session; real playback remains a physical-device check.
 The navigation review selected four destinations: Meetings / Knowledge / Ask /
 Documents. `KnowledgeRootNavigationView` is active under `knowledgeEnabled` and
 keeps a separate stack per tab. Meetings' upper options menu contains Library,
-Filters, Sort and Select; Settings and Record remain direct upper actions.
+Filters, Sort and Select; Settings remains a direct upper action. A separate
+prominent red circular Record button floats to the right of the four root
+destinations in the bottom safe area, using the same action as the legacy
+toolbar. It starts a meeting or reopens the active recording. The four stacks
+still belong to `TabView`; its built-in tab bar is hidden because it cannot
+reserve a separate slot for this action. `KnowledgeRootNavigationView` uses
+system-glass groups for the destination capsule and the recorder, without
+overlapping their hit targets. Labels give way to icons below 360 points or
+at accessibility text sizes; localized accessibility names and selected traits
+remain available. The root bar steps aside for the keyboard.
 Bulk Export/Delete move to the upper selection-actions menu, so no bottom
 meetings toolbar overlaps the root tabs. Library scope, structured filters,
 sorting and picked rows retain their existing state and action boundaries when
@@ -3446,12 +3455,15 @@ toolbar would be the wrong control**:
   `MeetingDetailView`'s `toolbarContent` uses `ToolbarSpacer(.fixed,
   placement: .topBarTrailing)` the same way to separate the favorite toggle from
   the overflow menu.
-- Three places deliberately stay custom content: `RecorderView`'s transport
+- Four places deliberately stay custom content: `RecorderView`'s transport
   controls (full-width, thumb-sized targets mid-recording — they take
   `.buttonStyle(.glass)`/`.glassProminent` but are not toolbar items), the
   minimized recorder's mini bar (`RecordingMiniBar`, a `.glassEffect` capsule in
   a root `.safeAreaInset`, since it has to float over every screen's own
-  toolbar rather than belong to one), and
+  toolbar rather than belong to one),
+  the four-destination root bar plus a separate prominent recorder (a native
+  tab bar has no adjacent action slot; both use system glass in a single
+  safe-area inset, and the underlying tab stacks retain state), and
   `MeetingChatView`'s composer (an input surface: an inset glass card laid
   over the transcript with `.overlay(alignment: .bottom)` rather than a
   `.safeAreaBar`, so the conversation keeps scrolling beneath both the card
