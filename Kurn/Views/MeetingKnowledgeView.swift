@@ -10,6 +10,7 @@ struct MeetingKnowledgeView: View {
     @Environment(KnowledgeCompilationCoordinator.self) private var coordinator
     @Environment(WikiCoordinator.self) private var wiki
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var selectedEntityID: UUID?
 
     var body: some View {
         ScrollView {
@@ -32,6 +33,9 @@ struct MeetingKnowledgeView: View {
             .padding(20)
         }
         .accessibilityIdentifier("knowledge.content")
+        .sheet(isPresented: Binding(get: { selectedEntityID != nil }, set: { if !$0 { selectedEntityID = nil } })) {
+            if let selectedEntityID { KnowledgeBrowserView(meetingIDs: [meeting.id], initialEntityID: selectedEntityID) }
+        }
     }
 
     private var contributionsTitle: some View {
@@ -93,7 +97,7 @@ struct MeetingKnowledgeView: View {
                     description: Text(NSLocalizedString("detail.knowledge.empty_detail", comment: "Contributions appear after processing")))
             } else {
                 ForEach(read.contributions) { contribution in
-                    MeetingContributionView(contribution: contribution)
+                    MeetingContributionView(contribution: contribution) { selectedEntityID = contribution.id }
                 }
             }
         }
@@ -102,12 +106,15 @@ struct MeetingKnowledgeView: View {
 
 private struct MeetingContributionView: View {
     let contribution: MeetingKnowledgeRead.Contribution
+    let onOpenEntity: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(verbatim: contribution.name)
-                .font(Theme.headline)
-                .accessibilityAddTraits(.isHeader)
+            Button(action: onOpenEntity) {
+                Label { Text(verbatim: contribution.name) } icon: { Image(systemName: "book.pages") }
+                    .font(Theme.headline)
+            }
+            .accessibilityIdentifier("knowledge.openEntity")
             Text(String(format: NSLocalizedString("detail.knowledge.claim_count", comment: "Claim count"), contribution.entries.count))
                 .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
             ForEach(contribution.entries, id: \.fact.id) { entry in

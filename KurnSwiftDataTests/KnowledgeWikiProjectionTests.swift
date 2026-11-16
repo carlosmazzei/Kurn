@@ -84,6 +84,75 @@ struct KnowledgeWikiProjectionTests {
         return try #require(context.fetch(FetchDescriptor<KnowledgeJob>(predicate: #Predicate { $0.kindRaw == kind })).first)
     }
 
+    @Test func browserReadsAuthorizedMetadataAndTranscriptWithoutWritingOrAcknowledgingOutbox() async throws {
+        let f = try fixture(count: 2)
+        try await compile(f, meetingID: f.meetings[0].id)
+        try await compile(f, meetingID: f.meetings[1].id)
+        let token = try await snapshot(f)
+        let fact = try #require(token.wiki.facts.first { $0.source.meetingID == f.meetings[0].id })
+        let evidence = try #require(fact.source.evidence.first)
+        let selection = KnowledgeEvidenceSelection(assertionID: fact.id, evidenceID: evidence.id)
+        let count = try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeJob>())
+        let pending = try await f.store.pendingProjection()?.number
+        let auth = f.auth
+        let read = try await f.store.browserRead(meetingIDs: f.ids, selection: selection, authorization: { auth })
+        #expect(read.meetingTitles == Dictionary(uniqueKeysWithValues: f.meetings.map { ($0.id, $0.title) }))
+        #expect(read.selectedEvidence?.entry.fact == fact)
+        #expect(read.selectedEvidence?.evidence == evidence)
+        #expect(read.selectedEvidence?.fileName == f.meetings[0].recordings.first?.fileName)
+        #expect(read.selectedEvidence?.segments == f.meetings[0].recordings.first?.transcript?.segments)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeJob>()) == count)
+        #expect(try await f.store.pendingProjection()?.number == pending)
+    }
+
+    @Test func browserRejectsUnselectedEvidenceAndRevokedSourceSets() async throws {
+        let f = try fixture(count: 2)
+        try await compile(f)
+        let token = try await snapshot(f)
+        let fact = try #require(token.wiki.facts.first)
+        let selection = KnowledgeEvidenceSelection(assertionID: fact.id, evidenceID: try #require(fact.source.evidence.first?.id))
+        let auth = f.auth
+        let otherID = try #require(f.meetings.first { $0.id != fact.source.meetingID }?.id)
+        await #expect(throws: KnowledgeWikiStoreError.scopeDenied) {
+            try await f.store.browserRead(meetingIDs: [otherID], selection: selection, authorization: { auth })
+        }
+        let restricted = KnowledgeSourceAuthorization(featureEnabled: true, meetingIDs: [otherID],
+            policies: auth.policies, sourceClassifications: [.internal])
+        await #expect(throws: KnowledgeWikiStoreError.scopeDenied) {
+            try await f.store.browserRead(meetingIDs: f.ids, authorization: { restricted })
+        }
+        await #expect(throws: KnowledgeWikiStoreError.scopeDenied) {
+            try await f.store.browserRead(meetingIDs: f.ids,
+                selection: .init(assertionID: fact.id, evidenceID: UUID()), authorization: { auth })
+        }
+    }
+
+    @Test func browserRefetchDropsChangedEvidenceAndDeniesNewContextPolicy() async throws {
+        let f = try fixture()
+        try await compile(f)
+        let token = try await snapshot(f)
+        let fact = try #require(token.wiki.facts.first)
+        let selection = KnowledgeEvidenceSelection(assertionID: fact.id, evidenceID: try #require(fact.source.evidence.first?.id))
+        let transcript = try #require(f.meetings[0].recordings.first?.transcript)
+        var segments = transcript.segments
+        segments[0].text = "A different synthetic passage."
+        transcript.segments = segments
+        try f.context.save()
+        let auth = f.auth
+        let read = try await f.store.browserRead(meetingIDs: f.ids, authorization: { auth })
+        #expect(read.pages.isEmpty)
+        await #expect(throws: KnowledgeWikiStoreError.scopeDenied) {
+            try await f.store.browserRead(meetingIDs: f.ids, selection: selection, authorization: { auth })
+        }
+        let occasion = KnowledgeContext(kind: .unknown, name: "Example private context", policyID: UUID().uuidString)
+        f.context.insert(occasion)
+        f.context.insert(SourceContextLink(meetingID: f.meetings[0].id, contextID: occasion.id))
+        try f.context.save()
+        await #expect(throws: KnowledgeWikiStoreError.scopeDenied) {
+            try await f.store.browserRead(meetingIDs: f.ids, authorization: { auth })
+        }
+    }
+
     @Test func publishesEvidenceBackedPagesAtomicallyAndReadsAfterWriterRecreation() async throws {
         let f = try fixture()
         try await compile(f)

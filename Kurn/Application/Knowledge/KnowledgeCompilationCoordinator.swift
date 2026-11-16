@@ -84,9 +84,13 @@ final class KnowledgeCompilationCoordinator {
     }
 
     func meetingReadAuthorization(meetingID: UUID) -> KnowledgeSourceAuthorization {
+        browserReadAuthorization(meetingIDs: [meetingID])
+    }
+
+    func browserReadAuthorization(meetingIDs: Set<UUID>) -> KnowledgeSourceAuthorization {
         let auth = authorization()
         return KnowledgeSourceAuthorization(featureEnabled: auth.featureEnabled && settings.knowledgeEnabled,
-            meetingIDs: [meetingID], policies: auth.policies, sourceClassifications: auth.sourceClassifications)
+            meetingIDs: meetingIDs, policies: auth.policies, sourceClassifications: auth.sourceClassifications)
     }
 
     private func hostAuthorization(provider: AIProvider, model: String) throws -> KnowledgeExtractionAuthorization {
