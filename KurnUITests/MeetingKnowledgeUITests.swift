@@ -2,7 +2,7 @@ import XCTest
 
 @MainActor
 final class MeetingKnowledgeUITests: XCTestCase {
-    private func launch(largeType: Bool = false, prototype: Bool = false) -> XCUIApplication {
+    private func launch(largeType: Bool = false, prototype: Bool = false, longTranscript: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["UI-Testing-Screenshots", "UI-Testing-DisableAnimations", "UI-Testing-KnowledgeFixture",
             "-settings.knowledgeEnabled", "YES", "-settings.semanticSearchEnabled", "NO",
@@ -10,6 +10,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         if largeType { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }
         if prototype { app.launchArguments += ["UI-Testing-KnowledgeNavigationPrototype"] }
+        if longTranscript { app.launchArguments += ["UI-Testing-KnowledgeLongTranscript"] }
         app.launch()
         return app
     }
@@ -63,7 +64,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
 
     func testEntityEvidenceAndTranscriptFromMeeting() throws {
         continueAfterFailure = false
-        let app = launch()
+        let app = launch(longTranscript: true)
         openKnowledge(app)
         let entity = app.buttons["knowledge.openEntity"].firstMatch
         XCTAssertTrue(entity.waitForExistence(timeout: 10))
@@ -83,7 +84,8 @@ final class MeetingKnowledgeUITests: XCTestCase {
         capture(app, named: "knowledge-evidence-detail")
         app.buttons["knowledge.browser.openTranscript"].tap()
         XCTAssertTrue(app.staticTexts["knowledge.browser.citedSegment"].firstMatch.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["knowledge.browser.play"].exists)
+        XCTAssertTrue(app.staticTexts["knowledge.browser.citedSegment"].firstMatch.isHittable)
+        XCTAssertTrue(app.buttons["knowledge.browser.play"].isHittable)
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
         capture(app, named: "knowledge-source-transcript")
     }

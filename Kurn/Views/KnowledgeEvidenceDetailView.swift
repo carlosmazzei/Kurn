@@ -31,34 +31,38 @@ struct KnowledgeSourceTranscriptView: View {
     let onPlay: () -> Void
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    Text(verbatim: source.meetingTitle).font(Theme.headline).accessibilityAddTraits(.isHeader)
-                    Button(action: onPlay) {
-                        Label(KnowledgeBrowserCopy.text(isPlaying ? "stop" : "play"), systemImage: isPlaying ? "stop.fill" : "play.fill")
-                    }
-                    .disabled(isLoadingAudio)
-                    .accessibilityIdentifier("knowledge.browser.play")
-                    if isLoadingAudio { ProgressView() }
-                    ForEach(source.segments) { segment in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(verbatim: segment.speakerLabel + " · " + segment.startTime.clockDisplay).font(Theme.footnoteEmphasized)
-                            Text(verbatim: segment.text).font(Theme.body).textSelection(.enabled)
-                                .accessibilityIdentifier(isCited(segment) ? "knowledge.browser.citedSegment" : "knowledge.browser.segment")
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(isCited(segment) ? Theme.accent.opacity(0.12) : Theme.surface, in: RoundedRectangle(cornerRadius: 12))
-                        .id(segment.id)
-                    }
-                }
-                .padding(20)
+        VStack(alignment: .leading, spacing: 12) {
+            Text(verbatim: source.meetingTitle).font(Theme.headline).accessibilityAddTraits(.isHeader)
+            Button(action: onPlay) {
+                Label(KnowledgeBrowserCopy.text(isPlaying ? "stop" : "play"), systemImage: isPlaying ? "stop.fill" : "play.fill")
             }
-            .onAppear {
-                if let anchor = source.evidence.segmentIDs.first.flatMap(UUID.init(uuidString:)) { proxy.scrollTo(anchor, anchor: .center) }
+            .disabled(isLoadingAudio)
+            .accessibilityIdentifier("knowledge.browser.play")
+            if isLoadingAudio { ProgressView() }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        ForEach(source.segments) { segment in
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(verbatim: segment.speakerLabel + " · " + segment.startTime.clockDisplay).font(Theme.footnoteEmphasized)
+                                Text(verbatim: segment.text).font(Theme.body).textSelection(.enabled)
+                                    .accessibilityIdentifier(isCited(segment) ? "knowledge.browser.citedSegment" : "knowledge.browser.segment")
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .background(isCited(segment) ? Theme.accent.opacity(0.12) : Theme.surface, in: RoundedRectangle(cornerRadius: 12))
+                            .id(segment.id)
+                        }
+                    }
+                    .padding(.vertical, 12)
+                }
+                .task(id: source.transcriptFingerprint) {
+                    await Task.yield()
+                    if let anchor = source.evidence.segmentIDs.first.flatMap(UUID.init(uuidString:)) { proxy.scrollTo(anchor, anchor: .center) }
+                }
             }
         }
+        .padding(20)
     }
 
     private func isCited(_ segment: TranscriptSegment) -> Bool { source.evidence.segmentIDs.contains(segment.id.uuidString.lowercased()) }
