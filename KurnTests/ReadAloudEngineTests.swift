@@ -62,6 +62,24 @@ private func waitUntil(timeout: TimeInterval = 180, _ condition: () -> Bool) asy
     return true
 }
 
+/// Wait for the engine's observable event rather than racing a polling
+/// deadline against main-actor saturation in the full simulator suite.
+@MainActor
+private func failureAfterStarting(_ engine: CloudSpeechEngine, chunks: [String]) async -> AppError? {
+    let (failures, continuation) = AsyncStream<AppError>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    engine.onFailed = { error in
+        continuation.yield(error)
+        continuation.finish()
+    }
+    defer {
+        engine.onFailed = nil
+        continuation.finish()
+    }
+    engine.start(chunks, at: 0)
+    var iterator = failures.makeAsyncIterator()
+    return await iterator.next()
+}
+
 @MainActor
 @Suite(.serialized)
 struct CloudSpeechEngineTests {
@@ -72,14 +90,13 @@ struct CloudSpeechEngineTests {
     /// on the CI simulator that call touches the audio session, blocked for
     /// minutes, and took the test process down with it. Playback itself is
     /// left to the device matrix.
-    @Test func startingFetchesTheRequestedChunkFirst() async {
+    @Test(.timeLimit(.minutes(10))) func startingFetchesTheRequestedChunkFirst() async {
         let provider = ScriptedSpeechProvider(failure: Offline())
         let engine = CloudSpeechEngine(provider: provider, languageCode: "pt", rate: 1)
-        var failure: AppError?
-        engine.onFailed = { failure = $0 }
+        defer { engine.stop() }
         engine.pause()
-        engine.start(["primeiro", "segundo"], at: 0)
-        #expect(await waitUntil { failure != nil })
+        let failure = await failureAfterStarting(engine, chunks: ["primeiro", "segundo"])
+        #expect(failure != nil)
         #expect(provider.requests == ["primeiro"])
         engine.resume()
         engine.stop()
@@ -93,25 +110,23 @@ struct CloudSpeechEngineTests {
         #expect(finished)
     }
 
-    @Test func providerAppErrorsAreSurfacedAsIs() async {
+    @Test(.timeLimit(.minutes(10))) func providerAppErrorsAreSurfacedAsIs() async {
         let engine = CloudSpeechEngine(
             provider: ScriptedSpeechProvider(failure: AppError.noAPIKey(provider: "OpenAI")),
             languageCode: nil,
             rate: 1
         )
-        var failure: AppError?
-        engine.onFailed = { failure = $0 }
-        engine.start(["texto"], at: 0)
-        #expect(await waitUntil { failure != nil })
+        defer { engine.stop() }
+        let failure = await failureAfterStarting(engine, chunks: ["texto"])
+        #expect(failure != nil)
         #expect(failure?.logCode == AppError.noAPIKey(provider: "").logCode)
     }
 
-    @Test func otherFailuresBecomeSpeechSynthesisErrors() async {
+    @Test(.timeLimit(.minutes(10))) func otherFailuresBecomeSpeechSynthesisErrors() async {
         let engine = CloudSpeechEngine(provider: ScriptedSpeechProvider(failure: Offline()), languageCode: nil, rate: 1)
-        var failure: AppError?
-        engine.onFailed = { failure = $0 }
-        engine.start(["texto"], at: 0)
-        #expect(await waitUntil { failure != nil })
+        defer { engine.stop() }
+        let failure = await failureAfterStarting(engine, chunks: ["texto"])
+        #expect(failure != nil)
         #expect(failure?.logCode == AppError.speechSynthesisFailed("").logCode)
     }
 
