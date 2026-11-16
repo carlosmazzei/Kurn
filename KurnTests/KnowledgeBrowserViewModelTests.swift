@@ -9,12 +9,13 @@ struct KnowledgeBrowserViewModelTests {
         var isPlaying = false
         var loads = 0
         var plays = 0
+        var stops = 0
         var position: TimeInterval?
         var onLoad: (() -> Void)?
         func load(fileName: String, title: String?, subtitle: String?, enhanced: Bool) async throws { loads += 1; onLoad?() }
         func seek(to time: TimeInterval) { position = time }
         func play() { plays += 1; isPlaying = true }
-        func stop() { isPlaying = false }
+        func stop() { stops += 1; isPlaying = false }
     }
 
     private func fixture() throws -> KnowledgeBrowserRead {
@@ -161,5 +162,30 @@ struct KnowledgeBrowserViewModelTests {
         #expect(model.state == .idle && audio.plays == 0)
         await model.load(meetingIDs: read.meetingIDs, selection: selected, isEnabled: { true }, reader: { throw CancellationError() })
         #expect(model.state == .idle)
+    }
+
+    @Test func openingAndInvalidatingAReaderWithoutAudioNeverStopsAnotherConsumer() async throws {
+        let read = try fixture(), selected = try selection(read)
+        let backend = Audio()
+        backend.isPlaying = true // A stop on this backend would disrupt the shared session.
+        let audio = KnowledgeEvidenceAudioPlayer(backend: backend)
+        let model = KnowledgeBrowserViewModel(audio: audio)
+        await model.load(meetingIDs: read.meetingIDs, selection: selected, isEnabled: { true }, reader: { read })
+        model.invalidate()
+        model.stopAudio()
+        #expect(backend.stops == 0 && backend.isPlaying)
+        #expect(!audio.isPlaying)
+    }
+
+    @Test func stoppingDuringPendingSetupStillCleansUpTheCompletedSetupOnce() async throws {
+        let backend = Audio()
+        let audio = KnowledgeEvidenceAudioPlayer(backend: backend)
+        backend.onLoad = { audio.stop() }
+        defer { backend.onLoad = nil }
+        try await audio.load(fileName: "synthetic.m4a", title: nil, subtitle: nil, enhanced: false)
+        #expect(backend.stops == 1)
+        audio.stop()
+        audio.stop()
+        #expect(backend.stops == 2)
     }
 }
