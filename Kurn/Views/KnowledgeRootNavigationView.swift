@@ -20,7 +20,6 @@ struct KnowledgeRootNavigationView: View {
     var body: some View {
         GeometryReader { geometry in
             destinations
-                .toolbar(.hidden, for: .tabBar)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     if !keyboardVisible {
                         rootBar(showTitles: geometry.size.width >= 360 && !dynamicTypeSize.isAccessibilitySize)
@@ -41,11 +40,13 @@ struct KnowledgeRootNavigationView: View {
                 NavigationStack { MeetingsListView(selection: $selection, usesRootTabs: true) }
             }
             .hostsRecordingMiniBar()
+            .toolbar(.hidden, for: .tabBar)
             .tabItem { Label(AppRootDestination.meetings.title, systemImage: AppRootDestination.meetings.systemImage) }
             .tag(AppRootDestination.meetings)
 
             KnowledgeLibraryDestination(initialMeetingIDs: initialKnowledgeSourceIDs)
                 .hostsRecordingMiniBar()
+                .toolbar(.hidden, for: .tabBar)
                 .tabItem { Label(AppRootDestination.knowledge.title, systemImage: AppRootDestination.knowledge.systemImage) }
                 .tag(AppRootDestination.knowledge)
 
@@ -57,11 +58,13 @@ struct KnowledgeRootNavigationView: View {
                 }
             }
             .hostsRecordingMiniBar()
+            .toolbar(.hidden, for: .tabBar)
             .tabItem { Label(AppRootDestination.ask.title, systemImage: AppRootDestination.ask.systemImage) }
             .tag(AppRootDestination.ask)
 
             ZStack { NavigationStack { DocumentsListView() } }
                 .hostsRecordingMiniBar()
+                .toolbar(.hidden, for: .tabBar)
                 .tabItem { Label(AppRootDestination.documents.title, systemImage: AppRootDestination.documents.systemImage) }
                 .tag(AppRootDestination.documents)
         }
