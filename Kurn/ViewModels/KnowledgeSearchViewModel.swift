@@ -27,7 +27,7 @@ final class KnowledgeSearchViewModel {
     func search(query: String, meetingIDs: Set<UUID>, useSemantic: Bool,
                 isEnabled: @escaping @MainActor @Sendable () -> Bool, reader: @escaping Reader,
                 searcher: Searcher = { query, read, dense, authorize in
-                    try await KnowledgeSearchService().search(query: query, read: read, useSemantic: dense, authorizeEmbedding: authorize)
+                    try await KnowledgeSearchService().search(query: query, corpus: read.searchCorpus, useSemantic: dense, authorizeEmbedding: authorize)
                 }) async {
         invalidate()
         self.query = query
@@ -57,7 +57,7 @@ final class KnowledgeSearchViewModel {
             guard after == before else {
                 state = .unavailable; return
             }
-            let valid = try await KnowledgeSearchService.validates(hits, in: after)
+            let valid = try await KnowledgeSearchService.validates(hits, in: after.searchCorpus)
             guard requestID == request else { return }
             guard isEnabled(), !Task.isCancelled else { invalidate(); return }
             guard valid else { state = .unavailable; return }

@@ -38,7 +38,7 @@ struct KnowledgeSearchTests {
 
     @Test func lexicalWorksWithSemanticOffAndNeverLoadsAModel() async throws {
         let read = try fixture(allowsEmbedding: true), embedder = Embedder()
-        let hits = try await KnowledgeSearchService(embedder: embedder).search(query: "Orion", read: read, useSemantic: false)
+        let hits = try await KnowledgeSearchService(embedder: embedder).search(query: "Orion", corpus: read.searchCorpus, useSemantic: false)
         #expect(hits.contains { $0.kind == .alias })
         #expect(await embedder.count == 0)
     }
@@ -46,13 +46,13 @@ struct KnowledgeSearchTests {
     @Test func embeddingRequiresBothPolicyAndFreshAdmissionAuthorization() async throws {
         let denied = try fixture(), embedder = Embedder()
         let service = KnowledgeSearchService(embedder: embedder)
-        _ = try await service.search(query: "portal", read: denied, useSemantic: true,
+        _ = try await service.search(query: "portal", corpus: denied.searchCorpus, useSemantic: true,
             authorizeEmbedding: { Issue.record("Policy denied before admission"); return true })
         let allowed = try fixture(allowsEmbedding: true)
-        #expect(try await service.search(query: "revenue", read: allowed, useSemantic: true,
+        #expect(try await service.search(query: "revenue", corpus: allowed.searchCorpus, useSemantic: true,
             authorizeEmbedding: { false }).isEmpty)
         #expect(await embedder.count == 0)
-        #expect(try await !service.search(query: "revenue", read: allowed, useSemantic: true,
+        #expect(try await !service.search(query: "revenue", corpus: allowed.searchCorpus, useSemantic: true,
             authorizeEmbedding: { true }).isEmpty)
         #expect(await embedder.count == 1)
     }
@@ -60,12 +60,12 @@ struct KnowledgeSearchTests {
     @Test func unavailableMalformedAndOverBudgetDenseInputsFallBackToTheWholeLexicalCorpus() async throws {
         let read = try fixture(allowsEmbedding: true)
         for embedder in [Embedder(fails: true), Embedder(malformed: true)] {
-            let hits = try await KnowledgeSearchService(embedder: embedder).search(query: "Orion", read: read, useSemantic: true,
+            let hits = try await KnowledgeSearchService(embedder: embedder).search(query: "Orion", corpus: read.searchCorpus, useSemantic: true,
                 authorizeEmbedding: { true })
             #expect(hits.contains { $0.kind == .alias })
         }
         let large = try fixture(allowsEmbedding: true, count: 50), embedder = Embedder()
-        let hits = try await KnowledgeSearchService(embedder: embedder).search(query: "portal", read: large, useSemantic: true,
+        let hits = try await KnowledgeSearchService(embedder: embedder).search(query: "portal", corpus: large.searchCorpus, useSemantic: true,
             authorizeEmbedding: { Issue.record("Oversized dense corpus"); return true })
         #expect(hits.count == 40)
         #expect(await embedder.count == 0)
@@ -74,9 +74,9 @@ struct KnowledgeSearchTests {
     @Test func invalidAndEmptyQueriesDoNotRunEmbedding() async throws {
         let read = try fixture(allowsEmbedding: true), embedder = Embedder()
         let service = KnowledgeSearchService(embedder: embedder)
-        #expect(try await service.search(query: "  ", read: read, useSemantic: true).isEmpty)
+        #expect(try await service.search(query: "  ", corpus: read.searchCorpus, useSemantic: true).isEmpty)
         await #expect(throws: KnowledgeSearchError.invalidQuery) {
-            try await service.search(query: String(repeating: "x", count: 257), read: read, useSemantic: true)
+            try await service.search(query: String(repeating: "x", count: 257), corpus: read.searchCorpus, useSemantic: true)
         }
         #expect(await embedder.count == 0)
     }
@@ -132,7 +132,7 @@ struct KnowledgeSearchTests {
         let read = try fixture(allowsEmbedding: true), embedder = Embedder(), gate = SearchGate()
         let service = KnowledgeSearchService(embedder: embedder)
         let task = Task {
-            try await service.search(query: "portal", read: read, useSemantic: true, authorizeEmbedding: {
+            try await service.search(query: "portal", corpus: read.searchCorpus, useSemantic: true, authorizeEmbedding: {
                 await gate.wait()
                 try Task.checkCancellation()
                 return true

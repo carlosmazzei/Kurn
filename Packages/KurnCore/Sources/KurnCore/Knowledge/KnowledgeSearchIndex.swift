@@ -6,6 +6,20 @@ public enum KnowledgeSearchError: String, Error, Sendable {
     case indexLimit = "knowledge_search_index_limit"
 }
 
+/// Pure value input shared with the retrieval layer. The embedding flag is a
+/// hint, never a capability: the host must still authorize at model admission.
+public struct KnowledgeSearchCorpus: Sendable {
+    public let pages: [KnowledgeWikiPage]
+    public let meetingIDs: Set<UUID>
+    public let allowsEmbedding: Bool
+
+    public init(pages: [KnowledgeWikiPage], meetingIDs: Set<UUID>, allowsEmbedding: Bool = false) {
+        self.pages = pages
+        self.meetingIDs = meetingIDs
+        self.allowsEmbedding = allowsEmbedding
+    }
+}
+
 /// Documents are derivatives, never evidence. Their IDs retain the source
 /// type rather than masquerading as transcript chunks with fabricated times.
 public struct KnowledgeSearchDocument: Codable, Equatable, Sendable, Identifiable {
@@ -47,22 +61,24 @@ public struct KnowledgeSearchIndex: Sendable {
         var assertions: [UUID: KnowledgeWikiPage.Entry] = [:]
         var byteCount = 0
         func append(kind: KnowledgeSearchDocument.Kind, id: UUID, page: KnowledgeWikiPage,
-                    entries: [KnowledgeWikiPage.Entry], text: String, display: String) throws {
+                    entries: [KnowledgeWikiPage.Entry], text: String, display: String,
+                    evidence: KnowledgeWikiSnapshot.Evidence? = nil) throws {
             let sources = Set(entries.map { $0.fact.source.meetingID })
             guard !sources.isEmpty, sources.isSubset(of: meetingIDs) else { throw KnowledgeSearchError.invalidScope }
             byteCount += text.utf8.count + display.utf8.count + page.entity.name.utf8.count
             guard result.count < Self.documentLimit, byteCount <= Self.byteLimit else { throw KnowledgeSearchError.indexLimit }
             let assertion = kind == .assertion ? entries.first : nil
             let entity = assertion?.subject ?? page.entity
-            result.append(KnowledgeSearchDocument(id: kind.rawValue + ":" + id.uuidString.lowercased(), kind: kind,
-                entityID: entity.id, assertionID: assertion?.fact.id, evidenceID: assertion?.fact.source.evidence.first?.id,
+            result.append(KnowledgeSearchDocument(id: kind.rawValue + ":" + id.uuidString.lowercased()
+                    + (evidence.map { ":" + $0.id.uuidString.lowercased() } ?? ""), kind: kind,
+                entityID: entity.id, assertionID: assertion?.fact.id, evidenceID: evidence?.id,
                 revision: page.revision, meetingIDs: sources, title: entity.name, text: text, displayText: display))
         }
         for page in pages.sorted(by: { $0.entity.id.uuidString < $1.entity.id.uuidString }) {
             try Task.checkCancellation()
             let entries = page.sections.flatMap(\.entries)
             guard !entries.isEmpty else { throw KnowledgeSearchError.invalidScope }
-            let body = entries.map(Self.text).joined(separator: "\n")
+            let body = entries.map { Self.text($0) }.joined(separator: "\n")
             let quotes = entries.flatMap { $0.fact.source.evidence.map(\.quote) }.joined(separator: "\n")
             try append(kind: .page, id: page.entity.id, page: page, entries: entries,
                 text: ([page.entity.name] + page.entity.aliases + [body]).joined(separator: "\n"), display: quotes)
@@ -78,8 +94,10 @@ public struct KnowledgeSearchIndex: Sendable {
                 }
                 guard assertions.count < KnowledgeWikiProjector.factLimit else { throw KnowledgeSearchError.indexLimit }
                 assertions[entry.fact.id] = entry
-                try append(kind: .assertion, id: entry.fact.id, page: page, entries: [entry], text: Self.text(entry),
-                    display: entry.fact.source.evidence.map(\.quote).joined(separator: "\n"))
+                for evidence in entry.fact.source.evidence {
+                    try append(kind: .assertion, id: entry.fact.id, page: page, entries: [entry],
+                        text: Self.text(entry, evidence: [evidence]), display: evidence.quote, evidence: evidence)
+                }
             }
         }
         documents = result.sorted { $0.id < $1.id }
@@ -104,7 +122,7 @@ public struct KnowledgeSearchIndex: Sendable {
         return ranked.prefix(min(limit, 100)).map { documents[$0.index] }
     }
 
-    private static func text(_ entry: KnowledgeWikiPage.Entry) -> String {
+    private static func text(_ entry: KnowledgeWikiPage.Entry, evidence: [KnowledgeWikiSnapshot.Evidence]? = nil) -> String {
         let fact = entry.fact
         let value: String
         switch fact.value {
@@ -117,6 +135,6 @@ public struct KnowledgeSearchIndex: Sendable {
         return [entry.subject.name, fact.predicate.rawValue, entry.object?.name ?? value,
             fact.qualifiers.polarity.rawValue, fact.qualifiers.modality.rawValue, fact.qualifiers.claimKind.rawValue,
             fact.qualifiers.validFrom?.text ?? "", fact.qualifiers.validTo?.text ?? "",
-            fact.source.evidence.map(\.quote).joined(separator: "\n")].joined(separator: "\n")
+            (evidence ?? fact.source.evidence).map(\.quote).joined(separator: "\n")].joined(separator: "\n")
     }
 }

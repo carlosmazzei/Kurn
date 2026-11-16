@@ -85,6 +85,30 @@ struct KnowledgeSearchIndexTests {
         #expect(result.snippet(query: "img").count == 241)
     }
 
+    @Test func aMatchInTheSecondCitationKeepsThatCitationAndItsRecordingPosition() throws {
+        let page = try #require(pages().first)
+        let entry = try #require(page.sections.first?.entries.first)
+        let first = try #require(entry.fact.source.evidence.first)
+        let second = KnowledgeWikiSnapshot.Evidence(id: UUID(), recordingID: first.recordingID, segmentIDs: ["s2"],
+            quote: "Only budgetOnly appears in this second passage.", startMs: 60_000, endMs: 61_000,
+            attributedSpeaker: first.attributedSpeaker)
+        let fact = KnowledgeWikiSnapshot.Fact(id: entry.fact.id, subjectID: entity, predicate: entry.fact.predicate,
+            value: entry.fact.value, qualifiers: entry.fact.qualifiers,
+            source: .init(meetingID: meeting, recordedAt: entry.fact.source.recordedAt, evidence: [first, second]))
+        let projected = try KnowledgeWikiProjector.project(.init(revision: 1, entities: [page.entity], facts: [fact]))
+        let index = try KnowledgeSearchIndex(pages: projected, meetingIDs: [meeting])
+        let assertions = index.documents.filter { $0.kind == .assertion }
+        #expect(assertions.count == 2)
+        #expect(Set(assertions.map(\.id)).count == 2)
+        let matches = try index.search(query: "budgetOnly").filter { $0.kind == .assertion }
+        let hit = try #require(matches.first)
+        #expect(matches.count == 1)
+        #expect(hit.assertionID == fact.id && hit.evidenceID == second.id)
+        #expect(hit.displayText == second.quote)
+        #expect(hit.snippet(query: "budgetOnly") == second.quote)
+        #expect(!hit.text.contains(first.quote))
+    }
+
     @Test func sharedRankerIsDeterministicAndDoesNotCountDuplicateDenseRanksTwice() {
         #expect(HybridSearchRanking.bm25Order(query: "same", texts: ["same", "same"]) == [0, 1])
         let ranked = HybridSearchRanking.reciprocalRankFusion([[0, 0], [1]])
