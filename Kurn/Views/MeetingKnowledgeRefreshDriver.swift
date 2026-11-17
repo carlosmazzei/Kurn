@@ -27,6 +27,7 @@ struct MeetingKnowledgeRefreshDriver: View {
                 refresh()
             }
             .onChange(of: phase) { _, phase in if phase == .active { refresh() } }
+            .onChange(of: settings.knowledgeControls) { _, _ in refresh() }
             .onDisappear { model.invalidate() }
     }
 

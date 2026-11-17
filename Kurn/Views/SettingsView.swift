@@ -68,6 +68,9 @@ struct SettingsView: View {
                 ) {
                     WikiSettingsView()
                 }
+                link(KnowledgeSettingsCopy.text("title"), systemImage: "book.pages", identifier: "settings.link.knowledge") {
+                    KnowledgeSettingsView()
+                }
                 link(
                     NSLocalizedString("settings.read_aloud.title", comment: "Read Aloud"),
                     systemImage: "speaker.wave.2",

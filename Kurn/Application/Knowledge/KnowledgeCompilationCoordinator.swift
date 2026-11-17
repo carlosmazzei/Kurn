@@ -9,7 +9,7 @@ import Observation
 final class KnowledgeCompilationCoordinator {
     typealias Authorization = @MainActor @Sendable () -> KnowledgeExtractionAuthorization
     let jobQueue: KnowledgeJobQueue
-    private let settings: AppSettings
+    let settings: AppSettings
     @ObservationIgnored private let authorization: Authorization
     @ObservationIgnored private let resolveProvider: ProviderFactory.LLMResolver
     @ObservationIgnored private let isProviderUsable: ProviderFactory.UsabilityCheck
@@ -30,30 +30,39 @@ final class KnowledgeCompilationCoordinator {
         }
         self.resolveProvider = resolveProvider
         self.isProviderUsable = isProviderUsable
-        queue.register(kind: .extraction) { [weak self] handle in
+        queue.register(kind: .extraction, eligibility: { [weak self] work in self?.allowsQueuedCompilation(work) == true }) { [weak self] handle in
             guard let self else { throw CancellationError() }
             try await self.perform(handle)
         }
+        observeControls()
     }
 
     /// A rebuild's generation is an explicit operation identity retained by its
     /// caller across retries. Regular triggers never mint a new generation.
     @discardableResult
     func compile(meetingID: UUID, scope: String = "workspace", trigger: ProviderAutomationTrigger = .automatic,
-                 rebuildGeneration: UUID? = nil) async -> KnowledgeJobQueue.Outcome {
+                 rebuildGeneration: UUID? = nil, expectedSource: KnowledgeCompilationExpectation? = nil) async -> KnowledgeJobQueue.Outcome {
         lastFailureCode = nil
         do {
             try Task.checkCancellation()
+            guard settings.knowledgeEnabled else { throw KnowledgeJobDeferred(reason: .featureDisabled) }
+            guard let controls = settings.knowledgeControls, controls.allows(meetingID) else { throw KnowledgeJobDeferred(reason: .policyDenied) }
+            guard !controls.isPaused else { throw KnowledgeJobDeferred(reason: .paused) }
+            guard trigger == .explicit || controls.automaticCompilation else { throw KnowledgeJobDeferred(reason: .automaticDisabled) }
             guard rebuildGeneration == nil || trigger == .explicit else { throw KnowledgeStoreError.invalidJob }
-            let provider = settings.aiProvider
+            guard let provider = settings.knowledgeProvider else { throw KnowledgeJobDeferred(reason: .providerUnavailable) }
             let model = settings.summaryModel(for: provider)
             _ = try hostAuthorization(provider: provider, model: model)
             let authorize: @Sendable () async -> KnowledgeExtractionAuthorization = { [weak self] in
                 guard let self else { return KnowledgeExtractionAuthorization(featureEnabled: false, policies: [], sourceClassifications: []) }
-                return await self.submissionAuthorization(provider: provider, model: model)
+                return await self.submissionAuthorization(meetingID: meetingID, provider: provider, model: model)
             }
             let store = await jobQueue.writer()
             let snapshot = try await store.snapshot(meetingID: meetingID, scope: scope, provider: provider, authorization: authorize)
+            if let expectedSource {
+                guard snapshot.transcriptFingerprint == expectedSource.fingerprint,
+                      snapshot.policyRevisionKey == expectedSource.policyRevisionKey else { throw KnowledgeSettingsError.stalePreview }
+            }
             guard snapshot.recordings.contains(where: { !$0.segments.isEmpty }) else { return .deferred }
             let work = try KnowledgeQueuedWork.extraction(snapshot: snapshot, provider: provider, model: model,
                 rebuildGeneration: rebuildGeneration?.uuidString.lowercased())
@@ -78,8 +87,11 @@ final class KnowledgeCompilationCoordinator {
         }
     }
 
-    private func submissionAuthorization(provider: AIProvider, model: String) -> KnowledgeExtractionAuthorization {
-        (try? hostAuthorization(provider: provider, model: model))
+    private func submissionAuthorization(meetingID: UUID, provider: AIProvider, model: String) -> KnowledgeExtractionAuthorization {
+        guard settings.knowledgeControls?.allows(meetingID) == true else {
+            return KnowledgeExtractionAuthorization(featureEnabled: false, policies: [], sourceClassifications: [])
+        }
+        return (try? hostAuthorization(provider: provider, model: model))
             ?? KnowledgeExtractionAuthorization(featureEnabled: false, policies: [], sourceClassifications: [])
     }
 
@@ -89,13 +101,16 @@ final class KnowledgeCompilationCoordinator {
 
     func browserReadAuthorization(meetingIDs: Set<UUID>) -> KnowledgeSourceAuthorization {
         let auth = authorization()
-        return KnowledgeSourceAuthorization(featureEnabled: auth.featureEnabled && settings.knowledgeEnabled,
-            meetingIDs: meetingIDs, policies: auth.policies, sourceClassifications: auth.sourceClassifications)
+        let controls = settings.knowledgeControls
+        return KnowledgeSourceAuthorization(featureEnabled: auth.featureEnabled && settings.knowledgeEnabled && controls != nil,
+            meetingIDs: Set(meetingIDs.filter { controls?.allows($0) == true }), policies: auth.policies, sourceClassifications: auth.sourceClassifications)
     }
 
     private func hostAuthorization(provider: AIProvider, model: String) throws -> KnowledgeExtractionAuthorization {
         guard settings.knowledgeEnabled else { throw KnowledgeJobDeferred(reason: .featureDisabled) }
-        guard settings.aiProvider == provider, settings.summaryModel(for: provider) == model else { throw KnowledgeWorkObsolete.providerChanged }
+        guard let controls = settings.knowledgeControls else { throw KnowledgeJobDeferred(reason: .policyDenied) }
+        guard !controls.isPaused else { throw KnowledgeJobDeferred(reason: .paused) }
+        guard settings.knowledgeProvider == provider, settings.summaryModel(for: provider) == model else { throw KnowledgeWorkObsolete.providerChanged }
         // This is a release gate, independent of even an injected permissive
         // policy or wiki consent. No canonical transcript egress ships in K1.6.
         guard provider.kind == .appleOnDevice else { throw KnowledgeJobDeferred(reason: .cloudReviewRequired) }
@@ -108,11 +123,16 @@ final class KnowledgeCompilationCoordinator {
     private func currentSource(_ handle: KnowledgeJobHandle) async throws -> KnowledgeStoreSnapshot {
         try Task.checkCancellation()
         guard jobQueue.mayPublish(handle), let intent = handle.work.compilation else { throw CancellationError() }
-        let auth = try hostAuthorization(provider: handle.work.provider, model: handle.work.model)
+        guard settings.knowledgeControls?.allows(handle.work.meetingID) == true else { throw KnowledgeJobDeferred(reason: .policyDenied) }
+        _ = try hostAuthorization(provider: handle.work.provider, model: handle.work.model)
         guard handle.work.pipelineVersion == KnowledgeCompilationWork.extractorVersion else { throw KnowledgeWorkObsolete.pipelineChanged }
         let store = await jobQueue.writer()
         let current = try await store.snapshot(meetingID: handle.work.meetingID, scope: intent.scope,
-            provider: handle.work.provider, authorization: { auth })
+            provider: handle.work.provider, authorization: { [weak self] in
+                guard let self else { return KnowledgeExtractionAuthorization(featureEnabled: false, policies: [], sourceClassifications: []) }
+                return await self.submissionAuthorization(meetingID: handle.work.meetingID, provider: handle.work.provider, model: handle.work.model)
+            })
+        guard settings.knowledgeControls?.allows(handle.work.meetingID) == true else { throw KnowledgeJobDeferred(reason: .policyDenied) }
         guard current.transcriptFingerprint == handle.work.sourceFingerprint else { throw KnowledgeWorkObsolete.sourceChanged }
         guard current.policyRevisionKey == intent.policyRevisionKey else { throw KnowledgeWorkObsolete.policyChanged }
         let latest = try hostAuthorization(provider: handle.work.provider, model: handle.work.model)
@@ -202,6 +222,26 @@ final class KnowledgeCompilationCoordinator {
             throw KnowledgeJobDeferred(reason: .policyDenied)
         } catch KnowledgeStoreError.sourceNotReady {
             throw KnowledgeJobDeferred(reason: .recording)
+        }
+    }
+
+    private func allowsQueuedCompilation(_ work: KnowledgeQueuedWork) -> Bool {
+        guard settings.knowledgeEnabled, let controls = settings.knowledgeControls, !controls.isPaused,
+              controls.allows(work.meetingID), let provider = settings.knowledgeProvider,
+              provider.kind == .appleOnDevice, provider == work.provider else { return false }
+        return true
+    }
+
+    private func observeControls() {
+        withObservationTracking {
+            _ = settings.knowledgeEnabled
+            _ = settings.knowledgeControls
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.jobQueue.refresh(kind: .extraction)
+                self.observeControls()
+            }
         }
     }
 }

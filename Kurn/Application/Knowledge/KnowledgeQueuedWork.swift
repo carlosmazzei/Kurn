@@ -95,6 +95,8 @@ struct KnowledgeJobDeferred: Error {
         case providerBlocked = "provider_blocked"
         case policyDenied = "policy_denied"
         case cloudReviewRequired = "cloud_review_required"
+        case paused = "knowledge_paused"
+        case automaticDisabled = "knowledge_automatic_disabled"
         case background, recording
     }
     let reason: Reason

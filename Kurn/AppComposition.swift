@@ -33,6 +33,7 @@ struct AppEnvironment {
     let wiki: WikiCoordinator
     let knowledgeJobs: KnowledgeJobQueue
     let knowledge: KnowledgeCompilationCoordinator
+    let knowledgeSettings: KnowledgeSettingsCoordinator
     /// The live recording session, app-wide so the recorder can be minimized
     /// while the rest of the app stays usable.
     let recordingSession: RecordingSessionController
@@ -85,6 +86,7 @@ final class AppComposition {
         let jobs = KnowledgeJobQueue(container: container, foreground: false)
         let wiki = WikiCoordinator(modelContext: context, appSettings: settings, jobQueue: jobs)
         let knowledge = KnowledgeCompilationCoordinator(queue: jobs, settings: settings)
+        let knowledgeSettings = KnowledgeSettingsCoordinator(compilation: knowledge)
         let reviewPrompt = ReviewPromptCoordinator()
         let transcription = TranscriptionCoordinator(
             modelContext: context,
@@ -103,6 +105,7 @@ final class AppComposition {
             wiki: wiki,
             knowledgeJobs: jobs,
             knowledge: knowledge,
+            knowledgeSettings: knowledgeSettings,
             recordingSession: RecordingSessionController(modelContext: context, settings: settings, onActivityChanged: { jobs.setRecording($0) }),
             reviewPrompt: reviewPrompt,
             chatConversations: ChatConversationHost()
