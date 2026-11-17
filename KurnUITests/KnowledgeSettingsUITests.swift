@@ -22,8 +22,8 @@ final class KnowledgeSettingsUITests: XCTestCase {
         let pause = app.switches["knowledge.settings.paused"]
         XCTAssertTrue(pause.waitForExistence(timeout: 10))
         capture(app, named: "knowledge-settings-controls")
-        pause.tap(); XCTAssertEqual(pause.value as? String, "1")
-        pause.tap(); XCTAssertEqual(pause.value as? String, "0")
+        XCTAssertTrue(flip(pause, to: "1"))
+        XCTAssertTrue(flip(pause, to: "0"))
         let choose = app.buttons["knowledge.settings.choose"]
         for _ in 0..<4 where !choose.isHittable { app.swipeUp() }
         choose.tap()
@@ -52,7 +52,8 @@ final class KnowledgeSettingsUITests: XCTestCase {
         let scope = app.buttons["knowledge.settings.scope"]
         XCTAssertTrue(scope.waitForExistence(timeout: 10)); scope.tap()
         let all = app.switches["knowledge.settings.all"]
-        XCTAssertTrue(all.waitForExistence(timeout: 10)); all.tap()
+        XCTAssertTrue(all.waitForExistence(timeout: 10))
+        XCTAssertTrue(flip(all, to: "0"))
         capture(app, named: "knowledge-settings-explicit-empty-scope")
         app.buttons["knowledge.settings.scopeDone"].tap()
         let choose = app.buttons["knowledge.settings.choose"]
@@ -60,6 +61,18 @@ final class KnowledgeSettingsUITests: XCTestCase {
         choose.tap()
         XCTAssertTrue(app.buttons["knowledge.sources.done"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.buttons.matching(identifier: "knowledge.sourceMeeting").count, 0)
+    }
+
+    /// A Form toggle's element spans its whole row, and a tap at the row's centre lands
+    /// on the label, which does not flip it. Tap the switch's own control at the trailing
+    /// edge and wait for the value to settle instead of reading it immediately.
+    private func flip(_ toggle: XCUIElement, to value: String) -> Bool {
+        let control = toggle.switches.firstMatch
+        if control.exists { control.tap() } else {
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        }
+        let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", value), object: toggle)
+        return XCTWaiter().wait(for: [settled], timeout: 5) == .completed
     }
 
     private func capture(_ app: XCUIApplication, named name: String) {
