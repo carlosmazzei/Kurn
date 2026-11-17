@@ -130,7 +130,10 @@ struct KnowledgeWikiQueueTests {
         await gate.release()
         _ = await task.value
         let read = ModelContext(container)
-        #expect(try read.fetchCount(FetchDescriptor<KnowledgeJob>()) == 0)
+        // Only the deletion tombstone (K2.8) remains; the article job is not recreated.
+        let tombstone = KnowledgeJobKind.deletion.rawValue
+        #expect(try read.fetchCount(FetchDescriptor<KnowledgeJob>(predicate: #Predicate { $0.kindRaw != tombstone })) == 0)
+        #expect(try read.fetchCount(FetchDescriptor<KnowledgeJob>(predicate: #Predicate { $0.kindRaw == tombstone })) == 1)
         #expect(try read.fetchCount(FetchDescriptor<WikiArticle>()) == 0)
         #expect(try read.fetchCount(FetchDescriptor<Meeting>()) == 0)
     }
