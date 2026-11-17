@@ -50,7 +50,7 @@ struct KnowledgeLifecycleTests {
         let runbook = try #require(line.entities["e6"])
         let projection = KnowledgeLifecycle.action.project(entityID: runbook, knownAt: Self.later, claims: line.claims)
         #expect(projection.transitions.map(\.status) == [.completed, .reopened])
-        #expect(projection.transitions.map(\.orderBasis) == [.statedTime, .lifecycle])
+        #expect(projection.transitions.map(\.orderBasis) == [.lifecycle, .lifecycle])
         #expect(projection.anomalies.isEmpty)
         // November covers the 12th, but the reopening bounds the completion.
         #expect(projection.state(at: Self.date("2026-11-05")) == .init(status: .completed, certainty: .possible, transitionIndex: 0))
@@ -63,7 +63,7 @@ struct KnowledgeLifecycleTests {
                       status("committed", on: Self.day("2026-11-03"), of: item)]
         let projection = KnowledgeLifecycle.action.project(entityID: item, knownAt: Self.later, claims: claims)
         #expect(projection.transitions.map(\.status) == [.committed, .completed])
-        #expect(projection.transitions.map(\.orderBasis) == [.statedTime, .lifecycle])
+        #expect(projection.transitions.map(\.orderBasis) == [.lifecycle, .lifecycle])
         #expect(projection.anomalies.isEmpty)
         #expect(projection.state(at: Self.date("2026-12-02"))?.status == .completed)
     }
@@ -121,6 +121,40 @@ struct KnowledgeLifecycleTests {
         for _ in 0..<8 {
             #expect(KnowledgeLifecycle.action.project(entityID: item, knownAt: Self.later, claims: claims.shuffled()) == projection)
         }
+    }
+
+    @Test func aWholeGroupOfOverlappingChangesIsOrderedByTheMachine() throws {
+        let item = UUID()
+        let november = try Self.month("2026-11")
+        let claims = [status("completed", on: november, of: item), status("inProgress", on: november, of: item),
+                      status("committed", on: Self.day("2026-11-03"), of: item)]
+        let projection = KnowledgeLifecycle.action.project(entityID: item, knownAt: Self.later, claims: claims)
+        #expect(projection.transitions.map(\.status) == [.committed, .inProgress, .completed])
+        #expect(projection.anomalies.isEmpty)
+        #expect(projection.state(at: Self.date("2026-12-02")) == .init(status: .completed, certainty: .definite, transitionIndex: 2))
+    }
+
+    @Test func overlappingChangesNoOrderAllowsAreUnresolvedAndNeverDefinite() throws {
+        let decision = UUID()
+        let approved = status("approved", on: try Self.month("2026-10"), of: decision)
+        let rejected = status("rejected", on: Self.day("2026-10-15"), of: decision)
+        let projection = KnowledgeLifecycle.decision.project(entityID: decision, knownAt: Self.later, claims: [rejected, approved])
+        #expect(projection.transitions.map(\.orderBasis) == [.unresolved, .unresolved])
+        #expect(projection.anomalies.map(\.code) == [.invalidTransition, .unresolvedOrder])
+        #expect(projection.state(at: Self.date("2026-11-02"))?.certainty == .possible)
+    }
+
+    @Test func overlappingRestatementsOfOneStatusAreNotAnOrderQuestion() throws {
+        let decision = UUID()
+        let approved = status("approved", on: Self.day("2026-09-10"), of: decision)
+        let revisedInOctober = status("revised", on: try Self.month("2026-10"), of: decision)
+        let revisedOnTheTenth = status("revised", on: Self.day("2026-10-10"), of: decision)
+        let projection = KnowledgeLifecycle.decision.project(entityID: decision, knownAt: Self.later,
+                                                             claims: [revisedOnTheTenth, revisedInOctober, approved])
+        #expect(projection.transitions.map(\.status) == [.approved, .revised])
+        #expect(Set(projection.transitions[1].claimIDs) == [revisedInOctober.id, revisedOnTheTenth.id])
+        #expect(projection.transitions[1].stated == revisedInOctober.validFrom)
+        #expect(projection.anomalies.isEmpty)
     }
 
     @Test func everyLifecycleStartsAndTransitionsOnlyThroughItsOwnStatuses() {

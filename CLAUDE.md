@@ -3499,19 +3499,24 @@ a `supersedes` claim naming it as the replaced entity. Pure and Foundation-only;
 like the reducer it is not yet wired to the store or a reader.
 
 - **Transitions come from stated valid time**, ordered by their stated period.
-  When two neighbours' periods overlap, the machine decides if exactly one order
-  is a valid path (`orderBasis` `lifecycle`: a reopening on the 12th puts
-  "completed in November" first); if both are, the order is `ambiguous`.
+  A group of changes whose periods overlap (directly or through each other) is
+  ordered as a whole by the machine: every order that keeps disjoint periods in
+  date order and is a valid path from the status before the group is tried
+  (groups above `maximumSearchedGroup`, 6, are not searched). One valid order is
+  `lifecycle` (a reopening on the 12th puts "completed in November" first);
+  several are `ambiguous` and none is `unresolved`, both reported as anomalies
+  and never `definite`. The same status stated for overlapping periods is one
+  restatement before any ordering, so it never raises an order question.
 - **Nothing is dropped.** A forbidden transition is kept and reported
   (`invalid_transition`), as is a status outside the machine
-  (`out_of_vocabulary`) and an ambiguous order. Hypothetical, disputed or
+  (`out_of_vocabulary`) and an ambiguous or unresolved order. Hypothetical, disputed or
   proposed claims (except a proposal that something is `proposed`), negated
   claims and undated ones are listed in `setAside` with their reason. The same
   status restated later joins the transition it repeats, keeping its earliest
   date.
 - `state(at:)` returns the status in force at a valid time: `definite` only when
   its transition has definitely started, the next has definitely not, and
-  neither order is ambiguous. A transition ordered by the lifecycle is bounded
+  neither was ordered `ambiguous` or `unresolved`. A transition ordered by the lifecycle is bounded
   by its neighbours. `KnowledgeLifecycleTests` checks the provisioning decision
   (proposed → approved → revised → superseded) and the runbook action
   (completed in November, reopened on the 12th) from the golden fixtures.
