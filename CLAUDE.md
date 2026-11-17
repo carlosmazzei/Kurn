@@ -3485,6 +3485,37 @@ and evidence checks.
   status does not end an earlier status by itself. `KnowledgeTemporalReducerTests`
   checks it against the `pt-provisioning-timeline` fixture.
 
+### Lifecycle state machines (K3.2)
+
+KurnCore's `KnowledgeLifecycle` (`decision` for `decisionThread`, `action` for
+`actionItem`, `risk`) projects an entity's status history from the claims known
+at a transaction time (`project(entityID:knownAt:claims:)`); a status is never
+the latest mention. The machines follow `KnowledgeStatus`: a decision is
+proposed → approved/rejected/deferred → revised → superseded/revoked (a rejected
+or deferred one may be proposed again); an action is proposed → committed →
+inProgress → completed/cancelled, reopened explicitly; a risk is identified →
+mitigated/accepted/closed, reopened explicitly. A decision is also superseded by
+a `supersedes` claim naming it as the replaced entity. Pure and Foundation-only;
+like the reducer it is not yet wired to the store or a reader.
+
+- **Transitions come from stated valid time**, ordered by their stated period.
+  When two neighbours' periods overlap, the machine decides if exactly one order
+  is a valid path (`orderBasis` `lifecycle`: a reopening on the 12th puts
+  "completed in November" first); if both are, the order is `ambiguous`.
+- **Nothing is dropped.** A forbidden transition is kept and reported
+  (`invalid_transition`), as is a status outside the machine
+  (`out_of_vocabulary`) and an ambiguous order. Hypothetical, disputed or
+  proposed claims (except a proposal that something is `proposed`), negated
+  claims and undated ones are listed in `setAside` with their reason. The same
+  status restated later joins the transition it repeats, keeping its earliest
+  date.
+- `state(at:)` returns the status in force at a valid time: `definite` only when
+  its transition has definitely started, the next has definitely not, and
+  neither order is ambiguous. A transition ordered by the lifecycle is bounded
+  by its neighbours. `KnowledgeLifecycleTests` checks the provisioning decision
+  (proposed → approved → revised → superseded) and the runbook action
+  (completed in November, reopened on the 12th) from the golden fixtures.
+
 ### Attached documents (PDFs)
 
 A meeting can carry PDFs as reference material for its summaries

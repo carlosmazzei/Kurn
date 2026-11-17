@@ -5,54 +5,10 @@ import Testing
 /// K3.1: bitemporal state, exact on the synthetic `pt-provisioning-timeline`
 /// fixture (a proposal → decision → revision, a blocker imported weeks late).
 struct KnowledgeTemporalReducerTests {
-    private static func date(_ text: String) -> Date {
-        ISO8601DateFormatter().date(from: text.count == 10 ? text + "T12:00:00Z" : text)!
-    }
-
-    private static func day(_ text: String) -> KnowledgeTemporalValue { KnowledgeTemporalValue(text: text, precision: .day)! }
-
-    /// The fixture's expected assertions as claims: valid time as stated, and
-    /// transaction time from the meeting's import (`ingestedAt`).
-    private struct Timeline {
-        let claims: [KnowledgeTemporalClaim]
-        let entities: [String: UUID]
-        let assertions: [String: UUID]
-    }
-
-    private struct Fixture: Decodable {
-        struct Source: Decodable { let id: String; let ingestedAt: String }
-        struct Entity: Decodable { let ref: String }
-        struct Evidence: Decodable { let source: String }
-        struct Assertion: Decodable {
-            let ref: String, subject: String, predicate: KnowledgePredicate, object: String?
-            let value: KnowledgeTypedValue?, modality: KnowledgeModality, polarity: KnowledgePolarity
-            let validFrom: String, precision: KnowledgeTemporalPrecision, evidence: [Evidence]
-        }
-        struct Expected: Decodable { let entities: [Entity]; let assertions: [Assertion] }
-        let sources: [Source]
-        let expected: Expected
-    }
-
-    private static func timeline() throws -> Timeline {
-        let url = try #require(Bundle.module.url(forResource: "pt-provisioning-timeline", withExtension: "json",
-                                                 subdirectory: "Fixtures/knowledge"))
-        let fixture = try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: url))
-        let ingested = Dictionary(uniqueKeysWithValues: fixture.sources.map { ($0.id, date($0.ingestedAt)) })
-        let entities = Dictionary(uniqueKeysWithValues: fixture.expected.entities.map { ($0.ref, UUID()) })
-        var claims: [KnowledgeTemporalClaim] = [], ids: [String: UUID] = [:]
-        for row in fixture.expected.assertions {
-            let source = try #require(row.evidence.first?.source)
-            let subject = try #require(entities[row.subject])
-            let recordedAt = try #require(ingested[source])
-            let claim = KnowledgeTemporalClaim(
-                id: UUID(), subjectID: subject, predicate: row.predicate, objectID: row.object.flatMap { entities[$0] },
-                value: row.value, polarity: row.polarity, modality: row.modality,
-                validFrom: KnowledgeTemporalValue(text: row.validFrom, precision: row.precision), recordedAt: recordedAt)
-            ids[row.ref] = claim.id
-            claims.append(claim)
-        }
-        return Timeline(claims: claims, entities: entities, assertions: ids)
-    }
+    private typealias Timeline = KnowledgeFixtureTimeline
+    private static func date(_ text: String) -> Date { Timeline.date(text) }
+    private static func day(_ text: String) -> KnowledgeTemporalValue { Timeline.day(text) }
+    private static func timeline() throws -> Timeline { try Timeline.load("pt-provisioning-timeline") }
 
     private static func statuses(_ state: KnowledgeTemporalState) -> [String] {
         state.holdings.filter { $0.predicate == .hasStatus }.compactMap {
