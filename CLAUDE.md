@@ -3444,6 +3444,40 @@ per code per process; an unknown scope or pipeline is refused, never dropped.
 
 `LibraryEraser` still deletes every knowledge row, tombstones included.
 
+### Temporal reducer (K3.1)
+
+KurnCore's `KnowledgeTemporalReducer.state(of:validAt:knownAt:claims:)` answers
+"what held for this entity at valid time T, as known at transaction time K". It
+is pure, Foundation-only and not yet wired to the store or any reader; the host
+will supply `KnowledgeTemporalClaim`s that already passed source authorization
+and evidence checks.
+
+- **Two clocks, never mixed.** A claim is known when `recordedAt <= knownAt` and
+  `knownAt` is before `retractedAt` (half-open). Valid time is the stated
+  `validFrom`/`validTo` at its precision, read as a half-open UTC interval
+  (`KnowledgeTemporalValue.bounds`: an instant covers its second, a day 24 hours,
+  a month the whole month). A meeting imported late changes what is known only
+  from its import.
+- **Precision is certainty.** A moment inside a bound's stated period gets
+  `possible` ("in October" asked about Oct 15), past it `definite`. A claim with
+  no `validFrom` is always `possible` and never displaces or conflicts.
+- **No last meeting wins.** Single-valued predicates (`singleValued`: `hasStatus`,
+  `dueOn`, outgoing only) are reduced by stated start alone: a different
+  statement (value or polarity) whose start is wholly after a claim's start
+  displaces it — definitely once that start has definitely passed, to
+  `possible` while it may have. `recordedAt` and input order decide nothing.
+  Other predicates and incoming relations (e.g. being `blocks`'s object) are
+  kept per other entity/value, with negation displacing the same way.
+- **Conflicts are surfaced, not resolved.** Different statements whose stated
+  starts overlap both stay as holdings and add a `Conflict`
+  (`unordered_values`, or `contradictory_polarity` for a statement and its
+  negation). Same statements from several meetings fold into one holding with
+  every claim ID.
+- Output is sorted (predicate, direction, detail, polarity, claim IDs), so it is
+  identical for any input order. Known gap: an explicit `validTo` on a later
+  status does not end an earlier status by itself. `KnowledgeTemporalReducerTests`
+  checks it against the `pt-provisioning-timeline` fixture.
+
 ### Attached documents (PDFs)
 
 A meeting can carry PDFs as reference material for its summaries
