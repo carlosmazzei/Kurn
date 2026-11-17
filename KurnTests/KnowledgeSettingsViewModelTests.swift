@@ -73,4 +73,28 @@ struct KnowledgeSettingsViewModelTests {
         await model.perform(.pages, meetingIDs: [id], rebuild: false, settings: settings, operations: operations)
         #expect(model.error != nil && model.plan == nil && !model.isBusy)
     }
+
+    @Test func corpusDeletionNeedsAuthorizationAndReportsOnlyRealFailures() async {
+        struct Injected: Error {}
+        let model = KnowledgeSettingsViewModel()
+        var deletions = 0
+        await model.deleteCorpus(authorize: { false }, delete: { deletions += 1 })
+        #expect(deletions == 0 && !model.corpusDeleted && model.error == nil)
+        await model.deleteCorpus(authorize: { true }, delete: { deletions += 1 })
+        #expect(deletions == 1 && model.corpusDeleted && !model.isDeletingCorpus)
+        await model.deleteCorpus(authorize: { true }, delete: { throw CancellationError() })
+        #expect(!model.corpusDeleted && model.error == nil)
+        await model.deleteCorpus(authorize: { true }, delete: { throw Injected() })
+        #expect(!model.corpusDeleted && model.error != nil && !model.isDeletingCorpus)
+    }
+
+    @Test func aSecondCorpusDeletionWhileOneRunsIsIgnored() async {
+        let model = KnowledgeSettingsViewModel()
+        var deletions = 0
+        await model.deleteCorpus(authorize: { true }, delete: {
+            deletions += 1
+            await model.deleteCorpus(authorize: { true }, delete: { deletions += 1 })
+        })
+        #expect(deletions == 1 && model.corpusDeleted)
+    }
 }

@@ -1525,3 +1525,8 @@
 "knowledge.settings.scope_detail" = "范围适用于 Knowledge 读取和编译。排除的会议仍保留在会议资料库中。";
 "knowledge.settings.coverage_counts" = "已检查片段：%d / %d";
 "knowledge.settings.coverage_detail" = "覆盖率衡量已检查的转录片段，而非语义准确率或召回率。";
+"knowledge.settings.delete" = "删除 Knowledge";
+"knowledge.settings.delete_detail" = "从你的会议编译出的所有实体、陈述、引文、审阅项和已保存页面都将从此设备中删除。会议、转写文本、会议 Wiki 文章以及你的 Knowledge 设置会保留，之后你可以重新编译。";
+"knowledge.settings.delete_footer" = "仅删除已编译的 Knowledge。删除会议或录音时，也会删除 Knowledge 由其编译出的全部内容。";
+"knowledge.settings.deleted" = "Knowledge 已删除。";
+"knowledge.settings.delete_failed" = "无法完全删除 Knowledge。下次打开应用时将自动完成删除。";

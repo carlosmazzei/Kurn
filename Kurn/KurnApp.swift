@@ -221,6 +221,7 @@ struct KurnApp: App {
                 .environment(appEnvironment.wiki)
                 .environment(appEnvironment.knowledge)
                 .environment(appEnvironment.knowledgeSettings)
+                .environment(appEnvironment.knowledgeDeletion)
                 .environment(appEnvironment.recordingSession)
                 .environment(appEnvironment.reviewPrompt)
                 .environment(appEnvironment.chatConversations)
@@ -277,6 +278,7 @@ struct KurnApp: App {
         // from its last completed chunk.
         if phase == .active {
             environment.knowledgeJobs.setForeground(true)
+            environment.knowledgeDeletion.drain()
             // A chat reply the background wind-down stopped resumes once (NH05).
             Task { await environment.chatConversations.resumeAfterForeground() }
             // Reviewed model capacities and prices published between releases; daily at most,

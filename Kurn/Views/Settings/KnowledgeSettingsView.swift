@@ -4,6 +4,7 @@ import SwiftUI
 struct KnowledgeSettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(KnowledgeSettingsCoordinator.self) private var management: KnowledgeSettingsCoordinator?
+    @Environment(KnowledgeDeletionCoordinator.self) private var deletion: KnowledgeDeletionCoordinator?
     @State private var sourceIDs: Set<UUID> = []
     @State private var showingSources = false
     @State private var rebuild = false
@@ -15,6 +16,7 @@ struct KnowledgeSettingsView: View {
     }
     @State private var confirming = false
     @State private var resetting = false
+    @State private var deleting = false
 
     var body: some View {
         @Bindable var presentation = model
@@ -56,6 +58,29 @@ struct KnowledgeSettingsView: View {
             Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
             Button(KnowledgeSettingsCopy.text("reset")) { do { try settings.resetKnowledgeControls() } catch { model.reportError() } }
         } message: { Text(KnowledgeSettingsCopy.text("reset_detail")) }
+        .kurnDialog(
+            isPresented: $deleting,
+            iconSystemName: "exclamationmark.triangle.fill",
+            iconTint: Theme.accent,
+            title: KnowledgeSettingsCopy.text("delete"),
+            message: KnowledgeSettingsCopy.text("delete_detail"),
+            primaryTitle: KnowledgeSettingsCopy.text("delete"),
+            primaryRole: .destructive,
+            primaryAction: { Task { await deleteCorpus() } },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
+    }
+
+    /// Destroying derived content re-authenticates like "Delete all data".
+    private func deleteCorpus() async {
+        guard let deletion else { return }
+        await model.deleteCorpus(authorize: {
+            switch await SensitiveActionAuthorizer().authorize(requireAuth: settings.requireAuthForRecordings) {
+            case .authorized: return true
+            case .cancelled: return false
+            case .denied(let error): model.error = error; return false
+            }
+        }, delete: { try await deletion.deleteCorpus() })
     }
 
     private func form(_ controls: KnowledgeControls, management: KnowledgeSettingsCoordinator) -> some View {
@@ -108,6 +133,16 @@ struct KnowledgeSettingsView: View {
                 }
             }
             if let coverage = model.coverage { KnowledgeCoverageSection(report: coverage.report) }
+            Section {
+                Button(KnowledgeSettingsCopy.text("delete"), role: .destructive) { deleting = true }
+                    .disabled(deletion == nil || model.isDeletingCorpus || deletion?.isDeletingCorpus == true
+                        || management.progress?.isRunning == true)
+                    .accessibilityIdentifier("knowledge.settings.delete")
+                if model.isDeletingCorpus { ProgressView() }
+                if model.corpusDeleted {
+                    Text(KnowledgeSettingsCopy.text("deleted")).accessibilityIdentifier("knowledge.settings.deleted")
+                }
+            } footer: { Text(KnowledgeSettingsCopy.text("delete_footer")) }
             if let progress = management.progress, management.progressControls == controls, management.progressMeetingIDs == sourceIDs {
                 Section(KnowledgeSettingsCopy.text("progress")) {
                     Text(String(format: KnowledgeSettingsCopy.text("progress_counts"), progress.completed, progress.deferred, progress.failed))

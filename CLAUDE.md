@@ -2941,8 +2941,8 @@ hold for every phase; code comments cite this section.
   live authorization are rechecked before retrieval, prompts, every call/repair,
   each checkpoint and commit. A changed source/provider/policy discards the old
   intent; disabling the feature defers it. Deleting a meeting purges unfinished
-  extraction jobs, preventing late publication; the full historical canonical
-  deletion pipeline remains K2.8.
+  extraction jobs, preventing late publication; its canonical history is then
+  purged through a deletion tombstone ("Knowledge deletion (K2.8)" below).
   Canonical commit requires the running queue lease and saves that same job's
   succeeded state, graph, provenance and projection outbox atomically. Expired
   or erased leases cannot publish or recreate jobs. Generic queue completion
@@ -3024,7 +3024,7 @@ Where the checkout makes the specification bend:
 | `transcriptRevisionID`, evidence pointing at a transcript revision | `Transcript` has no revision identity and keeps no history; `TranscriptSegment.id` is a UUID that a re-transcription regenerates | K1 adds a revision fingerprint (SHA-256 over the canonical segment encoding, as `WikiCoordinator.contentHash` does today) and segment IDs as evidence anchors. With no retained history, evidence from a superseded revision is marked unavailable (spec §12.1 permits this) rather than pretending to be verifiable |
 | Single writer `ModelActor` for commits | Coordinators are `@MainActor` over the app's main `ModelContext`; services run off-main on value types | ADR: a `KnowledgeStore` `@ModelActor` on the same container for canonical commits and the projection outbox, with Sendable DTOs at its boundary; UI reads stay on the main context. Measure main-thread fetch cost before adding any second store |
 | New models alongside existing ones | `KurnSchemaV6` (1.5.0, the harness session storage) listed the live classes | Done in K1.2: `KurnSchemaV7` (1.6.0) freezes V6, adds the ten knowledge models additively through a lightweight stage, and `SchemaV6MigrationTests` writes every V6 entity |
-| Graph as SwiftData relations | `Meeting` cascades its derived artifacts; there is no shared-entity model yet | Entities, assertions and evidence relate by persisted UUIDs, never by `@Relationship` to `Meeting` (no blind cascade across shared entities, spec §13). Deletion is explicit through a `KnowledgeDeletionCoordinator` called by `MeetingLibrary.deleteMeetings`, recording deletion and `LibraryEraser` |
+| Graph as SwiftData relations | `Meeting` cascades its derived artifacts; there is no shared-entity model yet | Entities, assertions and evidence relate by persisted UUIDs, never by `@Relationship` to `Meeting` (no blind cascade across shared entities, spec §13). Deletion is explicit: `MeetingLibrary` commits a tombstone with each meeting or transcribed-recording deletion, `KnowledgeDeletionCoordinator` purges it, and `LibraryEraser` removes every knowledge row ("Knowledge deletion (K2.8)") |
 | Typed `AppRoute` and `kurn://entity/…` deep links | The app deliberately declares no URL scheme (any app could open one, see "Cross-device control") | Typed in-process routes only; Markdown links in generated pages resolve through a router that accepts `entity:`/`evidence:` IDs and nothing else, consistent with `MarkdownPresentation` disabling links. No registered URL scheme |
 | Embeddings and hybrid retrieval | `SemanticSearchService.hybridSearch` (on-device `NLContextualEmbedding` + BM25 + RRF) over `SemanticChunk` | Extend the same index with typed documents (page, assertion, event, alias) carrying `modelIdentifier`; no cloud embeddings, so no extra consent for indexing |
 | Export bundle (JSONL, Markdown, GraphML) | Meeting export via share sheet (`MeetingExport`, `DocumentExport`) | Knowledge export is disabled by default, has no generic share sheet in the corporate mode, and lands last (K6) after the egress audit |
@@ -3391,9 +3391,55 @@ Page rebuilding uses the existing fresh projection snapshot/publication boundary
 without an LLM. Coverage reports examined segments, not accuracy or semantic
 recall. Seven languages cover the controls, safe-reset notice, scope editor,
 preview, local-cost confirmation and progress. Synthetic UI captures use a
-separate in-memory store; no real sources or paid calls are involved. Deleting
-the Knowledge corpus waits for K2.8's crash-resumable purge rather than exposing
-a partial destructive button. No canonical schema migration is introduced.
+separate in-memory store; no real sources or paid calls are involved. "Delete
+Knowledge" goes through K2.8's resumable purge (below). No canonical schema
+migration is introduced.
+
+### Knowledge deletion (K2.8)
+
+Knowledge relates to meetings by UUID, so no cascade reaches it; deletion is a
+durable **tombstone** plus a purge. A tombstone is a `KnowledgeJob` of the
+existing `.deletion` kind (no schema change): `KnowledgeDeletionRows` keys it
+`knowledge.deletion.v1:<scope>:<id>` and stores its `KnowledgeDeletionScope` in
+`strategyRaw` (raw values never change). `MeetingLibrary` inserts it in the SAME
+journaled commit that deletes a meeting (`.meeting`) or a recording that had a
+transcript (`.source`), so a process death between the two cannot leave rows
+quoting a deleted transcript. "Delete Knowledge" in Settings → Knowledge saves a
+`.corpus` tombstone first, re-authenticates through `SensitiveActionAuthorizer`
+like "Delete all data", and cancels canonical extraction in the queue.
+
+`KnowledgeDeletionCoordinator` (built by `AppComposition`) drains tombstones at
+launch, on activation and after any store save (the save notification is only a
+signal), coalescing requests. `KnowledgeStore.purgeNextDeletion` handles the
+oldest tombstone in one transaction: the canonical rows, the cache removals, a
+revision bump and the tombstone's own deletion commit in one save, and a failed
+save (fault seam `beforeSave`) or a process death leaves all of it for the next
+drain. Failures record a content-free `knowledge_deletion` reliability event once
+per code per process; an unknown scope or pipeline is refused, never dropped.
+
+- **Meeting/source:** every assertion, event and evidence row of that meeting,
+  their relations and all its extraction jobs (provenance included). Entities
+  named by its provenance, assertions or events are removed unless another
+  source's assertion or event still names them. A survivor merged into a
+  removed identity has its redirect cleared; its own name, aliases and claims
+  are untouched. Reviews whose subjects include a removed entity, or whose
+  candidate/merge audit names the meeting, are removed. Page caches whose source
+  set includes it are removed, as is any cache that cannot be decoded (it cannot
+  prove it excludes the source). `.meeting` also removes the meeting's
+  `SourceContextLink`; `.source` keeps it, because the meeting remains and can be
+  recompiled from its other recordings (passes are per recording, but
+  provenance and entity origins are per compilation, so the whole meeting is
+  purged rather than a partial job rewritten).
+- **Corpus:** all entities, assertions, evidence, events, relations, reviews and
+  every non-article job; meetings, their episodic `WikiArticle` work, contexts
+  and links are kept.
+- **Revisions** are content-free and kept: a revision whose job or merge audit
+  was removed stops waiting for projection (it could never be acknowledged),
+  and a new revision (`policyRevisionKey` = `knowledge-deletion-v1`, not
+  pending) makes every page, search or review snapshot taken before the purge
+  stale. The search index is in-memory only, so the bump is its purge.
+
+`LibraryEraser` still deletes every knowledge row, tombstones included.
 
 ### Attached documents (PDFs)
 
