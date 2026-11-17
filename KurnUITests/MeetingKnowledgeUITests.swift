@@ -251,7 +251,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         capture(app, named: "knowledge-review-identity")
         merge.tap()
         XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5))
-        app.alerts.buttons["Merge identities"].tap()
+        app.alerts.buttons["knowledge.review.confirmMerge"].firstMatch.tap()
         let undo = app.buttons["knowledge.review.undo"].firstMatch
         XCTAssertTrue(undo.waitForExistence(timeout: 10))
         let list = app.descendants(matching: .any)["knowledge.review.inbox"].firstMatch
@@ -277,7 +277,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         dismissed.tap()
         app.buttons["knowledge.review.reopen"].tap()
         XCTAssertTrue(candidate.waitForExistence(timeout: 10))
-        let warning = app.buttons["knowledge.review.warning.conflict"]
+        let warning = app.buttons["Possible conflict"].firstMatch
         XCTAssertTrue(warning.waitForExistence(timeout: 5))
         for _ in 0..<5 where !warning.isHittable { list.swipeUp() }
         warning.tap()

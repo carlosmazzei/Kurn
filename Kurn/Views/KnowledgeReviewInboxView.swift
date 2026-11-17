@@ -106,7 +106,6 @@ struct KnowledgeReviewInboxView: View {
                             Text(KnowledgeReviewCopy.text("limited"))
                         }
                     } label: { Text(KnowledgeReviewCopy.text(warning.kind == .conflict ? "conflict" : "date")) }
-                    .accessibilityIdentifier("knowledge.review.warning." + warning.kind.rawValue)
                 }
                 if read.warnings.isEmpty { Text(KnowledgeReviewCopy.text("none")) }
             }
