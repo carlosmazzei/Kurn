@@ -77,6 +77,11 @@ public struct KnowledgeTemporalState: Codable, Equatable, Sendable {
         public let value: KnowledgeTypedValue?
         public let polarity: KnowledgePolarity
         public let certainty: KnowledgeTemporalCertainty
+        /// True when every supporting claim is tentative (proposed, hypothetical
+        /// or disputed): shown, but it never established the state.
+        public let isTentative: Bool
+        /// The supporting claims' modalities, distinct and sorted by raw value.
+        public let modalities: [KnowledgeModality]
         /// Every claim stating this same thing, sorted by ID.
         public let claimIDs: [UUID]
     }
@@ -105,6 +110,12 @@ public struct KnowledgeTemporalState: Codable, Equatable, Sendable {
 public enum KnowledgeTemporalReducer {
     /// Predicates that have one value at a time per subject.
     public static let singleValued: Set<KnowledgePredicate> = [.hasStatus, .dueOn]
+
+    /// Modalities that do not establish a state: a proposal, a hypothesis or a
+    /// disputed claim is shown, never displaces an established statement and
+    /// never conflicts with one. A later established statement still displaces
+    /// it, so an approval ends a proposal.
+    public static let tentative: Set<KnowledgeModality> = [.proposed, .hypothetical, .disputed]
 
     /// The state of `entityID` at valid time `validAt`, from the claims known
     /// at transaction time `knownAt`. Pure and deterministic: the result does
@@ -165,9 +176,14 @@ public enum KnowledgeTemporalReducer {
         let claim: KnowledgeTemporalClaim
         var certainty: KnowledgeTemporalCertainty
         let other: UUID?
-        /// What the claim states, polarity included: two claims with the same
-        /// statement support each other and never displace or conflict.
-        var statement: String { claim.polarity.rawValue + "|" + KnowledgeTemporalReducer.detail(other: other, value: claim.value) }
+        var isTentative: Bool { KnowledgeTemporalReducer.tentative.contains(claim.modality) }
+        /// What the claim states, polarity and tentativeness included: two claims
+        /// with the same statement support each other and never displace or
+        /// conflict, and a tentative claim never merges into an established one.
+        var statement: String {
+            (isTentative ? "tentative|" : "established|") + claim.polarity.rawValue + "|"
+                + KnowledgeTemporalReducer.detail(other: other, value: claim.value)
+        }
     }
 
     private struct Disagreement {
@@ -175,16 +191,17 @@ public enum KnowledgeTemporalReducer {
         let ids: [UUID]
     }
 
-    /// Within one slot, a candidate is displaced by a different statement whose
-    /// stated start is definitely later than its own: definitely once that later
-    /// start has definitely passed, possibly while it may have. Different
-    /// statements that valid time cannot order both stay and disagree.
+    /// Within one slot, a candidate is displaced by a different established
+    /// statement whose stated start is definitely later than its own: definitely
+    /// once that later start has definitely passed, possibly while it may have.
+    /// Different established statements that valid time cannot order both stay
+    /// and disagree, each pair under its own reason.
     private static func reduce(_ candidates: [Candidate], at moment: Date) -> (survivors: [Candidate], conflicts: [Disagreement]) {
         guard Set(candidates.map(\.statement)).count > 1 else { return (candidates, []) }
         var survivors: [Candidate] = []
         for candidate in candidates {
             var certainty: KnowledgeTemporalCertainty? = candidate.certainty
-            for other in candidates where other.statement != candidate.statement {
+            for other in candidates where other.statement != candidate.statement && !other.isTentative {
                 guard let mine = candidate.claim.validFrom?.bounds, let theirs = other.claim.validFrom?.bounds,
                       theirs.lower >= mine.upper else { continue }
                 if other.certainty == .definite { certainty = nil; break }
@@ -195,20 +212,23 @@ public enum KnowledgeTemporalReducer {
         // Undated claims are shown as possible and never decide a disagreement.
         // Only pairs whose stated starts overlap disagree; a pair that valid time
         // orders was already reduced above (its earlier side is at most possible).
-        let dated = survivors.filter { $0.claim.validFrom != nil }
-        var involved: [Candidate] = []
+        // Tentative claims never disagree with anything.
+        let dated = survivors.filter { $0.claim.validFrom != nil && !$0.isTentative }
+        var involved: [KnowledgeTemporalState.ConflictReason: Set<UUID>] = [:]
         for (index, one) in dated.enumerated() {
             for another in dated[(index + 1)...] where another.statement != one.statement {
                 guard let first = one.claim.validFrom?.bounds, let second = another.claim.validFrom?.bounds,
                       first.lower < second.upper, second.lower < first.upper else { continue }
-                involved += [one, another]
+                let sameDetail = detail(other: one.other, value: one.claim.value)
+                    == detail(other: another.other, value: another.claim.value)
+                involved[sameDetail ? .contradictoryPolarity : .unorderedValues, default: []]
+                    .formUnion([one.claim.id, another.claim.id])
             }
         }
-        guard !involved.isEmpty else { return (survivors, []) }
-        let details = Set(involved.map { detail(other: $0.other, value: $0.claim.value) })
-        let reason: KnowledgeTemporalState.ConflictReason = details.count == 1 ? .contradictoryPolarity : .unorderedValues
-        let ids = Set(involved.map(\.claim.id)).sorted { $0.uuidString < $1.uuidString }
-        return (survivors, [Disagreement(reason: reason, ids: ids)])
+        let conflicts = involved.map { reason, ids in
+            Disagreement(reason: reason, ids: ids.sorted { $0.uuidString < $1.uuidString })
+        }
+        return (survivors, conflicts)
     }
 
     private static func group(_ candidates: [Candidate], key: SlotKey) -> [KnowledgeTemporalState.Holding] {
@@ -218,13 +238,15 @@ public enum KnowledgeTemporalReducer {
                 predicate: key.predicate, direction: key.direction, otherEntityID: first.other,
                 value: first.claim.value, polarity: first.claim.polarity,
                 certainty: same.contains { $0.certainty == .definite } ? .definite : .possible,
+                isTentative: first.isTentative,
+                modalities: Set(same.map(\.claim.modality)).sorted { $0.rawValue < $1.rawValue },
                 claimIDs: same.map(\.claim.id).sorted { $0.uuidString < $1.uuidString })
         }
     }
 
     private static func order(_ holding: KnowledgeTemporalState.Holding) -> [String] {
         [holding.predicate.rawValue, holding.direction.rawValue, detail(other: holding.otherEntityID, value: holding.value),
-         holding.polarity.rawValue] + holding.claimIDs.map(\.uuidString)
+         holding.polarity.rawValue, holding.isTentative ? "tentative" : "established"] + holding.claimIDs.map(\.uuidString)
     }
 
     private static func order(_ conflict: KnowledgeTemporalState.Conflict) -> [String] {
