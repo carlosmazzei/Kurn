@@ -274,6 +274,7 @@ struct KnowledgeDeletionTests {
         let recordings = meeting.recordings.sorted { $0.id.uuidString < $1.id.uuidString }
         let (removed, remaining) = (recordings[0], recordings[1])
         let removedID = removed.id, remainingID = remaining.id
+        let removedText = try #require(removed.transcript?.segments.first?.text)
         #expect(try count(KnowledgeEvidence.self, f.container, where: #Predicate { $0.recordingID == removedID }) == 1)
 
         try MeetingLibrary(context: f.container.mainContext).deleteRecording(removed)
@@ -284,7 +285,7 @@ struct KnowledgeDeletionTests {
         #expect(await f.compiler.compile(meetingID: meetingID, trigger: .explicit) == .completed)
         let evidence = try ModelContext(f.container).fetch(FetchDescriptor<KnowledgeEvidence>(predicate: #Predicate { $0.meetingID == meetingID }))
         #expect(evidence.count == 1 && evidence.allSatisfy { $0.recordingID == remainingID })
-        #expect(evidence.allSatisfy { !$0.quote.contains("part 0") })
+        #expect(evidence.allSatisfy { $0.quote != removedText })
     }
 
     @Test func aPendingCorpusDeletionLeavesALaterMeetingTombstoneToRemoveItsContextLink() async throws {
