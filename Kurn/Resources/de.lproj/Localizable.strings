@@ -1525,3 +1525,8 @@
 "knowledge.settings.scope_detail" = "Der Umfang gilt für Knowledge-Lesezugriffe und Kompilierung. Ausgeschlossene Besprechungen bleiben in der Bibliothek.";
 "knowledge.settings.coverage_counts" = "Geprüfte Segmente: %d von %d";
 "knowledge.settings.coverage_detail" = "Die Abdeckung misst geprüfte Transkriptsegmente, nicht semantische Genauigkeit oder Trefferquote.";
+"knowledge.settings.delete" = "Knowledge löschen";
+"knowledge.settings.delete_detail" = "Alle aus deinen Meetings kompilierten Entitäten, Aussagen, Zitate, Prüfungen und gespeicherten Seiten werden von diesem Gerät entfernt. Meetings, Transkripte, Meeting-Wiki-Artikel und deine Knowledge-Einstellungen bleiben erhalten, und du kannst später erneut kompilieren.";
+"knowledge.settings.delete_footer" = "Entfernt nur das kompilierte Knowledge. Wenn du ein Meeting oder eine Aufnahme löschst, wird auch alles entfernt, was Knowledge daraus kompiliert hat.";
+"knowledge.settings.deleted" = "Knowledge wurde gelöscht.";
+"knowledge.settings.delete_failed" = "Knowledge konnte nicht vollständig gelöscht werden. Das Löschen wird beim nächsten Öffnen der App automatisch abgeschlossen.";

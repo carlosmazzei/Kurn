@@ -1525,3 +1525,8 @@
 "knowledge.settings.scope_detail" = "Le périmètre concerne les lectures et la compilation Knowledge. Les réunions exclues restent dans la bibliothèque.";
 "knowledge.settings.coverage_counts" = "Segments examinés : %d sur %d";
 "knowledge.settings.coverage_detail" = "La couverture mesure les segments de transcription examinés, pas la précision sémantique ni le rappel.";
+"knowledge.settings.delete" = "Supprimer Knowledge";
+"knowledge.settings.delete_detail" = "Toutes les entités, affirmations, citations, révisions et pages enregistrées compilées à partir de vos réunions seront supprimées de cet appareil. Les réunions, transcriptions, articles wiki des réunions et vos réglages Knowledge sont conservés, et vous pourrez recompiler plus tard.";
+"knowledge.settings.delete_footer" = "Supprime uniquement le Knowledge compilé. Supprimer une réunion ou un enregistrement supprime aussi tout ce que Knowledge en a compilé.";
+"knowledge.settings.deleted" = "Knowledge a été supprimé.";
+"knowledge.settings.delete_failed" = "Knowledge n’a pas pu être entièrement supprimé. La suppression se terminera automatiquement à la prochaine ouverture de l’app.";

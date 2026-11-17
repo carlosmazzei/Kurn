@@ -1525,3 +1525,8 @@
 "knowledge.settings.scope_detail" = "O escopo vale para leituras e compilação do Knowledge. As reuniões excluídas continuam na biblioteca de reuniões.";
 "knowledge.settings.coverage_counts" = "Segmentos examinados: %d de %d";
 "knowledge.settings.coverage_detail" = "A cobertura mede segmentos de transcrição examinados, não precisão semântica ou recall.";
+"knowledge.settings.delete" = "Excluir Knowledge";
+"knowledge.settings.delete_detail" = "Todas as entidades, afirmações, citações, revisões e páginas salvas compiladas das suas reuniões serão removidas deste dispositivo. Reuniões, transcrições, artigos wiki das reuniões e suas configurações de Knowledge são mantidos, e você pode compilar novamente depois.";
+"knowledge.settings.delete_footer" = "Remove apenas o Knowledge compilado. Excluir uma reunião ou uma gravação também remove tudo o que o Knowledge compilou a partir dela.";
+"knowledge.settings.deleted" = "O Knowledge foi excluído.";
+"knowledge.settings.delete_failed" = "Não foi possível excluir todo o Knowledge. A exclusão será concluída automaticamente na próxima vez que o app for aberto.";

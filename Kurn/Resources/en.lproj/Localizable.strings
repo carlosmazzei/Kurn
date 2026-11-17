@@ -1525,3 +1525,8 @@
 "knowledge.settings.scope_detail" = "Scope applies to Knowledge reads and compilation. Excluded meetings stay in your meeting library.";
 "knowledge.settings.coverage_counts" = "Examined segments: %d of %d";
 "knowledge.settings.coverage_detail" = "Coverage measures inspected transcript segments, not semantic accuracy or recall.";
+"knowledge.settings.delete" = "Delete Knowledge";
+"knowledge.settings.delete_detail" = "Every entity, claim, quote, review and saved page compiled from your meetings will be removed from this device. Meetings, transcripts, meeting wiki articles and your Knowledge settings are kept, and you can compile again later.";
+"knowledge.settings.delete_footer" = "Removes the compiled Knowledge only. Deleting a meeting or a recording also removes everything Knowledge compiled from it.";
+"knowledge.settings.deleted" = "Knowledge was deleted.";
+"knowledge.settings.delete_failed" = "Knowledge could not be fully deleted. It will finish automatically the next time the app opens.";

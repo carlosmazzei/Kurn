@@ -13,6 +13,8 @@ final class KnowledgeSettingsViewModel {
     private(set) var plan: KnowledgeBackfillPlan?
     private(set) var coverage: KnowledgeScopedMaintenanceReport?
     private(set) var isBusy = false
+    private(set) var isDeletingCorpus = false
+    private(set) var corpusDeleted = false
     var error: AppError?
     @ObservationIgnored private var requestID = UUID()
 
@@ -47,6 +49,25 @@ final class KnowledgeSettingsViewModel {
                 try await operations.pages(meetingIDs)
             }
         } catch { if current(request, controls: controls, settings: settings) { reportError() } }
+    }
+
+    /// "Delete Knowledge": the authorization and the durable, resumable purge are
+    /// the caller's. A repeated tap while one runs is ignored; a cancelled one
+    /// reports nothing, since its tombstone resumes it.
+    func deleteCorpus(authorize: @MainActor () async -> Bool, delete: @MainActor () async throws -> Void) async {
+        guard !isDeletingCorpus else { return }
+        isDeletingCorpus = true
+        defer { isDeletingCorpus = false }
+        guard await authorize() else { return }
+        invalidate()
+        corpusDeleted = false
+        do {
+            try await delete()
+            corpusDeleted = true
+        } catch is CancellationError {
+        } catch {
+            self.error = .persistenceFailed(NSLocalizedString("knowledge.settings.delete_failed", comment: "Knowledge deletion failed"))
+        }
     }
 
     func reportError() { error = .resourceUnavailable(NSLocalizedString("knowledge.settings.failed", comment: "Knowledge operation failed")) }

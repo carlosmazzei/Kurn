@@ -34,6 +34,8 @@ struct AppEnvironment {
     let knowledgeJobs: KnowledgeJobQueue
     let knowledge: KnowledgeCompilationCoordinator
     let knowledgeSettings: KnowledgeSettingsCoordinator
+    /// Purges what deleted meetings and recordings supported (K2.8).
+    let knowledgeDeletion: KnowledgeDeletionCoordinator
     /// The live recording session, app-wide so the recorder can be minimized
     /// while the rest of the app stays usable.
     let recordingSession: RecordingSessionController
@@ -73,6 +75,9 @@ final class AppComposition {
         environment?.knowledgeJobs.setForeground(false)
         let built = Self.makeEnvironment(container: container, settings: settings)
         Self.runLaunchSweeps(container: container, settings: settings)
+        // A tombstone left by a process that died before its purge resumes now.
+        built.knowledgeDeletion.observeStoreSaves()
+        built.knowledgeDeletion.drain()
         environment = built
         return built
     }
@@ -106,6 +111,7 @@ final class AppComposition {
             knowledgeJobs: jobs,
             knowledge: knowledge,
             knowledgeSettings: knowledgeSettings,
+            knowledgeDeletion: KnowledgeDeletionCoordinator(queue: jobs),
             recordingSession: RecordingSessionController(modelContext: context, settings: settings, onActivityChanged: { jobs.setRecording($0) }),
             reviewPrompt: reviewPrompt,
             chatConversations: ChatConversationHost()
