@@ -19,36 +19,36 @@ struct KnowledgeTemporalReducerTests {
         let assertions: [String: UUID]
     }
 
+    private struct Fixture: Decodable {
+        struct Source: Decodable { let id: String; let ingestedAt: String }
+        struct Entity: Decodable { let ref: String }
+        struct Evidence: Decodable { let source: String }
+        struct Assertion: Decodable {
+            let ref: String, subject: String, predicate: KnowledgePredicate, object: String?
+            let value: KnowledgeTypedValue?, modality: KnowledgeModality, polarity: KnowledgePolarity
+            let validFrom: String, precision: KnowledgeTemporalPrecision, evidence: [Evidence]
+        }
+        struct Expected: Decodable { let entities: [Entity]; let assertions: [Assertion] }
+        let sources: [Source]
+        let expected: Expected
+    }
+
     private static func timeline() throws -> Timeline {
         let url = try #require(Bundle.module.url(forResource: "pt-provisioning-timeline", withExtension: "json",
                                                  subdirectory: "Fixtures/knowledge"))
-        let root = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
-        let sources = try #require(root["sources"] as? [[String: Any]])
-        var ingested: [String: Date] = [:]
-        for source in sources {
-            ingested[try #require(source["id"] as? String)] = date(try #require(source["ingestedAt"] as? String))
-        }
-        let expected = try #require(root["expected"] as? [String: Any])
-        var entities: [String: UUID] = [:]
-        for entity in try #require(expected["entities"] as? [[String: Any]]) { entities[try #require(entity["ref"] as? String)] = UUID() }
+        let fixture = try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: url))
+        let ingested = Dictionary(uniqueKeysWithValues: fixture.sources.map { ($0.id, date($0.ingestedAt)) })
+        let entities = Dictionary(uniqueKeysWithValues: fixture.expected.entities.map { ($0.ref, UUID()) })
         var claims: [KnowledgeTemporalClaim] = [], ids: [String: UUID] = [:]
-        for row in try #require(expected["assertions"] as? [[String: Any]]) {
-            let ref = try #require(row["ref"] as? String)
-            let evidence = try #require((row["evidence"] as? [[String: Any]])?.first?["source"] as? String)
-            var value: KnowledgeTypedValue?
-            if let raw = row["value"] {
-                value = try JSONDecoder().decode(KnowledgeTypedValue.self, from: JSONSerialization.data(withJSONObject: raw))
-            }
-            let precision = try #require(KnowledgeTemporalPrecision(rawValue: try #require(row["precision"] as? String)))
+        for row in fixture.expected.assertions {
+            let source = try #require(row.evidence.first?.source)
+            let subject = try #require(entities[row.subject])
+            let recordedAt = try #require(ingested[source])
             let claim = KnowledgeTemporalClaim(
-                id: UUID(), subjectID: try #require(entities[try #require(row["subject"] as? String)]),
-                predicate: try #require(KnowledgePredicate(rawValue: try #require(row["predicate"] as? String))),
-                objectID: (row["object"] as? String).flatMap { entities[$0] }, value: value,
-                polarity: try #require(KnowledgePolarity(rawValue: try #require(row["polarity"] as? String))),
-                modality: try #require(KnowledgeModality(rawValue: try #require(row["modality"] as? String))),
-                validFrom: KnowledgeTemporalValue(text: try #require(row["validFrom"] as? String), precision: precision),
-                recordedAt: try #require(ingested[evidence]))
-            ids[ref] = claim.id
+                id: UUID(), subjectID: subject, predicate: row.predicate, objectID: row.object.flatMap { entities[$0] },
+                value: row.value, polarity: row.polarity, modality: row.modality,
+                validFrom: KnowledgeTemporalValue(text: row.validFrom, precision: row.precision), recordedAt: recordedAt)
+            ids[row.ref] = claim.id
             claims.append(claim)
         }
         return Timeline(claims: claims, entities: entities, assertions: ids)
