@@ -38,7 +38,7 @@ struct KnowledgeDeletionTests {
         let deletion: KnowledgeDeletionCoordinator
     }
 
-    private func fixture(meetings count: Int = 2) throws -> Fixture {
+    private func fixture(meetings count: Int = 2, recordings: Int = 1) throws -> Fixture {
         let schema = KurnModelGraph.schema
         let container = try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)])
         let context = container.mainContext
@@ -47,11 +47,14 @@ struct KnowledgeDeletionTests {
         for index in 0..<count {
             let meeting = Meeting(title: "Synthetic deletion \(index)")
             context.insert(meeting)
-            let recording = Recording(meeting: meeting, fileName: "synthetic-deletion-\(index).m4a", duration: 2, transcriptionStatus: .done)
-            context.insert(recording)
-            let transcript = Transcript(recording: recording,
-                segments: [.init(speakerLabel: "Speaker 1", startTime: 0, endTime: 2, text: "Example topic \(index) is open.")], language: "en")
-            context.insert(transcript); recording.transcript = transcript
+            for part in 0..<recordings {
+                let recording = Recording(meeting: meeting, fileName: "synthetic-deletion-\(index)-\(part).m4a", duration: 2,
+                    transcriptionStatus: .done)
+                context.insert(recording)
+                let transcript = Transcript(recording: recording, segments: [.init(speakerLabel: "Speaker 1", startTime: 0, endTime: 2,
+                    text: "Example topic \(index) part \(part) is open.")], language: "en")
+                context.insert(transcript); recording.transcript = transcript
+            }
             meetings.append(meeting)
         }
         try context.save()
@@ -261,6 +264,49 @@ struct KnowledgeDeletionTests {
         try context.save()
         await #expect(throws: KnowledgeStoreError.invalidJob) { try await store.purgeNextDeletion() }
         #expect(try deletionCount(f.container) == 1)
+    }
+
+
+    @Test func deletingOneOfTwoRecordingsLeavesOnlyKnowledgeTheRemainingOneSupports() async throws {
+        let f = try fixture(meetings: 1, recordings: 2)
+        try await compiled(f)
+        let meeting = f.meetings[0], meetingID = meeting.id
+        let recordings = meeting.recordings.sorted { $0.id.uuidString < $1.id.uuidString }
+        let (removed, remaining) = (recordings[0], recordings[1])
+        let removedID = removed.id, remainingID = remaining.id
+        #expect(try count(KnowledgeEvidence.self, f.container, where: #Predicate { $0.recordingID == removedID }) == 1)
+
+        try MeetingLibrary(context: f.container.mainContext).deleteRecording(removed)
+        f.deletion.drain(); await f.deletion.waitUntilIdle()
+        #expect(try count(KnowledgeAssertion.self, f.container, where: #Predicate { $0.sourceMeetingID == meetingID }) == 0)
+        #expect(try deletionCount(f.container) == 0)
+
+        #expect(await f.compiler.compile(meetingID: meetingID, trigger: .explicit) == .completed)
+        let evidence = try ModelContext(f.container).fetch(FetchDescriptor<KnowledgeEvidence>(predicate: #Predicate { $0.meetingID == meetingID }))
+        #expect(evidence.count == 1 && evidence.allSatisfy { $0.recordingID == remainingID })
+        #expect(evidence.allSatisfy { !$0.quote.contains("part 0") })
+    }
+
+    @Test func aPendingCorpusDeletionLeavesALaterMeetingTombstoneToRemoveItsContextLink() async throws {
+        let f = try fixture(meetings: 1)
+        try await compiled(f)
+        let meeting = f.meetings[0], meetingID = meeting.id
+        let context = f.container.mainContext
+        let occasion = KnowledgeContext(kind: .internalMeeting, name: "Synthetic occasion")
+        context.insert(occasion)
+        context.insert(SourceContextLink(meetingID: meetingID, contextID: occasion.id))
+        try context.save()
+        let store = await f.queue.writer()
+        try await store.requestCorpusDeletion()
+        try delete(meeting, in: f)
+        #expect(try deletionCount(f.container) == 2)
+
+        f.deletion.drain(); await f.deletion.waitUntilIdle()
+
+        #expect(try deletionCount(f.container) == 0)
+        #expect(try count(SourceContextLink.self, f.container) == 0)
+        #expect(try count(KnowledgeAssertion.self, f.container) == 0)
+        #expect(try count(KnowledgeContext.self, f.container) == 1)
     }
 }
 }

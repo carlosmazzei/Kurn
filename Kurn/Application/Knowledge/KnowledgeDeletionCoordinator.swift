@@ -62,15 +62,15 @@ final class KnowledgeDeletionCoordinator {
         while let task { await task.value }
     }
 
-    /// "Delete Knowledge" in Settings. The tombstone is saved first; stopping
-    /// canonical extraction then keeps a running compilation from committing
-    /// into the corpus being erased (its lease row is purged in any case).
+    /// "Delete Knowledge" in Settings. The tombstone is saved first. Only an
+    /// active canonical extraction is interrupted (`refresh` is producer-scoped,
+    /// so a running wiki article continues); it could not publish anyway, since
+    /// the purge removes its lease row and bumps the revision in one save.
     func deleteCorpus() async throws {
         isDeletingCorpus = true
         defer { isDeletingCorpus = false }
         try await queue.writer().requestCorpusDeletion()
-        queue.cancel(kind: .extraction)
-        await queue.waitUntilIdle()
+        queue.refresh(kind: .extraction)
         drain()
         await waitUntilIdle()
         if let lastFailureCode { throw KnowledgeDeletionError.purgeFailed(lastFailureCode) }
