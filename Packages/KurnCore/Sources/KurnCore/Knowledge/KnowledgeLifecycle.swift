@@ -72,8 +72,11 @@ public struct KnowledgeLifecycleProjection: Codable, Equatable, Sendable {
         case statedTime = "stated_time"
         /// The dates overlap; only one order is a valid path through the machine.
         case lifecycle
-        /// The dates overlap and the machine allows either order.
+        /// The dates overlap and the machine allows several orders (or the
+        /// group is too large to search); the earliest-dated valid one is kept.
         case ambiguous
+        /// The dates overlap and no order is a valid path; date order is kept.
+        case unresolved
     }
 
     public struct Transition: Codable, Equatable, Sendable {
@@ -88,6 +91,7 @@ public struct KnowledgeLifecycleProjection: Codable, Equatable, Sendable {
     public enum AnomalyCode: String, Codable, Sendable {
         case invalidTransition = "invalid_transition"
         case ambiguousOrder = "ambiguous_order"
+        case unresolvedOrder = "unresolved_order"
         case outOfVocabulary = "out_of_vocabulary"
     }
 
@@ -125,8 +129,8 @@ public struct KnowledgeLifecycleProjection: Codable, Equatable, Sendable {
 
     /// The status in force at valid time `moment`, or nil before the first
     /// transition could have started. `definite` only when the transition has
-    /// definitely started, the next has definitely not, and the order is not
-    /// ambiguous; a transition ordered by the lifecycle is bounded by its
+    /// definitely started, the next has definitely not, and neither order is
+    /// ambiguous or unresolved; a transition ordered by the lifecycle is bounded by its
     /// neighbours (a completion stated for November that precedes a reopening
     /// on the 12th started by the 12th).
     public func state(at moment: Date) -> Snapshot? {
@@ -142,9 +146,9 @@ public struct KnowledgeLifecycleProjection: Codable, Equatable, Sendable {
         }
         guard let index = transitions.indices.last(where: { effectiveLower[$0] <= moment }) else { return nil }
         let nextMayHaveStarted = index + 1 < transitions.count && effectiveLower[index + 1] <= moment
-        let definite = moment >= effectiveUpper[index] && !nextMayHaveStarted
-            && transitions[index].orderBasis != .ambiguous
-            && (index + 1 >= transitions.count || transitions[index + 1].orderBasis != .ambiguous)
+        let settled: (Int) -> Bool = { [.statedTime, .lifecycle].contains(transitions[$0].orderBasis) }
+        let definite = moment >= effectiveUpper[index] && !nextMayHaveStarted && settled(index)
+            && (index + 1 >= transitions.count || settled(index + 1))
         return Snapshot(status: transitions[index].status, certainty: definite ? .definite : .possible,
                         transitionIndex: index)
     }
@@ -223,44 +227,95 @@ extension KnowledgeLifecycle {
         return nil
     }
 
-    /// The same status stated at the same date by several claims is one change.
+    /// The same status stated for overlapping periods is one change: later
+    /// statements are restatements and join the earliest one, keeping its date.
     private func merge(_ steps: [Step]) -> [Step] {
-        var merged: [String: Step] = [:]
-        for step in steps {
-            let key = step.status.rawValue + "|" + step.stated.precision.rawValue + "|" + step.stated.text
-            if merged[key] == nil { merged[key] = step } else { merged[key]?.claimIDs += step.claimIDs }
+        var merged: [Step] = []
+        for step in steps.sorted(by: Self.chronologically) {
+            if let index = merged.firstIndex(where: { $0.status == step.status && $0.overlaps(step) }) {
+                merged[index].claimIDs += step.claimIDs
+            } else {
+                merged.append(step)
+            }
         }
-        return merged.values.sorted {
-            ($0.lower, $0.upper, $0.status.rawValue, Self.sorted($0.claimIDs).first?.uuidString ?? "")
-                < ($1.lower, $1.upper, $1.status.rawValue, Self.sorted($1.claimIDs).first?.uuidString ?? "")
-        }
+        return merged
     }
 
-    /// Orders steps by stated time; where two neighbours' stated periods
-    /// overlap, the machine decides when exactly one order is a valid path.
-    private func order(_ input: [Step]) -> (steps: [Step], bases: [KnowledgeLifecycleProjection.OrderBasis],
+    private static func chronologically(_ lhs: Step, _ rhs: Step) -> Bool {
+        (lhs.lower, lhs.upper, lhs.status.rawValue, sorted(lhs.claimIDs).first?.uuidString ?? "")
+            < (rhs.lower, rhs.upper, rhs.status.rawValue, sorted(rhs.claimIDs).first?.uuidString ?? "")
+    }
+
+    /// Larger groups of mutually overlapping changes are not searched.
+    static let maximumSearchedGroup = 6
+
+    /// Orders chronologically sorted steps. A group of steps whose stated
+    /// periods overlap (directly or through each other) is ordered by the
+    /// machine: every order that keeps disjoint periods in date order and is a
+    /// valid path from the status before the group is considered. One such
+    /// order is `lifecycle`; several are `ambiguous` (the first is kept); none
+    /// is `unresolved` and keeps date order.
+    private func order(_ steps: [Step]) -> (steps: [Step], bases: [KnowledgeLifecycleProjection.OrderBasis],
                                             anomalies: [KnowledgeLifecycleProjection.Anomaly]) {
-        var steps = input
-        var bases = Array(repeating: KnowledgeLifecycleProjection.OrderBasis.statedTime, count: steps.count)
+        var result: [Step] = [], bases: [KnowledgeLifecycleProjection.OrderBasis] = []
         var anomalies: [KnowledgeLifecycleProjection.Anomaly] = []
-        var index = 0
-        while index + 1 < steps.count {
-            let first = steps[index], second = steps[index + 1]
-            if first.overlaps(second) {
-                let previous = index > 0 ? steps[index - 1].status : nil
-                let asStated = allows(from: previous, to: first.status) && allows(from: first.status, to: second.status)
-                let swapped = allows(from: previous, to: second.status) && allows(from: second.status, to: first.status)
-                if swapped && !asStated { steps.swapAt(index, index + 1) }
-                if asStated && swapped {
-                    bases[index + 1] = .ambiguous
-                    anomalies.append(.init(code: .ambiguousOrder, claimIDs: Self.sorted(first.claimIDs + second.claimIDs)))
-                } else if asStated || swapped {
-                    bases[index + 1] = .lifecycle
-                }
+        var start = 0
+        while start < steps.count {
+            var end = start + 1, reach = steps[start].upper
+            while end < steps.count, steps[end].lower < reach {
+                reach = max(reach, steps[end].upper)
+                end += 1
             }
-            index += 1
+            let group = Array(steps[start..<end])
+            start = end
+            guard group.count > 1 else {
+                result += group
+                bases.append(.statedTime)
+                continue
+            }
+            let ids = Self.sorted(group.flatMap(\.claimIDs))
+            let search = group.count <= Self.maximumSearchedGroup ? paths(through: group, after: result.last?.status) : nil
+            let basis: KnowledgeLifecycleProjection.OrderBasis
+            switch search?.count {
+            case 1?: basis = .lifecycle
+            case 0?: basis = .unresolved
+            default: basis = .ambiguous
+            }
+            if basis == .ambiguous { anomalies.append(.init(code: .ambiguousOrder, claimIDs: ids)) }
+            if basis == .unresolved { anomalies.append(.init(code: .unresolvedOrder, claimIDs: ids)) }
+            result += search?.first.map { $0.map { group[$0] } } ?? group
+            bases += Array(repeating: basis, count: group.count)
         }
-        return (steps, bases, anomalies)
+        return (result, bases, anomalies)
+    }
+
+    /// How many valid orders of `group` follow `previous` (counting stops at
+    /// two), and the first in date-order preference.
+    private func paths(through group: [Step], after previous: KnowledgeStatus?) -> (count: Int, first: [Int]?) {
+        var count = 0, first: [Int]?
+        var placed: [Int] = [], used = Array(repeating: false, count: group.count)
+        func extend(from last: KnowledgeStatus?) {
+            guard count < 2 else { return }
+            guard placed.count < group.count else {
+                count += 1
+                if first == nil { first = placed }
+                return
+            }
+            for candidate in group.indices where !used[candidate] {
+                // A step whose period ends before the candidate's begins must come first.
+                let mustWait = group.indices.contains { other in
+                    !used[other] && other != candidate && group[other].upper <= group[candidate].lower
+                }
+                guard !mustWait, allows(from: last, to: group[candidate].status) else { continue }
+                used[candidate] = true
+                placed.append(candidate)
+                extend(from: group[candidate].status)
+                placed.removeLast()
+                used[candidate] = false
+            }
+        }
+        extend(from: previous)
+        return (count, first)
     }
 
     private static func key(_ anomaly: KnowledgeLifecycleProjection.Anomaly) -> [String] {
