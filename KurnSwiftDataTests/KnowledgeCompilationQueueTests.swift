@@ -236,7 +236,12 @@ struct KnowledgeCompilationQueueTests {
             let read = ModelContext(f.container)
             #expect(try read.fetchCount(FetchDescriptor<KnowledgeAssertion>()) == 0)
             #expect(try read.fetchCount(FetchDescriptor<KnowledgeRevision>()) == 0)
-            if delete { #expect(try read.fetchCount(FetchDescriptor<KnowledgeJob>()) == 0) }
+            if delete {
+                // Only the deletion tombstone (K2.8) remains; no work job is recreated.
+                let tombstone = KnowledgeJobKind.deletion.rawValue
+                #expect(try read.fetchCount(FetchDescriptor<KnowledgeJob>(predicate: #Predicate { $0.kindRaw != tombstone })) == 0)
+                #expect(try read.fetchCount(FetchDescriptor<KnowledgeJob>(predicate: #Predicate { $0.kindRaw == tombstone })) == 1)
+            }
         }
     }
 
