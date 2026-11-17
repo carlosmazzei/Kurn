@@ -7,16 +7,17 @@ struct KnowledgeSettingsView: View {
     @State private var sourceIDs: Set<UUID> = []
     @State private var showingSources = false
     @State private var rebuild = false
-    @State private var plan: KnowledgeBackfillPlan?
-    @State private var coverage: KnowledgeScopedMaintenanceReport?
-    @State private var action: Action?
-    @State private var epoch = 0
-    @State private var error: AppError?
+    @State private var model = KnowledgeSettingsViewModel()
+    @State private var action: PendingAction?
+    private struct PendingAction: Hashable {
+        let id = UUID()
+        let action: KnowledgeSettingsViewModel.SettingsAction
+    }
     @State private var confirming = false
     @State private var resetting = false
-    private enum Action: Hashable { case preview, coverage, pages }
 
     var body: some View {
+        @Bindable var presentation = model
         Group {
             if let management, let controls = settings.knowledgeControls {
                 form(controls, management: management)
@@ -33,10 +34,10 @@ struct KnowledgeSettingsView: View {
             KnowledgeMeetingSelectionView(selectedIDs: sourceIDs) { sourceIDs = $0; showingSources = false }
         }
         .task(id: action) {
-            let token = epoch
-            let requested = action
-            if let requested { await perform(requested) }
-            if token == epoch && action == requested { action = nil }
+            guard let action, let management else { return }
+            await model.perform(action.action, meetingIDs: sourceIDs, rebuild: rebuild, settings: settings,
+                operations: .init(preview: { try await management.preview(meetingIDs: $0, rebuild: $1) },
+                    coverage: { try await management.coverage(meetingIDs: $0) }, pages: { try await management.rebuildPages(meetingIDs: $0) }))
         }
         .onChange(of: sourceIDs) { _, _ in invalidate() }
         .onChange(of: rebuild) { _, _ in invalidate() }
@@ -45,15 +46,15 @@ struct KnowledgeSettingsView: View {
             sourceIDs = Set(sourceIDs.filter { settings.knowledgeControls?.allows($0) == true }); invalidate()
         }
         .onDisappear { invalidate() }
-        .errorAlert($error)
+        .errorAlert($presentation.error)
         .alert(KnowledgeSettingsCopy.text("confirm"), isPresented: $confirming) {
             Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
-            Button(KnowledgeSettingsCopy.text("start")) { if let plan { management?.start(plan) } }
+            Button(KnowledgeSettingsCopy.text("start")) { if let plan = model.plan { management?.start(plan) } }
                 .accessibilityIdentifier("knowledge.settings.confirm")
         } message: { Text(KnowledgeSettingsCopy.text("local_cost")) }
         .alert(KnowledgeSettingsCopy.text("reset"), isPresented: $resetting) {
             Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
-            Button(KnowledgeSettingsCopy.text("reset")) { do { try settings.resetKnowledgeControls() } catch { reportError() } }
+            Button(KnowledgeSettingsCopy.text("reset")) { do { try settings.resetKnowledgeControls() } catch { model.reportError() } }
         } message: { Text(KnowledgeSettingsCopy.text("reset_detail")) }
     }
 
@@ -80,14 +81,14 @@ struct KnowledgeSettingsView: View {
                 Text(String(format: KnowledgeSettingsCopy.text("selected"), sourceIDs.count))
                 Group {
                     Toggle(KnowledgeSettingsCopy.text("recompile"), isOn: $rebuild)
-                    Button(KnowledgeSettingsCopy.text("preview")) { action = .preview }
+                    Button(KnowledgeSettingsCopy.text("preview")) { action = .init(action: .preview) }
                         .accessibilityIdentifier("knowledge.settings.preview")
-                    Button(KnowledgeSettingsCopy.text("coverage")) { action = .coverage }
-                    Button(KnowledgeSettingsCopy.text("pages")) { action = .pages }
+                    Button(KnowledgeSettingsCopy.text("coverage")) { action = .init(action: .coverage) }
+                    Button(KnowledgeSettingsCopy.text("pages")) { action = .init(action: .pages) }
                 }
-                .disabled(!settings.knowledgeEnabled || sourceIDs.isEmpty || action != nil || management.progress?.isRunning == true)
+                .disabled(!settings.knowledgeEnabled || sourceIDs.isEmpty || model.isBusy || management.progress?.isRunning == true)
             } footer: { Text(KnowledgeSettingsCopy.text("selection_detail")) }
-            if let plan {
+            if let plan = model.plan {
                 Section(KnowledgeSettingsCopy.text("preview")) {
                     ForEach(plan.read.sources) { source in
                         VStack(alignment: .leading) {
@@ -106,7 +107,7 @@ struct KnowledgeSettingsView: View {
                     if !management.canCompile { Text(OnDeviceModelAvailability.unavailableReason ?? KnowledgeSettingsCopy.text("unavailable")) }
                 }
             }
-            if let coverage { KnowledgeCoverageSection(report: coverage.report) }
+            if let coverage = model.coverage { KnowledgeCoverageSection(report: coverage.report) }
             if let progress = management.progress, management.progressControls == controls, management.progressMeetingIDs == sourceIDs {
                 Section(KnowledgeSettingsCopy.text("progress")) {
                     Text(String(format: KnowledgeSettingsCopy.text("progress_counts"), progress.completed, progress.deferred, progress.failed))
@@ -122,26 +123,8 @@ struct KnowledgeSettingsView: View {
     private func binding(_ controls: KnowledgeControls, _ key: WritableKeyPath<KnowledgeControls, Bool>) -> Binding<Bool> {
         Binding(get: { settings.knowledgeControls?[keyPath: key] ?? false }, set: { value in var next = controls; next[keyPath: key] = value; save(next) })
     }
-    private func save(_ controls: KnowledgeControls) { do { try settings.saveKnowledgeControls(controls) } catch { reportError() } }
-    private func invalidate() { epoch += 1; action = nil; plan = nil; coverage = nil }
-    private func reportError() { error = .resourceUnavailable(KnowledgeSettingsCopy.text("failed")) }
-    private func perform(_ requested: Action) async {
-        guard let management else { return }
-        let token = epoch
-        let ids = sourceIDs
-        let controls = settings.knowledgeControls
-        do {
-            switch requested {
-            case .preview:
-                let result = try await management.preview(meetingIDs: ids, rebuild: rebuild)
-                guard token == epoch, settings.knowledgeControls == controls, !Task.isCancelled else { return }; plan = result
-            case .coverage:
-                let result = try await management.coverage(meetingIDs: ids)
-                guard token == epoch, settings.knowledgeControls == controls, !Task.isCancelled else { return }; coverage = result
-            case .pages: try await management.rebuildPages(meetingIDs: ids)
-            }
-        } catch { if token == epoch && !Task.isCancelled { reportError() } }
-    }
+    private func save(_ controls: KnowledgeControls) { do { try settings.saveKnowledgeControls(controls) } catch { model.reportError() } }
+    private func invalidate() { action = nil; model.invalidate() }
 }
 
 enum KnowledgeSettingsCopy {

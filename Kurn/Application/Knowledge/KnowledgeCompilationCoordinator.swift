@@ -16,7 +16,8 @@ final class KnowledgeCompilationCoordinator {
     private(set) var lastFailureCode: String?
 
     // A stable host-owned default policy, rather than minting a policy revision
-    // on every launch. Policy persistence/editing is part of K2.7.
+    // on every launch. Local controls narrow this policy; corporate policy
+    // administration remains a separate reviewed capability.
     static let localPolicyID = UUID(uuid: (0x84, 0xF1, 0x65, 0xB2, 0xC4, 0x9A, 0x47, 0x01, 0xA0, 0xCC, 0x1B, 0x00, 0x00, 0x00, 0x00, 0x01))
 
     init(queue: KnowledgeJobQueue, settings: AppSettings, authorization: Authorization? = nil,

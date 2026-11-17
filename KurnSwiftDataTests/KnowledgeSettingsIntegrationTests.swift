@@ -186,5 +186,29 @@ struct KnowledgeSettingsIntegrationTests {
         try f.settings.saveKnowledgeControls(controls)
         #expect(await f.compiler.compile(meetingID: f.meeting.id, trigger: .explicit) == .completed)
     }
+
+    @Test func cancelledSourceIdentityRequiresAnExplicitRebuildAfterRestoration() async throws {
+        let gate = Gate()
+        let f = try fixture(gate: gate)
+        let original = try #require(f.meeting.recordings.first?.transcript).segments
+        let operation = Task { await f.compiler.compile(meetingID: f.meeting.id, trigger: .explicit) }
+        try await wait(gate)
+        let transcript = try #require(f.meeting.recordings.first?.transcript)
+        transcript.segments = [.init(speakerLabel: "Speaker 1", startTime: 0, endTime: 2, text: "Changed source.")]
+        try f.container.mainContext.save()
+        await gate.release()
+        #expect(await operation.value == .deferred)
+        transcript.segments = original
+        try f.container.mainContext.save()
+        let normal = try await f.management.preview(meetingIDs: f.ids, rebuild: false)
+        #expect(normal.requiresRebuild)
+        f.management.start(normal); await f.management.waitUntilIdle()
+        #expect(f.management.failed)
+        #expect(await f.provider.calls == 1)
+        let rebuild = try await f.management.preview(meetingIDs: f.ids, rebuild: true)
+        f.management.start(rebuild); await f.management.waitUntilIdle()
+        #expect(f.management.progress?.completed == 1)
+        #expect(await f.provider.calls == 2)
+    }
 }
 }

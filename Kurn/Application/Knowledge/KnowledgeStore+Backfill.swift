@@ -34,7 +34,7 @@ extension KnowledgeStore {
             let work = try KnowledgeQueuedWork.extraction(snapshot: source, provider: .appleOnDevice, model: model)
             let key = work.key
             let previous = try context.fetch(FetchDescriptor<KnowledgeJob>(predicate: #Predicate { $0.idempotencyKey == key })).first
-            let rebuild = !current && previous?.stateRaw == KnowledgeJobState.succeeded.rawValue
+            let rebuild = !current && [KnowledgeJobState.succeeded.rawValue, KnowledgeJobState.cancelled.rawValue].contains(previous?.stateRaw ?? "")
             result.append(.init(id: id, title: meeting.title, fingerprint: source.transcriptFingerprint, segments: segments.count,
                 characters: segments.reduce(0) { $0 + $1.text.count }, isCurrent: current, requiresRebuild: rebuild))
         }
