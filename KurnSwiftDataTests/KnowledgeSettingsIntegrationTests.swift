@@ -158,14 +158,14 @@ struct KnowledgeSettingsIntegrationTests {
         let gate = Gate()
         f.queue.register(kind: .meetingArticle) { _ in await gate.wait() }
         let work = try KnowledgeQueuedWork.article(meetingID: f.meeting.id, generator: "synthetic", provider: .appleOnDevice,
-            model: "on-device", fingerprint: "synthetic")
+            model: "on-device", fingerprint: "synthetic", force: false)
         let operation = Task { try await f.queue.submit(work, explicit: true) }
         try await wait(gate)
         var controls = try #require(f.settings.knowledgeControls)
         controls.isPaused = true
         try f.settings.saveKnowledgeControls(controls)
         await gate.release()
-        #expect(try await operation.value == .completed)
+        #expect(try await operation.value == KnowledgeJobQueue.Outcome.completed)
     }
 
     @Test func scopedRefreshCannotStrandAnUnrelatedCancellationBarrier() async throws {
