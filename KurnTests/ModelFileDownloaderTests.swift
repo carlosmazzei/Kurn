@@ -20,6 +20,13 @@
 //  the whole test target. `@Suite(.serialized)` is kept because tests
 //  within *this* suite still share `StubDownloadProtocol`'s one static stub.
 //
+//  Every fetch also runs under `tempFileTestLock`: the downloader stages
+//  each download as a `kurn_model_*` file in the temporary directory, and
+//  `TempFileCleaner.forceCleanup()` (exercised by
+//  `TranscriptionServiceTempCleanupTests`, which holds the same lock) removes
+//  every such file regardless of age, so a concurrent cleanup test could
+//  delete a staged download before it is installed.
+//
 
 import CryptoKit
 import Foundation
@@ -109,89 +116,69 @@ struct ModelFileDownloaderTests {
 
     @Test("installs a file whose size matches the declared Content-Length")
     func installsWhenSizeMatches() async throws {
-        let downloader = makeDownloader()
-        let destination = tempDestination()
-        defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
+        try await tempFileTestLock.run {
+            let downloader = makeDownloader()
+            let destination = tempDestination()
+            defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
 
-        let body = Data(repeating: 0x41, count: 1_000)
-        StubDownloadProtocol.enqueue(.init(body: body, headers: ["Content-Length": "\(body.count)"]))
+            let body = Data(repeating: 0x41, count: 1_000)
+            StubDownloadProtocol.enqueue(.init(body: body, headers: ["Content-Length": "\(body.count)"]))
 
-        try await downloader.fetch(
-            url: URL(string: "https://example.com/model.bin")!,
-            destination: destination,
-            minimumPlausibleBytes: 500,
-            policy: .wifiOnly,
-            logLabel: "test",
-            pinnedSHA256: sha256Hex(of: body)
-        ) { _ in }
-
-        let installed = try Data(contentsOf: destination)
-        #expect(installed == body)
-    }
-
-    @Test("rejects a file whose size does not match the declared Content-Length")
-    func rejectsWhenSizeMismatches() async throws {
-        let downloader = makeDownloader()
-        let destination = tempDestination()
-        defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
-
-        let body = Data(repeating: 0x41, count: 1_000)
-        // Declare a length longer than the body actually delivered.
-        StubDownloadProtocol.enqueue(.init(body: body, headers: ["Content-Length": "\(body.count + 500)"]))
-
-        await #expect(throws: AppError.self) {
             try await downloader.fetch(
                 url: URL(string: "https://example.com/model.bin")!,
                 destination: destination,
                 minimumPlausibleBytes: 500,
                 policy: .wifiOnly,
-                logLabel: "test"
+                logLabel: "test",
+                pinnedSHA256: sha256Hex(of: body)
             ) { _ in }
-        }
 
-        #expect(!FileManager.default.fileExists(atPath: destination.path))
+            let installed = try Data(contentsOf: destination)
+            #expect(installed == body)
+        }
+    }
+
+    @Test("rejects a file whose size does not match the declared Content-Length")
+    func rejectsWhenSizeMismatches() async throws {
+        try await tempFileTestLock.run {
+            let downloader = makeDownloader()
+            let destination = tempDestination()
+            defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
+
+            let body = Data(repeating: 0x41, count: 1_000)
+            // Declare a length longer than the body actually delivered.
+            StubDownloadProtocol.enqueue(.init(body: body, headers: ["Content-Length": "\(body.count + 500)"]))
+
+            await #expect(throws: AppError.self) {
+                try await downloader.fetch(
+                    url: URL(string: "https://example.com/model.bin")!,
+                    destination: destination,
+                    minimumPlausibleBytes: 500,
+                    policy: .wifiOnly,
+                    logLabel: "test"
+                ) { _ in }
+            }
+
+            #expect(!FileManager.default.fileExists(atPath: destination.path))
+        }
     }
 
     // MARK: - Origin digest verification
 
     @Test("installs a file whose SHA-256 matches X-Linked-ETag")
     func installsWhenHashMatches() async throws {
-        let downloader = makeDownloader()
-        let destination = tempDestination()
-        defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
+        try await tempFileTestLock.run {
+            let downloader = makeDownloader()
+            let destination = tempDestination()
+            defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
 
-        let body = Data(repeating: 0x7A, count: 2_048)
-        let hex = sha256Hex(of: body)
-        StubDownloadProtocol.enqueue(.init(body: body, headers: [
-            "Content-Length": "\(body.count)",
-            "X-Linked-ETag": hex
-        ]))
+            let body = Data(repeating: 0x7A, count: 2_048)
+            let hex = sha256Hex(of: body)
+            StubDownloadProtocol.enqueue(.init(body: body, headers: [
+                "Content-Length": "\(body.count)",
+                "X-Linked-ETag": hex
+            ]))
 
-        try await downloader.fetch(
-            url: URL(string: "https://example.com/model.bin")!,
-            destination: destination,
-            minimumPlausibleBytes: 500,
-            policy: .wifiOnly,
-            logLabel: "test"
-        ) { _ in }
-
-        #expect(FileManager.default.fileExists(atPath: destination.path))
-    }
-
-    @Test("rejects a file whose SHA-256 does not match X-Linked-ETag")
-    func rejectsWhenHashMismatches() async throws {
-        let downloader = makeDownloader()
-        let destination = tempDestination()
-        defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
-
-        let body = Data(repeating: 0x7A, count: 2_048)
-        let wrongHex = String(repeating: "0", count: 64)
-        StubDownloadProtocol.enqueue(.init(body: body, headers: [
-            "Content-Length": "\(body.count)",
-            "X-Linked-ETag": wrongHex
-        ]))
-
-        await #expect(throws: AppError.self) {
             try await downloader.fetch(
                 url: URL(string: "https://example.com/model.bin")!,
                 destination: destination,
@@ -199,32 +186,62 @@ struct ModelFileDownloaderTests {
                 policy: .wifiOnly,
                 logLabel: "test"
             ) { _ in }
-        }
 
-        #expect(!FileManager.default.fileExists(atPath: destination.path))
+            #expect(FileManager.default.fileExists(atPath: destination.path))
+        }
+    }
+
+    @Test("rejects a file whose SHA-256 does not match X-Linked-ETag")
+    func rejectsWhenHashMismatches() async throws {
+        try await tempFileTestLock.run {
+            let downloader = makeDownloader()
+            let destination = tempDestination()
+            defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
+
+            let body = Data(repeating: 0x7A, count: 2_048)
+            let wrongHex = String(repeating: "0", count: 64)
+            StubDownloadProtocol.enqueue(.init(body: body, headers: [
+                "Content-Length": "\(body.count)",
+                "X-Linked-ETag": wrongHex
+            ]))
+
+            await #expect(throws: AppError.self) {
+                try await downloader.fetch(
+                    url: URL(string: "https://example.com/model.bin")!,
+                    destination: destination,
+                    minimumPlausibleBytes: 500,
+                    policy: .wifiOnly,
+                    logLabel: "test"
+                ) { _ in }
+            }
+
+            #expect(!FileManager.default.fileExists(atPath: destination.path))
+        }
     }
 
     // MARK: - Pinned digests
 
     @Test("installs a file whose SHA-256 matches the pinned digest")
     func installsWhenPinMatches() async throws {
-        let downloader = makeDownloader()
-        let destination = tempDestination()
-        defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
+        try await tempFileTestLock.run {
+            let downloader = makeDownloader()
+            let destination = tempDestination()
+            defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
 
-        let body = Data(repeating: 0x33, count: 2_048)
-        StubDownloadProtocol.enqueue(.init(body: body, headers: ["Content-Length": "\(body.count)"]))
+            let body = Data(repeating: 0x33, count: 2_048)
+            StubDownloadProtocol.enqueue(.init(body: body, headers: ["Content-Length": "\(body.count)"]))
 
-        try await downloader.fetch(
-            url: URL(string: "https://example.com/model.bin")!,
-            destination: destination,
-            minimumPlausibleBytes: 500,
-            policy: .wifiOnly,
-            logLabel: "test",
-            pinnedSHA256: sha256Hex(of: body)
-        ) { _ in }
+            try await downloader.fetch(
+                url: URL(string: "https://example.com/model.bin")!,
+                destination: destination,
+                minimumPlausibleBytes: 500,
+                policy: .wifiOnly,
+                logLabel: "test",
+                pinnedSHA256: sha256Hex(of: body)
+            ) { _ in }
 
-        #expect(try Data(contentsOf: destination) == body)
+            #expect(try Data(contentsOf: destination) == body)
+        }
     }
 
     /// The case the pin exists for: an origin that serves a different file
@@ -232,79 +249,85 @@ struct ModelFileDownloaderTests {
     /// bytes, so only the pinned value can tell the file was swapped.
     @Test("rejects a swapped file even when the origin's digest header agrees with it")
     func rejectsSwappedFileDespiteMatchingHeader() async throws {
-        let downloader = makeDownloader()
-        let destination = tempDestination()
-        defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
+        try await tempFileTestLock.run {
+            let downloader = makeDownloader()
+            let destination = tempDestination()
+            defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
 
-        let expected = Data(repeating: 0x33, count: 2_048)
-        let swapped = Data(repeating: 0x66, count: 2_048)
-        StubDownloadProtocol.enqueue(.init(body: swapped, headers: [
-            "Content-Length": "\(swapped.count)",
-            "X-Linked-ETag": sha256Hex(of: swapped)
-        ]))
+            let expected = Data(repeating: 0x33, count: 2_048)
+            let swapped = Data(repeating: 0x66, count: 2_048)
+            StubDownloadProtocol.enqueue(.init(body: swapped, headers: [
+                "Content-Length": "\(swapped.count)",
+                "X-Linked-ETag": sha256Hex(of: swapped)
+            ]))
 
-        await #expect(throws: AppError.self) {
-            try await downloader.fetch(
-                url: URL(string: "https://example.com/model.bin")!,
-                destination: destination,
-                minimumPlausibleBytes: 500,
-                policy: .wifiOnly,
-                logLabel: "test",
-                pinnedSHA256: sha256Hex(of: expected)
-            ) { _ in }
+            await #expect(throws: AppError.self) {
+                try await downloader.fetch(
+                    url: URL(string: "https://example.com/model.bin")!,
+                    destination: destination,
+                    minimumPlausibleBytes: 500,
+                    policy: .wifiOnly,
+                    logLabel: "test",
+                    pinnedSHA256: sha256Hex(of: expected)
+                ) { _ in }
+            }
+
+            #expect(!FileManager.default.fileExists(atPath: destination.path))
         }
-
-        #expect(!FileManager.default.fileExists(atPath: destination.path))
     }
 
     @Test("rejects a file whose SHA-256 does not match the pinned digest")
     func rejectsWhenPinMismatches() async throws {
-        let downloader = makeDownloader()
-        let destination = tempDestination()
-        defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
+        try await tempFileTestLock.run {
+            let downloader = makeDownloader()
+            let destination = tempDestination()
+            defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
 
-        let expected = Data(repeating: 0x33, count: 2_048)
-        let received = Data(repeating: 0x44, count: 2_048)
-        StubDownloadProtocol.enqueue(.init(body: received, headers: ["Content-Length": "\(received.count)"]))
+            let expected = Data(repeating: 0x33, count: 2_048)
+            let received = Data(repeating: 0x44, count: 2_048)
+            StubDownloadProtocol.enqueue(.init(body: received, headers: ["Content-Length": "\(received.count)"]))
 
-        let error = await #expect(throws: AppError.self) {
-            try await downloader.fetch(
-                url: URL(string: "https://example.com/model.bin")!,
-                destination: destination,
-                minimumPlausibleBytes: 500,
-                policy: .wifiOnly,
-                logLabel: "test",
-                pinnedSHA256: sha256Hex(of: expected)
-            ) { _ in }
+            let error = await #expect(throws: AppError.self) {
+                try await downloader.fetch(
+                    url: URL(string: "https://example.com/model.bin")!,
+                    destination: destination,
+                    minimumPlausibleBytes: 500,
+                    policy: .wifiOnly,
+                    logLabel: "test",
+                    pinnedSHA256: sha256Hex(of: expected)
+                ) { _ in }
+            }
+
+            #expect(Self.isModelDownloadFailed(error))
+            #expect(!FileManager.default.fileExists(atPath: destination.path))
         }
-
-        #expect(Self.isModelDownloadFailed(error))
-        #expect(!FileManager.default.fileExists(atPath: destination.path))
     }
 
     /// A size check alone cannot tell a swapped file from the real one, so a
     /// transfer with neither a pin nor an `X-Linked-ETag` must not install.
     @Test("rejects a download when no checksum is available to verify it")
     func rejectsWhenNoHashIsAvailable() async throws {
-        let downloader = makeDownloader()
-        let destination = tempDestination()
-        defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
+        try await tempFileTestLock.run {
+            let downloader = makeDownloader()
+            let destination = tempDestination()
+            defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
 
-        let body = Data(repeating: 0x41, count: 1_000)
-        StubDownloadProtocol.enqueue(.init(body: body, headers: ["Content-Length": "\(body.count)"]))
+            let body = Data(repeating: 0x41, count: 1_000)
+            StubDownloadProtocol.enqueue(.init(body: body, headers: ["Content-Length": "\(body.count)"]))
 
-        let error = await #expect(throws: AppError.self) {
-            try await downloader.fetch(
-                url: URL(string: "https://example.com/model.bin")!,
-                destination: destination,
-                minimumPlausibleBytes: 500,
-                policy: .wifiOnly,
-                logLabel: "test"
-            ) { _ in }
+            let error = await #expect(throws: AppError.self) {
+                try await downloader.fetch(
+                    url: URL(string: "https://example.com/model.bin")!,
+                    destination: destination,
+                    minimumPlausibleBytes: 500,
+                    policy: .wifiOnly,
+                    logLabel: "test"
+                ) { _ in }
+            }
+
+            #expect(Self.isModelDownloadFailed(error))
+            #expect(!FileManager.default.fileExists(atPath: destination.path))
         }
-
-        #expect(Self.isModelDownloadFailed(error))
-        #expect(!FileManager.default.fileExists(atPath: destination.path))
     }
 
     @Test("the whisper.cpp catalog pins a well-formed SHA-256 digest for every model")
@@ -331,127 +354,135 @@ struct ModelFileDownloaderTests {
 
     @Test("a plain ETag is never treated as a hash to verify")
     func plainETagIsIgnored() async throws {
-        let downloader = makeDownloader()
-        let destination = tempDestination()
-        defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
+        try await tempFileTestLock.run {
+            let downloader = makeDownloader()
+            let destination = tempDestination()
+            defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
 
-        let body = Data(repeating: 0x11, count: 512)
-        // A short, quoted git-blob-style ETag: not 64 hex characters, so it
-        // must be ignored rather than compared against as a checksum — and,
-        // being the only integrity signal, it is not enough to install.
-        StubDownloadProtocol.enqueue(.init(body: body, headers: [
-            "Content-Length": "\(body.count)",
-            "ETag": "\"abc123\""
-        ]))
+            let body = Data(repeating: 0x11, count: 512)
+            // A short, quoted git-blob-style ETag: not 64 hex characters, so it
+            // must be ignored rather than compared against as a checksum — and,
+            // being the only integrity signal, it is not enough to install.
+            StubDownloadProtocol.enqueue(.init(body: body, headers: [
+                "Content-Length": "\(body.count)",
+                "ETag": "\"abc123\""
+            ]))
 
-        let error = await #expect(throws: AppError.self) {
-            try await downloader.fetch(
-                url: URL(string: "https://example.com/model.bin")!,
-                destination: destination,
-                minimumPlausibleBytes: 100,
-                policy: .wifiOnly,
-                logLabel: "test"
-            ) { _ in }
+            let error = await #expect(throws: AppError.self) {
+                try await downloader.fetch(
+                    url: URL(string: "https://example.com/model.bin")!,
+                    destination: destination,
+                    minimumPlausibleBytes: 100,
+                    policy: .wifiOnly,
+                    logLabel: "test"
+                ) { _ in }
+            }
+
+            #expect(Self.isModelDownloadFailed(error))
+            #expect(!FileManager.default.fileExists(atPath: destination.path))
         }
-
-        #expect(Self.isModelDownloadFailed(error))
-        #expect(!FileManager.default.fileExists(atPath: destination.path))
     }
 
     // MARK: - Atomic replacement and preservation of the previous file
 
     @Test("replaces an existing installed file atomically")
     func replacesExistingFile() async throws {
-        let downloader = makeDownloader()
-        let destination = tempDestination()
-        defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
+        try await tempFileTestLock.run {
+            let downloader = makeDownloader()
+            let destination = tempDestination()
+            defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
 
-        try FileManager.default.createDirectory(
-            at: destination.deletingLastPathComponent(), withIntermediateDirectories: true
-        )
-        let original = Data(repeating: 0x01, count: 1_000)
-        try original.write(to: destination)
+            try FileManager.default.createDirectory(
+                at: destination.deletingLastPathComponent(), withIntermediateDirectories: true
+            )
+            let original = Data(repeating: 0x01, count: 1_000)
+            try original.write(to: destination)
 
-        let replacement = Data(repeating: 0x02, count: 1_500)
-        StubDownloadProtocol.enqueue(.init(body: replacement, headers: ["Content-Length": "\(replacement.count)"]))
+            let replacement = Data(repeating: 0x02, count: 1_500)
+            StubDownloadProtocol.enqueue(.init(body: replacement, headers: ["Content-Length": "\(replacement.count)"]))
 
-        try await downloader.fetch(
-            url: URL(string: "https://example.com/model.bin")!,
-            destination: destination,
-            // Below the original's size, so `fetch` doesn't short-circuit as
-            // "already installed" and skip the network call entirely.
-            minimumPlausibleBytes: replacement.count.int64Value,
-            policy: .wifiOnly,
-            logLabel: "test",
-            pinnedSHA256: sha256Hex(of: replacement)
-        ) { _ in }
+            try await downloader.fetch(
+                url: URL(string: "https://example.com/model.bin")!,
+                destination: destination,
+                // Below the original's size, so `fetch` doesn't short-circuit as
+                // "already installed" and skip the network call entirely.
+                minimumPlausibleBytes: replacement.count.int64Value,
+                policy: .wifiOnly,
+                logLabel: "test",
+                pinnedSHA256: sha256Hex(of: replacement)
+            ) { _ in }
 
-        let installed = try Data(contentsOf: destination)
-        #expect(installed == replacement)
-        // No leftover backup file beside the installed one.
-        let siblingCount = try FileManager.default.contentsOfDirectory(
-            at: destination.deletingLastPathComponent(), includingPropertiesForKeys: nil
-        ).count
-        #expect(siblingCount == 1)
+            let installed = try Data(contentsOf: destination)
+            #expect(installed == replacement)
+            // No leftover backup file beside the installed one.
+            let siblingCount = try FileManager.default.contentsOfDirectory(
+                at: destination.deletingLastPathComponent(), includingPropertiesForKeys: nil
+            ).count
+            #expect(siblingCount == 1)
+        }
     }
 
     @Test("preserves the previous file when the new download fails verification")
     func preservesPreviousFileOnVerificationFailure() async throws {
-        let downloader = makeDownloader()
-        let destination = tempDestination()
-        defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
+        try await tempFileTestLock.run {
+            let downloader = makeDownloader()
+            let destination = tempDestination()
+            defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
 
-        try FileManager.default.createDirectory(
-            at: destination.deletingLastPathComponent(), withIntermediateDirectories: true
-        )
-        let original = Data(repeating: 0x01, count: 1_000)
-        try original.write(to: destination)
+            try FileManager.default.createDirectory(
+                at: destination.deletingLastPathComponent(), withIntermediateDirectories: true
+            )
+            let original = Data(repeating: 0x01, count: 1_000)
+            try original.write(to: destination)
 
-        let replacement = Data(repeating: 0x02, count: 1_500)
-        // Declared length disagrees with the actual body, so verification
-        // must fail before install ever touches the destination.
-        StubDownloadProtocol.enqueue(
-            .init(body: replacement, headers: ["Content-Length": "\(replacement.count + 100)"])
-        )
+            let replacement = Data(repeating: 0x02, count: 1_500)
+            // Declared length disagrees with the actual body, so verification
+            // must fail before install ever touches the destination.
+            StubDownloadProtocol.enqueue(
+                .init(body: replacement, headers: ["Content-Length": "\(replacement.count + 100)"])
+            )
 
-        await #expect(throws: AppError.self) {
-            try await downloader.fetch(
-                url: URL(string: "https://example.com/model.bin")!,
-                destination: destination,
-                minimumPlausibleBytes: replacement.count.int64Value,
-                policy: .wifiOnly,
-                logLabel: "test"
-            ) { _ in }
+            await #expect(throws: AppError.self) {
+                try await downloader.fetch(
+                    url: URL(string: "https://example.com/model.bin")!,
+                    destination: destination,
+                    minimumPlausibleBytes: replacement.count.int64Value,
+                    policy: .wifiOnly,
+                    logLabel: "test"
+                ) { _ in }
+            }
+
+            let stillThere = try Data(contentsOf: destination)
+            #expect(stillThere == original)
         }
-
-        let stillThere = try Data(contentsOf: destination)
-        #expect(stillThere == original)
     }
 
     // MARK: - Skip when already installed
 
     @Test("does not make a network call when a plausible file is already installed")
     func skipsWhenAlreadyInstalled() async throws {
-        let downloader = makeDownloader()
-        let destination = tempDestination()
-        defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
+        try await tempFileTestLock.run {
+            let downloader = makeDownloader()
+            let destination = tempDestination()
+            defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
 
-        try FileManager.default.createDirectory(
-            at: destination.deletingLastPathComponent(), withIntermediateDirectories: true
-        )
-        try Data(repeating: 0x01, count: 1_000).write(to: destination)
+            try FileManager.default.createDirectory(
+                at: destination.deletingLastPathComponent(), withIntermediateDirectories: true
+            )
+            try Data(repeating: 0x01, count: 1_000).write(to: destination)
 
-        StubDownloadProtocol.enqueue(nil) // any request would fail with no stub to answer it
+            StubDownloadProtocol.enqueue(nil) // any request would fail with no stub to answer it
 
-        try await downloader.fetch(
-            url: URL(string: "https://example.com/model.bin")!,
-            destination: destination,
-            minimumPlausibleBytes: 500,
-            policy: .wifiOnly,
-            logLabel: "test"
-        ) { _ in }
+            try await downloader.fetch(
+                url: URL(string: "https://example.com/model.bin")!,
+                destination: destination,
+                minimumPlausibleBytes: 500,
+                policy: .wifiOnly,
+                logLabel: "test"
+            ) { _ in }
 
-        #expect(StubDownloadProtocol.capturedRequestCount == 0)
+            #expect(StubDownloadProtocol.capturedRequestCount == 0)
+        }
     }
 }
 
