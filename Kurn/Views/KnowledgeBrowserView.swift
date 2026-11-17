@@ -161,6 +161,8 @@ struct KnowledgeBrowserView: View {
             if let page = read.pages.first(where: { $0.entity.id == id }) {
                 KnowledgeEntityPageView(page: page, meetingTitles: read.meetingTitles)
             } else { KnowledgeBrowserUnavailable() }
+        case .timeline:
+            KnowledgeTimelineView(read: read)
         case .evidence:
             if let source = read.selectedEvidence { KnowledgeEvidenceDetailView(source: source) }
             else { KnowledgeBrowserUnavailable() }
@@ -178,6 +180,7 @@ struct KnowledgeBrowserView: View {
         case let .entity(id):
             if case let .loaded(read) = state, let page = read.pages.first(where: { $0.entity.id == id }) { return page.entity.name }
             return KnowledgeBrowserCopy.text("title")
+        case .timeline: return KnowledgeBrowserCopy.text("timeline")
         case .evidence: return KnowledgeBrowserCopy.text("evidence")
         case .transcript: return KnowledgeBrowserCopy.text("transcript")
         case nil: return KnowledgeBrowserCopy.text("title")
@@ -204,6 +207,12 @@ struct KnowledgeHomeView: View {
             ContentUnavailableView(NSLocalizedString("detail.knowledge.empty", comment: "No contributions"), systemImage: "book.closed")
         } else {
             List {
+                Section {
+                    NavigationLink(value: KnowledgeBrowserRoute.timeline) {
+                        Label(KnowledgeBrowserCopy.text("timeline"), systemImage: "calendar.day.timeline.leading")
+                    }
+                    .accessibilityIdentifier("knowledge.browser.timeline")
+                }
                 Section {
                     ForEach(read.pages, id: \.entity.id) { page in
                         NavigationLink(value: KnowledgeBrowserRoute.entity(page.entity.id)) {

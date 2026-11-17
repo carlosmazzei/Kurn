@@ -3524,6 +3524,38 @@ like the reducer it is not yet wired to the store or a reader.
   (proposed → approved → revised → superseded) and the runbook action
   (completed in November, reopened on the 12th) from the golden fixtures.
 
+### Knowledge timeline (K3.3)
+
+The scoped Knowledge reader opens a Timeline from Knowledge Home
+(`KnowledgeBrowserRoute.timeline`, `KnowledgeTimelineView`). It is a projection of
+the same authorized, evidence-checked pages the reader shows (KurnCore's
+`KnowledgeTimeline.build(pages:filter:)`), never a second store, and reads offline
+with no provider.
+
+- **Placed by stated time, shown with recorded time.** Each claim sits in the UTC
+  month its stated `validFrom` falls in, shown at its own precision (a month stays
+  a month); the meeting and date it was said in are shown beside it and never move
+  it. Within a month, the earlier stated start comes first, a narrower period
+  first when two start together. A stated date after its meeting is marked
+  "planned ahead" (`isAhead`).
+- **Unknown dates are kept apart.** A claim with no stated date is listed under
+  "No stated date" in recorded order instead of being given one.
+- **One entry per claim.** A relation on both entities' pages is shown once.
+  Kinds: status, due date, supersession, other relation, other value.
+- **Filters** keep chosen kinds (`Filter.showing` never hides the last one) and
+  can hide tentative (proposed, hypothetical, disputed) or negated claims;
+  filter state is per view and never persisted.
+- **Lifecycle findings reach their claims.** K3.2's projection runs per stated
+  identity over the claims shown (filters apply afterwards), and each
+  `invalid_transition`, `ambiguous_order`, `unresolved_order` or
+  `out_of_vocabulary` finding is shown on every claim it names. Nothing is
+  resolved or rewritten.
+- Rows open the claim's first cited passage through the existing ID-only evidence
+  route. `KnowledgeTimelinePresentation` (Application) holds the wording and is
+  tested; the view only binds it.
+- Not yet: context lanes on iPad (the read carries no context per claim yet),
+  canonical `KnowledgeEvent` rows and known-at ("as of") navigation.
+
 ### Attached documents (PDFs)
 
 A meeting can carry PDFs as reference material for its summaries
