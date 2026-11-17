@@ -62,6 +62,7 @@ struct KnowledgeReviewInboxView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave).receive(on: RunLoop.main)) { _ in reload() }
         .onChange(of: settings.knowledgeEnabled) { _, _ in reload() }
+        .onChange(of: settings.knowledgeControls) { _, _ in reload() }
         .onChange(of: meetingIDs) { _, _ in path = []; reload() }
         .onChange(of: phase) { _, value in if value == .active { reload() } else { clear() } }
         .onDisappear { model.invalidate() }

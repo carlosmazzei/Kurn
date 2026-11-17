@@ -36,11 +36,13 @@ struct KnowledgeLibraryDestination: View {
     }
 }
 
-private struct KnowledgeMeetingSelectionView: View {
+struct KnowledgeMeetingSelectionView: View {
     @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppSettings.self) private var settings
     @State private var selectedIDs: Set<UUID>
     let onDone: (Set<UUID>) -> Void
+    private var allowedMeetings: [Meeting] { meetings.filter { settings.knowledgeControls?.allows($0.id) == true } }
 
     init(selectedIDs: Set<UUID>, onDone: @escaping (Set<UUID>) -> Void) {
         _selectedIDs = State(initialValue: selectedIDs)
@@ -51,7 +53,7 @@ private struct KnowledgeMeetingSelectionView: View {
         NavigationStack {
             List {
                 Section {
-                    ForEach(meetings) { meeting in
+                    ForEach(allowedMeetings) { meeting in
                         Button { toggle(meeting.id) } label: {
                             HStack {
                                 Image(systemName: selectedIDs.contains(meeting.id) ? "checkmark.circle.fill" : "circle")
@@ -77,12 +79,13 @@ private struct KnowledgeMeetingSelectionView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(NSLocalizedString("common.done", comment: "Done")) {
-                        onDone(selectedIDs.intersection(Set(meetings.map(\.id))))
+                        onDone(selectedIDs.intersection(Set(allowedMeetings.map(\.id))))
                     }
                     .disabled(selectedIDs.count > 16)
                     .accessibilityIdentifier("knowledge.sources.done")
                 }
             }
+            .onChange(of: Set(allowedMeetings.map(\.id))) { _, ids in selectedIDs.formIntersection(ids) }
         }
     }
 

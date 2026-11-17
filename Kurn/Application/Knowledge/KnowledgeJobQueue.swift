@@ -11,6 +11,7 @@ final class KnowledgeJobQueue {
     enum Outcome { case completed, deferred, failed }
     typealias Handler = @MainActor (KnowledgeJobHandle) async throws -> Void
     typealias Recovery = @MainActor (KnowledgeQueuedWork) throws -> Bool
+    typealias Eligibility = @MainActor (KnowledgeQueuedWork) -> Bool
     typealias Erase = @MainActor (KnowledgeStore, KnowledgeJobKind, Date) async throws -> Void
     private struct CancellationRequest {
         let kind: KnowledgeJobKind
@@ -22,6 +23,8 @@ final class KnowledgeJobQueue {
     private let scheduler: ResourceScheduler
     private var handlers: [String: Handler] = [:]
     private var recovery: [String: Recovery] = [:]
+    private var eligibility: [String: Eligibility] = [:]
+    private var activeKind: KnowledgeJobKind?
     private var foreground: Bool
     private var recording = false
     private var backgroundOpportunity = false
@@ -30,6 +33,8 @@ final class KnowledgeJobQueue {
     private var runErrors: [UUID: Error] = [:]
     private var cancellationInProgress = false
     private var invalidationEpoch = 0
+    private var executionEpoch = 0
+    private var activeEpoch: Int?
     private var pendingCancellation: CancellationRequest?
     @ObservationIgnored private let eraseJobs: Erase
     private(set) var activeJobID: UUID?
@@ -46,9 +51,18 @@ final class KnowledgeJobQueue {
         automaticBudget = foreground ? 5 : 0
     }
 
-    func register(kind: KnowledgeJobKind, recovery: @escaping Recovery = { _ in false }, handler: @escaping Handler) {
+    func register(kind: KnowledgeJobKind, recovery: @escaping Recovery = { _ in false },
+                  eligibility: @escaping Eligibility = { _ in true }, handler: @escaping Handler) {
         handlers[kind.rawValue] = handler
         self.recovery[kind.rawValue] = recovery
+        self.eligibility[kind.rawValue] = eligibility
+    }
+
+    /// Refresh one producer's live permissions without pausing unrelated wiki
+    /// articles sharing this queue. Publication also checks eligibility live.
+    func refresh(kind: KnowledgeJobKind) {
+        if activeKind == kind { executionEpoch += 1; drainTask?.cancel() }
+        wake()
     }
 
     func setForeground(_ active: Bool) {
@@ -124,6 +138,7 @@ final class KnowledgeJobQueue {
     /// request. A fresh user request after Clear gets a new generation key.
     func cancel(kind: KnowledgeJobKind) {
         invalidationEpoch += 1
+        executionEpoch += 1
         pendingCancellation = CancellationRequest(kind: kind, cutoff: Date(), epoch: invalidationEpoch)
         cancellationInProgress = true
         pause()
@@ -155,17 +170,19 @@ final class KnowledgeJobQueue {
     }
 
     func mayPublish(_ handle: KnowledgeJobHandle) -> Bool {
-        activeJobID == handle.id && canRun(handle.work) && !Task.isCancelled
+        activeJobID == handle.id && activeEpoch == executionEpoch && canRun(handle.work) && !Task.isCancelled
     }
 
     func hasLocalWork() async -> Bool {
         guard let records = try? await storeHost.writer().queuedJobs(kinds: Set(handlers.keys)) else { return false }
-        return records.contains { $0.envelope?.work.provider.kind == .appleOnDevice
+        return records.contains { $0.envelope.map { eligibility[$0.work.kind.rawValue]?($0.work) ?? true } == true
+            && $0.envelope?.work.provider.kind == .appleOnDevice
             && !["explicit_retry_required", "feature_disabled", "provider_unavailable", "provider_blocked", "policy_denied", "cloud_review_required"].contains($0.code ?? "") }
     }
 
     private func canRun(_ work: KnowledgeQueuedWork) -> Bool {
-        !cancellationInProgress && !recording && (foreground || (backgroundOpportunity && work.provider.kind == .appleOnDevice))
+        !cancellationInProgress && !recording && (eligibility[work.kind.rawValue]?(work) ?? true)
+            && (foreground || (backgroundOpportunity && work.provider.kind == .appleOnDevice))
     }
 
     private func pause() {
@@ -229,21 +246,23 @@ final class KnowledgeJobQueue {
     private func execute(_ handle: KnowledgeJobHandle, store: KnowledgeStore, automatic: Bool) async throws -> Bool {
         runErrors[handle.id] = nil
         activeJobID = handle.id
-        defer { activeJobID = nil }
-        let epoch = invalidationEpoch
+        activeKind = handle.work.kind
+        defer { activeJobID = nil; activeKind = nil; activeEpoch = nil }
+        let epoch = executionEpoch
+        activeEpoch = epoch
         var began = false
         do {
             try await withResourceReservation(.knowledgeGeneration(onDevice: handle.work.provider.kind == .appleOnDevice), on: scheduler) {
                 try Task.checkCancellation()
-                guard canRun(handle.work), epoch == invalidationEpoch else { throw CancellationError() }
+                guard canRun(handle.work), epoch == executionEpoch else { throw CancellationError() }
                 try await store.markJobStarted(handle)
                 try Task.checkCancellation()
-                guard canRun(handle.work), epoch == invalidationEpoch else { throw CancellationError() }
+                guard canRun(handle.work), epoch == executionEpoch else { throw CancellationError() }
                 began = true
                 guard let handler = handlers[handle.work.kind.rawValue] else { throw KnowledgeQueueError.workFailed }
                 try await handler(handle)
                 try Task.checkCancellation()
-                guard canRun(handle.work), epoch == invalidationEpoch else { throw CancellationError() }
+                guard canRun(handle.work), epoch == executionEpoch else { throw CancellationError() }
             }
             try await store.finishJob(handle)
         } catch is CancellationError {

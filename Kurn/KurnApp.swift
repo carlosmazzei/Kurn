@@ -220,6 +220,7 @@ struct KurnApp: App {
                 .environment(appEnvironment.semanticIndex)
                 .environment(appEnvironment.wiki)
                 .environment(appEnvironment.knowledge)
+                .environment(appEnvironment.knowledgeSettings)
                 .environment(appEnvironment.recordingSession)
                 .environment(appEnvironment.reviewPrompt)
                 .environment(appEnvironment.chatConversations)
@@ -377,6 +378,7 @@ struct KurnApp: App {
             )
             ScreenshotSeedData.seed(into: container.mainContext)
             if ProcessInfo.processInfo.arguments.contains("UI-Testing-KnowledgeFixture") {
+                try AppSettings().resetKnowledgeControls()
                 try KnowledgeMeetingSeed.seed(container: container)
             }
             return container

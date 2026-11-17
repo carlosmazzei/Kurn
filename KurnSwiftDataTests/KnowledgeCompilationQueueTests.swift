@@ -91,6 +91,9 @@ struct KnowledgeCompilationQueueTests {
         let defaults = try #require(UserDefaults(suiteName: "knowledge-compile-tests-\(UUID().uuidString)"))
         let settings = AppSettings(defaults: defaults)
         settings.knowledgeEnabled = true
+        var controls = try #require(settings.knowledgeControls)
+        controls.automaticCompilation = true
+        try settings.saveKnowledgeControls(controls)
         settings.aiProviderID = AIProvider.appleOnDevice.id
         let queue = KnowledgeJobQueue(container: container, foreground: foreground)
         let policy = PolicyState()
@@ -103,7 +106,7 @@ struct KnowledgeCompilationQueueTests {
         let deadline = ContinuousClock.now.advanced(by: .seconds(15))
         while !(await gate.started) {
             guard ContinuousClock.now < deadline else { throw KnowledgeQueueError.workFailed }
-            await Task.yield()
+            try await Task.sleep(for: .milliseconds(5))
         }
     }
 
@@ -249,6 +252,9 @@ struct KnowledgeCompilationQueueTests {
         #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<KnowledgeRevision>()) == 0)
         f.settings.knowledgeEnabled = true
         f.settings.aiProviderID = AIProvider.openAI.id
+        var controls = try #require(f.settings.knowledgeControls)
+        controls.providerID = AIProvider.openAI.id
+        try f.settings.saveKnowledgeControls(controls)
         f.policy.policy.allowedRemoteProviderIDs = [AIProvider.openAI.id]
         f.policy.policy.maxRemoteClassification = .restricted
         #expect(await f.coordinator.compile(meetingID: UUID(), trigger: .explicit) == .deferred)

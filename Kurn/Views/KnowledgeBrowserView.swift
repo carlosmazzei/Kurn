@@ -106,6 +106,7 @@ struct KnowledgeBrowserView: View {
         .onChange(of: settings.semanticSearchEnabled) { _, _ in invalidateAndRefresh() }
         .onChange(of: path) { _, _ in searchFocused = false; invalidateAndRefresh() }
         .onChange(of: settings.knowledgeEnabled) { _, _ in invalidateAndRefresh() }
+        .onChange(of: settings.knowledgeControls) { _, _ in showingReview = false; invalidateAndRefresh() }
         .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave).receive(on: RunLoop.main)) { _ in
             invalidateAndRefresh()
         }

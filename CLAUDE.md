@@ -2926,7 +2926,8 @@ hold for every phase; code comments cite this section.
   personal consent permit it. No model download is triggered. The stable
   host-owned workspace policy defaults to on-device/internal; named context
   policies must be supplied explicitly, never silently replaced by that default.
-  Policy persistence, scope controls, consent and backfill UI remain K2.7.
+  Local scope/control preferences and backfill UI are described in K2.7 below;
+  corporate-policy editing and canonical cloud consent remain gated.
   `KnowledgeCompilationIdentity` retains exact v1 keys and adds reversible v2
   keys with a generation digest covering provider configuration, model, policy
   revisions and an explicit rebuild operation UUID. Retries keep their operation
@@ -3337,6 +3338,56 @@ invalidate visible content and cancel pending work. Seven languages cover the
 inbox, native merge confirmation and recoverable errors. Synthetic UI fixtures
 exercise keep-separate/reopen, merge/undo and warning → evidence without a model
 or network call; physical-device and wider-layout release checks remain open.
+
+### Knowledge settings and explicit backfill (K2.7)
+
+Settings → Knowledge exposes the separate, off-by-default feature flag, an
+opt-in future-transcription trigger, a compilation pause, on-device provider,
+source scope/exclusions, explicit batch preview/confirmation, segment coverage
+and page rebuilding. Turning Knowledge on never enumerates older meetings or
+starts a backfill. The summary provider remains independent; canonical cloud
+processing is still refused even under an injected permissive policy. Its UI
+control and corporate-policy administration remain future reviewed work.
+
+`KnowledgeControls` is a versioned, bounded value stored through observable
+`AppSettings` accessors. Missing controls use safe local defaults; wrong types,
+corrupt bytes and future versions remain unreadable. Draft revisions and reset
+generations prevent stale/ABA writes. Reset turns the feature off, preserves
+meeting/canonical data and never falls back to a wider scope silently. All vs
+explicitly selected meetings (including an empty selection) are distinct;
+exclusions win. Preferences contain IDs/configuration only, not source content.
+They narrow the live source ACL without changing corporate policy revisions or
+invalidating still-authorized canonical evidence. Reader, search, playback,
+review and source-picker lifecycles invalidate on control changes.
+
+`KnowledgeJobQueue` has per-producer live eligibility and refresh. Pausing or
+revoking canonical extraction cannot cancel an active meeting article. Execution
+invalidation is separate from the durable cancellation-request epoch, preventing
+one producer's settings update from stranding another producer's cancellation
+barrier. Publication checks the active execution epoch and live source/provider
+permissions. The automatic toggle governs new transcription triggers; already
+approved pending jobs may resume, with Pause as the explicit execution stop.
+
+`KnowledgeStore.backfillRead` authorizes an explicit 1–16-meeting selection
+before metadata/coverage reads and bounds input to 8 MiB. Preview never enqueues,
+repairs, loads a model or calls a provider. It distinguishes current, missing,
+no-transcript and explicit-rebuild cases. `KnowledgeSettingsCoordinator` retains
+the confirmed operation beyond the Settings view, refetches scope/fingerprints
+and policy before each item, and binds compilation admission to the previewed
+source expectation. Regular work keeps normal idempotency; explicit recompiles
+retain the plan's generation across retries. Current sources are skipped in
+missing-only mode. On-device provider fees are zero; runtime is not estimated as
+a guarantee. Unavailable Apple models remain unavailable, with no asset download
+or cloud fallback. Old progress counts are hidden when the control/source scope
+changes. Source content is never written to preference storage.
+
+Page rebuilding uses the existing fresh projection snapshot/publication boundary
+without an LLM. Coverage reports examined segments, not accuracy or semantic
+recall. Seven languages cover the controls, safe-reset notice, scope editor,
+preview, local-cost confirmation and progress. Synthetic UI captures use a
+separate in-memory store; no real sources or paid calls are involved. Deleting
+the Knowledge corpus waits for K2.8's crash-resumable purge rather than exposing
+a partial destructive button. No canonical schema migration is introduced.
 
 ### Attached documents (PDFs)
 
