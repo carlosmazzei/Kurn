@@ -107,10 +107,10 @@ struct KnowledgeTemporalReducerTests {
     }
 
     private func claim(_ status: String, from: KnowledgeTemporalValue?, to: KnowledgeTemporalValue? = nil,
-                       polarity: KnowledgePolarity = .positive, subject: UUID, recordedAt: String = "2026-01-01",
-                       retractedAt: String? = nil, id: UUID = UUID()) -> KnowledgeTemporalClaim {
+                       polarity: KnowledgePolarity = .positive, modality: KnowledgeModality = .reported, subject: UUID,
+                       recordedAt: String = "2026-01-01", retractedAt: String? = nil, id: UUID = UUID()) -> KnowledgeTemporalClaim {
         KnowledgeTemporalClaim(id: id, subjectID: subject, predicate: .hasStatus, value: .enumeration(status), polarity: polarity,
-                               modality: .reported, validFrom: from, validTo: to, recordedAt: Self.date(recordedAt),
+                               modality: modality, validFrom: from, validTo: to, recordedAt: Self.date(recordedAt),
                                retractedAt: retractedAt.map(Self.date))
     }
 
@@ -185,6 +185,45 @@ struct KnowledgeTemporalReducerTests {
         #expect(open.claimIDs == open.claimIDs.sorted { $0.uuidString < $1.uuidString })
         #expect(state.holdings.first { $0.value == .enumeration("blocked") }?.certainty == .possible)
         #expect(state.conflicts.isEmpty)
+    }
+
+    @Test func aLaterHypothesisNeverDisplacesAnEstablishedStatus() throws {
+        let subject = UUID()
+        let observed = claim("open", from: Self.day("2026-09-01"), modality: .observed, subject: subject)
+        let maybe = claim("approved", from: Self.day("2026-10-01"), modality: .hypothetical, subject: subject)
+        let state = KnowledgeTemporalReducer.state(of: subject, validAt: Self.date("2026-10-10"), knownAt: Self.date("2026-12-31"),
+                                                   claims: [observed, maybe])
+        #expect(Self.statuses(state) == ["approved:definite", "open:definite"])
+        let hypothesis = try #require(state.holdings.first { $0.value == .enumeration("approved") })
+        #expect(hypothesis.isTentative && hypothesis.modalities == [.hypothetical])
+        let established = try #require(state.holdings.first { $0.value == .enumeration("open") })
+        #expect(!established.isTentative && established.modalities == [.observed])
+        #expect(state.conflicts.isEmpty)
+    }
+
+    @Test func aTentativeAndAnEstablishedClaimOfOneValueStaySeparate() {
+        let subject = UUID()
+        let proposed = claim("approved", from: Self.day("2026-09-01"), modality: .proposed, subject: subject)
+        let agreed = claim("approved", from: Self.day("2026-09-01"), modality: .agreed, subject: subject)
+        let state = KnowledgeTemporalReducer.state(of: subject, validAt: Self.date("2026-09-10"), knownAt: Self.date("2026-12-31"),
+                                                   claims: [agreed, proposed])
+        #expect(state.holdings.map(\.isTentative) == [false, true])
+        #expect(state.holdings.map(\.claimIDs) == [[agreed.id], [proposed.id]])
+        #expect(state.conflicts.isEmpty)
+    }
+
+    @Test func eachOverlappingPairIsReportedUnderItsOwnReason() {
+        let subject = UUID()
+        let day = Self.day("2026-10-10")
+        let approved = claim("approved", from: day, subject: subject)
+        let notApproved = claim("approved", from: day, polarity: .negative, subject: subject)
+        let rejected = claim("rejected", from: day, subject: subject)
+        let state = KnowledgeTemporalReducer.state(of: subject, validAt: Self.date("2026-10-20"), knownAt: Self.date("2026-12-31"),
+                                                   claims: [rejected, notApproved, approved])
+        let byReason = Dictionary(uniqueKeysWithValues: state.conflicts.map { ($0.reason, Set($0.claimIDs)) })
+        #expect(byReason[.contradictoryPolarity] == [approved.id, notApproved.id])
+        #expect(byReason[.unorderedValues] == [approved.id, notApproved.id, rejected.id])
+        #expect(state.conflicts.map(\.reason) == [.contradictoryPolarity, .unorderedValues])
     }
 
     @Test func boundsCoverTheWholeStatedPeriodInUTC() throws {

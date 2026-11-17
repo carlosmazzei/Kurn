@@ -3468,11 +3468,18 @@ and evidence checks.
   `possible` while it may have. `recordedAt` and input order decide nothing.
   Other predicates and incoming relations (e.g. being `blocks`'s object) are
   kept per other entity/value, with negation displacing the same way.
-- **Conflicts are surfaced, not resolved.** Different statements whose stated
-  starts overlap both stay as holdings and add a `Conflict`
-  (`unordered_values`, or `contradictory_polarity` for a statement and its
-  negation). Same statements from several meetings fold into one holding with
-  every claim ID.
+- **Tentative claims never establish state.** `tentative` modalities
+  (`proposed`, `hypothetical`, `disputed`) are shown as their own holdings
+  (`isTentative`, with every supporting `modalities`), never displace or
+  conflict with anything, and never merge into an established claim of the
+  same value; a later established statement still displaces them (an approval
+  ends a proposal).
+- **Conflicts are surfaced, not resolved.** Different established statements
+  whose stated starts overlap both stay as holdings and add a `Conflict` per
+  reason, classified pair by pair (`unordered_values` for different values,
+  `contradictory_polarity` for a statement and its negation), so three
+  overlapping claims can yield both. Same statements from several meetings
+  fold into one holding with every claim ID.
 - Output is sorted (predicate, direction, detail, polarity, claim IDs), so it is
   identical for any input order. Known gap: an explicit `validTo` on a later
   status does not end an earlier status by itself. `KnowledgeTemporalReducerTests`
