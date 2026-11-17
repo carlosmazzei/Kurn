@@ -196,6 +196,21 @@ final class MeetingKnowledgeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Selected meetings: 1")).firstMatch.exists)
     }
 
+    func testTimelineOpensFromHomeAndLeadsToEvidence() throws {
+        continueAfterFailure = false
+        let app = launch(prototype: true)
+        let timeline = app.buttons["knowledge.browser.timeline"]
+        XCTAssertTrue(timeline.waitForExistence(timeout: 15))
+        timeline.tap()
+        let entry = app.buttons["knowledge.timeline.entry"].firstMatch
+        XCTAssertTrue(entry.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["knowledge.timeline.filter"].exists)
+        assertRootBarFits(app)
+        capture(app, named: "knowledge-timeline")
+        entry.tap()
+        XCTAssertTrue(app.staticTexts["knowledge.browser.claim"].firstMatch.waitForExistence(timeout: 10))
+    }
+
     func testKnowledgeSearchFindsAliasesAndEvidenceWithoutSemanticSearch() throws {
         continueAfterFailure = false
         let app = launch(prototype: true)
