@@ -157,6 +157,29 @@ struct KnowledgeLifecycleTests {
         #expect(projection.anomalies.isEmpty)
     }
 
+    @Test func aRestatementOverlappingTheNextChangeStillLetsItSettle() throws {
+        let item = UUID()
+        let committed = status("committed", on: Self.day("2026-10-01"), of: item)
+        let again = status("committed", on: try Self.month("2026-11"), of: item)
+        let started = status("inProgress", on: Self.day("2026-11-10"), of: item)
+        let projection = KnowledgeLifecycle.action.project(entityID: item, knownAt: Self.later, claims: [started, again, committed])
+        #expect(projection.transitions.map(\.status) == [.committed, .inProgress])
+        #expect(Set(projection.transitions[0].claimIDs) == [committed.id, again.id])
+        #expect(projection.anomalies.isEmpty)
+        #expect(projection.state(at: Self.date("2026-12-02"))?.certainty == .definite)
+    }
+
+    @Test func aReopeningBetweenTwoCompletionsInOneMonthKeepsBothCycles() throws {
+        let item = UUID()
+        let claims = [status("completed", on: try Self.month("2026-11"), of: item),
+                      status("reopened", on: Self.day("2026-11-12"), of: item),
+                      status("completed", on: Self.day("2026-11-20"), of: item)]
+        let projection = KnowledgeLifecycle.action.project(entityID: item, knownAt: Self.later, claims: claims)
+        #expect(projection.transitions.map(\.status) == [.completed, .reopened, .completed])
+        #expect(projection.anomalies.isEmpty)
+        #expect(projection.state(at: Self.date("2026-12-02")) == .init(status: .completed, certainty: .definite, transitionIndex: 2))
+    }
+
     @Test func everyLifecycleStartsAndTransitionsOnlyThroughItsOwnStatuses() {
         #expect(KnowledgeLifecycle.action.allows(from: .completed, to: .reopened))
         #expect(!KnowledgeLifecycle.action.allows(from: nil, to: .reopened))

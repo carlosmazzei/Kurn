@@ -45,7 +45,7 @@ public enum KnowledgeLifecycle: String, Codable, Sendable, CaseIterable {
              .deferred: [.proposed, .approved, .rejected],
              .rejected: [.proposed],
              .approved: [.revised, .superseded, .revoked],
-             .revised: [.revised, .superseded, .revoked]]
+             .revised: [.superseded, .revoked]]
         case .action:
             [nil: [.proposed, .committed, .inProgress, .completed, .cancelled],
              .proposed: [.committed, .cancelled],
@@ -227,18 +227,17 @@ extension KnowledgeLifecycle {
         return nil
     }
 
-    /// The same status stated for overlapping periods is one change: later
-    /// statements are restatements and join the earliest one, keeping its date.
+    /// The same status stated for the same period by several claims is one
+    /// statement. Statements of a status that only overlap stay apart: a
+    /// reopening may separate two completions in one month, and the order
+    /// search decides which are restatements.
     private func merge(_ steps: [Step]) -> [Step] {
-        var merged: [Step] = []
-        for step in steps.sorted(by: Self.chronologically) {
-            if let index = merged.firstIndex(where: { $0.status == step.status && $0.overlaps(step) }) {
-                merged[index].claimIDs += step.claimIDs
-            } else {
-                merged.append(step)
-            }
+        var merged: [String: Step] = [:]
+        for step in steps {
+            let key = step.status.rawValue + "|" + step.stated.precision.rawValue + "|" + step.stated.text
+            if merged[key] == nil { merged[key] = step } else { merged[key]?.claimIDs += step.claimIDs }
         }
-        return merged
+        return merged.values.sorted(by: Self.chronologically)
     }
 
     private static func chronologically(_ lhs: Step, _ rhs: Step) -> Bool {
@@ -254,7 +253,9 @@ extension KnowledgeLifecycle {
     /// machine: every order that keeps disjoint periods in date order and is a
     /// valid path from the status before the group is considered. One such
     /// order is `lifecycle`; several are `ambiguous` (the first is kept); none
-    /// is `unresolved` and keeps date order.
+    /// is `unresolved` and keeps date order. A statement of the status already
+    /// in force is a restatement, not a transition, and orders differing only
+    /// in where a restatement falls count as one.
     private func order(_ steps: [Step]) -> (steps: [Step], bases: [KnowledgeLifecycleProjection.OrderBasis],
                                             anomalies: [KnowledgeLifecycleProjection.Anomaly]) {
         var result: [Step] = [], bases: [KnowledgeLifecycleProjection.OrderBasis] = []
@@ -289,15 +290,20 @@ extension KnowledgeLifecycle {
         return (result, bases, anomalies)
     }
 
-    /// How many valid orders of `group` follow `previous` (counting stops at
-    /// two), and the first in date-order preference.
+    /// How many distinct status sequences through `group` follow `previous`
+    /// (counting stops at two), and the first valid order in date-order
+    /// preference.
     private func paths(through group: [Step], after previous: KnowledgeStatus?) -> (count: Int, first: [Int]?) {
-        var count = 0, first: [Int]?
+        var sequences: Set<[KnowledgeStatus]> = [], first: [Int]?
         var placed: [Int] = [], used = Array(repeating: false, count: group.count)
         func extend(from last: KnowledgeStatus?) {
-            guard count < 2 else { return }
+            guard sequences.count < 2 else { return }
             guard placed.count < group.count else {
-                count += 1
+                var sequence: [KnowledgeStatus] = []
+                for status in placed.map({ group[$0].status }) where status != (sequence.last ?? previous) {
+                    sequence.append(status)
+                }
+                sequences.insert(sequence)
                 if first == nil { first = placed }
                 return
             }
@@ -306,7 +312,8 @@ extension KnowledgeLifecycle {
                 let mustWait = group.indices.contains { other in
                     !used[other] && other != candidate && group[other].upper <= group[candidate].lower
                 }
-                guard !mustWait, allows(from: last, to: group[candidate].status) else { continue }
+                let status = group[candidate].status
+                guard !mustWait, status == last || allows(from: last, to: status) else { continue }
                 used[candidate] = true
                 placed.append(candidate)
                 extend(from: group[candidate].status)
@@ -315,7 +322,7 @@ extension KnowledgeLifecycle {
             }
         }
         extend(from: previous)
-        return (count, first)
+        return (sequences.count, first)
     }
 
     private static func key(_ anomaly: KnowledgeLifecycleProjection.Anomaly) -> [String] {
