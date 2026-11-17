@@ -3505,15 +3505,18 @@ like the reducer it is not yet wired to the store or a reader.
   (groups above `maximumSearchedGroup`, 6, are not searched). One valid order is
   `lifecycle` (a reopening on the 12th puts "completed in November" first);
   several are `ambiguous` and none is `unresolved`, both reported as anomalies
-  and never `definite`. The same status stated for overlapping periods is one
-  restatement before any ordering, so it never raises an order question.
+  and never `definite`. Inside the search a statement of the status already in
+  force is a restatement, not a transition, and orders that differ only in
+  where a restatement falls count as one; overlapping statements of one status
+  are therefore never an order question, while a reopening between two
+  completions in one month keeps both cycles.
 - **Nothing is dropped.** A forbidden transition is kept and reported
   (`invalid_transition`), as is a status outside the machine
   (`out_of_vocabulary`) and an ambiguous or unresolved order. Hypothetical, disputed or
   proposed claims (except a proposal that something is `proposed`), negated
-  claims and undated ones are listed in `setAside` with their reason. The same
-  status restated later joins the transition it repeats, keeping its earliest
-  date.
+  claims and undated ones are listed in `setAside` with their reason. A status
+  restated right after itself joins the transition it repeats, keeping its
+  earliest date.
 - `state(at:)` returns the status in force at a valid time: `definite` only when
   its transition has definitely started, the next has definitely not, and
   neither was ordered `ambiguous` or `unresolved`. A transition ordered by the lifecycle is bounded
