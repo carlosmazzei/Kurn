@@ -3406,7 +3406,9 @@ journaled commit that deletes a meeting (`.meeting`) or a recording that had a
 transcript (`.source`), so a process death between the two cannot leave rows
 quoting a deleted transcript. "Delete Knowledge" in Settings → Knowledge saves a
 `.corpus` tombstone first, re-authenticates through `SensitiveActionAuthorizer`
-like "Delete all data", and cancels canonical extraction in the queue.
+like "Delete all data", and interrupts only an active canonical extraction
+(`KnowledgeJobQueue.refresh(kind:)` is producer-scoped, so a wiki article being
+generated is not cut off).
 
 `KnowledgeDeletionCoordinator` (built by `AppComposition`) drains tombstones at
 launch, on activation and after any store save (the save notification is only a
@@ -3432,7 +3434,8 @@ per code per process; an unknown scope or pipeline is refused, never dropped.
   purged rather than a partial job rewritten).
 - **Corpus:** all entities, assertions, evidence, events, relations, reviews and
   every non-article job; meetings, their episodic `WikiArticle` work, contexts
-  and links are kept.
+  and links are kept. Other tombstones are kept and purged after it, since only
+  a meeting's own purge removes its context link.
 - **Revisions** are content-free and kept: a revision whose job or merge audit
   was removed stops waiting for projection (it could never be acknowledged),
   and a new revision (`policyRevisionKey` = `knowledge-deletion-v1`, not

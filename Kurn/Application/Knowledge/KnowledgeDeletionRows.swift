@@ -76,7 +76,7 @@ enum KnowledgeDeletionRows {
         if let meetingID = tombstone.meetingID {
             try purge.meeting(meetingID, unlinkContext: scope == .meeting)
         } else {
-            try purge.corpus(keeping: tombstone.id)
+            try purge.corpus()
         }
         let revision = try KnowledgeStoreRows.latestRevision(in: context) + 1
         // Every canonical read and cache compares this number: the bump makes
@@ -151,7 +151,7 @@ enum KnowledgeDeletionRows {
             try settleRevisions()
         }
 
-        mutating func corpus(keeping tombstoneID: UUID) throws {
+        mutating func corpus() throws {
             for row in try context.fetch(FetchDescriptor<KnowledgeEntity>()) { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<KnowledgeAssertion>()) { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<KnowledgeEvidence>()) { context.delete(row) }
@@ -159,10 +159,14 @@ enum KnowledgeDeletionRows {
             for row in try context.fetch(FetchDescriptor<KnowledgeRelation>()) { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<KnowledgeReview>()) { context.delete(row) }
             // The episodic article queue and the context configuration are not
-            // canonical knowledge; every other job (and tombstone) is.
+            // canonical knowledge; every other job is. Other tombstones stay:
+            // a deleted meeting's context link is removed only by its own purge.
             let article = KnowledgeJobKind.meetingArticle.rawValue
-            let jobs = try context.fetch(FetchDescriptor<KnowledgeJob>(predicate: #Predicate { $0.kindRaw != article }))
-            for job in jobs where job.id != tombstoneID {
+            let deletion = KnowledgeJobKind.deletion.rawValue
+            let jobs = try context.fetch(FetchDescriptor<KnowledgeJob>(predicate: #Predicate {
+                $0.kindRaw != article && $0.kindRaw != deletion
+            }))
+            for job in jobs {
                 deletedJobIDs.insert(job.id)
                 context.delete(job)
             }
