@@ -19,6 +19,18 @@ public struct KnowledgeControls: Codable, Equatable, Sendable {
         (includedMeetingIDs?.contains(meetingID) ?? true) && !excludedMeetingIDs.contains(meetingID)
     }
 
+    public mutating func setAllMeetings(_ all: Bool) { includedMeetingIDs = all ? nil : [] }
+
+    public mutating func toggleMeeting(_ id: UUID) {
+        if allows(id) {
+            if includedMeetingIDs == nil { excludedMeetingIDs.insert(id) }
+            else { includedMeetingIDs?.remove(id) }
+        } else {
+            if includedMeetingIDs != nil { includedMeetingIDs?.insert(id) }
+            excludedMeetingIDs.remove(id)
+        }
+    }
+
     public func validated() throws -> Self {
         guard version == 1 else { throw KnowledgeControlsError.unsupportedVersion }
         guard revision > 0, revision < Int.max, !providerID.isEmpty, providerID.utf8.count <= 128,

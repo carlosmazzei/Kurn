@@ -39,4 +39,19 @@ struct KnowledgeControlsTests {
         controls.providerID = "apple-on-device"; controls.generation = "invalid"
         #expect(throws: KnowledgeControlsError.invalidControls) { try controls.encoded() }
     }
+
+    @Test func scopeEditingPreservesExplicitIntentAndExclusions() {
+        let id = UUID()
+        var controls = KnowledgeControls()
+        controls.toggleMeeting(id)
+        #expect(controls.includedMeetingIDs == nil && controls.excludedMeetingIDs == [id])
+        controls.setAllMeetings(false)
+        #expect(controls.includedMeetingIDs == [] && !controls.allows(id))
+        controls.toggleMeeting(id)
+        #expect(controls.includedMeetingIDs == [id] && controls.excludedMeetingIDs.isEmpty)
+        controls.toggleMeeting(id)
+        #expect(controls.includedMeetingIDs == [])
+        controls.setAllMeetings(true)
+        #expect(controls.includedMeetingIDs == nil && controls.allows(id))
+    }
 }

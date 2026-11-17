@@ -3371,7 +3371,8 @@ approved pending jobs may resume, with Pause as the explicit execution stop.
 `KnowledgeStore.backfillRead` authorizes an explicit 1–16-meeting selection
 before metadata/coverage reads and bounds input to 8 MiB. Preview never enqueues,
 repairs, loads a model or calls a provider. It distinguishes current, missing,
-no-transcript and explicit-rebuild cases. `KnowledgeSettingsCoordinator` retains
+no-transcript and explicit-rebuild cases, including a restored source whose normal
+identity was already cancelled. `KnowledgeSettingsCoordinator` retains
 the confirmed operation beyond the Settings view, refetches scope/fingerprints
 and policy before each item, and binds compilation admission to the previewed
 source expectation. Regular work keeps normal idempotency; explicit recompiles
@@ -3380,6 +3381,11 @@ missing-only mode. On-device provider fees are zero; runtime is not estimated as
 a guarantee. Unavailable Apple models remain unavailable, with no asset download
 or cloud fallback. Old progress counts are hidden when the control/source scope
 changes. Source content is never written to preference storage.
+
+`KnowledgeSettingsViewModel` owns asynchronous presentation, request epochs,
+source/control checks and recoverable errors; stale/cancelled responses cannot
+restore metadata after invalidation. The native view only binds controls and
+forwards user actions. Scope-edit transformations live in tested KurnCore values.
 
 Page rebuilding uses the existing fresh projection snapshot/publication boundary
 without an LLM. Coverage reports examined segments, not accuracy or semantic

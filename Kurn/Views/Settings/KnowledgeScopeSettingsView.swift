@@ -15,11 +15,11 @@ struct KnowledgeScopeSettingsView: View {
         Form {
             Section {
                 Toggle(KnowledgeSettingsCopy.text("all"), isOn: Binding(get: { controls.includedMeetingIDs == nil }, set: {
-                    controls.includedMeetingIDs = $0 ? nil : []
+                    controls.setAllMeetings($0)
                 }))
                 .accessibilityIdentifier("knowledge.settings.all")
                 ForEach(meetings) { meeting in
-                    Button { toggle(meeting.id) } label: {
+                    Button { controls.toggleMeeting(meeting.id) } label: {
                         HStack {
                             Image(systemName: controls.allows(meeting.id) ? "checkmark.circle.fill" : "circle").accessibilityHidden(true)
                             Text(verbatim: meeting.title).foregroundStyle(Theme.textPrimary)
@@ -35,7 +35,7 @@ struct KnowledgeScopeSettingsView: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button(NSLocalizedString("common.done", comment: "Done")) {
                     do { try settings.saveKnowledgeControls(controls); dismiss() }
-                    catch { error = .persistenceFailed(KnowledgeSettingsCopy.text("failed")) }
+                    catch { self.error = .persistenceFailed(KnowledgeSettingsCopy.text("failed")) }
                 }
                 .accessibilityIdentifier("knowledge.settings.scopeDone")
             }
@@ -43,15 +43,6 @@ struct KnowledgeScopeSettingsView: View {
         .errorAlert($error)
     }
 
-    private func toggle(_ id: UUID) {
-        if controls.allows(id) {
-            if controls.includedMeetingIDs == nil { controls.excludedMeetingIDs.insert(id) }
-            else { controls.includedMeetingIDs?.remove(id) }
-        } else {
-            if controls.includedMeetingIDs != nil { controls.includedMeetingIDs?.insert(id) }
-            controls.excludedMeetingIDs.remove(id)
-        }
-    }
 }
 
 struct KnowledgeCoverageSection: View {
