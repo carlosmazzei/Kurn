@@ -38,15 +38,22 @@ struct KnowledgeGraphLayoutTests {
         return ((first.x - second.x) * (first.x - second.x) + (first.y - second.y) * (first.y - second.y)).squareRoot()
     }
 
+    private struct Star {
+        let graph: KnowledgeGraph
+        let root: UUID
+        let spokes: [UUID]
+        let far: UUID
+    }
+
     /// A root with five spokes and a chain hanging off the first.
-    private static func star() throws -> (graph: KnowledgeGraph, root: UUID, spokes: [UUID], far: UUID) {
+    private static func star() throws -> Star {
         var builder = Builder()
         let root = builder.entity("Root")
         let spokes = (0..<5).map { builder.entity("Spoke \($0)") }
         for spoke in spokes { builder.relate(root, spoke) }
         let far = builder.entity("Far")
         builder.relate(spokes[0], far)
-        return (try builder.graph(root: root), root, spokes, far)
+        return Star(graph: try builder.graph(root: root), root: root, spokes: spokes, far: far)
     }
 
     @Test func theSameGraphAndSeedGiveTheSameLayout() throws {
