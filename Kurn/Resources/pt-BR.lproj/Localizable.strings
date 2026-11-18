@@ -1433,8 +1433,8 @@
 "knowledge.browser.timeline" = "Linha do tempo";
 "knowledge.timeline.footer" = "Posicionado pela data que cada afirmação declara, não por quando foi dita.";
 "knowledge.timeline.stated" = "Declarado para %@";
-"knowledge.timeline.recorded" = "Dito em %@";
-"knowledge.timeline.recorded_in" = "Dito em %1$@ em %2$@";
+"knowledge.timeline.recorded" = "Registrado em %@";
+"knowledge.timeline.recorded_in" = "De %1$@ · registrado em %2$@";
 "knowledge.timeline.tentative" = "Provisório";
 "knowledge.timeline.ahead" = "Planejado adiante";
 "knowledge.timeline.anomaly.invalid_transition" = "Mudança de status inesperada";

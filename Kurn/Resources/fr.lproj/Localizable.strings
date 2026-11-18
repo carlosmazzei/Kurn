@@ -1433,8 +1433,8 @@
 "knowledge.browser.timeline" = "Chronologie";
 "knowledge.timeline.footer" = "Placé selon la date que chaque affirmation énonce, pas selon le moment où elle a été dite.";
 "knowledge.timeline.stated" = "Énoncé pour %@";
-"knowledge.timeline.recorded" = "Dit le %@";
-"knowledge.timeline.recorded_in" = "Dit dans %1$@ le %2$@";
+"knowledge.timeline.recorded" = "Enregistré le %@";
+"knowledge.timeline.recorded_in" = "De %1$@ · enregistré le %2$@";
 "knowledge.timeline.tentative" = "Provisoire";
 "knowledge.timeline.ahead" = "Prévu à l’avance";
 "knowledge.timeline.anomaly.invalid_transition" = "Changement de statut inattendu";

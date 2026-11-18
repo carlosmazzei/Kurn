@@ -1433,8 +1433,8 @@
 "knowledge.browser.timeline" = "Zeitleiste";
 "knowledge.timeline.footer" = "Nach dem Datum eingeordnet, das jede Aussage nennt, nicht danach, wann sie gesagt wurde.";
 "knowledge.timeline.stated" = "Angegeben für %@";
-"knowledge.timeline.recorded" = "Gesagt am %@";
-"knowledge.timeline.recorded_in" = "Gesagt in %1$@ am %2$@";
+"knowledge.timeline.recorded" = "Erfasst am %@";
+"knowledge.timeline.recorded_in" = "Aus %1$@ · erfasst am %2$@";
 "knowledge.timeline.tentative" = "Vorläufig";
 "knowledge.timeline.ahead" = "Vorausgeplant";
 "knowledge.timeline.anomaly.invalid_transition" = "Unerwarteter Statuswechsel";

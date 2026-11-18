@@ -93,11 +93,15 @@ public struct KnowledgeStateComparison: Equatable, Sendable {
         for (key, holding) in afterByStatement where beforeByStatement[key] == nil {
             started[slot(holding), default: []].append(holding)
         }
-        // One statement replaced by exactly one other in the same slot is a
-        // change; anything less clear-cut is left as what started and ended.
+        // A slot that held exactly one statement at each point, and a different
+        // one, changed. Anything less clear-cut (a conflict on either side,
+        // even one whose other value held throughout) is left as what started
+        // and ended.
+        let beforeSlots = Dictionary(grouping: before.holdings, by: slot).mapValues(\.count)
+        let afterSlots = Dictionary(grouping: after.holdings, by: slot).mapValues(\.count)
         for slotKey in Set(ended.keys).union(started.keys) {
             let gone = ended[slotKey] ?? [], new = started[slotKey] ?? []
-            if gone.count == 1, new.count == 1 {
+            if gone.count == 1, new.count == 1, beforeSlots[slotKey] == 1, afterSlots[slotKey] == 1 {
                 changes.append(Change(kind: .changed, predicate: gone[0].predicate, direction: gone[0].direction,
                                       before: gone[0], after: new[0]))
                 continue

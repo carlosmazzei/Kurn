@@ -93,6 +93,24 @@ struct KnowledgeStateComparisonTests {
         #expect(result.earlier.conflicts.count == 1 && result.later.conflicts.isEmpty)
     }
 
+    @Test func aConflictThatPersistsIsNotReadAsAReplacement() throws {
+        // Open holds throughout; blocked (ending in May) and ready (from May)
+        // each disagree with it. Neither replaced the other: both sides conflict.
+        let open = Self.claim(.hasStatus, value: .enumeration("open"), from: Timeline.day("2026-03-01"))
+        let blocked = Self.claim(.hasStatus, value: .enumeration("blocked"), from: Timeline.day("2026-03-01"),
+                                 to: Timeline.day("2026-05-01"))
+        let ready = Self.claim(.hasStatus, value: .enumeration("ready"), from: Timeline.day("2026-03-01"))
+        let readyLater = KnowledgeTemporalClaim(id: ready.id, subjectID: ready.subjectID, predicate: ready.predicate,
+                                                value: ready.value, polarity: ready.polarity, modality: ready.modality,
+                                                validFrom: ready.validFrom, recordedAt: Timeline.date("2026-05-15"))
+        // Each day as known at its own end: ready was recorded only in May.
+        let april = try #require(Comparison.Point.endOfDay(Timeline.day("2026-04-01")))
+        let june = try #require(Comparison.Point.endOfDay(Timeline.day("2026-06-01")))
+        let result = Comparison.compare(entityID: Self.subject, earlier: april, later: june, claims: [open, blocked, readyLater])
+        #expect(result.changes.map(\.kind) == [.started, .ended, .unchanged])
+        #expect(!result.earlier.conflicts.isEmpty && !result.later.conflicts.isEmpty)
+    }
+
     @Test func aStatementGrowsCertainWhenItsPeriodHasPassed() throws {
         let month = try #require(KnowledgeTemporalValue(text: "2026-03", precision: .month))
         let status = Self.claim(.hasStatus, value: .enumeration("open"), from: month)

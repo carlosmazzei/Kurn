@@ -4,7 +4,7 @@ import KurnCore
 /// Words and links for the K3.3 timeline (CLAUDE.md "Knowledge timeline (K3.3)").
 /// A month is named from the stated month in UTC, the date a claim states is shown
 /// at its own precision (never given a day it did not state), and the meeting it
-/// was said in is shown beside it, never used to place it.
+/// came from and the date it was recorded are shown beside it, never used to place it.
 enum KnowledgeTimelinePresentation {
     struct Row: Equatable {
         let claim: String
