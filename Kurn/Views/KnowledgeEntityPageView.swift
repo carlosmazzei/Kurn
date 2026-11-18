@@ -43,6 +43,7 @@ struct KnowledgeEntityPageView: View {
                                 .font(Theme.title3).accessibilityAddTraits(.isHeader)
                             ForEach(section.entries, id: \.fact.id) { entry in KnowledgeClaimReadView(entry: entry) }
                         }
+                        KnowledgeLateArrivalsView(page: page)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).padding(20)

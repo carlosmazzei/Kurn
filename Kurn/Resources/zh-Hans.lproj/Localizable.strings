@@ -1468,6 +1468,12 @@
 "knowledge.compare.possible" = "当天不确定";
 "knowledge.compare.certainty_changed" = "确定性已变化";
 "knowledge.compare.before" = "之前：%@";
+"knowledge.late.header" = "之后修订";
+"knowledge.late.footer" = "之后记录的知识改变了这些较早日期成立的内容。";
+"knowledge.late.recorded" = "记录于 %@";
+"knowledge.late.from" = "自 %@ 起";
+"knowledge.late.on" = "%@";
+"knowledge.late.range" = "%1$@ 至 %2$@";
 "knowledge.browser.evidence" = "证据";
 "knowledge.browser.transcript" = "转录";
 "knowledge.browser.valid_from" = "生效起始：%@";
