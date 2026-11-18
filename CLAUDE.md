@@ -3679,7 +3679,8 @@ app; no drawing yet (the Graph Explorer is K4.3).
   per cached answer and remembers where each node was last shown in the scope
   (`shownPositions`): a neighbourhood that grows, or is re-rooted on a shown
   node, keeps the nodes already on screen where they were and places only the
-  new ones. A new scope or `clear()` forgets the positions with the answers.
+  new ones. A new scope or `clear()` forgets the positions with the answers,
+  and another seed is a new drawing that drops every layout and shown position.
 
 ### Attached documents (PDFs)
 

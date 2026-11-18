@@ -34,6 +34,8 @@ final class KnowledgeGraphQueryService {
     /// Where each node was last shown in this scope, so a neighbourhood that
     /// grows or moves keeps the nodes already on screen where they were.
     private(set) var shownPositions: [UUID: KnowledgeGraphLayout.Point] = [:]
+    /// The seed the cached layouts and shown positions were drawn with.
+    private(set) var layoutSeed: UInt64 = 0
     /// How many times an index was built, for tests.
     private(set) var indexBuilds = 0
 
@@ -71,10 +73,16 @@ final class KnowledgeGraphQueryService {
 
     /// The neighbourhood `query` asks for and its positions (K4.2). A layout is
     /// computed once per answer; nodes already shown in this scope keep their
-    /// positions, and only new ones are placed.
+    /// positions, and only new ones are placed. Another seed is a new drawing:
+    /// it drops every layout and shown position before laying out.
     func laidOut(_ query: KnowledgeGraph.Query, in read: KnowledgeBrowserRead,
                  seed: UInt64 = 0) -> (graph: KnowledgeGraph, layout: KnowledgeGraphLayout)? {
         guard let graph = graph(query, in: read) else { return nil }
+        if seed != layoutSeed {
+            layoutSeed = seed
+            layouts = [:]
+            shownPositions = [:]
+        }
         if let cached = layouts[query] { return (graph, cached) }
         let shown = Set(graph.nodes.map(\.id))
         let layout = KnowledgeGraphLayout.layout(graph, seed: seed, fixed: shownPositions.filter { shown.contains($0.key) })
