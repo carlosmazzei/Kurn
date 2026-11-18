@@ -1468,6 +1468,12 @@
 "knowledge.compare.possible" = "Incertain ce jour-là";
 "knowledge.compare.certainty_changed" = "La certitude a changé";
 "knowledge.compare.before" = "Avant : %@";
+"knowledge.late.header" = "Révisé ensuite";
+"knowledge.late.footer" = "Des connaissances enregistrées plus tard ont changé ce qui valait ces jours précédents.";
+"knowledge.late.recorded" = "Enregistré le %@";
+"knowledge.late.from" = "À partir du %@";
+"knowledge.late.on" = "Le %@";
+"knowledge.late.range" = "Du %1$@ au %2$@";
 "knowledge.browser.evidence" = "Preuve";
 "knowledge.browser.transcript" = "Transcription";
 "knowledge.browser.valid_from" = "Valide à partir du : %@";

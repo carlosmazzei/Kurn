@@ -3590,6 +3590,36 @@ picks, from the same authorized pages the reader shows, offline.
   show what a change replaced, and open the first cited passage through the
   ID-only evidence route.
 
+### Knowledge late arrivals (K3.5)
+
+An entity page's overview ends with "Revised later" when knowledge recorded after
+the fact changed what held on earlier days (`KnowledgeLateArrivalsView`,
+`KnowledgeLateArrivalPresentation`). Nothing derived is stored, so there is no
+cache to invalidate: "recomputing the affected interval" is computing, on read,
+only the stretch of valid time an arrival changed.
+
+- KurnCore's `KnowledgeLateArrival.recompute(entityID:arrivedAt:claims:)` takes
+  the claims recorded at one transaction time that name the entity. It needs
+  earlier knowledge of the entity and starts at the earliest moment the new
+  claims could hold (an undated one reaches back to the entity's earliest stated
+  bound). From there it compares the K3.1 state as known just before the arrival
+  with the state as known at it (two K3.4 `Point`s on the same valid time) at
+  every stated bound that could change it, and keeps the stretches that differ,
+  merging neighbours whose differences name the same claims (so a change that
+  only grows certain stays one stretch; the last one is open while it lasts).
+- An arrival is late only when what it changed starts before the UTC day it was
+  recorded on: a status stated for its own recording day revises nothing past.
+  `revisions(of:claims:)` lists every late arrival for an entity, oldest first,
+  independent of claim order.
+- A page holds every claim about its entity in both directions, so the page
+  alone is the input. `recordedAt` is the assertion's transaction time (when its
+  meeting was compiled into knowledge), so "late" means "compiled after the days
+  it changed". Stated days are shown in UTC, the recording date in the person's
+  time zone; a stretch's rows are the K3.4 change rows (every change, and an
+  unchanged statement only when it grew or lost certainty).
+- Not yet: `KnowledgeEvent` rows written from these reductions, and a marker on
+  the timeline for late claims.
+
 ### Attached documents (PDFs)
 
 A meeting can carry PDFs as reference material for its summaries
