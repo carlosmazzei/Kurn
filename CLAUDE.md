@@ -3214,7 +3214,8 @@ reserve a separate slot for this action. `KnowledgeRootNavigationView` uses
 system-glass groups for the destination capsule and the recorder, without
 overlapping their hit targets. The destinations look like the legacy bottom
 toolbar's buttons — regular-weight icons with no title beneath, the selected
-one in the accent colour — and the recorder's title gives way to its icon below
+one in the accent colour on a light capsule, so selection is never colour
+only — and the recorder's title gives way to its icon below
 360 points or at accessibility text sizes; localized accessibility names and
 selected traits remain available. Each tab reserves the measured bar height within its host,
 so chat composers, source-audio controls and mini bars stay above it even
