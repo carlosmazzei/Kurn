@@ -8,7 +8,8 @@ import Testing
 struct KnowledgeGraphQueryServiceTests {
     private static let meeting = UUID(), project = UUID(), team = UUID(), owner = UUID()
 
-    private static func read(revision: Int = 1, withOwner: Bool = false, policy: String = "p1") throws -> KnowledgeBrowserRead {
+    private static func read(revision: Int = 1, withOwner: Bool = false, policy: String = "p1",
+                             withBlocker: Bool = true) throws -> KnowledgeBrowserRead {
         func fact(_ subject: UUID, _ predicate: KnowledgePredicate, _ object: UUID) -> KnowledgeWikiSnapshot.Fact {
             KnowledgeWikiSnapshot.Fact(
                 id: UUID(), subjectID: subject, predicate: predicate, objectID: object,
@@ -22,11 +23,10 @@ struct KnowledgeGraphQueryServiceTests {
         var entities: [KnowledgeWikiSnapshot.Entity] = [
             .init(id: project, kind: .project, name: "Portal"), .init(id: team, kind: .team, name: "Platform"),
         ]
-        var facts = [fact(team, .blocks, project)]
-        if withOwner {
-            entities.append(.init(id: owner, kind: .team, name: "Owners"))
-            facts.append(fact(owner, .owns, project))
-        }
+        // Without the blocker the team still has a page, through the claim it owns.
+        var facts = withBlocker ? [fact(team, .blocks, project)] : [fact(team, .owns, owner)]
+        if withOwner || !withBlocker { entities.append(.init(id: owner, kind: .team, name: "Owners")) }
+        if withOwner { facts.append(fact(owner, .owns, project)) }
         return try KnowledgeBrowserRead(meetingIDs: [meeting], wiki: .init(revision: revision, entities: entities, facts: facts),
                                         meetingTitles: [meeting: "Weekly"], policyRevisionKey: policy)
     }
@@ -55,6 +55,22 @@ struct KnowledgeGraphQueryServiceTests {
         #expect(service.scope == nil && service.cachedAnswerCount == 0)
         _ = service.graph(query, in: try Self.read())
         #expect(service.indexBuilds == 4)
+    }
+
+    @Test func pagesThatChangedWithoutANewRevisionAreReindexed() throws {
+        // A corrected transcript can drop a claim without a new canonical revision.
+        let service = KnowledgeGraphQueryService()
+        let query = KnowledgeGraph.Query(rootID: Self.team)
+        let before = try #require(service.graph(query, in: try Self.read(withOwner: true)))
+        #expect(before.edges.contains { $0.predicate == .blocks })
+        // Same revision, meetings, policy and page count: only the pages differ.
+        let corrected = try Self.read(withOwner: true, withBlocker: false)
+        let original = try Self.read(withOwner: true)
+        #expect(corrected.pages.count == original.pages.count)
+        let after = try #require(service.graph(query, in: corrected))
+        #expect(!after.edges.contains { $0.predicate == .blocks } && service.indexBuilds == 2)
+        let fresh = try #require(service.graph(.init(rootID: Self.project), in: corrected))
+        #expect(!fresh.edges.contains { $0.predicate == .blocks })
     }
 
     @Test func theLeastRecentlyAskedAnswerIsForgottenFirst() throws {
