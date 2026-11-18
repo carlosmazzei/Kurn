@@ -5,21 +5,22 @@ import KurnCore
 /// "Knowledge graph query (K4.1)"). The read is already authorized and
 /// evidence-checked; this only indexes its pages once and remembers recent
 /// answers, keyed by the canonical revision, the meetings and the policy
-/// revision the read was taken under, so a newer read (a compile, a merge, a
-/// deletion, another scope or policy) is never answered from an older one.
+/// revision the read was taken under and by the pages themselves: a read can
+/// change without a new revision (a corrected transcript drops evidence and,
+/// with it, a claim), so nothing is answered from pages other than the read's.
 @MainActor
 final class KnowledgeGraphQueryService {
-    struct GraphScope: Hashable {
+    struct GraphScope: Equatable {
         let revision: Int
         let meetingIDs: Set<UUID>
         let policyRevisionKey: String
-        let pageCount: Int
+        let pages: [KnowledgeWikiPage]
 
         init(_ read: KnowledgeBrowserRead) {
             revision = read.pages.first?.revision ?? -1
             meetingIDs = read.meetingIDs
             policyRevisionKey = read.policyRevisionKey
-            pageCount = read.pages.count
+            pages = read.pages
         }
     }
 

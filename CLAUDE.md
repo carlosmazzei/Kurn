@@ -3649,9 +3649,10 @@ time. Backend only so far: the Graph Explorer (K4.3) and layout (K4.2) follow.
 - The app's `KnowledgeGraphQueryService` (`Application/Knowledge`,
   `@MainActor`) keeps one index and up to 32 recent answers (least recently
   asked evicted) per scope: the canonical revision, the meetings, the policy
-  revision and the page count of the read. Any other scope rebuilds the index
-  and drops every answer, so a compile, merge, deletion, scope or policy
-  change is never answered from an older read; `clear()` forgets everything.
+  revision and the pages of the read themselves, since a read can change
+  without a new revision (a corrected transcript drops a claim's evidence).
+  Any other scope rebuilds the index and drops every answer, so nothing is
+  answered from an older read; `clear()` forgets everything.
 
 ### Attached documents (PDFs)
 
