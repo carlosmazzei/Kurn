@@ -91,7 +91,6 @@ struct KnowledgeTimelineView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
         if let route = row.evidence {
             NavigationLink(value: route) { content }
                 .accessibilityIdentifier("knowledge.timeline.entry")

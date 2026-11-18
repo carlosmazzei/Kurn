@@ -202,7 +202,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         let timeline = app.buttons["knowledge.browser.timeline"]
         XCTAssertTrue(timeline.waitForExistence(timeout: 15))
         timeline.tap()
-        let entry = app.buttons["knowledge.timeline.entry"].firstMatch
+        let entry = app.descendants(matching: .any)["knowledge.timeline.entry"].firstMatch
         XCTAssertTrue(entry.waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["knowledge.timeline.filter"].exists)
         assertRootBarFits(app)
