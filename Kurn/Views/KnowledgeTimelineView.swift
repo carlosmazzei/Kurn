@@ -43,10 +43,10 @@ struct KnowledgeTimelineView: View {
                             ForEach(timeline.undated, id: \.factID) { row($0) }
                         } header: {
                             Text(KnowledgeTimelinePresentation.text("undated")).accessibilityAddTraits(.isHeader)
+                                .accessibilityIdentifier("knowledge.timeline.undated")
                         } footer: {
                             Text(KnowledgeTimelinePresentation.text("undated_footer"))
                         }
-                        .accessibilityIdentifier("knowledge.timeline.undated")
                     }
                 }
                 .accessibilityIdentifier("knowledge.timeline")
