@@ -48,6 +48,14 @@ struct KnowledgeEntityPageView: View {
                 .frame(maxWidth: .infinity, alignment: .leading).padding(20)
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink(value: KnowledgeBrowserRoute.compare(page.entity.id)) {
+                    Label(KnowledgeComparePresentation.copy("title"), systemImage: "calendar.badge.clock")
+                }
+                .accessibilityIdentifier("knowledge.browser.compare")
+            }
+        }
     }
 }
 

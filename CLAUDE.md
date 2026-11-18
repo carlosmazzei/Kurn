@@ -3556,6 +3556,36 @@ with no provider.
 - Not yet: context lanes on iPad (the read carries no context per claim yet),
   canonical `KnowledgeEvent` rows and known-at ("as of") navigation.
 
+### Knowledge comparison (K3.4)
+
+An entity page opens "Compare dates" (`KnowledgeBrowserRoute.compare`,
+`KnowledgeCompareView`): the entity's state at the end of two days the person
+picks, from the same authorized pages the reader shows, offline.
+
+- KurnCore's `KnowledgeStateComparison.compare(entityID:earlier:later:claims:)`
+  runs the K3.1 reducer at two `Point`s (a valid time and a transaction time
+  each) and lines up their holdings: the same statement at both is
+  `unchanged` (with `certaintyChanged` when it is definite at one point and only
+  possible at the other); one statement replaced by exactly one other in the
+  same slot (another status, a negation) is `changed`; anything else is
+  `started` or `ended`, so two conflicting values are never paired into a
+  change. Conflicts stay on their side. Output is sorted and independent of
+  claim order.
+- `Point.endOfDay` is the last second of a stated day (UTC): a claim stated for
+  that day is `possible` there, since a day's precision cannot say whether it
+  had already happened. The app reads the picked days in the person's calendar
+  (`KnowledgeComparePresentation.day`) and orders them.
+- "As known on each date" sets each point's transaction time to its own moment,
+  so a meeting imported later does not change what was known then; otherwise
+  both days are read with everything recorded so far. Page facts carry their
+  meeting's date as `recordedAt`, so this reads "known" as "said by then".
+- `KnowledgeStateComparison.claims(from:)` turns pages into temporal claims that
+  name the identities the pages show, so a merged identity compares as one.
+- Rows read like the reader's claims, in their own direction (an incoming
+  `blocks` names the other side first), mark tentative and uncertain holdings,
+  show what a change replaced, and open the first cited passage through the
+  ID-only evidence route.
+
 ### Attached documents (PDFs)
 
 A meeting can carry PDFs as reference material for its summaries
