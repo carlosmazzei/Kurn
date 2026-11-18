@@ -45,6 +45,23 @@ struct KnowledgeLateArrivalPresentationTests {
         #expect(item.stretches[0].rows.count == 2 && item.stretches[0].rows.contains { $0.notes.contains(shifted) })
         let change = try #require(item.stretches[1].rows.first)
         #expect(item.stretches[1].rows.count == 1 && change.before != nil && change.evidence != nil)
+        #expect(change.notes.first == KnowledgeComparePresentation.copy("kind.changed"))
+        #expect(item.stretches[0].rows.map { $0.notes.first } == [
+            KnowledgeComparePresentation.copy("kind.started"), KnowledgeComparePresentation.copy("kind.unchanged"),
+        ])
+    }
+
+    @Test func conflictingStatesALateArrivalSettlesAreMarkedAsEnded() throws {
+        // Open and blocked conflict from March; ready, stated for May and
+        // recorded in June, ends both rather than replacing either one.
+        let page = try Self.page([("open", "2026-03-01", "2026-03-01T12:00:00Z"),
+                                  ("blocked", "2026-03-01", "2026-03-01T12:00:00Z"),
+                                  ("ready", "2026-05-01", "2026-06-01T12:00:00Z")])
+        let item = try #require(KnowledgeLateArrivalPresentation.items(page: page, locale: Self.english, timeZone: Self.utc).first)
+        let settled = try #require(item.stretches.last)
+        let kinds = settled.rows.compactMap { $0.notes.first }
+        #expect(kinds.filter { $0 == KnowledgeComparePresentation.copy("kind.ended") }.count == 2)
+        #expect(kinds.filter { $0 == KnowledgeComparePresentation.copy("kind.started") }.count == 1)
     }
 
     @Test func aPageWithNothingLateShowsNothing() throws {

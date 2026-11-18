@@ -30,11 +30,16 @@ enum KnowledgeLateArrivalPresentation {
     }
 
     /// What differs in a stretch: every change, and an unchanged statement only
-    /// when the arrival made it more or less certain.
+    /// when the arrival made it more or less certain. Each row leads its notes
+    /// with what happened to it (changed, started, ended, unchanged), since the
+    /// rows of a stretch are listed together without section headers.
     static func rows(_ comparison: KnowledgeStateComparison, page: KnowledgeWikiPage) -> [KnowledgeComparePresentation.Row] {
         let shifted = KnowledgeComparePresentation.copy("certainty_changed")
         return KnowledgeComparePresentation.sections(comparison, pages: [page]).flatMap { section in
-            section.kind == .unchanged ? section.rows.filter { $0.notes.contains(shifted) } : section.rows
+            (section.kind == .unchanged ? section.rows.filter { $0.notes.contains(shifted) } : section.rows).map { row in
+                KnowledgeComparePresentation.Row(text: row.text, before: row.before, notes: [section.title] + row.notes,
+                                                 evidence: row.evidence)
+            }
         }
     }
 
