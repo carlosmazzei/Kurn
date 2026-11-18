@@ -118,7 +118,7 @@ public struct KnowledgeGraphIndex: Sendable {
         }
         self.entities = entities
         self.adjacency = adjacency.mapValues { list in
-            list.sorted { Self.visitKey($0) < Self.visitKey($1) }
+            list.sorted { Self.visitKey($0).lexicographicallyPrecedes(Self.visitKey($1)) }
         }
         cycles = Self.supersessionCycles(Array(edges.values))
     }
@@ -154,18 +154,18 @@ public struct KnowledgeGraphIndex: Sendable {
                 if depths[edge.sourceID] != nil, depths[edge.targetID] != nil { candidates.append(edge) }
             }
         }
-        candidates.sort { Self.shownKey($0, depths) < Self.shownKey($1, depths) }
+        candidates.sort { Self.shownKey($0, depths).lexicographicallyPrecedes(Self.shownKey($1, depths)) }
         if candidates.count > query.maxEdges { truncated = true }
         let shown = Array(candidates.prefix(query.maxEdges))
         let shownIDs = Set(shown.map(\.factID))
         let nodes = order.compactMap { id in entities[id].map { KnowledgeGraph.Node(entity: $0, depth: depths[id] ?? 0) } }
-            .sorted { Self.nodeKey($0) < Self.nodeKey($1) }
+            .sorted { Self.nodeKey($0).lexicographicallyPrecedes(Self.nodeKey($1)) }
         let frontier = nodes.map(\.id).filter { id in
             (adjacency[id] ?? []).contains { query.follows($0) && !shownIDs.contains($0.factID) }
         }
         let touched = Set(order)
         return KnowledgeGraph(query: query, nodes: nodes, edges: shown, isTruncated: truncated, frontier: frontier,
-                              supersessionCycles: cycles.filter { $0.contains(where: touched.contains) })
+                              supersessionCycles: cycles.filter { cycle in cycle.contains { touched.contains($0) } })
     }
 
     // MARK: - Ordering
