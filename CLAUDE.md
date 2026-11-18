@@ -3620,6 +3620,39 @@ only the stretch of valid time an arrival changed.
 - Not yet: `KnowledgeEvent` rows written from these reductions, and a marker on
   the timeline for late claims.
 
+### Knowledge graph query (K4.1)
+
+The relationship graph of a scoped knowledge read, queried a neighbourhood at a
+time. Backend only so far: the Graph Explorer (K4.3) and layout (K4.2) follow.
+
+- KurnCore's `KnowledgeGraphIndex(pages:)` indexes the reader's authorized,
+  evidence-checked pages once; it is a projection, never a second store. A node
+  is an identity a page shows (a merged identity is the one it was merged into)
+  and an edge is one claim between two entities, in its stated direction, with
+  its predicate, polarity, modality and first cited passage (for the ID-only
+  evidence route). Value claims are not edges, a claim shown on both ends'
+  pages is one edge, and a claim whose two ends a merge made one identity is
+  not drawn.
+- `query(_:)` walks breadth first from a root within `KnowledgeGraph.Query`'s
+  bounds (default depth 1, 40 nodes, 80 edges; clamped to depth 0–2, 1–40
+  nodes, 0–80 edges), optionally following only chosen predicates and leaving
+  out tentative or negated claims. Nodes come root first, then by depth and
+  name; edges nearest first (the deeper end's depth), so an edge bound drops
+  the farthest. `isTruncated` says a node or edge bound cut the walk short (the
+  depth bound alone does not), and `frontier` lists shown nodes with a followed
+  claim the graph does not show: where to expand next. It returns nil for a
+  root the pages do not show. Output is identical for any page order.
+- `supersessionCycles` reports each set of identities whose established,
+  positive `supersedes` claims form a cycle (Tarjan, over every page, a
+  self-supersession after a merge included) and that touches a shown node. A
+  cycle is surfaced, never ordered through.
+- The app's `KnowledgeGraphQueryService` (`Application/Knowledge`,
+  `@MainActor`) keeps one index and up to 32 recent answers (least recently
+  asked evicted) per scope: the canonical revision, the meetings, the policy
+  revision and the page count of the read. Any other scope rebuilds the index
+  and drops every answer, so a compile, merge, deletion, scope or policy
+  change is never answered from an older read; `clear()` forgets everything.
+
 ### Attached documents (PDFs)
 
 A meeting can carry PDFs as reference material for its summaries
