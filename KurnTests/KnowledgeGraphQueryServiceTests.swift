@@ -104,6 +104,11 @@ struct KnowledgeGraphQueryServiceTests {
         #expect(rerooted.layout.positions[Self.team] == teamPoint)
         #expect(service.laidOut(.init(rootID: UUID()), in: read) == nil)
         #expect(service.shownPositions.count == 3)
+        // Another seed is a new drawing: nothing cached or shown is reused.
+        let reseeded = try #require(service.laidOut(.init(rootID: Self.project), in: read, seed: 9))
+        #expect(reseeded.layout.seed == 9 && service.layoutSeed == 9)
+        #expect(reseeded.layout.positions[Self.project] == KnowledgeGraphLayout.Point(x: 0.5, y: 0.5))
+        #expect(service.shownPositions == reseeded.layout.positions)
         // A new scope or a clear forgets every shown position.
         _ = service.graph(.init(rootID: Self.project), in: try Self.read(revision: 2, withOwner: true))
         #expect(service.shownPositions.isEmpty)
