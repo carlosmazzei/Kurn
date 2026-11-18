@@ -1433,8 +1433,8 @@
 "knowledge.browser.timeline" = "Timeline";
 "knowledge.timeline.footer" = "Placed by the date each claim states, not by when it was said.";
 "knowledge.timeline.stated" = "Stated for %@";
-"knowledge.timeline.recorded" = "Said on %@";
-"knowledge.timeline.recorded_in" = "Said in %1$@ on %2$@";
+"knowledge.timeline.recorded" = "Recorded %@";
+"knowledge.timeline.recorded_in" = "From %1$@ · recorded %2$@";
 "knowledge.timeline.tentative" = "Tentative";
 "knowledge.timeline.ahead" = "Planned ahead";
 "knowledge.timeline.anomaly.invalid_transition" = "Unexpected status change";

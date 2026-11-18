@@ -20,9 +20,12 @@ enum KnowledgeComparePresentation {
         let rows: [Row]
     }
 
-    /// The day `date` falls on in `calendar`, as a stated day.
+    /// The day `date` falls on in `calendar`'s time zone, as a stated day.
+    /// Stated days are Gregorian whatever calendar the person reads in.
     static func day(_ date: Date, calendar: Calendar = .current) -> KnowledgeTemporalValue? {
-        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = calendar.timeZone
+        let parts = gregorian.dateComponents([.year, .month, .day], from: date)
         guard let year = parts.year, let month = parts.month, let day = parts.day else { return nil }
         return KnowledgeTemporalValue(text: String(format: "%04d-%02d-%02d", year, month, day), precision: .day)
     }

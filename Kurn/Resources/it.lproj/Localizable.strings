@@ -1433,8 +1433,8 @@
 "knowledge.browser.timeline" = "Cronologia";
 "knowledge.timeline.footer" = "Ordinato per la data che ogni affermazione dichiara, non per quando è stata detta.";
 "knowledge.timeline.stated" = "Dichiarato per %@";
-"knowledge.timeline.recorded" = "Detto il %@";
-"knowledge.timeline.recorded_in" = "Detto in %1$@ il %2$@";
+"knowledge.timeline.recorded" = "Registrato il %@";
+"knowledge.timeline.recorded_in" = "Da %1$@ · registrato il %2$@";
 "knowledge.timeline.tentative" = "Provvisorio";
 "knowledge.timeline.ahead" = "Pianificato in anticipo";
 "knowledge.timeline.anomaly.invalid_transition" = "Cambio di stato inatteso";

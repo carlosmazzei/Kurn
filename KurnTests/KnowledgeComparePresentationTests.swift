@@ -57,6 +57,9 @@ struct KnowledgeComparePresentationTests {
         let lateEvening = try #require(ISO8601DateFormatter().date(from: "2026-03-01T20:00:00Z"))
         #expect(KnowledgeComparePresentation.day(lateEvening, calendar: Self.utc)?.text == "2026-03-01")
         #expect(KnowledgeComparePresentation.day(lateEvening, calendar: tokyo)?.text == "2026-03-02")
+        var buddhist = Calendar(identifier: .buddhist)
+        buddhist.timeZone = Self.utc.timeZone
+        #expect(KnowledgeComparePresentation.day(lateEvening, calendar: buddhist)?.text == "2026-03-01")
     }
 
     @Test func aChangeShowsWhatItWasAndLinksToItsEvidence() throws {

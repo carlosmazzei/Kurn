@@ -39,7 +39,7 @@ public struct KnowledgeTimeline: Equatable, Sendable {
         public let lifecycleAnomalies: [KnowledgeLifecycleProjection.AnomalyCode]
 
         public var factID: UUID { item.fact.id }
-        /// The stated date lies after the meeting it was said in: a plan or a commitment.
+        /// The stated date lies after the claim was recorded: a plan or a commitment.
         public var isAhead: Bool { stated?.bounds.map { $0.lower > recordedAt } ?? false }
     }
 

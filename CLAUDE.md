@@ -3534,9 +3534,11 @@ with no provider.
 
 - **Placed by stated time, shown with recorded time.** Each claim sits in the UTC
   month its stated `validFrom` falls in, shown at its own precision (a month stays
-  a month); the meeting and date it was said in are shown beside it and never move
+  a month); the meeting it came from and the date it was recorded (the
+  assertion's transaction time, `recordedAt`, set when its meeting was compiled
+  into knowledge, not the meeting's own date) are shown beside it and never move
   it. Within a month, the earlier stated start comes first, a narrower period
-  first when two start together. A stated date after its meeting is marked
+  first when two start together. A stated date after it was recorded is marked
   "planned ahead" (`isAhead`).
 - **Unknown dates are kept apart.** A claim with no stated date is listed under
   "No stated date" in recorded order instead of being given one.
@@ -3577,8 +3579,10 @@ picks, from the same authorized pages the reader shows, offline.
   (`KnowledgeComparePresentation.day`) and orders them.
 - "As known on each date" sets each point's transaction time to its own moment,
   so a meeting imported later does not change what was known then; otherwise
-  both days are read with everything recorded so far. Page facts carry their
-  meeting's date as `recordedAt`, so this reads "known" as "said by then".
+  both days are read with everything recorded so far. A page fact's
+  `recordedAt` is its assertion's transaction time (when its meeting was
+  compiled into knowledge), so "known" means "compiled by then", not "said in a
+  meeting by then".
 - `KnowledgeStateComparison.claims(from:)` turns pages into temporal claims that
   name the identities the pages show, so a merged identity compares as one.
 - Rows read like the reader's claims, in their own direction (an incoming
