@@ -95,6 +95,11 @@ struct KnowledgeRootNavigationView: View {
                                 .imageScale(.large)
                                 .frame(maxWidth: .infinity, minHeight: 44)
                                 .contentShape(Rectangle())
+                                // A shape, not only the accent colour, marks the
+                                // selected destination (state is never colour-only).
+                                .background {
+                                    if tab == destination { Capsule().fill(.tint.opacity(0.15)) }
+                                }
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(tab == destination ? Color.accentColor : Theme.textPrimary)
