@@ -3626,7 +3626,7 @@ only the stretch of valid time an arrival changed.
 ### Knowledge graph query (K4.1)
 
 The relationship graph of a scoped knowledge read, queried a neighbourhood at a
-time. Backend only so far: the Graph Explorer (K4.3) and layout (K4.2) follow.
+time. Backend only so far: positions come from K4.2 below and the Graph Explorer (K4.3) follows.
 
 - KurnCore's `KnowledgeGraphIndex(pages:)` indexes the reader's authorized,
   evidence-checked pages once; it is a projection, never a second store. A node
@@ -3656,6 +3656,30 @@ time. Backend only so far: the Graph Explorer (K4.3) and layout (K4.2) follow.
   without a new revision (a corrected transcript drops a claim's evidence).
   Any other scope rebuilds the index and drops every answer, so nothing is
   answered from an older read; `clear()` forgets everything.
+
+### Knowledge graph layout (K4.2)
+
+Positions for a graph neighbourhood, computed in KurnCore and cached by the
+app; no drawing yet (the Graph Explorer is K4.3).
+
+- `KnowledgeGraphLayout.layout(_:seed:fixed:iterations:)` is a force-directed
+  (Fruchterman-Reingold) layout in the unit square, every position kept
+  `margin` (0.06) inside its edges. It is deterministic by node ID and seed:
+  nodes are visited in ID order, start on rings by depth at angles drawn from a
+  SplitMix64 hash of the seed and the ID (stable across processes, unlike
+  `Hasher`), and move for a fixed number of steps (150) under a cooling step
+  budget. The same graph, seed and fixed positions give the same layout
+  whatever the order of the graph's nodes and edges; several claims between one
+  pair pull harder.
+- Nodes in `fixed` keep exactly that position (clamped inside the margins); the
+  root sits at the centre unless it is fixed elsewhere; the forces place every
+  other node. Coincident nodes are pushed apart in a direction drawn from their
+  IDs, never by chance.
+- The app's `KnowledgeGraphQueryService.laidOut(_:in:seed:)` computes one layout
+  per cached answer and remembers where each node was last shown in the scope
+  (`shownPositions`): a neighbourhood that grows, or is re-rooted on a shown
+  node, keeps the nodes already on screen where they were and places only the
+  new ones. A new scope or `clear()` forgets the positions with the answers.
 
 ### Attached documents (PDFs)
 
