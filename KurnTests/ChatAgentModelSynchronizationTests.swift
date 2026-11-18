@@ -12,11 +12,14 @@ struct ChatAgentModelSynchronizationTests {
         let pause = ChatAgentCancellationPause()
         let task = Task { try await pause.wait() }
         defer { task.cancel() }
-        let deadline = ContinuousClock.now.advanced(by: .seconds(15))
+        // Sleep rather than yield between polls: a yielding loop keeps a
+        // cooperative thread busy, and with the rest of the suite running in
+        // parallel the task it waits for may not get one in time.
+        let deadline = ContinuousClock.now.advanced(by: .seconds(45))
         while !pause.hasWaiter {
             try Task.checkCancellation()
             guard ContinuousClock.now < deadline else { Issue.record("Pause did not register"); return }
-            await Task.yield()
+            try await Task.sleep(for: .milliseconds(10))
         }
         #expect(!task.isCancelled)
         task.cancel()
