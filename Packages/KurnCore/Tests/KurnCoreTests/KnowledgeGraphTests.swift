@@ -107,12 +107,12 @@ struct KnowledgeGraphTests {
         graph.fact(root, .relatesTo, idea, modality: .proposed)
         graph.fact(root, .opposes, rival, polarity: .negative)
         let index = try graph.index()
-        #expect(try #require(index.query(Query(rootID: root))).nodes.count == 4)
+        let everything = try #require(index.query(Query(rootID: root)))
+        #expect(everything.nodes.count == 4 && everything.edges.contains { $0.isTentative })
         let owned = try #require(index.query(Query(rootID: root, predicates: [.owns])))
         #expect(owned.nodes.map(\.id) == [root, owner] && owned.frontier.isEmpty)
         let established = try #require(index.query(Query(rootID: root, includesTentative: false, includesNegated: false)))
         #expect(Set(established.nodes.map(\.id)) == [root, owner])
-        #expect(try #require(index.query(Query(rootID: root))).edges.contains { $0.isTentative })
     }
 
     @Test func aMergedIdentityIsOneNodeAndItsOwnLoopIsNotAnEdge() throws {
@@ -121,7 +121,8 @@ struct KnowledgeGraphTests {
         let merged = graph.entity("Portal v2", mergedInto: kept)
         graph.fact(merged, .dependsOn, team)
         graph.fact(merged, .relatesTo, kept)
-        let result = try #require(try graph.index().query(Query(rootID: kept)))
+        let index = try graph.index()
+        let result = try #require(index.query(Query(rootID: kept)))
         #expect(result.nodes.map(\.id) == [kept, team] && result.edges.count == 1)
         #expect(result.edges.first?.sourceID == kept)
     }
@@ -145,8 +146,10 @@ struct KnowledgeGraphTests {
         let index = try graph.index()
         let cycle = try #require(index.query(Query(rootID: first)))
         #expect(cycle.supersessionCycles == [[first, second, third].sorted { $0.uuidString < $1.uuidString }])
-        #expect(try #require(index.query(Query(rootID: apart, depth: 0))).supersessionCycles.isEmpty)
-        #expect(try #require(index.query(Query(rootID: loop, depth: 0))).supersessionCycles == [[loop]])
+        let apartGraph = try #require(index.query(Query(rootID: apart, depth: 0)))
+        #expect(apartGraph.supersessionCycles.isEmpty)
+        let loopGraph = try #require(index.query(Query(rootID: loop, depth: 0)))
+        #expect(loopGraph.supersessionCycles == [[loop]])
     }
 
     @Test func theAnswerDoesNotDependOnPageOrder() throws {
