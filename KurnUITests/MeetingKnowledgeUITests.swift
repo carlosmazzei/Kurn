@@ -211,6 +211,20 @@ final class MeetingKnowledgeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["knowledge.browser.claim"].firstMatch.waitForExistence(timeout: 10))
     }
 
+    func testEntityComparesTwoDates() throws {
+        continueAfterFailure = false
+        let app = launch(prototype: true)
+        let entity = app.buttons["knowledge.browser.entity"].firstMatch
+        XCTAssertTrue(entity.waitForExistence(timeout: 15))
+        entity.tap()
+        let compare = app.buttons["knowledge.browser.compare"].firstMatch
+        XCTAssertTrue(compare.waitForExistence(timeout: 10))
+        compare.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["knowledge.compare.from"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["knowledge.compare.asKnownThen"].firstMatch.exists)
+        capture(app, named: "knowledge-compare")
+    }
+
     func testKnowledgeSearchFindsAliasesAndEvidenceWithoutSemanticSearch() throws {
         continueAfterFailure = false
         let app = launch(prototype: true)

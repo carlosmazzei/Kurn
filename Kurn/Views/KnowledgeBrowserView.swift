@@ -163,6 +163,10 @@ struct KnowledgeBrowserView: View {
             } else { KnowledgeBrowserUnavailable() }
         case .timeline:
             KnowledgeTimelineView(read: read)
+        case let .compare(id):
+            if let page = read.pages.first(where: { $0.entity.id == id }) {
+                KnowledgeCompareView(page: page, pages: read.pages)
+            } else { KnowledgeBrowserUnavailable() }
         case .evidence:
             if let source = read.selectedEvidence { KnowledgeEvidenceDetailView(source: source) }
             else { KnowledgeBrowserUnavailable() }
@@ -181,6 +185,7 @@ struct KnowledgeBrowserView: View {
             if case let .loaded(read) = state, let page = read.pages.first(where: { $0.entity.id == id }) { return page.entity.name }
             return KnowledgeBrowserCopy.text("title")
         case .timeline: return KnowledgeBrowserCopy.text("timeline")
+        case .compare: return KnowledgeComparePresentation.copy("title")
         case .evidence: return KnowledgeBrowserCopy.text("evidence")
         case .transcript: return KnowledgeBrowserCopy.text("transcript")
         case nil: return KnowledgeBrowserCopy.text("title")

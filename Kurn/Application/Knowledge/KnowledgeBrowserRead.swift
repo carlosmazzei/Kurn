@@ -7,12 +7,14 @@ enum KnowledgeBrowserRoute: Hashable, Sendable {
     case entity(UUID)
     /// The scoped timeline (K3.3), projected from the same pages as the reader.
     case timeline
+    /// An entity's state compared between two days (K3.4).
+    case compare(UUID)
     case evidence(assertionID: UUID, evidenceID: UUID)
     case transcript(assertionID: UUID, evidenceID: UUID)
 
     var evidenceSelection: KnowledgeEvidenceSelection? {
         switch self {
-        case .entity, .timeline: nil
+        case .entity, .timeline, .compare: nil
         case let .evidence(assertionID, evidenceID), let .transcript(assertionID, evidenceID):
             KnowledgeEvidenceSelection(assertionID: assertionID, evidenceID: evidenceID)
         }
