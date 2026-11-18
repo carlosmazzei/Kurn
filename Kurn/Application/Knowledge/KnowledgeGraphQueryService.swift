@@ -30,6 +30,10 @@ final class KnowledgeGraphQueryService {
     private var index: KnowledgeGraphIndex?
     private var answers: [KnowledgeGraph.Query: KnowledgeGraph?] = [:]
     private var recency: [KnowledgeGraph.Query] = []
+    private var layouts: [KnowledgeGraph.Query: KnowledgeGraphLayout] = [:]
+    /// Where each node was last shown in this scope, so a neighbourhood that
+    /// grows or moves keeps the nodes already on screen where they were.
+    private(set) var shownPositions: [UUID: KnowledgeGraphLayout.Point] = [:]
     /// How many times an index was built, for tests.
     private(set) var indexBuilds = 0
 
@@ -47,6 +51,8 @@ final class KnowledgeGraphQueryService {
             indexBuilds += 1
             answers = [:]
             recency = []
+            layouts = [:]
+            shownPositions = [:]
         }
         if let cached = answers[query] {
             touch(query)
@@ -58,8 +64,23 @@ final class KnowledgeGraphQueryService {
         if recency.count > capacity {
             let evicted = recency.removeFirst()
             answers[evicted] = nil
+            layouts[evicted] = nil
         }
         return answer
+    }
+
+    /// The neighbourhood `query` asks for and its positions (K4.2). A layout is
+    /// computed once per answer; nodes already shown in this scope keep their
+    /// positions, and only new ones are placed.
+    func laidOut(_ query: KnowledgeGraph.Query, in read: KnowledgeBrowserRead,
+                 seed: UInt64 = 0) -> (graph: KnowledgeGraph, layout: KnowledgeGraphLayout)? {
+        guard let graph = graph(query, in: read) else { return nil }
+        if let cached = layouts[query] { return (graph, cached) }
+        let shown = Set(graph.nodes.map(\.id))
+        let layout = KnowledgeGraphLayout.layout(graph, seed: seed, fixed: shownPositions.filter { shown.contains($0.key) })
+        layouts[query] = layout
+        shownPositions.merge(layout.positions) { _, new in new }
+        return (graph, layout)
     }
 
     /// Forgets everything, e.g. when the reader closes or its scope is revoked.
@@ -68,6 +89,8 @@ final class KnowledgeGraphQueryService {
         index = nil
         answers = [:]
         recency = []
+        layouts = [:]
+        shownPositions = [:]
     }
 
     var cachedAnswerCount: Int { answers.count }

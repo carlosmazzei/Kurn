@@ -87,4 +87,28 @@ struct KnowledgeGraphQueryServiceTests {
         #expect(service.graph(two, in: read)?.nodes.map(\.id) == [Self.team, Self.project])
         #expect(service.indexBuilds == 1 && KnowledgeGraphQueryService(capacity: 0).capacity == 1)
     }
+
+    @Test func layoutsAreCachedAndKeepNodesWhereTheyWereShown() throws {
+        let service = KnowledgeGraphQueryService(capacity: 1)
+        let read = try Self.read(withOwner: true)
+        let alone = try #require(service.laidOut(.init(rootID: Self.project, depth: 0), in: read))
+        #expect(alone.layout.positions == [Self.project: KnowledgeGraphLayout.Point(x: 0.5, y: 0.5)])
+        let grown = try #require(service.laidOut(.init(rootID: Self.project), in: read))
+        #expect(grown.layout.positions.count == 3)
+        #expect(grown.layout.positions[Self.project] == KnowledgeGraphLayout.Point(x: 0.5, y: 0.5))
+        let teamPoint = try #require(grown.layout.positions[Self.team])
+        // Asked again, the same layout comes back from the cache.
+        #expect(service.laidOut(.init(rootID: Self.project), in: read)?.layout == grown.layout)
+        // Re-rooting on the team keeps it where it was shown instead of centring it.
+        let rerooted = try #require(service.laidOut(.init(rootID: Self.team), in: read))
+        #expect(rerooted.layout.positions[Self.team] == teamPoint)
+        #expect(service.laidOut(.init(rootID: UUID()), in: read) == nil)
+        #expect(service.shownPositions.count == 3)
+        // A new scope or a clear forgets every shown position.
+        _ = service.graph(.init(rootID: Self.project), in: try Self.read(revision: 2, withOwner: true))
+        #expect(service.shownPositions.isEmpty)
+        _ = service.laidOut(.init(rootID: Self.project), in: read)
+        service.clear()
+        #expect(service.shownPositions.isEmpty && service.cachedAnswerCount == 0)
+    }
 }
