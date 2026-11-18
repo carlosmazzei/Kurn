@@ -3206,15 +3206,17 @@ The navigation review selected four destinations: Meetings / Knowledge / Ask /
 Documents. `KnowledgeRootNavigationView` is active under `knowledgeEnabled` and
 keeps a separate stack per tab. Meetings' upper options menu contains Library,
 Filters, Sort and Select; Settings remains a direct upper action. A separate
-prominent red circular Record button floats to the right of the four root
-destinations in the bottom safe area, using the same action as the legacy
-toolbar. It starts a meeting or reopens the active recording. The four stacks
+prominent red Record button, titled like the legacy toolbar's, floats to the
+right of the four root destinations in the bottom safe area, using the same
+action as the legacy toolbar. It starts a meeting or reopens the active recording. The four stacks
 still belong to `TabView`; its built-in tab bar is hidden because it cannot
 reserve a separate slot for this action. `KnowledgeRootNavigationView` uses
 system-glass groups for the destination capsule and the recorder, without
-overlapping their hit targets. Labels give way to icons below 360 points or
-at accessibility text sizes; localized accessibility names and selected traits
-remain available. Each tab reserves the measured bar height within its host,
+overlapping their hit targets. The destinations look like the legacy bottom
+toolbar's buttons — regular-weight icons with no title beneath, the selected
+one in the accent colour — and the recorder's title gives way to its icon below
+360 points or at accessibility text sizes; localized accessibility names and
+selected traits remain available. Each tab reserves the measured bar height within its host,
 so chat composers, source-audio controls and mini bars stay above it even
 inside a pushed navigation stack. An inset outside TabView does not reach
 those UIKit-hosted stacks. The root bar and its reserved space step aside

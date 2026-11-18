@@ -23,7 +23,7 @@ struct KnowledgeRootNavigationView: View {
             ZStack(alignment: .bottom) {
                 destinations
                 if !keyboardVisible {
-                    rootBar(showTitles: geometry.size.width >= 360 && !dynamicTypeSize.isAccessibilitySize)
+                    rootBar(showsRecordTitle: geometry.size.width >= 360 && !dynamicTypeSize.isAccessibilitySize)
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rootBarHeight = $0 }
                 }
             }
@@ -78,32 +78,23 @@ struct KnowledgeRootNavigationView: View {
     }
 
     /// A native tab bar has no slot for a separate capture action. Keep the
-    /// four destination stacks, but give their controls and the prominent
-    /// recorder separate system-glass groups. Each tab reserves the measured
-    /// bar height inside its host: an outer safe-area inset does not reach
-    /// nested UIKit navigation stacks and lets chat/audio overlays cover it.
-    private func rootBar(showTitles: Bool) -> some View {
+    /// four destination stacks, but draw their controls the way the legacy
+    /// bottom toolbar does (regular-weight icons, no titles beneath) in one
+    /// glass capsule, and the recorder in its own, titled like the legacy
+    /// toolbar's record button. Each tab reserves the measured bar height
+    /// inside its host: an outer safe-area inset does not reach nested UIKit
+    /// navigation stacks and lets chat/audio overlays cover it.
+    private func rootBar(showsRecordTitle: Bool) -> some View {
         GlassEffectContainer(spacing: 8) {
             HStack(spacing: 8) {
                 HStack(spacing: 0) {
                     ForEach(AppRootDestination.allCases, id: \.self) { destination in
                         Button { tab = destination } label: {
-                            VStack(spacing: 3) {
-                                Image(systemName: destination.systemImage)
-                                    .font(.system(size: 22, weight: .semibold))
-                                    .accessibilityHidden(true)
-                                if showTitles {
-                                    Text(destination.title)
-                                        .font(Theme.caption2Emphasized)
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.8)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 52)
-                            .contentShape(Rectangle())
-                            .background {
-                                if tab == destination { Capsule().fill(.tint.opacity(0.15)) }
-                            }
+                            Image(systemName: destination.systemImage)
+                                .font(.body)
+                                .imageScale(.large)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(tab == destination ? Color.accentColor : Theme.textPrimary)
@@ -112,14 +103,12 @@ struct KnowledgeRootNavigationView: View {
                         .accessibilityIdentifier("root.destination.\(destination.rawValue)")
                     }
                 }
-                .padding(4)
-                .glassEffect(.regular, in: .capsule)
+                .padding(.horizontal, 4)
+                .glassEffect(.regular.interactive(), in: .capsule)
 
                 RecordingActionButton()
-                    .font(.system(size: 26, weight: .semibold))
-                    .labelStyle(.iconOnly)
+                    .labelStyle(RootRecordLabelStyle(showsTitle: showsRecordTitle))
                     .controlSize(.large)
-                    .buttonBorderShape(.circle)
                     .fixedSize()
             }
         }
@@ -129,4 +118,21 @@ struct KnowledgeRootNavigationView: View {
         .frame(maxWidth: .infinity)
     }
 
+}
+
+/// The legacy toolbar shows "Record" beside its icon; on a narrow screen or at
+/// accessibility text sizes the title would squeeze the destinations, so only
+/// the icon stays (the accessibility label still names the action).
+private struct RootRecordLabelStyle: LabelStyle {
+    let showsTitle: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        if showsTitle {
+            Label(configuration)
+                .labelStyle(.titleAndIcon)
+        } else {
+            Label(configuration)
+                .labelStyle(.iconOnly)
+        }
+    }
 }
