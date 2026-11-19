@@ -19,6 +19,7 @@ struct KnowledgeLibraryDestination: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .knowledgeReadingSurface()
                     .navigationTitle(KnowledgeBrowserCopy.text("title"))
+                    .toolbar(.hidden, for: .tabBar)
                 }
             } else {
                 KnowledgeBrowserView(meetingIDs: meetingIDs, showsDone: false, onChooseSources: { showingSources = true })
