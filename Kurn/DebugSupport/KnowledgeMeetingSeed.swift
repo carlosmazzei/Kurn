@@ -88,7 +88,8 @@ enum KnowledgeMeetingSeed {
     /// explorer has an edge to draw (K4.3).
     private static func addRelationship(to wire: inout [String: Any], segment: TranscriptSegment) {
         let anchor = segment.id.uuidString.lowercased()
-        wire["entities"] = (wire["entities"] as? [[String: Any]] ?? []) + [["ref": "e3", "kind": "team", "name": "Example platform team"]]
+        let team: [String: Any] = ["ref": "e3", "kind": "team", "name": "Example platform team", "aliases": [String]()]
+        wire["entities"] = (wire["entities"] as? [[String: Any]] ?? []) + [team]
         wire["assertions"] = (wire["assertions"] as? [[String: Any]] ?? []) + [[
             "ref": "a5", "subject": "e3", "predicate": "blocks", "object": "e1",
             "modality": "reported", "polarity": "positive", "claimKind": "internalStatusReport", "authorityStatus": "attributed",
