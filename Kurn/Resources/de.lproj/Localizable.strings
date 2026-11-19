@@ -1494,11 +1494,12 @@
 "knowledge.graph.mode.compare" = "Vergleichen";
 "knowledge.graph.on" = "Am";
 "knowledge.graph.mode.evolution.footer" = "Beziehungen, die am Ende des gewählten Tages galten. Ein Ring markiert eine, die womöglich noch nicht begonnen hatte.";
-"knowledge.graph.mode.compare.footer" = "Beziehungen, die an einem der beiden Tage galten. Ein Plus markiert eine, die dazwischen begann, ein Quadrat eine, die endete; unmarkierte galten an beiden.";
+"knowledge.graph.mode.compare.footer" = "Beziehungen, die an einem der beiden Tage galten. Ein Plus markiert eine, die dazwischen begann, ein Quadrat eine, die endete, und ein Ring eine, die an einem der Tage womöglich nicht galt; unmarkierte galten an beiden.";
 "knowledge.graph.state.possible" = "Galt an diesem Tag womöglich noch nicht";
 "knowledge.graph.state.started" = "Begonnen";
 "knowledge.graph.state.ended" = "Beendet";
 "knowledge.graph.state.kept" = "Galt an beiden Tagen";
+"knowledge.graph.state.uncertain" = "Galt an einem der Tage womöglich nicht";
 "knowledge.graph.filter" = "Filtern";
 "knowledge.graph.unnamed" = "Ohne Namen";
 "knowledge.late.header" = "Später überarbeitet";

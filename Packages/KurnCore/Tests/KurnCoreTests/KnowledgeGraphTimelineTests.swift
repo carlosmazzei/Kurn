@@ -75,4 +75,29 @@ struct KnowledgeGraphTimelineTests {
                                    supersessionCycles: [])
         #expect(KnowledgeGraphTimeline.holdings(of: empty, at: to, claims: claims).isEmpty)
     }
+
+    @Test func anEquivalentClaimDoesNotLendItsCertainty() throws {
+        // Two meetings say the root depends on the vendor; on Feb 15 the one
+        // stated for January has started for certain, the one stated for
+        // February only possibly. Each edge keeps its own certainty.
+        let meeting = UUID(), other = UUID(), root = UUID(), vendor = UUID()
+        func fact(_ month: String, meeting: UUID) -> KnowledgeWikiSnapshot.Fact {
+            .init(id: UUID(), subjectID: root, predicate: .dependsOn, objectID: vendor,
+                  qualifiers: .init(modality: .reported, polarity: .positive, claimKind: .internalStatusReport, authority: .attributed,
+                                    confidence: .medium, review: .machineExtracted,
+                                    validFrom: KnowledgeTemporalValue(text: month, precision: .month)),
+                  source: .init(meetingID: meeting, recordedAt: Timeline.date("2026-01-01"), evidence: [
+                      .init(id: UUID(), recordingID: UUID(), segmentIDs: ["s1"], quote: "quoted", startMs: 0, endMs: 500,
+                            attributedSpeaker: "Speaker 1"),
+                  ]))
+        }
+        let january = fact("2026-01", meeting: meeting), february = fact("2026-02", meeting: other)
+        let pages = try KnowledgeWikiProjector.project(.init(revision: 1, entities: [
+            .init(id: root, kind: .project, name: "Root"), .init(id: vendor, kind: .organization, name: "Vendor"),
+        ], facts: [january, february]))
+        let graph = try #require(KnowledgeGraphIndex(pages: pages).query(.init(rootID: root)))
+        let mid = try Self.point("2026-02-15")
+        let held = KnowledgeGraphTimeline.holdings(of: graph, at: mid, claims: KnowledgeStateComparison.claims(from: pages))
+        #expect(held == [january.id: .definite, february.id: .possible])
+    }
 }

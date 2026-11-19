@@ -134,7 +134,7 @@ enum KnowledgeGraphPresentation {
     /// crosses out negated ones; in words, a negated claim's sentence already
     /// says so and a tentative one is noted here (never colour alone).
     static func notes(_ edge: Edge) -> [String] {
-        [note(edge.state)].compactMap { $0 } + (edge.isTentative ? [KnowledgeTimelinePresentation.text("tentative")] : [])
+        notes(for: edge.state) + (edge.isTentative ? [KnowledgeTimelinePresentation.text("tentative")] : [])
             + (edge.isInferred ? [copy("inferred")] : [])
     }
 

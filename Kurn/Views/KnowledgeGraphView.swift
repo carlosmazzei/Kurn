@@ -82,7 +82,7 @@ struct KnowledgeGraphView: View {
     private func modeCard(days: KnowledgeGraphPresentation.Days) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Picker(KnowledgeGraphPresentation.copy("mode"), selection: $exploration.mode) {
-                ForEach(KnowledgeGraphPresentation.GraphMode.allCases) { Text($0.title).tag($0) }
+                ForEach(KnowledgeGraphPresentation.GraphMode.allCases) { Text($0.displayName).tag($0) }
             }
             .pickerStyle(.segmented)
             .accessibilityIdentifier("knowledge.graph.mode")
@@ -281,22 +281,25 @@ private struct KnowledgeGraphCanvas: View {
     }
 
     /// The shape that marks an edge's state in the evolution and compare modes:
-    /// a plus for a relationship that started, a square for one that ended and
-    /// a ring for one that may not have held yet (the footer says so in words).
+    /// a plus for a relationship that started, a square for one that ended,
+    /// and a ring around either, or alone, for one that may not have held on a
+    /// day it is shown for (the footer and the rows say so in words).
     private func stateMark(_ state: KnowledgeGraphPresentation.EdgeState?, at point: CGPoint) -> Path? {
-        let box = CGRect(x: point.x - 5, y: point.y - 5, width: 10, height: 10)
+        guard let state else { return nil }
+        var path = Path()
         switch state {
         case .started:
-            var path = Path()
-            path.move(to: CGPoint(x: point.x - 6, y: point.y))
-            path.addLine(to: CGPoint(x: point.x + 6, y: point.y))
-            path.move(to: CGPoint(x: point.x, y: point.y - 6))
-            path.addLine(to: CGPoint(x: point.x, y: point.y + 6))
-            return path
-        case .ended: return Path(box)
-        case .holds(.possible): return Path(ellipseIn: box)
-        case .holds(.definite), .kept, nil: return nil
+            path.move(to: CGPoint(x: point.x - 5, y: point.y))
+            path.addLine(to: CGPoint(x: point.x + 5, y: point.y))
+            path.move(to: CGPoint(x: point.x, y: point.y - 5))
+            path.addLine(to: CGPoint(x: point.x, y: point.y + 5))
+        case .ended:
+            path.addRect(CGRect(x: point.x - 4, y: point.y - 4, width: 8, height: 8))
+        case .holds, .kept:
+            break
         }
+        if state.isUncertain { path.addEllipse(in: CGRect(x: point.x - 8, y: point.y - 8, width: 16, height: 16)) }
+        return path.isEmpty ? nil : path
     }
 
     private func cross(at point: CGPoint) -> Path {
