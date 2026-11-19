@@ -39,12 +39,18 @@ public enum KnowledgeGraphTimeline {
         guard !edgeIDs.isEmpty else { return [:] }
         // An edge is an outgoing holding of its source, so the sources are enough.
         let sources = Set(graph.edges.map(\.sourceID)).sorted { $0.uuidString < $1.uuidString }
+        let byID = Dictionary(claims.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var result: [UUID: KnowledgeTemporalCertainty] = [:]
         for source in sources {
             let state = KnowledgeTemporalReducer.state(of: source, validAt: point.validAt, knownAt: point.knownAt, claims: claims)
             for holding in state.holdings where holding.direction == .outgoing && holding.otherEntityID != nil {
                 for claimID in holding.claimIDs where edgeIDs.contains(claimID) {
-                    result[claimID] = strongest(result[claimID], holding.certainty)
+                    // A holding folds equivalent claims and is definite when any
+                    // of them is; each edge is one claim, so it is definite only
+                    // when its own stated interval is too.
+                    let own = byID[claimID].flatMap { KnowledgeTemporalReducer.holds($0, at: point.validAt) } ?? .possible
+                    let certainty: KnowledgeTemporalCertainty = holding.certainty == .definite && own == .definite ? .definite : .possible
+                    result[claimID] = strongest(result[claimID], certainty)
                 }
             }
         }

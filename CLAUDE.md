@@ -3718,10 +3718,13 @@ which the read does not carry yet).
   each edge's source: `holdings(of:at:claims:)` gives how certainly each edge held at a point
   (`KnowledgeStateComparison.Point`, the end of a picked day in the person's calendar, as known now or,
   with "As known on each date", as known then), and `compare(_:from:to:claims:)` whether it started,
-  ended or held at both. Nothing orders claims by recording date. An edge that did not hold is not
-  drawn, while its nodes keep their places. The drawing marks a relationship that only possibly held
-  with a ring, one that started with a plus and one that ended with a square, and each mode's footer
-  and every row say so in words. The days default to today and, for Compare's earlier day, the first
+  ended or held at both. Nothing orders claims by recording date, and an edge keeps its own claim's
+  certainty: a holding folds equivalent claims and is definite when any of them is, so each edge is
+  capped by `KnowledgeTemporalReducer.holds` for its claim alone. An edge that did not hold is not
+  drawn, while its nodes keep their places. The drawing marks a relationship that started with a
+  plus and one that ended with a square, and rings one that may not have held on a day it is shown
+  for (`EdgeState` keeps each day's certainty, compare included); each mode's footer and every row
+  say so in words. The days default to today and, for Compare's earlier day, the first
   stated start on the opened entity's page; they are part of the kept exploration. Day reading, states
   and wording are `KnowledgeGraphPresentation+Timeline` (tested).
 - Not yet: graph performance targets measured on a physical device, and the Context lanes mode.

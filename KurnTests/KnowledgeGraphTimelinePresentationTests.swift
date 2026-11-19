@@ -75,6 +75,7 @@ struct KnowledgeGraphTimelinePresentationTests {
         exploration.day = try Self.date("2026-02-01")
         let firstDay = try #require(try Self.scene(exploration, now: try Self.date("2026-05-01")).edges.first { $0.factID == Self.blocker })
         #expect(firstDay.state == .holds(.possible) && Presentation.notes(firstDay) == [Presentation.copy("state.possible")])
+        #expect(firstDay.state?.isUncertain == true)
         // Before anything was stated, nothing is shown.
         exploration.day = try Self.date("2025-12-01")
         #expect(try Self.scene(exploration, now: try Self.date("2026-05-01")).edges.isEmpty)
@@ -88,7 +89,7 @@ struct KnowledgeGraphTimelinePresentationTests {
         exploration.to = try Self.date("2026-04-15")
         let scene = try Self.scene(exploration, now: try Self.date("2026-05-01"))
         let states = Dictionary(uniqueKeysWithValues: scene.edges.map { ($0.factID, $0.state) })
-        #expect(states == [Self.blocker: .started, Self.dependency: .ended])
+        #expect(states == [Self.blocker: .started(.definite), Self.dependency: .ended(.definite)])
         // The days may be picked in either order.
         (exploration.from, exploration.to) = (exploration.to, exploration.from)
         let swapped = try Self.scene(exploration, now: try Self.date("2026-05-01"))
@@ -96,11 +97,11 @@ struct KnowledgeGraphTimelinePresentationTests {
         exploration.from = try Self.date("2026-02-15")
         exploration.to = try Self.date("2026-02-20")
         let kept = try Self.scene(exploration, now: try Self.date("2026-05-01"))
-        #expect(kept.edges.allSatisfy { $0.state == .kept })
-        #expect(Presentation.note(.kept) == Presentation.copy("state.kept"))
-        #expect(Presentation.note(.started) == Presentation.copy("state.started"))
-        #expect(Presentation.note(.ended) == Presentation.copy("state.ended"))
-        #expect(Presentation.note(.holds(.definite)) == nil && Presentation.note(nil) == nil)
+        #expect(kept.edges.allSatisfy { $0.state == .kept(before: .definite, after: .definite) })
+        #expect(Presentation.notes(for: .kept(before: .definite, after: .definite)) == [Presentation.copy("state.kept")])
+        #expect(Presentation.notes(for: .started(.definite)) == [Presentation.copy("state.started")])
+        #expect(Presentation.notes(for: .ended(.definite)) == [Presentation.copy("state.ended")])
+        #expect(Presentation.notes(for: .holds(.definite)).isEmpty && Presentation.notes(for: nil).isEmpty)
         #expect(Presentation.legend(.compare) == Presentation.copy("mode.compare.footer"))
     }
 
@@ -125,6 +126,27 @@ struct KnowledgeGraphTimelinePresentationTests {
         let then = try #require(Presentation.point(day, asKnownThen: true, calendar: Self.utc))
         let current = try #require(Presentation.point(day, asKnownThen: false, calendar: Self.utc))
         #expect(then.knownAt < current.knownAt && then.validAt == current.validAt)
-        #expect(Presentation.GraphMode.allCases.map(\.title).allSatisfy { !$0.isEmpty })
+        #expect(Presentation.GraphMode.allCases.map(\.displayName).allSatisfy { !$0.isEmpty })
+    }
+
+    @Test func compareKeepsWhatOnlyPossiblyHeld() throws {
+        var exploration = Presentation.Exploration(root: Self.project)
+        exploration.mode = .compare
+        // The blocker was stated for Feb 1: only possibly held at the end of that day.
+        exploration.from = try Self.date("2026-02-01")
+        exploration.to = try Self.date("2026-02-20")
+        let scene = try Self.scene(exploration, now: try Self.date("2026-05-01"))
+        let blocker = try #require(scene.edges.first { $0.factID == Self.blocker })
+        #expect(blocker.state == .kept(before: .possible, after: .definite))
+        #expect(blocker.state?.isUncertain == true)
+        #expect(Presentation.notes(blocker) == [Presentation.copy("state.kept"), Presentation.copy("state.uncertain")])
+        // Starting on a day it only possibly held is noted as both.
+        exploration.from = try Self.date("2026-01-20")
+        exploration.to = try Self.date("2026-02-01")
+        let started = try #require(try Self.scene(exploration, now: try Self.date("2026-05-01")).edges.first { $0.factID == Self.blocker })
+        #expect(started.state == .started(.possible))
+        #expect(Presentation.notes(for: started.state) == [Presentation.copy("state.started"), Presentation.copy("state.uncertain")])
+        #expect(Presentation.notes(for: .ended(.possible)) == [Presentation.copy("state.ended"), Presentation.copy("state.uncertain")])
+        #expect(!Presentation.EdgeState.kept(before: .definite, after: .definite).isUncertain)
     }
 }
