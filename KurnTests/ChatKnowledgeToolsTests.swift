@@ -7,15 +7,15 @@ import Testing
 /// K5.1: the chat's read-only knowledge tools and the gate that decides whether a run may use them.
 @MainActor
 struct ChatKnowledgeToolsTests {
-    private static let meeting = UUID(), project = UUID(), team = UUID()
-    private static let blocker = UUID(), status = UUID(), evidenceID = UUID(), recording = UUID()
+    private nonisolated static let meeting = UUID(), project = UUID(), team = UUID()
+    private nonisolated static let blocker = UUID(), status = UUID(), evidenceID = UUID(), recording = UUID()
 
-    private static let entities: [KnowledgeWikiSnapshot.Entity] = [
+    private nonisolated static let entities: [KnowledgeWikiSnapshot.Entity] = [
         .init(id: project, kind: .project, name: "Example portal", aliases: ["Portal"]),
         .init(id: team, kind: .team, name: "Platform team"),
     ]
 
-    private static func wiki() -> KnowledgeWikiSnapshot {
+    private nonisolated static func wiki() -> KnowledgeWikiSnapshot {
         func source(_ quote: String, evidence: UUID = UUID()) -> KnowledgeWikiSnapshot.Source {
             .init(meetingID: meeting, recordedAt: Date(timeIntervalSince1970: 1_790_000_000), evidence: [
                 .init(id: evidence, recordingID: recording, segmentIDs: ["s1"], quote: quote, startMs: 65_000, endMs: 70_000,
@@ -37,7 +37,7 @@ struct ChatKnowledgeToolsTests {
         return KnowledgeWikiSnapshot(revision: 7, entities: entities, facts: facts)
     }
 
-    private static func read(_ selection: KnowledgeEvidenceSelection?,
+    private nonisolated static func read(_ selection: KnowledgeEvidenceSelection?,
                              classification: KnowledgeClassification = .internal) throws -> KnowledgeBrowserRead {
         let snapshot = wiki()
         var evidence: KnowledgeEvidenceRead?
