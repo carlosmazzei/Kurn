@@ -239,8 +239,11 @@ final class MeetingKnowledgeUITests: XCTestCase {
         let nodes = app.buttons.matching(identifier: "knowledge.graph.node")
         XCTAssertTrue(nodes.firstMatch.waitForExistence(timeout: 10))
         XCTAssertEqual(nodes.count, 2)
-        XCTAssertTrue(app.descendants(matching: .any)["knowledge.graph.claim"].firstMatch.exists)
         capture(app, named: "knowledge-graph")
+        // The mode controls sit above the drawing, so the selected node's
+        // claims start below the fold of a lazy list: scroll to them and back.
+        XCTAssertTrue(revealGraphClaim(app))
+        for _ in 0..<3 where !nodes.firstMatch.isHittable { app.swipeDown() }
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
         // The first entity (the team) is the centre; select the portal, then
         // read the same claims as a list.
@@ -262,14 +265,16 @@ final class MeetingKnowledgeUITests: XCTestCase {
         XCTAssertTrue(app.buttons["knowledge.graph.recentre"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertFalse(nodes.firstMatch.exists)
         // Comparing two days: the undated blocker holds on both, so it stays.
+        for _ in 0..<4 where !app.buttons["Compare"].firstMatch.isHittable { app.swipeDown() }
         app.buttons["Compare"].firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any)["knowledge.graph.from"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["knowledge.graph.to"].firstMatch.exists)
-        XCTAssertTrue(app.descendants(matching: .any)["knowledge.graph.claim"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(revealGraphClaim(app))
         capture(app, named: "knowledge-graph-compare")
+        for _ in 0..<4 where !app.buttons["On a day"].firstMatch.isHittable { app.swipeDown() }
         app.buttons["On a day"].firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any)["knowledge.graph.day"].firstMatch.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.descendants(matching: .any)["knowledge.graph.claim"].firstMatch.exists)
+        XCTAssertTrue(revealGraphClaim(app))
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
     }
 
@@ -384,6 +389,18 @@ final class MeetingKnowledgeUITests: XCTestCase {
             XCTAssertLessThanOrEqual(button.frame.maxX, record.frame.minX, file: file, line: line)
             XCTAssertEqual(button.frame.midY, record.frame.midY, accuracy: 4, file: file, line: line)
         }
+    }
+
+    /// The graph's mode controls sit above its claims, which a lazy list
+    /// only creates once they scroll near the screen.
+    private func revealGraphClaim(_ app: XCUIApplication) -> Bool {
+        let claim = app.descendants(matching: .any)["knowledge.graph.claim"].firstMatch
+        if claim.waitForExistence(timeout: 3) { return true }
+        for _ in 0..<4 {
+            app.swipeUp()
+            if claim.waitForExistence(timeout: 2) { return true }
+        }
+        return false
     }
 
     private func capture(_ app: XCUIApplication, named name: String) {
