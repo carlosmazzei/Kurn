@@ -1,9 +1,10 @@
 import KurnCore
 import SwiftUI
 
-/// The Graph Explorer's relationships mode (K4.3): a neighbourhood drawn on a
-/// `Canvas`, with one button per node laid over it for touch and VoiceOver,
-/// and a list of the same claims as the alternative. What it shows comes from
+/// The Graph Explorer (K4.3): a neighbourhood drawn on a `Canvas`, with one
+/// button per node laid over it for touch and VoiceOver, and a list of the
+/// same claims as the alternative; as it is (relationships), on a day
+/// (evolution) or between two days (compare). What it shows comes from
 /// `KnowledgeGraphQueryService`; words and links from `KnowledgeGraphPresentation`.
 struct KnowledgeGraphView: View {
     let read: KnowledgeBrowserRead
@@ -28,8 +29,10 @@ struct KnowledgeGraphView: View {
         let laidOut = service.laidOut(exploration, from: entityID, in: read)
         Group {
             if let laidOut {
-                let scene = KnowledgeGraphPresentation.scene(laidOut.graph, layout: laidOut.layout, pages: read.pages)
-                content(scene)
+                let days = KnowledgeGraphPresentation.days(exploration, pages: read.pages, entityID: entityID, now: Date())
+                let states = KnowledgeGraphPresentation.states(exploration, graph: laidOut.graph, pages: read.pages, days: days)
+                let scene = KnowledgeGraphPresentation.scene(laidOut.graph, layout: laidOut.layout, pages: read.pages, states: states)
+                content(scene, days: days)
             } else {
                 KnowledgeBrowserUnavailable()
             }
@@ -41,8 +44,9 @@ struct KnowledgeGraphView: View {
         .accessibilityIdentifier("knowledge.graph")
     }
 
-    private func content(_ scene: KnowledgeGraphPresentation.Scene) -> some View {
+    private func content(_ scene: KnowledgeGraphPresentation.Scene, days: KnowledgeGraphPresentation.Days) -> some View {
         List {
+            modeSection(days: days)
             Section {
                 Picker(KnowledgeGraphPresentation.copy("view"), selection: Binding(get: { isList }, set: { exploration.showsList = $0 })) {
                     Text(KnowledgeGraphPresentation.copy("view.graph")).tag(false)
@@ -68,6 +72,41 @@ struct KnowledgeGraphView: View {
                 nodeSection(node, edges: scene.edges(touching: node.id))
             }
         }
+    }
+
+    /// The mode, and the days the evolution and compare modes read.
+    private func modeSection(days: KnowledgeGraphPresentation.Days) -> some View {
+        Section {
+            Picker(KnowledgeGraphPresentation.copy("mode"), selection: $exploration.mode) {
+                ForEach(KnowledgeGraphPresentation.GraphMode.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("knowledge.graph.mode")
+            switch exploration.mode {
+            case .relationships:
+                EmptyView()
+            case .evolution:
+                DatePicker(KnowledgeGraphPresentation.copy("on"),
+                           selection: Binding(get: { days.day }, set: { exploration.day = $0 }), displayedComponents: .date)
+                    .accessibilityIdentifier("knowledge.graph.day")
+                knownThenToggle
+            case .compare:
+                DatePicker(KnowledgeComparePresentation.copy("from"),
+                           selection: Binding(get: { days.from }, set: { exploration.from = $0 }), displayedComponents: .date)
+                    .accessibilityIdentifier("knowledge.graph.from")
+                DatePicker(KnowledgeComparePresentation.copy("to"),
+                           selection: Binding(get: { days.to }, set: { exploration.to = $0 }), displayedComponents: .date)
+                    .accessibilityIdentifier("knowledge.graph.to")
+                knownThenToggle
+            }
+        } footer: {
+            if let legend = KnowledgeGraphPresentation.legend(exploration.mode) { Text(legend) }
+        }
+    }
+
+    private var knownThenToggle: some View {
+        Toggle(KnowledgeComparePresentation.copy("as_known_then"), isOn: $exploration.asKnownThen)
+            .accessibilityIdentifier("knowledge.graph.asKnownThen")
     }
 
     @ViewBuilder
@@ -183,6 +222,7 @@ private struct KnowledgeGraphCanvas: View {
             context.stroke(line, with: shading, style: style)
             context.fill(arrowhead(from: from, to: to), with: shading)
             if edge.isNegated { context.stroke(cross(at: midpoint(from, to)), with: shading, lineWidth: 2) }
+            if let mark = stateMark(edge.state, at: along(from, to, 0.35)) { context.stroke(mark, with: shading, lineWidth: 2) }
         }
         for node in scene.nodes {
             let centre = KnowledgeGraphPresentation.point(node.point, in: size)
@@ -206,7 +246,30 @@ private struct KnowledgeGraphCanvas: View {
         }
     }
 
-    private func midpoint(_ from: CGPoint, _ to: CGPoint) -> CGPoint { CGPoint(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2) }
+    private func midpoint(_ from: CGPoint, _ to: CGPoint) -> CGPoint { along(from, to, 0.5) }
+
+    private func along(_ from: CGPoint, _ to: CGPoint, _ fraction: CGFloat) -> CGPoint {
+        CGPoint(x: from.x + (to.x - from.x) * fraction, y: from.y + (to.y - from.y) * fraction)
+    }
+
+    /// The shape that marks an edge's state in the evolution and compare modes:
+    /// a plus for a relationship that started, a square for one that ended and
+    /// a ring for one that may not have held yet (the footer says so in words).
+    private func stateMark(_ state: KnowledgeGraphPresentation.EdgeState?, at point: CGPoint) -> Path? {
+        let box = CGRect(x: point.x - 5, y: point.y - 5, width: 10, height: 10)
+        switch state {
+        case .started:
+            var path = Path()
+            path.move(to: CGPoint(x: point.x - 6, y: point.y))
+            path.addLine(to: CGPoint(x: point.x + 6, y: point.y))
+            path.move(to: CGPoint(x: point.x, y: point.y - 6))
+            path.addLine(to: CGPoint(x: point.x, y: point.y + 6))
+            return path
+        case .ended: return Path(box)
+        case .holds(.possible): return Path(ellipseIn: box)
+        case .holds(.definite), .kept, nil: return nil
+        }
+    }
 
     private func cross(at point: CGPoint) -> Path {
         var path = Path()

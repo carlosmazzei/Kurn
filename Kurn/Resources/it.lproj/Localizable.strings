@@ -1488,6 +1488,17 @@
 "knowledge.graph.show_negated" = "Mostra relazioni negate";
 "knowledge.graph.show_inferred" = "Mostra relazioni dedotte";
 "knowledge.graph.inferred" = "Dedotta, non dichiarata";
+"knowledge.graph.mode" = "Modalità";
+"knowledge.graph.mode.relationships" = "Tutte";
+"knowledge.graph.mode.evolution" = "In un giorno";
+"knowledge.graph.mode.compare" = "Confronta";
+"knowledge.graph.on" = "Il";
+"knowledge.graph.mode.evolution.footer" = "Relazioni valide alla fine del giorno scelto. Un anello indica una relazione forse non ancora iniziata.";
+"knowledge.graph.mode.compare.footer" = "Relazioni valide in uno dei due giorni. Un più indica quella iniziata tra i due, un quadrato quella terminata; le altre valevano in entrambi.";
+"knowledge.graph.state.possible" = "Forse non ancora valida in questo giorno";
+"knowledge.graph.state.started" = "Iniziata";
+"knowledge.graph.state.ended" = "Terminata";
+"knowledge.graph.state.kept" = "Valida in entrambi i giorni";
 "knowledge.graph.filter" = "Filtra";
 "knowledge.graph.unnamed" = "Senza nome";
 "knowledge.late.header" = "Rivisto in seguito";
