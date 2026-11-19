@@ -52,11 +52,14 @@ public struct KnowledgeGraph: Equatable, Sendable {
         public let predicates: Set<KnowledgePredicate>
         public let includesTentative: Bool
         public let includesNegated: Bool
+        /// Claims a model inferred rather than heard stated (K4.3 hides them by default).
+        public let includesInferred: Bool
 
         /// Bounds outside their range are clamped to it: depth 0…2, 1…40
         /// nodes, 0…80 edges.
         public init(rootID: UUID, depth: Int = 1, maxNodes: Int = maximumNodes, maxEdges: Int = maximumEdges,
-                    predicates: Set<KnowledgePredicate> = [], includesTentative: Bool = true, includesNegated: Bool = true) {
+                    predicates: Set<KnowledgePredicate> = [], includesTentative: Bool = true, includesNegated: Bool = true,
+                    includesInferred: Bool = true) {
             self.rootID = rootID
             self.depth = min(max(depth, 0), Self.maximumDepth)
             self.maxNodes = min(max(maxNodes, 1), Self.maximumNodes)
@@ -64,11 +67,12 @@ public struct KnowledgeGraph: Equatable, Sendable {
             self.predicates = predicates
             self.includesTentative = includesTentative
             self.includesNegated = includesNegated
+            self.includesInferred = includesInferred
         }
 
         func follows(_ edge: Edge) -> Bool {
             (predicates.isEmpty || predicates.contains(edge.predicate)) && (includesTentative || !edge.isTentative)
-                && (includesNegated || edge.polarity == .positive)
+                && (includesNegated || edge.polarity == .positive) && (includesInferred || edge.modality != .inferred)
         }
     }
 

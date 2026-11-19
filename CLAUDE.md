@@ -3626,7 +3626,7 @@ only the stretch of valid time an arrival changed.
 ### Knowledge graph query (K4.1)
 
 The relationship graph of a scoped knowledge read, queried a neighbourhood at a
-time. Backend only so far: positions come from K4.2 below and the Graph Explorer (K4.3) follows.
+time. Positions come from K4.2 below and the drawing from the Graph Explorer (K4.3).
 
 - KurnCore's `KnowledgeGraphIndex(pages:)` indexes the reader's authorized,
   evidence-checked pages once; it is a projection, never a second store. A node
@@ -3660,7 +3660,7 @@ time. Backend only so far: positions come from K4.2 below and the Graph Explorer
 ### Knowledge graph layout (K4.2)
 
 Positions for a graph neighbourhood, computed in KurnCore and cached by the
-app; no drawing yet (the Graph Explorer is K4.3).
+app; the Graph Explorer (K4.3) draws them.
 
 - `KnowledgeGraphLayout.layout(_:seed:fixed:iterations:)` is a force-directed
   (Fruchterman-Reingold) layout in the unit square, every position kept
@@ -3681,6 +3681,40 @@ app; no drawing yet (the Graph Explorer is K4.3).
   node, keeps the nodes already on screen where they were and places only the
   new ones. A new scope or `clear()` forgets the positions with the answers,
   and another seed is a new drawing that drops every layout and shown position.
+
+### Knowledge graph explorer (K4.3)
+
+An entity page opens "Relationships" (`KnowledgeBrowserRoute.graph`, `KnowledgeGraphView`): the
+neighbourhood K4.1 answers, at the positions K4.2 gives, from the same authorized read as the page,
+offline. Only the relationships mode exists so far; Evolution, Compare and Context lanes are later
+K4.3 steps (lanes need a context per claim, which the read does not carry yet).
+
+- **Drawn on a `Canvas`, touched through an overlay.** The canvas is hidden from assistive
+  technologies. Each node has a 44-point button laid over it, whose label carries its name, how many
+  relationships are shown, and whether it is the centre or has more. That button is also what
+  VoiceOver reads. A selected node is ringed and its edges drawn thicker. Edges have an arrowhead in
+  their stated direction. A tentative claim is dashed, an inferred one dotted and a negated one
+  crossed out. A dotted ring marks a node on the query's frontier. No state is shown by colour alone.
+- **The list alternative.** A segmented control switches between the drawing and a list of every
+  node with the claims that touch it. While VoiceOver runs, the list is the default until the reader
+  chooses. Claims read like the reader's, in their stated direction, and open their first cited
+  passage through the ID-only evidence route.
+- **Selection and recentring.** The selected node's section offers "Open page" (the entity route)
+  and "Centre the graph here". `KnowledgeGraphPresentation.Exploration` holds the centre, the
+  selection, the filters and the chosen view. `KnowledgeGraphQueryService` keeps it per entity the
+  graph was opened from, because the reader re-reads, and so rebuilds its destinations, on every
+  navigation. A page opened from the graph therefore comes back to the graph as it was left. It
+  holds IDs only. A centre no longer in the read falls back to the entity the graph was opened from.
+  The reader clears the service on disappearing and when the scene leaves the foreground.
+- **Filters** (per view, never persisted): distance 1 or 2, and tentative, negated and inferred
+  claims. Inferred claims (`KnowledgeModality.inferred`) are off by default
+  (`KnowledgeGraph.Query.includesInferred`, which defaults to on for other callers).
+- The footer says how much is shown. It also says when a bound truncated the walk and names each
+  supersession loop. Words, labels and links are `KnowledgeGraphPresentation` (Application,
+  tested); the view only binds them. The UI fixture's graph variant
+  (`UI-Testing-KnowledgeGraphFixture`) adds a team that blocks the portal.
+- Not yet: graph performance targets measured on a physical device, and the Evolution, Compare and
+  Context lanes modes.
 
 ### Attached documents (PDFs)
 

@@ -2,7 +2,8 @@ import XCTest
 
 @MainActor
 final class MeetingKnowledgeUITests: XCTestCase {
-    private func launch(largeType: Bool = false, prototype: Bool = false, longTranscript: Bool = false, review: Bool = false) -> XCUIApplication {
+    private func launch(largeType: Bool = false, prototype: Bool = false, longTranscript: Bool = false, review: Bool = false,
+                        graph: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["UI-Testing-Screenshots", "UI-Testing-DisableAnimations", "UI-Testing-KnowledgeFixture",
             "-settings.knowledgeEnabled", "YES", "-settings.semanticSearchEnabled", "NO",
@@ -12,6 +13,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         if prototype { app.launchArguments += ["UI-Testing-KnowledgeNavigationPrototype"] }
         if longTranscript { app.launchArguments += ["UI-Testing-KnowledgeLongTranscript"] }
         if review { app.launchArguments += ["UI-Testing-KnowledgeReviewFixture"] }
+        if graph { app.launchArguments += ["UI-Testing-KnowledgeGraphFixture"] }
         app.launch()
         return app
     }
@@ -223,6 +225,42 @@ final class MeetingKnowledgeUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["knowledge.compare.from"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["knowledge.compare.asKnownThen"].firstMatch.exists)
         capture(app, named: "knowledge-compare")
+    }
+
+    func testGraphExplorerDrawsListsAndKeepsItsSelection() throws {
+        continueAfterFailure = false
+        let app = launch(prototype: true, graph: true)
+        let entity = app.buttons["knowledge.browser.entity"].firstMatch
+        XCTAssertTrue(entity.waitForExistence(timeout: 15))
+        entity.tap()
+        let open = app.buttons["knowledge.browser.graph"].firstMatch
+        XCTAssertTrue(open.waitForExistence(timeout: 10))
+        open.tap()
+        let nodes = app.buttons.matching(identifier: "knowledge.graph.node")
+        XCTAssertTrue(nodes.firstMatch.waitForExistence(timeout: 10))
+        XCTAssertEqual(nodes.count, 2)
+        XCTAssertTrue(app.descendants(matching: .any)["knowledge.graph.claim"].firstMatch.exists)
+        capture(app, named: "knowledge-graph")
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
+        // The first entity (the team) is the centre; select the portal, then
+        // read the same claims as a list.
+        let portal = nodes.matching(NSPredicate(format: "label BEGINSWITH %@", "Example portal")).firstMatch
+        XCTAssertTrue(portal.exists)
+        portal.tap()
+        let selected = app.staticTexts["knowledge.graph.selected"].firstMatch
+        XCTAssertTrue(selected.waitForExistence(timeout: 5))
+        XCTAssertEqual(selected.label.lowercased(), "example portal")
+        XCTAssertTrue(app.buttons["knowledge.graph.recentre"].firstMatch.exists)
+        app.buttons["List"].firstMatch.tap()
+        XCTAssertFalse(nodes.firstMatch.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["knowledge.graph.recentre"].firstMatch.waitForExistence(timeout: 5))
+        capture(app, named: "knowledge-graph-list")
+        // A page opened from the graph comes back to the list it was left in.
+        app.buttons["knowledge.graph.openPage"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["knowledge.browser.claim"].firstMatch.waitForExistence(timeout: 10))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["knowledge.graph.recentre"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertFalse(nodes.firstMatch.exists)
     }
 
     func testKnowledgeSearchFindsAliasesAndEvidenceWithoutSemanticSearch() throws {
