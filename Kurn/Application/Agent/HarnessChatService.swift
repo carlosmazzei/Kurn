@@ -13,6 +13,9 @@ struct HarnessChatService {
     var prepareDocumentSession: (@MainActor @Sendable () throws -> Void)?
     var documentOrigin: ChatArtifactOrigin?
     var contextWindows: ModelContextWindowStore = .shared
+    /// Canonical knowledge the run may read (K5.1). Its tools are offered only when
+    /// `ChatKnowledgeGate` authorizes answering from it with the run's provider.
+    var knowledge: ChatKnowledgeSource?
     /// The reasoning level the run's model is asked for, recorded with its capabilities; it is the
     /// same decision the model factory makes (`ChatReasoningPreference`).
     var reasoningLevel: @Sendable (AIProvider, String, ModelContextWindowStore) -> AgentReasoningLevel? = {
@@ -128,10 +131,13 @@ struct HarnessChatService {
         let documents = ChatDocumentEffectExecutor(writer: ChatDocumentEffectWriter(
             store: SwiftDataAgentSessionStore(context: context), sessionID: sessionID,
             prepareSession: prepare, origin: origin), workspace: workspace)
-        let tools = ChatSourceTools.make(reader: reader, allowedMeetingIDs: ids, scope: effective)
+        var tools = ChatSourceTools.make(reader: reader, allowedMeetingIDs: ids, scope: effective)
             + ChatDocumentTools.make(workspace: workspace, mutation: { name, arguments, execution in
                 try await documents.execute(name, arguments: arguments, context: execution)
             })
+        if let knowledge, let meetings = ChatKnowledgeGate.meetings(ids, source: knowledge, provider: provider) {
+            tools += ChatKnowledgeTools.make(source: knowledge, meetings: meetings, provider: provider)
+        }
         try Task.checkCancellation()
         let refresh = try await refreshMetadata(provider, modelIdentifier, contextWindows)
         // What the model can do, recorded with the run (NH07, C03): the chat cannot work without tools.

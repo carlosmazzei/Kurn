@@ -114,7 +114,9 @@ final class AppComposition {
             knowledgeDeletion: KnowledgeDeletionCoordinator(queue: jobs),
             recordingSession: RecordingSessionController(modelContext: context, settings: settings, onActivityChanged: { jobs.setRecording($0) }),
             reviewPrompt: reviewPrompt,
-            chatConversations: ChatConversationHost()
+            chatConversations: ChatConversationHost(makeConversation: {
+                MeetingChatViewModel(harnessService: HarnessChatService(knowledge: ChatKnowledgeSource(coordinator: knowledge)))
+            })
         )
     }
 

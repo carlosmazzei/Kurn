@@ -29,7 +29,8 @@ extension KnowledgeStore {
             guard let contextID = source.contextID else { continue }
             let occasion = try context.fetch(FetchDescriptor<KnowledgeContext>(predicate: #Predicate { $0.id == contextID })).first
             guard let occasion else { throw KnowledgeStoreError.invalidContext }
-            contexts[source.meetingID] = KnowledgeBrowserContext(id: contextID, kind: source.contextKind, name: occasion.name)
+            contexts[source.meetingID] = KnowledgeBrowserContext(id: contextID, kind: source.contextKind, name: occasion.name,
+                                                                  classification: source.contextClassification)
         }
         return try KnowledgeBrowserRead(meetingIDs: meetingIDs, wiki: snapshot.wiki, meetingTitles: titles, selectedEvidence: evidence,
             policyRevisionKey: snapshot.policyRevisionKey, allowsEmbedding: allowsEmbedding, meetingContexts: contexts)
