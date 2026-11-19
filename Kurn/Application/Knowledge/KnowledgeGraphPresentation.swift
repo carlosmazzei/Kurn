@@ -87,8 +87,11 @@ enum KnowledgeGraphPresentation {
         var summary: String { String(format: copy("summary"), nodes.count, edges.count) }
     }
 
-    static func scene(_ graph: KnowledgeGraph, layout: KnowledgeGraphLayout) -> Scene {
-        let names = Dictionary(graph.nodes.map { ($0.id, $0.entity.name) }, uniquingKeysWith: { first, _ in first })
+    /// The scene for `graph`. `pages` name what the drawing does not show: a
+    /// supersession loop is reported whole, including members beyond the bounds.
+    static func scene(_ graph: KnowledgeGraph, layout: KnowledgeGraphLayout, pages: [KnowledgeWikiPage] = []) -> Scene {
+        let names = Dictionary(graph.nodes.map { ($0.id, $0.entity.name) } + pages.map { ($0.entity.id, $0.entity.name) },
+                               uniquingKeysWith: { first, _ in first })
         let more = Set(graph.frontier)
         let nodes = graph.nodes.compactMap { node -> Node? in
             guard let point = layout.positions[node.id] else { return nil }

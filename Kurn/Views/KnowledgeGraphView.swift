@@ -28,7 +28,7 @@ struct KnowledgeGraphView: View {
         let laidOut = service.laidOut(exploration, from: entityID, in: read)
         Group {
             if let laidOut {
-                let scene = KnowledgeGraphPresentation.scene(laidOut.graph, layout: laidOut.layout)
+                let scene = KnowledgeGraphPresentation.scene(laidOut.graph, layout: laidOut.layout, pages: read.pages)
                 content(scene)
             } else {
                 KnowledgeBrowserUnavailable()
@@ -186,8 +186,11 @@ private struct KnowledgeGraphCanvas: View {
         }
         for node in scene.nodes {
             let centre = KnowledgeGraphPresentation.point(node.point, in: size)
-            let circle = Path(ellipseIn: CGRect(x: centre.x - radius, y: centre.y - radius, width: radius * 2, height: radius * 2))
-            context.fill(circle, with: .color(node.isRoot ? Theme.accent : Theme.textSecondary))
+            // The centre is a square, every other node a circle: its shape,
+            // not only its colour, says which one the graph is centred on.
+            let frame = CGRect(x: centre.x - radius, y: centre.y - radius, width: radius * 2, height: radius * 2)
+            let mark = node.isRoot ? Path(roundedRect: frame, cornerRadius: 3) : Path(ellipseIn: frame)
+            context.fill(mark, with: .color(node.isRoot ? Theme.accent : Theme.textSecondary))
             if node.hasMore {
                 let outer = Path(ellipseIn: CGRect(x: centre.x - radius - 5, y: centre.y - radius - 5,
                                                    width: (radius + 5) * 2, height: (radius + 5) * 2))

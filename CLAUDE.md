@@ -3692,7 +3692,7 @@ K4.3 steps (lanes need a context per claim, which the read does not carry yet).
 - **Drawn on a `Canvas`, touched through an overlay.** The canvas is hidden from assistive
   technologies. Each node has a 44-point button laid over it, whose label carries its name, how many
   relationships are shown, and whether it is the centre or has more. That button is also what
-  VoiceOver reads. A selected node is ringed and its edges drawn thicker. Edges have an arrowhead in
+  VoiceOver reads. The centre is a square and other nodes circles; a selected node is ringed and its edges drawn thicker. Edges have an arrowhead in
   their stated direction. A tentative claim is dashed, an inferred one dotted and a negated one
   crossed out. A dotted ring marks a node on the query's frontier. No state is shown by colour alone.
 - **The list alternative.** A segmented control switches between the drawing and a list of every
@@ -3710,7 +3710,7 @@ K4.3 steps (lanes need a context per claim, which the read does not carry yet).
   claims. Inferred claims (`KnowledgeModality.inferred`) are off by default
   (`KnowledgeGraph.Query.includesInferred`, which defaults to on for other callers).
 - The footer says how much is shown. It also says when a bound truncated the walk and names each
-  supersession loop. Words, labels and links are `KnowledgeGraphPresentation` (Application,
+  supersession loop by every member, named from the whole read even beyond the bounds. Words, labels and links are `KnowledgeGraphPresentation` (Application,
   tested); the view only binds them. The UI fixture's graph variant
   (`UI-Testing-KnowledgeGraphFixture`) adds a team that blocks the portal.
 - Not yet: graph performance targets measured on a physical device, and the Evolution, Compare and
