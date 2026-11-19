@@ -86,7 +86,7 @@ struct KnowledgeGraphPresentationTests {
     }
 
     @Test func aSupersessionLoopIsNamed() throws {
-        let meeting = UUID(), first = UUID(), second = UUID()
+        let meeting = UUID(), first = UUID(), second = UUID(), third = UUID(), fourth = UUID()
         func supersedes(_ subject: UUID, _ object: UUID) -> KnowledgeWikiSnapshot.Fact {
             .init(id: UUID(), subjectID: subject, predicate: .supersedes, objectID: object,
                   qualifiers: .init(modality: .reported, polarity: .positive, claimKind: .internalStatusReport, authority: .attributed,
@@ -99,12 +99,16 @@ struct KnowledgeGraphPresentationTests {
         let read = try KnowledgeBrowserRead(
             meetingIDs: [meeting],
             wiki: .init(revision: 1, entities: [.init(id: first, kind: .decisionThread, name: "First"),
-                                                .init(id: second, kind: .decisionThread, name: "Second")],
-                        facts: [supersedes(first, second), supersedes(second, first)]),
+                                                .init(id: second, kind: .decisionThread, name: "Second"),
+                                                .init(id: third, kind: .decisionThread, name: "Third"),
+                                                .init(id: fourth, kind: .decisionThread, name: "Fourth")],
+                        facts: [supersedes(first, second), supersedes(second, third), supersedes(third, fourth), supersedes(fourth, first)]),
             meetingTitles: [meeting: "Weekly"])
+        // At distance 1, Third is not drawn but the loop still names it.
         let laidOut = try #require(KnowledgeGraphQueryService().laidOut(.init(rootID: first), in: read))
-        let scene = KnowledgeGraphPresentation.scene(laidOut.graph, layout: laidOut.layout)
-        #expect(scene.cycles.count == 1 && Set(scene.cycles[0]) == ["First", "Second"])
+        #expect(!laidOut.graph.nodes.contains { $0.id == third })
+        let scene = KnowledgeGraphPresentation.scene(laidOut.graph, layout: laidOut.layout, pages: read.pages)
+        #expect(scene.cycles.count == 1 && Set(scene.cycles[0]) == ["First", "Second", "Third", "Fourth"])
     }
 
     @Test func theExplorationIsKeptAndFallsBackToWhereItWasOpened() throws {
