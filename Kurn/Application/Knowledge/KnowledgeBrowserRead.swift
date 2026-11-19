@@ -37,10 +37,23 @@ struct KnowledgeEvidenceRead: Equatable, Sendable {
     let segments: [TranscriptSegment]
 }
 
+/// The occasion a meeting was recorded at (spec §20.1), for the graph's
+/// context lanes. A meeting with no link is in context `unknown`.
+struct KnowledgeBrowserContext: Equatable, Sendable {
+    /// nil for the unknown context.
+    let id: UUID?
+    let kind: KnowledgeContextKind
+    let name: String
+
+    static let unknown = KnowledgeBrowserContext(id: nil, kind: .unknown, name: "")
+}
+
 struct KnowledgeBrowserRead: Equatable, Sendable {
     let meetingIDs: Set<UUID>
     let pages: [KnowledgeWikiPage]
     let meetingTitles: [UUID: String]
+    /// Each meeting's context; a meeting missing here is in context `unknown`.
+    let meetingContexts: [UUID: KnowledgeBrowserContext]
     let selectedEvidence: KnowledgeEvidenceRead?
     let policyRevisionKey: String
     let allowsEmbedding: Bool
@@ -50,8 +63,10 @@ struct KnowledgeBrowserRead: Equatable, Sendable {
     }
 
     init(meetingIDs: Set<UUID>, wiki: KnowledgeWikiSnapshot, meetingTitles: [UUID: String],
-         selectedEvidence: KnowledgeEvidenceRead? = nil, policyRevisionKey: String = "", allowsEmbedding: Bool = false) throws {
+         selectedEvidence: KnowledgeEvidenceRead? = nil, policyRevisionKey: String = "", allowsEmbedding: Bool = false,
+         meetingContexts: [UUID: KnowledgeBrowserContext] = [:]) throws {
         guard !meetingIDs.isEmpty, meetingIDs.count <= 16, Set(meetingTitles.keys) == meetingIDs,
+              Set(meetingContexts.keys).isSubset(of: meetingIDs),
               wiki.facts.allSatisfy({ meetingIDs.contains($0.source.meetingID) }) else { throw KnowledgeWikiStoreError.scopeDenied }
         let pages = try KnowledgeWikiProjector.project(wiki)
         if let selectedEvidence {
@@ -67,6 +82,7 @@ struct KnowledgeBrowserRead: Equatable, Sendable {
             return left == right ? $0.entity.id.uuidString < $1.entity.id.uuidString : left < right
         }
         self.meetingTitles = meetingTitles
+        self.meetingContexts = meetingContexts
         self.selectedEvidence = selectedEvidence
         self.policyRevisionKey = policyRevisionKey
         self.allowsEmbedding = allowsEmbedding

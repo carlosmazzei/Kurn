@@ -3686,9 +3686,8 @@ app; the Graph Explorer (K4.3) draws them.
 
 An entity page opens "Relationships" (`KnowledgeBrowserRoute.graph`, `KnowledgeGraphView`): the
 neighbourhood K4.1 answers, at the positions K4.2 gives, from the same authorized read as the page,
-offline. Three modes share one neighbourhood and its positions: All (every claim the query shows),
-On a day (evolution) and Compare. Context lanes are a later K4.3 step (they need a context per claim,
-which the read does not carry yet).
+offline. Four modes share one neighbourhood and its positions: All (every claim the query shows),
+On a day (evolution), Compare and Contexts (lanes).
 
 - **Drawn on a `Canvas`, touched through an overlay.** The canvas is hidden from assistive
   technologies. Each node has a 44-point button laid over it, whose label carries its name, how many
@@ -3727,7 +3726,17 @@ which the read does not carry yet).
   say so in words. The days default to today and, for Compare's earlier day, the first
   stated start on the opened entity's page; they are part of the kept exploration. Day reading, states
   and wording are `KnowledgeGraphPresentation+Timeline` (tested).
-- Not yet: graph performance targets measured on a physical device, and the Context lanes mode.
+- **Contexts** lays the same neighbourhood out in one horizontal lane per context its relationships were
+  said in (`KnowledgeGraphPresentation+Lanes`). The read carries each meeting's context
+  (`KnowledgeBrowserRead.meetingContexts`, from its `SourceContextLink`, read in the same authorized
+  context as the pages; a meeting with no link is in context `unknown`). A relationship belongs to its
+  meeting's context; lanes are ordered by `KnowledgeContextKind` (unknown last), then by title, which is
+  the context's name or else its kind in words. A node sits in the lane most of its shown relationships
+  belong to (the earlier lane on a tie), keeps its x and keeps its order within the lane's middle 70%.
+  Each lane is named at its top left, and every relationship row and node label names its context in
+  words, so lanes are never told apart by position or colour alone. Nothing is filtered: Contexts shows
+  what All shows.
+- Not yet: graph performance targets measured on a physical device.
 
 ### Attached documents (PDFs)
 

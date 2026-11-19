@@ -24,8 +24,15 @@ extension KnowledgeStore {
             try KnowledgeBrowserSourceRows.read($0, wiki: snapshot.wiki, sources: sources, titles: titles, in: context)
         }
         let allowsEmbedding = (try? auth.authorize(classifications: sources.map(\.contextClassification), operation: .embedding)) != nil
+        var contexts: [UUID: KnowledgeBrowserContext] = [:]
+        for source in sources {
+            guard let contextID = source.contextID else { continue }
+            let occasion = try context.fetch(FetchDescriptor<KnowledgeContext>(predicate: #Predicate { $0.id == contextID })).first
+            guard let occasion else { throw KnowledgeStoreError.invalidContext }
+            contexts[source.meetingID] = KnowledgeBrowserContext(id: contextID, kind: source.contextKind, name: occasion.name)
+        }
         return try KnowledgeBrowserRead(meetingIDs: meetingIDs, wiki: snapshot.wiki, meetingTitles: titles, selectedEvidence: evidence,
-            policyRevisionKey: snapshot.policyRevisionKey, allowsEmbedding: allowsEmbedding)
+            policyRevisionKey: snapshot.policyRevisionKey, allowsEmbedding: allowsEmbedding, meetingContexts: contexts)
     }
 }
 

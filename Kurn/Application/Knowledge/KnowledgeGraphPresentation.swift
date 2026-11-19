@@ -60,6 +60,8 @@ enum KnowledgeGraphPresentation {
         let hasMore: Bool
         /// Position in the unit square, from the layout.
         let point: KnowledgeGraphLayout.Point
+        /// The title of the context lane it sits in; lanes mode only.
+        var lane: String?
     }
 
     struct Edge: Equatable, Identifiable {
@@ -75,6 +77,8 @@ enum KnowledgeGraphPresentation {
         let evidence: KnowledgeBrowserRoute?
         /// What the evolution or compare mode says about it; nil otherwise.
         var state: EdgeState?
+        /// The title of the context it was said in; lanes mode only.
+        var lane: String?
     }
 
     struct Scene: Equatable {
@@ -86,6 +90,8 @@ enum KnowledgeGraphPresentation {
         let isTruncated: Bool
         /// Each supersession cycle among the shown identities, as names.
         let cycles: [[String]]
+        /// The context lanes, top to bottom; empty outside lanes mode.
+        var lanes: [Lane] = []
 
         func node(_ id: UUID) -> Node? { nodes.first { $0.id == id } }
 
@@ -135,7 +141,7 @@ enum KnowledgeGraphPresentation {
     /// says so and a tentative one is noted here (never colour alone).
     static func notes(_ edge: Edge) -> [String] {
         notes(for: edge.state) + (edge.isTentative ? [KnowledgeTimelinePresentation.text("tentative")] : [])
-            + (edge.isInferred ? [copy("inferred")] : [])
+            + (edge.isInferred ? [copy("inferred")] : []) + (edge.lane.map { [String(format: copy("in_context"), $0)] } ?? [])
     }
 
     /// Where a unit-square point sits in a canvas of `size`.
@@ -146,6 +152,7 @@ enum KnowledgeGraphPresentation {
     /// The accessibility label of a node's hit target.
     static func label(_ node: Node, scene: Scene) -> String {
         var parts = [node.name, String(format: copy("connections"), scene.edges(touching: node.id).count)]
+        if let lane = node.lane { parts.append(String(format: copy("in_context"), lane)) }
         if node.isRoot { parts.append(copy("centre")) }
         if node.hasMore { parts.append(copy("has_more")) }
         return parts.joined(separator: ", ")

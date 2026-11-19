@@ -8,7 +8,7 @@ import KurnCore
 /// person's calendar and words the result.
 extension KnowledgeGraphPresentation {
     enum GraphMode: String, CaseIterable, Identifiable, Equatable {
-        case relationships, evolution, compare
+        case relationships, evolution, compare, lanes
 
         var id: String { rawValue }
         var displayName: String { copy("mode." + rawValue) }
@@ -55,7 +55,7 @@ extension KnowledgeGraphPresentation {
                        calendar: Calendar = .current) -> [UUID: EdgeState]? {
         let claims = { KnowledgeStateComparison.claims(from: pages) }
         switch exploration.mode {
-        case .relationships:
+        case .relationships, .lanes:
             return nil
         case .evolution:
             guard let moment = point(days.day, asKnownThen: exploration.asKnownThen, calendar: calendar) else { return [:] }
