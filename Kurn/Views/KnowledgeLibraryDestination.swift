@@ -17,6 +17,7 @@ struct KnowledgeLibraryDestination: View {
                         Text(KnowledgeBrowserCopy.text("choose_sources_detail"))
                     } actions: { chooseSourcesButton }
                     .navigationTitle(KnowledgeBrowserCopy.text("title"))
+                    .toolbar(.hidden, for: .tabBar)
                 }
             } else {
                 KnowledgeBrowserView(meetingIDs: meetingIDs, showsDone: false, onChooseSources: { showingSources = true })
