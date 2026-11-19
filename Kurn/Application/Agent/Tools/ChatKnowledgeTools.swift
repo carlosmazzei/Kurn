@@ -68,6 +68,8 @@ enum ChatKnowledgeGate {
 /// (`ChatKnowledgeToolText`) ending with a `page:` line and a `revision:` line.
 enum ChatKnowledgeTools {
     static let names = ["search_knowledge", "get_entity", "get_timeline", "get_evidence"]
+    /// The ranked window search pages, the index's own maximum.
+    static let searchWindow = 100
 
     static func make(source: ChatKnowledgeSource, meetings: Set<UUID>, provider: AIProvider) -> [AgentTool] {
         names.map { name in
@@ -110,10 +112,17 @@ enum ChatKnowledgeTools {
         switch name {
         case "search_knowledge":
             let query = try params.string("query", limit: KnowledgeSearchIndex.queryLimit)
-            let hits = try KnowledgeSearchIndex(pages: read.pages, meetingIDs: read.meetingIDs).search(query: query)
-            return ChatKnowledgeToolText.output(header: "knowledge search results (best first):",
-                                                lines: hits.map { ChatKnowledgeToolText.hit($0, query: query) },
-                                                offset: params.offset, limit: params.limit, read: read)
+            // Pages a ranked top-`searchWindow` window, like the transcript search; a full window
+            // says so instead of passing its size off as the number of matches.
+            let hits = try KnowledgeSearchIndex(pages: read.pages, meetingIDs: read.meetingIDs)
+                .search(query: query, limit: searchWindow)
+            let window = hits.count >= searchWindow ? "top \(searchWindow) shown; refine the query for more" : "all matches"
+            let output = ChatKnowledgeToolText.output(header: "knowledge search results (best first; \(window)):",
+                                                      lines: hits.map { ChatKnowledgeToolText.hit($0, query: query) },
+                                                      offset: params.offset, limit: params.limit, read: read)
+            let metrics = output.metrics.merging([.searchResultLimit: searchWindow,
+                                                  .searchWindowFull: hits.count >= searchWindow ? 1 : 0]) { _, new in new }
+            return AgentToolOutput(content: output.content, summary: output.summary, metrics: metrics)
         case "get_entity":
             let id = try params.uuid("entityID")
             guard let page = read.pages.first(where: { $0.entity.id == id }) else { throw Invalid("Unknown entityID.") }

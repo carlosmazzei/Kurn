@@ -62,8 +62,8 @@ enum ChatKnowledgeToolText {
 
     static func timeline(_ entry: KnowledgeTimeline.Entry) -> Rendered {
         let text = ChatSourceToolText.renderedField(claimText(entry.item), limit: 400)
-        var line = "- \(entry.stated?.text ?? "undated") | \(text.text) | assertion \(entry.factID.uuidString)"
-            + " | recorded \(ChatSourceToolText.date(entry.recordedAt))"
+        var line = "- \(entry.stated?.text ?? "undated") | \(text.text) | \(qualifiers(entry.item.fact.qualifiers))"
+            + " | assertion \(entry.factID.uuidString) | recorded \(ChatSourceToolText.date(entry.recordedAt))"
         if entry.isTentative { line += " | tentative" }
         if !entry.lifecycleAnomalies.isEmpty {
             line += " | anomalies: " + entry.lifecycleAnomalies.map(\.rawValue).joined(separator: ", ")
@@ -76,7 +76,7 @@ enum ChatKnowledgeToolText {
         let quote = ChatSourceToolText.renderedField(read.evidence.quote, limit: 2000)
         let speaker = ChatSourceToolText.field(read.evidence.attributedSpeaker, limit: 100)
         let line = "meeting \(read.entry.fact.source.meetingID.uuidString) | \(title.text)"
-            + " | assertion \(read.entry.fact.id.uuidString) | \(claimText(read.entry))"
+            + " | assertion \(read.entry.fact.id.uuidString) | \(claimText(read.entry)) | \(qualifiers(read.entry.fact.qualifiers))"
             + "\n\(timestamp(read.evidence.startMs))–\(timestamp(read.evidence.endMs)) \(speaker): \"\(quote.text)\""
         return Rendered(text: line, omittedScalars: title.omittedScalars + quote.omittedScalars)
     }

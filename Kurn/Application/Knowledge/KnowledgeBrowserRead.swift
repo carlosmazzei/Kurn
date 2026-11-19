@@ -62,8 +62,8 @@ struct KnowledgeBrowserRead: Equatable, Sendable {
         meetingIDs.sorted { $0.uuidString < $1.uuidString }.map { meetingContexts[$0]?.classification ?? .internal }
     }
 
-    /// The canonical revision the pages were projected from.
-    var revision: Int { pages.map(\.revision).max() ?? 0 }
+    /// The canonical revision the read was taken at, kept even when it holds no visible claim.
+    let revision: Int
     let selectedEvidence: KnowledgeEvidenceRead?
     let policyRevisionKey: String
     let allowsEmbedding: Bool
@@ -93,6 +93,7 @@ struct KnowledgeBrowserRead: Equatable, Sendable {
         }
         self.meetingTitles = meetingTitles
         self.meetingContexts = meetingContexts
+        revision = wiki.revision
         self.selectedEvidence = selectedEvidence
         self.policyRevisionKey = policyRevisionKey
         self.allowsEmbedding = allowsEmbedding

@@ -26,7 +26,8 @@ struct ChatKnowledgeToolsTests {
             .init(id: blocker, subjectID: team, predicate: .blocks, objectID: project,
                   qualifiers: .init(modality: .reported, polarity: .positive, claimKind: .internalStatusReport, authority: .attributed,
                                     confidence: .medium, review: .machineExtracted,
-                                    validFrom: KnowledgeTemporalValue(text: "2026-10", precision: .month)),
+                                    validFrom: KnowledgeTemporalValue(text: "2026-10", precision: .month),
+                                    validTo: KnowledgeTemporalValue(text: "2026-11", precision: .month)),
                   source: source("The platform team is blocking the portal.", evidence: evidenceID)),
             .init(id: status, subjectID: project, predicate: .hasStatus, value: .enumeration("open"),
                   qualifiers: .init(modality: .proposed, polarity: .negative, claimKind: .internalStatusReport, authority: .attributed,
@@ -100,7 +101,7 @@ struct ChatKnowledgeToolsTests {
     @Test func searchFindsClaimsAndAliasesWithTheirIDs() async throws {
         let output = try await run("search_knowledge", ["query": .string("portal")])
         #expect(!output.isError)
-        #expect(output.content.hasPrefix("knowledge search results (best first):"))
+        #expect(output.content.hasPrefix("knowledge search results (best first; all matches):"))
         #expect(output.content.contains("entity \(Self.project.uuidString)"))
         #expect(output.content.contains("assertion \(Self.blocker.uuidString)"))
         #expect(output.content.hasSuffix("revision: 7; meetings: 1"))
@@ -129,7 +130,10 @@ struct ChatKnowledgeToolsTests {
         let dated = try #require(lines.firstIndex { $0.hasPrefix("- 2026-10 | Platform team blocks Example portal") })
         let undated = try #require(lines.firstIndex { $0.hasPrefix("- undated | NOT Example portal hasStatus open") })
         #expect(dated < undated)
-        #expect(lines[undated].hasSuffix("| tentative"))
+        #expect(lines[undated].hasSuffix("| tentative") && lines[undated].contains("modality: proposed"))
+        // Both ends of a stated validity reach the model.
+        #expect(lines[dated].contains("modality: reported; kind: internalStatusReport; review: machineExtracted; "
+            + "valid from: 2026-10; valid to: 2026-11"))
         let teamOnly = try await run("get_timeline", ["entityID": .string(Self.team.uuidString)])
         #expect(teamOnly.content.contains("blocks") && !teamOnly.content.contains("hasStatus"))
         #expect(try await run("get_timeline", ["entityID": .string(UUID().uuidString)]).isError)
@@ -140,6 +144,8 @@ struct ChatKnowledgeToolsTests {
                                                     "evidenceID": .string(Self.evidenceID.uuidString)])
         #expect(output.content.contains("meeting \(Self.meeting.uuidString) | Weekly review | assertion \(Self.blocker.uuidString)"))
         #expect(output.content.contains("[1:05]–[1:10] Speaker 2: \"The platform team is blocking the portal.\""))
+        #expect(output.content.contains("Platform team blocks Example portal | modality: reported"))
+        #expect(output.content.contains("valid to: 2026-11"))
         #expect(try await run("get_evidence", ["assertionID": .string(Self.blocker.uuidString),
                                                "evidenceID": .string(UUID().uuidString)]).isError)
         #expect(try await run("get_evidence", ["assertionID": .string(Self.blocker.uuidString)]).isError)
@@ -168,6 +174,37 @@ struct ChatKnowledgeToolsTests {
         #expect(!source.authorization([Self.meeting]).featureEnabled)
         #expect(ChatKnowledgeGate.meetings([Self.meeting], source: source, provider: .openAI) == nil)
         await #expect(throws: (any Error).self) { try await source.read([Self.meeting], nil) }
+    }
+
+    @Test func theRevisionIsTheSnapshotsEvenWithoutVisibleClaims() throws {
+        let empty = try KnowledgeBrowserRead(meetingIDs: [Self.meeting],
+                                             wiki: KnowledgeWikiSnapshot(revision: 12, entities: [], facts: []),
+                                             meetingTitles: [Self.meeting: "Weekly review"])
+        #expect(empty.pages.isEmpty && empty.revision == 12)
+        #expect(try Self.read(nil).revision == 7)
+    }
+
+    @Test func searchPagesARankedWindowAndSaysWhenItIsFull() async throws {
+        // 60 entities whose page and claim both match: more matches than the window holds.
+        let entities = (0..<60).map { KnowledgeWikiSnapshot.Entity(id: UUID(), kind: .project, name: "Portal \($0)") }
+        let facts = entities.map { entity in
+            KnowledgeWikiSnapshot.Fact(id: UUID(), subjectID: entity.id, predicate: .hasStatus, value: .enumeration("open"),
+                qualifiers: .init(modality: .reported, polarity: .positive, claimKind: .internalStatusReport, authority: .attributed,
+                                  confidence: .medium, review: .machineExtracted),
+                source: .init(meetingID: Self.meeting, recordedAt: Date(timeIntervalSince1970: 1_790_000_000), evidence: [
+                    .init(id: UUID(), recordingID: Self.recording, segmentIDs: ["s1"], quote: "The \(entity.name) is open.",
+                          startMs: 0, endMs: 500, attributedSpeaker: "Speaker 1"),
+                ]))
+        }
+        let large = try KnowledgeBrowserRead(meetingIDs: [Self.meeting], wiki: .init(revision: 3, entities: entities, facts: facts),
+                                             meetingTitles: [Self.meeting: "Weekly review"])
+        let source = ChatKnowledgeSource(read: { _, _ in large }, authorization: Self.source().authorization, remoteConsent: { true })
+        let first = try await run("search_knowledge", ["query": .string("portal")], source: source)
+        #expect(first.content.hasPrefix("knowledge search results (best first; top 100 shown; refine the query for more):"))
+        #expect(first.metrics[.searchWindowFull] == 1 && first.metrics[.searchResultLimit] == 100)
+        let last = try await run("search_knowledge", ["query": .string("portal"), "offset": .number(90), "limit": .number(20)],
+                                 source: source)
+        #expect(last.content.contains("page: items 91–100 of 100; end"))
     }
 
     @Test func claimTextAndValuesAreCanonical() {
