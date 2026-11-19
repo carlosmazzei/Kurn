@@ -21,52 +21,47 @@ struct KnowledgeCompareView: View {
     var body: some View {
         let comparison = KnowledgeComparePresentation.compare(entityID: page.entity.id, from: earlier, to: later,
                                                               asKnownThen: asKnownThen, pages: pages)
-        List {
-            Section {
-                DatePicker(KnowledgeComparePresentation.copy("from"), selection: $earlier, displayedComponents: .date)
-                    .accessibilityIdentifier("knowledge.compare.from")
-                DatePicker(KnowledgeComparePresentation.copy("to"), selection: $later, displayedComponents: .date)
-                    .accessibilityIdentifier("knowledge.compare.to")
-                Toggle(KnowledgeComparePresentation.copy("as_known_then"), isOn: $asKnownThen)
-                    .accessibilityIdentifier("knowledge.compare.asKnownThen")
-            } footer: {
-                Text(KnowledgeComparePresentation.copy(asKnownThen ? "as_known_then_footer" : "as_known_now_footer"))
-            }
-            if let comparison {
-                let sections = KnowledgeComparePresentation.sections(comparison, pages: pages)
-                if sections.isEmpty {
-                    Text(KnowledgeComparePresentation.copy("empty")).foregroundStyle(Theme.textSecondary)
-                        .accessibilityIdentifier("knowledge.compare.empty")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 10) {
+                    DatePicker(KnowledgeComparePresentation.copy("from"), selection: $earlier, displayedComponents: .date)
+                        .accessibilityIdentifier("knowledge.compare.from")
+                    Divider().overlay(Theme.separator).accessibilityHidden(true)
+                    DatePicker(KnowledgeComparePresentation.copy("to"), selection: $later, displayedComponents: .date)
+                        .accessibilityIdentifier("knowledge.compare.to")
+                    Divider().overlay(Theme.separator).accessibilityHidden(true)
+                    Toggle(KnowledgeComparePresentation.copy("as_known_then"), isOn: $asKnownThen)
+                        .accessibilityIdentifier("knowledge.compare.asKnownThen")
                 }
-                ForEach(sections, id: \.kind) { section in
-                    Section {
-                        ForEach(Array(section.rows.enumerated()), id: \.offset) { _, row in rowView(row) }
-                    } header: {
-                        Text(section.title).accessibilityAddTraits(.isHeader)
+                .font(Theme.subheadline)
+                .knowledgeCard()
+                Text(KnowledgeComparePresentation.copy(asKnownThen ? "as_known_then_footer" : "as_known_now_footer"))
+                    .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let comparison {
+                    let sections = KnowledgeComparePresentation.sections(comparison, pages: pages)
+                    if sections.isEmpty {
+                        Text(KnowledgeComparePresentation.copy("empty"))
+                            .font(Theme.subheadline).foregroundStyle(Theme.textSecondary)
+                            .frame(maxWidth: .infinity).padding(.top, 16)
+                            .accessibilityIdentifier("knowledge.compare.empty")
+                    }
+                    ForEach(sections, id: \.kind) { section in
+                        KnowledgeSectionLabel(section.title).padding(.top, 4)
+                        VStack(alignment: .leading, spacing: 12) {
+                            ForEach(Array(section.rows.enumerated()), id: \.offset) { index, row in
+                                if index > 0 { Divider().overlay(Theme.separator).accessibilityHidden(true) }
+                                KnowledgeChangeRow(row: row, identifier: "knowledge.compare.change")
+                            }
+                        }
+                        .knowledgeCard()
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
         }
+        .knowledgeReadingSurface()
         .accessibilityIdentifier("knowledge.compare")
-    }
-
-    @ViewBuilder
-    private func rowView(_ row: KnowledgeComparePresentation.Row) -> some View {
-        let content = VStack(alignment: .leading, spacing: 4) {
-            if let before = row.before {
-                Text(verbatim: before).font(Theme.footnote).foregroundStyle(Theme.textSecondary)
-            }
-            Text(verbatim: row.text).font(Theme.bodyEmphasized)
-            if !row.notes.isEmpty {
-                Text(verbatim: row.notes.joined(separator: " · ")).font(Theme.captionEmphasized)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        if let route = row.evidence {
-            NavigationLink(value: route) { content }
-                .accessibilityIdentifier("knowledge.compare.change")
-        } else {
-            content.accessibilityIdentifier("knowledge.compare.change")
-        }
     }
 }

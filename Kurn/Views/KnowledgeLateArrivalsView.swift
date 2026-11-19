@@ -9,35 +9,55 @@ struct KnowledgeLateArrivalsView: View {
     var body: some View {
         let items = KnowledgeLateArrivalPresentation.items(page: page)
         if !items.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(KnowledgeLateArrivalPresentation.copy("header")).font(Theme.title3).accessibilityAddTraits(.isHeader)
-                Text(KnowledgeLateArrivalPresentation.copy("footer")).font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+            VStack(alignment: .leading, spacing: 10) {
+                KnowledgeSectionLabel(KnowledgeLateArrivalPresentation.copy("header")).padding(.top, 4)
+                Text(KnowledgeLateArrivalPresentation.copy("footer"))
+                    .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(verbatim: item.title).font(Theme.headline)
+                        Text(verbatim: item.title).font(Theme.headline).foregroundStyle(Theme.textPrimary)
                         ForEach(Array(item.stretches.enumerated()), id: \.offset) { _, stretch in
-                            Text(verbatim: stretch.title).font(Theme.footnoteEmphasized)
-                            ForEach(Array(stretch.rows.enumerated()), id: \.offset) { _, row in rowView(row) }
+                            Text(verbatim: stretch.title).font(Theme.caption2Emphasized).foregroundStyle(Theme.textSecondary)
+                            ForEach(Array(stretch.rows.enumerated()), id: \.offset) { _, row in KnowledgeChangeRow(row: row) }
                         }
                     }
-                    .padding(16).background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+                    .knowledgeCard()
                 }
             }
         }
     }
+}
 
-    @ViewBuilder
-    private func rowView(_ row: KnowledgeComparePresentation.Row) -> some View {
+/// One change line shared by the comparison and late-arrival views: what it
+/// was before, what it is, its notes, and the passage it opens when cited.
+struct KnowledgeChangeRow: View {
+    let row: KnowledgeComparePresentation.Row
+    var identifier: String?
+
+    var body: some View {
         let content = VStack(alignment: .leading, spacing: 4) {
-            if let before = row.before { Text(verbatim: before).font(Theme.footnote).foregroundStyle(Theme.textSecondary) }
-            Text(verbatim: row.text).font(Theme.body)
-            if !row.notes.isEmpty { Text(verbatim: row.notes.joined(separator: " · ")).font(Theme.captionEmphasized) }
+            if let before = row.before {
+                Text(verbatim: before).font(Theme.caption).foregroundStyle(Theme.textSecondary)
+            }
+            Text(verbatim: row.text).font(Theme.subheadlineEmphasized).foregroundStyle(Theme.textPrimary)
+            if !row.notes.isEmpty {
+                Text(verbatim: row.notes.joined(separator: " · ")).font(Theme.caption2Emphasized).foregroundStyle(Theme.textSecondary)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         if let route = row.evidence {
-            NavigationLink(value: route) { content }
+            NavigationLink(value: route) {
+                HStack(spacing: 12) {
+                    content
+                    KnowledgeChevron()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(identifier ?? "knowledge.change")
         } else {
-            content
+            content.accessibilityIdentifier(identifier ?? "knowledge.change")
         }
     }
 }

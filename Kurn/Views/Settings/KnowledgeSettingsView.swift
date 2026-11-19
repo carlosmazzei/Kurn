@@ -49,15 +49,27 @@ struct KnowledgeSettingsView: View {
         }
         .onDisappear { invalidate() }
         .errorAlert($presentation.error)
-        .alert(KnowledgeSettingsCopy.text("confirm"), isPresented: $confirming) {
-            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
-            Button(KnowledgeSettingsCopy.text("start")) { if let plan = model.plan { management?.start(plan) } }
-                .accessibilityIdentifier("knowledge.settings.confirm")
-        } message: { Text(KnowledgeSettingsCopy.text("local_cost")) }
-        .alert(KnowledgeSettingsCopy.text("reset"), isPresented: $resetting) {
-            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
-            Button(KnowledgeSettingsCopy.text("reset")) { do { try settings.resetKnowledgeControls() } catch { model.reportError() } }
-        } message: { Text(KnowledgeSettingsCopy.text("reset_detail")) }
+        .kurnDialog(
+            isPresented: $confirming,
+            iconSystemName: "books.vertical",
+            iconTint: Theme.info,
+            title: KnowledgeSettingsCopy.text("confirm"),
+            message: KnowledgeSettingsCopy.text("local_cost"),
+            primaryTitle: KnowledgeSettingsCopy.text("start"),
+            primaryAction: { if let plan = model.plan { management?.start(plan) } },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
+        .kurnDialog(
+            isPresented: $resetting,
+            iconSystemName: "arrow.counterclockwise",
+            iconTint: Theme.warning,
+            title: KnowledgeSettingsCopy.text("reset"),
+            message: KnowledgeSettingsCopy.text("reset_detail"),
+            primaryTitle: KnowledgeSettingsCopy.text("reset"),
+            primaryRole: .destructive,
+            primaryAction: { do { try settings.resetKnowledgeControls() } catch { model.reportError() } },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
         .kurnDialog(
             isPresented: $deleting,
             iconSystemName: "exclamationmark.triangle.fill",

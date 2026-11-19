@@ -16,6 +16,8 @@ struct KnowledgeLibraryDestination: View {
                     } description: {
                         Text(KnowledgeBrowserCopy.text("choose_sources_detail"))
                     } actions: { chooseSourcesButton }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .knowledgeReadingSurface()
                     .navigationTitle(KnowledgeBrowserCopy.text("title"))
                     .toolbar(.hidden, for: .tabBar)
                 }
@@ -29,10 +31,15 @@ struct KnowledgeLibraryDestination: View {
         }
     }
 
+    /// Choosing sources is the one thing this empty screen is for: the
+    /// primary action style (Theme "Button language").
     private var chooseSourcesButton: some View {
         Button { showingSources = true } label: {
             Label(KnowledgeBrowserCopy.text("choose_sources"), systemImage: "checklist")
+                .font(Theme.calloutEmphasized)
         }
+        .buttonStyle(.glassProminent)
+        .tint(Theme.accent)
         .accessibilityIdentifier("knowledge.chooseSources")
     }
 }
@@ -56,14 +63,17 @@ struct KnowledgeMeetingSelectionView: View {
                 Section {
                     ForEach(allowedMeetings) { meeting in
                         Button { toggle(meeting.id) } label: {
-                            HStack {
+                            HStack(spacing: 12) {
                                 Image(systemName: selectedIDs.contains(meeting.id) ? "checkmark.circle.fill" : "circle")
+                                    .font(Theme.title3)
+                                    .foregroundStyle(selectedIDs.contains(meeting.id) ? Theme.accent : Theme.textTertiary)
                                     .accessibilityHidden(true)
-                                VStack(alignment: .leading) {
-                                    Text(verbatim: meeting.title)
-                                    Text(meeting.createdAt.meetingDisplay).font(.footnote)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(verbatim: meeting.title).font(Theme.subheadline).foregroundStyle(Theme.textPrimary)
+                                    Text(meeting.createdAt.meetingDisplay).font(Theme.caption).foregroundStyle(Theme.textSecondary)
                                 }
                             }
+                            .contentShape(Rectangle())
                         }
                         .accessibilityAddTraits(selectedIDs.contains(meeting.id) ? .isSelected : [])
                         .accessibilityIdentifier("knowledge.sourceMeeting")
@@ -74,6 +84,7 @@ struct KnowledgeMeetingSelectionView: View {
                 } footer: { Text(KnowledgeBrowserCopy.text("choose_sources_detail")) }
             }
             .navigationTitle(KnowledgeBrowserCopy.text("choose_sources"))
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(NSLocalizedString("common.cancel", comment: "Cancel")) { dismiss() }

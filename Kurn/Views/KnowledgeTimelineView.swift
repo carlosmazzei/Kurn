@@ -20,38 +20,37 @@ struct KnowledgeTimelineView: View {
                     if !filter.isDefault { Text(KnowledgeTimelinePresentation.text("empty_filtered")) }
                 } actions: {
                     if !filter.isDefault {
-                        Button(KnowledgeTimelinePresentation.text("reset")) { filter = KnowledgeTimeline.Filter() }
-                            .buttonStyle(.bordered)
-                            .accessibilityIdentifier("knowledge.timeline.reset")
+                        KnowledgeChipButton(title: KnowledgeTimelinePresentation.text("reset"), systemImage: "arrow.uturn.backward") {
+                            filter = KnowledgeTimeline.Filter()
+                        }
+                        .accessibilityIdentifier("knowledge.timeline.reset")
                     }
                 }
             } else {
-                List {
-                    Section {
-                        Text(KnowledgeTimelinePresentation.text("footer")).font(Theme.footnote).foregroundStyle(Theme.textSecondary)
-                    }
-                    ForEach(timeline.periods, id: \.month.text) { period in
-                        Section {
-                            ForEach(period.entries, id: \.factID) { row($0) }
-                        } header: {
-                            Text(verbatim: KnowledgeTimelinePresentation.monthTitle(period.month))
-                                .accessibilityAddTraits(.isHeader)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        Text(KnowledgeTimelinePresentation.text("footer"))
+                            .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        ForEach(timeline.periods, id: \.month.text) { period in
+                            KnowledgeSectionLabel(KnowledgeTimelinePresentation.monthTitle(period.month)).padding(.top, 8)
+                            entries(period.entries)
                         }
-                    }
-                    if !timeline.undated.isEmpty {
-                        Section {
-                            ForEach(timeline.undated, id: \.factID) { row($0) }
-                        } header: {
-                            Text(KnowledgeTimelinePresentation.text("undated")).accessibilityAddTraits(.isHeader)
+                        if !timeline.undated.isEmpty {
+                            KnowledgeSectionLabel(KnowledgeTimelinePresentation.text("undated")).padding(.top, 8)
                                 .accessibilityIdentifier("knowledge.timeline.undated")
-                        } footer: {
+                            entries(timeline.undated)
                             Text(KnowledgeTimelinePresentation.text("undated_footer"))
+                                .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                    .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
                 }
                 .accessibilityIdentifier("knowledge.timeline")
             }
         }
+        .knowledgeReadingSurface()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { filterMenu }
         }
@@ -79,21 +78,38 @@ struct KnowledgeTimelineView: View {
         .accessibilityIdentifier("knowledge.timeline.filter")
     }
 
+    private func entries(_ entries: [KnowledgeTimeline.Entry]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(Array(entries.enumerated()), id: \.element.factID) { index, entry in
+                if index > 0 { Divider().overlay(Theme.separator).accessibilityHidden(true) }
+                row(entry)
+            }
+        }
+        .knowledgeCard()
+    }
+
     @ViewBuilder
     private func row(_ entry: KnowledgeTimeline.Entry) -> some View {
         let row = KnowledgeTimelinePresentation.row(entry, meetingTitles: read.meetingTitles)
         let content = VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: row.claim).font(Theme.bodyEmphasized)
-            if let stated = row.stated { Text(verbatim: stated).font(Theme.footnote) }
-            Text(verbatim: row.source).font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+            Text(verbatim: row.claim).font(Theme.subheadlineEmphasized).foregroundStyle(Theme.textPrimary)
+            if let stated = row.stated { Text(verbatim: stated).font(Theme.caption).foregroundStyle(Theme.textPrimary) }
+            Text(verbatim: row.source).font(Theme.caption).foregroundStyle(Theme.textSecondary)
             if !row.badges.isEmpty {
-                Text(verbatim: row.badges.joined(separator: " · ")).font(Theme.captionEmphasized)
+                Text(verbatim: row.badges.joined(separator: " · ")).font(Theme.caption2Emphasized).foregroundStyle(Theme.textSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         if let route = row.evidence {
-            NavigationLink(value: route) { content }
-                .accessibilityIdentifier("knowledge.timeline.entry")
+            NavigationLink(value: route) {
+                HStack(spacing: 12) {
+                    content
+                    KnowledgeChevron()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("knowledge.timeline.entry")
         } else {
             content.accessibilityIdentifier("knowledge.timeline.entry")
         }

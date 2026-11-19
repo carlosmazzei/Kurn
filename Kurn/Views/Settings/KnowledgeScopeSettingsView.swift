@@ -21,7 +21,9 @@ struct KnowledgeScopeSettingsView: View {
                 ForEach(meetings) { meeting in
                     Button { controls.toggleMeeting(meeting.id) } label: {
                         HStack {
-                            Image(systemName: controls.allows(meeting.id) ? "checkmark.circle.fill" : "circle").accessibilityHidden(true)
+                            Image(systemName: controls.allows(meeting.id) ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(controls.allows(meeting.id) ? Theme.accent : Theme.textTertiary)
+                                .accessibilityHidden(true)
                             Text(verbatim: meeting.title).foregroundStyle(Theme.textPrimary)
                         }
                     }

@@ -77,63 +77,107 @@ struct KnowledgeReviewInboxView: View {
     }
 
     private func inbox(_ read: KnowledgeReviewRead) -> some View {
-        List {
-            Section {
-                Text(KnowledgeReviewCopy.text("intro")).foregroundStyle(.secondary)
-                if !read.allowsMutation { Text(KnowledgeReviewCopy.text("read_only")) }
-                if read.isTruncated { Text(KnowledgeReviewCopy.text("limited")) }
-                if model.decisionFailed { Text(KnowledgeReviewCopy.text("decision_failed")).accessibilityIdentifier("knowledge.review.failed") }
-                if read.evidenceUnavailable { Text(KnowledgeReviewCopy.text("evidence_unavailable")).accessibilityIdentifier("knowledge.review.evidenceUnavailable") }
-            }
-            Section(KnowledgeReviewCopy.text("identities")) {
-                ForEach(read.candidates.filter { !$0.isDismissed }) { candidate in candidateLink(candidate) }
-                if !read.candidates.contains(where: { !$0.isDismissed }) { Text(KnowledgeReviewCopy.text("none")) }
-            }
-            Section(KnowledgeReviewCopy.text("warnings")) {
-                ForEach(read.warnings) { warning in
-                    DisclosureGroup {
-                        Text(KnowledgeReviewCopy.text(warning.kind == .conflict ? "conflict_detail" : "date_detail"))
-                        ForEach(Array(warning.entries.prefix(16)), id: \.fact.id) { entry in
-                            Text(verbatim: entry.subject.name).font(.headline)
-                            ForEach(Array(entry.fact.source.evidence.prefix(3)), id: \.id) { passage in
-                                Text(verbatim: passage.quote)
-                                Button(KnowledgeReviewCopy.text("open_evidence")) {
-                                    evidence = EvidenceRoute(selection: .init(assertionID: entry.fact.id, evidenceID: passage.id))
-                                }
-                                .accessibilityIdentifier("knowledge.review.evidence")
-                            }
-                        }
-                        if warning.entries.count > 16 || warning.entries.contains(where: { $0.fact.source.evidence.count > 3 }) {
-                            Text(KnowledgeReviewCopy.text("limited"))
-                        }
-                    } label: { Text(KnowledgeReviewCopy.text(warning.kind == .conflict ? "conflict" : "date")) }
-                }
-                if read.warnings.isEmpty { Text(KnowledgeReviewCopy.text("none")) }
-            }
-            Section(KnowledgeReviewCopy.text("history")) {
-                ForEach(read.merges) { merge in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(verbatim: merge.sourceName + " → " + merge.targetName)
-                        if merge.isUndone { Text(KnowledgeReviewCopy.text("undone")).foregroundStyle(.secondary) }
-                        else {
-                            Button(KnowledgeReviewCopy.text("undo")) { decide(.undo(merge.id)) }
-                                .disabled(!read.allowsMutation)
-                                .accessibilityIdentifier("knowledge.review.undo")
-                        }
-                    }
-                }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 12) {
+                notices(read)
+                KnowledgeSectionLabel(KnowledgeReviewCopy.text("identities")).padding(.top, 8)
+                let open = read.candidates.filter { !$0.isDismissed }
+                if open.isEmpty { emptyCard } else { ForEach(open) { candidate in candidateLink(candidate) } }
+                KnowledgeSectionLabel(KnowledgeReviewCopy.text("warnings")).padding(.top, 8)
+                if read.warnings.isEmpty { emptyCard } else { ForEach(read.warnings) { warning in warningCard(warning) } }
+                KnowledgeSectionLabel(KnowledgeReviewCopy.text("history")).padding(.top, 8)
+                ForEach(read.merges) { merge in mergeCard(merge, allowsMutation: read.allowsMutation) }
                 ForEach(read.candidates.filter(\.isDismissed)) { candidate in candidateLink(candidate) }
-                if read.merges.isEmpty && !read.candidates.contains(where: \.isDismissed) { Text(KnowledgeReviewCopy.text("none")) }
+                if read.merges.isEmpty && !read.candidates.contains(where: \.isDismissed) { emptyCard }
             }
+            .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
         }
+        .knowledgeReadingSurface()
         .accessibilityIdentifier("knowledge.review.inbox")
     }
 
+    @ViewBuilder
+    private func notices(_ read: KnowledgeReviewRead) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            notice(KnowledgeReviewCopy.text("intro"))
+            if !read.allowsMutation { notice(KnowledgeReviewCopy.text("read_only")) }
+            if read.isTruncated { notice(KnowledgeReviewCopy.text("limited")) }
+            if model.decisionFailed {
+                notice(KnowledgeReviewCopy.text("decision_failed")).accessibilityIdentifier("knowledge.review.failed")
+            }
+            if read.evidenceUnavailable {
+                notice(KnowledgeReviewCopy.text("evidence_unavailable")).accessibilityIdentifier("knowledge.review.evidenceUnavailable")
+            }
+        }
+    }
+
+    private func notice(_ text: String) -> some View {
+        Text(text).font(Theme.footnote).foregroundStyle(Theme.textSecondary).fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var emptyCard: some View {
+        Text(KnowledgeReviewCopy.text("none")).font(Theme.subheadline).foregroundStyle(Theme.textSecondary).knowledgeCard()
+    }
+
+    private func warningCard(_ warning: KnowledgeReviewRead.Warning) -> some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 10) {
+                notice(KnowledgeReviewCopy.text(warning.kind == .conflict ? "conflict_detail" : "date_detail"))
+                ForEach(Array(warning.entries.prefix(16)), id: \.fact.id) { entry in
+                    Divider().overlay(Theme.separator).accessibilityHidden(true)
+                    Text(verbatim: entry.subject.name).font(Theme.subheadlineEmphasized).foregroundStyle(Theme.textPrimary)
+                    ForEach(Array(entry.fact.source.evidence.prefix(3)), id: \.id) { passage in
+                        KnowledgeQuote(text: passage.quote)
+                        KnowledgeChipButton(title: KnowledgeReviewCopy.text("open_evidence"), systemImage: "text.quote") {
+                            evidence = EvidenceRoute(selection: .init(assertionID: entry.fact.id, evidenceID: passage.id))
+                        }
+                        .accessibilityIdentifier("knowledge.review.evidence")
+                    }
+                }
+                if warning.entries.count > 16 || warning.entries.contains(where: { $0.fact.source.evidence.count > 3 }) {
+                    notice(KnowledgeReviewCopy.text("limited"))
+                }
+            }
+            .padding(.top, 10)
+        } label: {
+            HStack(spacing: 12) {
+                KnowledgeIconWell(systemImage: warning.kind == .conflict ? "exclamationmark.triangle" : "calendar", tint: Theme.warning)
+                Text(KnowledgeReviewCopy.text(warning.kind == .conflict ? "conflict" : "date"))
+                    .font(Theme.headline).foregroundStyle(Theme.textPrimary)
+            }
+        }
+        .tint(Theme.textSecondary)
+        .knowledgeCard()
+    }
+
+    private func mergeCard(_ merge: KnowledgeReviewRead.Merge, allowsMutation: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                KnowledgeIconWell(systemImage: "arrow.triangle.merge", tint: Theme.info)
+                Text(verbatim: merge.sourceName + " → " + merge.targetName)
+                    .font(Theme.subheadlineEmphasized).foregroundStyle(Theme.textPrimary)
+            }
+            if merge.isUndone {
+                Text(KnowledgeReviewCopy.text("undone")).font(Theme.caption).foregroundStyle(Theme.textSecondary)
+            } else {
+                KnowledgeChipButton(title: KnowledgeReviewCopy.text("undo"), systemImage: "arrow.uturn.backward") { decide(.undo(merge.id)) }
+                    .disabled(!allowsMutation)
+                    .accessibilityIdentifier("knowledge.review.undo")
+            }
+        }
+        .knowledgeCard()
+    }
+
     private func candidateLink(_ candidate: KnowledgeReviewRead.Candidate) -> some View {
-        NavigationLink(value: candidate.id) {
-            VStack(alignment: .leading) {
-                Text(verbatim: candidate.source.name + " · " + candidate.target.name)
-                Text(KnowledgeReviewCopy.text(candidate.isDismissed ? "kept_separate" : "possible_match")).foregroundStyle(.secondary)
+        KnowledgeLinkCard(route: candidate.id) {
+            HStack(spacing: 12) {
+                KnowledgeIconWell(systemImage: candidate.isDismissed ? "person.2.slash" : "person.2")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: candidate.source.name + " · " + candidate.target.name)
+                        .font(Theme.subheadlineEmphasized).foregroundStyle(Theme.textPrimary)
+                    Text(KnowledgeReviewCopy.text(candidate.isDismissed ? "kept_separate" : "possible_match"))
+                        .font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                }
             }
         }
         .accessibilityIdentifier(candidate.isDismissed ? "knowledge.review.dismissed" : "knowledge.review.candidate")

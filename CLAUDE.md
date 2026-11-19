@@ -3994,6 +3994,16 @@ toolbar would be the wrong control**:
   `.subheadline` because white
   on `Theme.accent`/`Theme.info` measures ~3.55:1 / ~3.65:1 — under AA for
   normal text, above the 3:1 large-text floor that ≥14 pt bold qualifies for.
+- **Knowledge screens share one look** (`Views/KnowledgeStyle.swift`), taken from the screens before
+  them: content on `Theme.background` with 20-point insets; section titles as
+  `KnowledgeSectionLabel` (the meeting tabs' uppercase, tracked `caption2Emphasized` label in the
+  tertiary colour); content in `knowledgeCard()` (`kurnCard` with 16-point corners); tappable rows
+  as `KnowledgeLinkCard` (an accent `KnowledgeIconWell`, primary text, secondary detail and a
+  chevron, like `DocumentsListView`); quotes as `KnowledgeQuote`; and secondary actions as
+  `KnowledgeChipButton` (the summary tab's grey `Theme.fill` capsule). No action is a bare tinted
+  text link; a screen's one decision (merging two identities, choosing sources) takes
+  `.glassProminent` + `Theme.accent`, and confirmations use `kurnDialog`. Settings keep the native
+  `Form`, like every other settings screen.
 - **Fixed font sizes need a reason.** `.font(.system(size:))` appears only on
   icons constrained by a small fixed well or grid cell, each with an inline
   comment saying so; everything else uses a `Theme` font or a scalable

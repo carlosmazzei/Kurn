@@ -225,23 +225,34 @@ struct KnowledgeHomeView: View {
         if read.pages.isEmpty {
             ContentUnavailableView(NSLocalizedString("detail.knowledge.empty", comment: "No contributions"), systemImage: "book.closed")
         } else {
-            List {
-                Section {
-                    NavigationLink(value: KnowledgeBrowserRoute.timeline) {
-                        Label(KnowledgeBrowserCopy.text("timeline"), systemImage: "calendar.day.timeline.leading")
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    KnowledgeLinkCard(route: KnowledgeBrowserRoute.timeline) {
+                        HStack(spacing: 12) {
+                            KnowledgeIconWell(systemImage: "calendar.day.timeline.leading", tint: Theme.info)
+                            Text(KnowledgeBrowserCopy.text("timeline")).font(Theme.headline).foregroundStyle(Theme.textPrimary)
+                        }
                     }
                     .accessibilityIdentifier("knowledge.browser.timeline")
-                }
-                Section {
+                    KnowledgeSectionLabel(String(format: KnowledgeBrowserCopy.text("scope"), read.meetingIDs.count))
+                        .padding(.top, 14)
                     ForEach(read.pages, id: \.entity.id) { page in
-                        NavigationLink(value: KnowledgeBrowserRoute.entity(page.entity.id)) {
-                            Text(verbatim: page.entity.name).font(Theme.headline)
+                        KnowledgeLinkCard(route: KnowledgeBrowserRoute.entity(page.entity.id)) {
+                            HStack(spacing: 12) {
+                                KnowledgeIconWell(systemImage: "book.pages")
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(verbatim: page.entity.name).font(Theme.headline).foregroundStyle(Theme.textPrimary)
+                                    if !page.entity.aliases.isEmpty {
+                                        Text(verbatim: page.entity.aliases.joined(separator: " · "))
+                                            .font(Theme.caption).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                                    }
+                                }
+                            }
                         }
                         .accessibilityIdentifier("knowledge.browser.entity")
                     }
-                } header: {
-                    Text(String(format: KnowledgeBrowserCopy.text("scope"), read.meetingIDs.count))
                 }
+                .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 24)
             }
             .accessibilityIdentifier("knowledge.browser.home")
         }
