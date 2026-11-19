@@ -32,6 +32,13 @@ enum KnowledgeGraphPresentation {
         var options = Options()
         /// nil follows VoiceOver: the list while it runs, else the drawing.
         var showsList: Bool?
+        var mode = GraphMode.relationships
+        /// The days the evolution and compare modes read; nil until chosen.
+        var day: Date?
+        var from: Date?
+        var to: Date?
+        /// Read each day with only what had been recorded by its end.
+        var asKnownThen = false
 
         init(root: UUID) {
             self.root = root
@@ -66,6 +73,8 @@ enum KnowledgeGraphPresentation {
         let isNegated: Bool
         let isInferred: Bool
         let evidence: KnowledgeBrowserRoute?
+        /// What the evolution or compare mode says about it; nil otherwise.
+        var state: EdgeState?
     }
 
     struct Scene: Equatable {
@@ -89,7 +98,9 @@ enum KnowledgeGraphPresentation {
 
     /// The scene for `graph`. `pages` name what the drawing does not show: a
     /// supersession loop is reported whole, including members beyond the bounds.
-    static func scene(_ graph: KnowledgeGraph, layout: KnowledgeGraphLayout, pages: [KnowledgeWikiPage] = []) -> Scene {
+    /// With `states` (evolution or compare), only the edges it names are shown.
+    static func scene(_ graph: KnowledgeGraph, layout: KnowledgeGraphLayout, pages: [KnowledgeWikiPage] = [],
+                      states: [UUID: EdgeState]? = nil) -> Scene {
         let names = Dictionary(graph.nodes.map { ($0.id, $0.entity.name) } + pages.map { ($0.entity.id, $0.entity.name) },
                                uniquingKeysWith: { first, _ in first })
         let more = Set(graph.frontier)
@@ -98,11 +109,13 @@ enum KnowledgeGraphPresentation {
             return Node(id: node.id, name: node.entity.name, depth: node.depth, isRoot: node.id == graph.query.rootID,
                         hasMore: more.contains(node.id), point: point)
         }
-        let edges = graph.edges.map { edge in
-            Edge(factID: edge.factID, sourceID: edge.sourceID, targetID: edge.targetID,
-                 text: text(edge, names: names), isTentative: edge.isTentative, isNegated: edge.polarity == .negative,
-                 isInferred: edge.modality == .inferred,
-                 evidence: edge.evidenceID.map { .evidence(assertionID: edge.factID, evidenceID: $0) })
+        let edges = graph.edges.compactMap { edge -> Edge? in
+            if let states, states[edge.factID] == nil { return nil }
+            return Edge(factID: edge.factID, sourceID: edge.sourceID, targetID: edge.targetID,
+                        text: text(edge, names: names), isTentative: edge.isTentative, isNegated: edge.polarity == .negative,
+                        isInferred: edge.modality == .inferred,
+                        evidence: edge.evidenceID.map { .evidence(assertionID: edge.factID, evidenceID: $0) },
+                        state: states?[edge.factID])
         }
         let cycles = graph.supersessionCycles.map { cycle in cycle.map { names[$0] ?? copy("unnamed") } }
         return Scene(rootID: graph.query.rootID, nodes: nodes, edges: edges, isTruncated: graph.isTruncated, cycles: cycles)
@@ -121,7 +134,8 @@ enum KnowledgeGraphPresentation {
     /// crosses out negated ones; in words, a negated claim's sentence already
     /// says so and a tentative one is noted here (never colour alone).
     static func notes(_ edge: Edge) -> [String] {
-        (edge.isTentative ? [KnowledgeTimelinePresentation.text("tentative")] : []) + (edge.isInferred ? [copy("inferred")] : [])
+        [note(edge.state)].compactMap { $0 } + (edge.isTentative ? [KnowledgeTimelinePresentation.text("tentative")] : [])
+            + (edge.isInferred ? [copy("inferred")] : [])
     }
 
     /// Where a unit-square point sits in a canvas of `size`.

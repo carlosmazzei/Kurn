@@ -1488,6 +1488,17 @@
 "knowledge.graph.show_negated" = "Show denied relationships";
 "knowledge.graph.show_inferred" = "Show inferred relationships";
 "knowledge.graph.inferred" = "Inferred, not stated";
+"knowledge.graph.mode" = "Mode";
+"knowledge.graph.mode.relationships" = "All";
+"knowledge.graph.mode.evolution" = "On a day";
+"knowledge.graph.mode.compare" = "Compare";
+"knowledge.graph.on" = "On";
+"knowledge.graph.mode.evolution.footer" = "Relationships that held at the end of the chosen day. A ring marks one that may not have started yet by then.";
+"knowledge.graph.mode.compare.footer" = "Relationships that held on either day. A plus marks one that started between them, a square one that ended; unmarked ones held on both.";
+"knowledge.graph.state.possible" = "May not have held yet on this day";
+"knowledge.graph.state.started" = "Started";
+"knowledge.graph.state.ended" = "Ended";
+"knowledge.graph.state.kept" = "Held on both days";
 "knowledge.graph.filter" = "Filter";
 "knowledge.graph.unnamed" = "Unnamed";
 "knowledge.late.header" = "Revised later";

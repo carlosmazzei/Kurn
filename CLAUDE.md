@@ -3686,8 +3686,9 @@ app; the Graph Explorer (K4.3) draws them.
 
 An entity page opens "Relationships" (`KnowledgeBrowserRoute.graph`, `KnowledgeGraphView`): the
 neighbourhood K4.1 answers, at the positions K4.2 gives, from the same authorized read as the page,
-offline. Only the relationships mode exists so far; Evolution, Compare and Context lanes are later
-K4.3 steps (lanes need a context per claim, which the read does not carry yet).
+offline. Three modes share one neighbourhood and its positions: All (every claim the query shows),
+On a day (evolution) and Compare. Context lanes are a later K4.3 step (they need a context per claim,
+which the read does not carry yet).
 
 - **Drawn on a `Canvas`, touched through an overlay.** The canvas is hidden from assistive
   technologies. Each node has a 44-point button laid over it, whose label carries its name, how many
@@ -3713,8 +3714,17 @@ K4.3 steps (lanes need a context per claim, which the read does not carry yet).
   supersession loop by every member, named from the whole read even beyond the bounds. Words, labels and links are `KnowledgeGraphPresentation` (Application,
   tested); the view only binds them. The UI fixture's graph variant
   (`UI-Testing-KnowledgeGraphFixture`) adds a team that blocks the portal.
-- Not yet: graph performance targets measured on a physical device, and the Evolution, Compare and
-  Context lanes modes.
+- **On a day and Compare** ask KurnCore's `KnowledgeGraphTimeline`, which runs the K3.1 reducer for
+  each edge's source: `holdings(of:at:claims:)` gives how certainly each edge held at a point
+  (`KnowledgeStateComparison.Point`, the end of a picked day in the person's calendar, as known now or,
+  with "As known on each date", as known then), and `compare(_:from:to:claims:)` whether it started,
+  ended or held at both. Nothing orders claims by recording date. An edge that did not hold is not
+  drawn, while its nodes keep their places. The drawing marks a relationship that only possibly held
+  with a ring, one that started with a plus and one that ended with a square, and each mode's footer
+  and every row say so in words. The days default to today and, for Compare's earlier day, the first
+  stated start on the opened entity's page; they are part of the kept exploration. Day reading, states
+  and wording are `KnowledgeGraphPresentation+Timeline` (tested).
+- Not yet: graph performance targets measured on a physical device, and the Context lanes mode.
 
 ### Attached documents (PDFs)
 

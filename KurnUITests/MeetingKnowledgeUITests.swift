@@ -261,6 +261,16 @@ final class MeetingKnowledgeUITests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.buttons["knowledge.graph.recentre"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertFalse(nodes.firstMatch.exists)
+        // Comparing two days: the undated blocker holds on both, so it stays.
+        app.buttons["Compare"].firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["knowledge.graph.from"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["knowledge.graph.to"].firstMatch.exists)
+        XCTAssertTrue(app.descendants(matching: .any)["knowledge.graph.claim"].firstMatch.waitForExistence(timeout: 10))
+        capture(app, named: "knowledge-graph-compare")
+        app.buttons["On a day"].firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["knowledge.graph.day"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["knowledge.graph.claim"].firstMatch.exists)
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
     }
 
     func testKnowledgeSearchFindsAliasesAndEvidenceWithoutSemanticSearch() throws {
