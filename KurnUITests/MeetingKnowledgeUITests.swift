@@ -276,6 +276,14 @@ final class MeetingKnowledgeUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["knowledge.graph.day"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(revealGraphClaim(app))
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
+        // Context lanes: every relationship names the context it was said in.
+        for _ in 0..<4 where !app.buttons["Contexts"].firstMatch.isHittable { app.swipeDown() }
+        app.buttons["Contexts"].firstMatch.tap()
+        let inContext = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "Context: Example vendor sync")).firstMatch
+        XCTAssertTrue(reveal(inContext, in: app))
+        capture(app, named: "knowledge-graph-lanes")
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
     }
 
     func testKnowledgeSearchFindsAliasesAndEvidenceWithoutSemanticSearch() throws {
@@ -394,11 +402,14 @@ final class MeetingKnowledgeUITests: XCTestCase {
     /// The graph's mode controls sit above its claims, which a lazy list
     /// only creates once they scroll near the screen.
     private func revealGraphClaim(_ app: XCUIApplication) -> Bool {
-        let claim = app.descendants(matching: .any)["knowledge.graph.claim"].firstMatch
-        if claim.waitForExistence(timeout: 3) { return true }
+        reveal(app.descendants(matching: .any)["knowledge.graph.claim"].firstMatch, in: app)
+    }
+
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
+        if element.waitForExistence(timeout: 3) { return true }
         for _ in 0..<4 {
             app.swipeUp()
-            if claim.waitForExistence(timeout: 2) { return true }
+            if element.waitForExistence(timeout: 2) { return true }
         }
         return false
     }

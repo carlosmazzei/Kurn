@@ -4,7 +4,7 @@ import SwiftUI
 /// The Graph Explorer (K4.3): a neighbourhood drawn on a `Canvas`, with one
 /// button per node laid over it for touch and VoiceOver, and a list of the
 /// same claims as the alternative; as it is (relationships), on a day
-/// (evolution) or between two days (compare). What it shows comes from
+/// (evolution), between two days (compare) or by context (lanes). What it shows comes from
 /// `KnowledgeGraphQueryService`; words and links from `KnowledgeGraphPresentation`.
 struct KnowledgeGraphView: View {
     let read: KnowledgeBrowserRead
@@ -32,7 +32,8 @@ struct KnowledgeGraphView: View {
                 let days = KnowledgeGraphPresentation.days(exploration, pages: read.pages, entityID: entityID, now: Date())
                 let states = KnowledgeGraphPresentation.states(exploration, graph: laidOut.graph, pages: read.pages, days: days)
                 let scene = KnowledgeGraphPresentation.scene(laidOut.graph, layout: laidOut.layout, pages: read.pages, states: states)
-                content(scene, days: days)
+                content(exploration.mode == .lanes
+                    ? KnowledgeGraphPresentation.laned(scene, pages: read.pages, contexts: read.meetingContexts) : scene, days: days)
             } else {
                 KnowledgeBrowserUnavailable()
             }
@@ -87,7 +88,7 @@ struct KnowledgeGraphView: View {
             .pickerStyle(.segmented)
             .accessibilityIdentifier("knowledge.graph.mode")
             switch exploration.mode {
-            case .relationships:
+            case .relationships, .lanes:
                 EmptyView()
             case .evolution:
                 Divider().overlay(Theme.separator).accessibilityHidden(true)
@@ -235,6 +236,7 @@ private struct KnowledgeGraphCanvas: View {
     }
 
     private func draw(in context: inout GraphicsContext, size: CGSize) {
+        drawLanes(in: &context, size: size)
         let touching = Set(scene.edges(touching: selected).map(\.factID))
         for edge in scene.edges {
             guard let source = scene.node(edge.sourceID), let target = scene.node(edge.targetID) else { continue }
@@ -271,6 +273,22 @@ private struct KnowledgeGraphCanvas: View {
             }
             context.draw(Text(verbatim: node.name).font(Theme.captionEmphasized).foregroundStyle(Theme.textPrimary),
                          at: CGPoint(x: centre.x, y: centre.y + radius + 14), anchor: .center)
+        }
+    }
+
+    /// Lines between the context lanes, and each lane's name at its top left.
+    private func drawLanes(in context: inout GraphicsContext, size: CGSize) {
+        let count = CGFloat(scene.lanes.count)
+        for (index, lane) in scene.lanes.enumerated() {
+            let top = CGFloat(index) / count * size.height
+            if index > 0 {
+                var line = Path()
+                line.move(to: CGPoint(x: 0, y: top))
+                line.addLine(to: CGPoint(x: size.width, y: top))
+                context.stroke(line, with: .color(Theme.separator), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+            }
+            context.draw(Text(verbatim: lane.title.uppercased()).font(Theme.caption2Emphasized).foregroundStyle(Theme.textTertiary),
+                         at: CGPoint(x: 6, y: top + 6), anchor: .topLeading)
         }
     }
 

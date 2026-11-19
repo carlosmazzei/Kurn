@@ -41,6 +41,12 @@ enum KnowledgeMeetingSeed {
         context.insert(GeneratedDocument(title: "Example portal notes",
             bodyMarkdown: "Example portal artifact retained from the library chat.", userPrompt: "Create synthetic notes",
             sourceKind: .transcripts, sourceNames: [meeting.title], sourceMeetingIDs: [meeting.id], generatorModelIdentifier: "synthetic-local"))
+        if graphFixture {
+            // A named context for the graph's context lanes (K4.3).
+            let occasion = KnowledgeContext(kind: .vendorDiscussion, name: "Example vendor sync")
+            context.insert(occasion)
+            context.insert(SourceContextLink(meetingID: meeting.id, contextID: occasion.id))
+        }
         try context.save()
         let auth = KnowledgeExtractionAuthorization(featureEnabled: true,
             policies: [.defaultDeny(id: KnowledgeCompilationCoordinator.localPolicyID)], sourceClassifications: [.internal])
