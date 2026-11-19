@@ -13,7 +13,8 @@ struct KnowledgeGraphTimelineTests {
 
     private static func projectGraph(_ line: Timeline) throws -> KnowledgeGraph {
         let index = KnowledgeGraphIndex(pages: try KnowledgeWikiProjector.project(line.snapshot))
-        return try #require(index.query(.init(rootID: try #require(line.entities["e1"]))))
+        let project = try #require(line.entities["e1"])
+        return try #require(index.query(.init(rootID: project)))
     }
 
     @Test func theBlockerHoldsFromTheDayItWasStated() throws {
