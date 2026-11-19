@@ -14,23 +14,13 @@ struct MeetingKnowledgeView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 16) {
                 if case .loaded = state { articleSection }
-                if dynamicTypeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: 12) {
-                        contributionsTitle
-                        refreshButton
-                    }
-                } else {
-                    HStack {
-                        contributionsTitle
-                        Spacer()
-                        refreshButton
-                    }
-                }
+                contributionsHeader
                 contributions
             }
-            .padding(20)
+            // The same insets as the Transcript and Summary tabs.
+            .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
         }
         .accessibilityIdentifier("knowledge.content")
         .sheet(isPresented: Binding(get: { selectedEntityID != nil }, set: { if !$0 { selectedEntityID = nil } })) {
@@ -38,18 +28,29 @@ struct MeetingKnowledgeView: View {
         }
     }
 
-    private var contributionsTitle: some View {
-        Text(NSLocalizedString("detail.knowledge.contributions", comment: "Meeting contributions"))
-            .font(Theme.headline)
-            .accessibilityAddTraits(.isHeader)
-            .fixedSize(horizontal: false, vertical: true)
+    /// The section label with the refresh chip beside it, or under it at
+    /// accessibility text sizes.
+    @ViewBuilder
+    private var contributionsHeader: some View {
+        let label = KnowledgeSectionLabel(NSLocalizedString("detail.knowledge.contributions", comment: "Meeting contributions"))
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 8) {
+                label
+                refreshButton
+            }
+        } else {
+            HStack {
+                label
+                Spacer()
+                refreshButton
+            }
+        }
     }
 
     private var refreshButton: some View {
-        Button(action: onRefresh) {
-            Label(NSLocalizedString("detail.knowledge.refresh", comment: "Refresh contributions"), systemImage: "arrow.clockwise")
-        }
-        .accessibilityIdentifier("knowledge.refresh")
+        KnowledgeChipButton(title: NSLocalizedString("detail.knowledge.refresh", comment: "Refresh contributions"),
+                            systemImage: "arrow.clockwise", action: onRefresh)
+            .accessibilityIdentifier("knowledge.refresh")
     }
 
     private var articleSection: some View {
@@ -58,29 +59,38 @@ struct MeetingKnowledgeView: View {
                 DisclosureGroup {
                     MeetingWikiContent(article: article).padding(.top, 12)
                 } label: {
-                    Label(NSLocalizedString("detail.knowledge.notes", comment: "Meeting notes"), systemImage: "book.pages")
-                        .font(Theme.headline)
+                    notesTitle
                 }
+                .tint(Theme.textSecondary)
                 .accessibilityIdentifier("knowledge.notes")
             } else {
-                Text(NSLocalizedString("detail.knowledge.notes", comment: "Meeting notes")).font(Theme.headline)
+                notesTitle
                 Text(NSLocalizedString("detail.knowledge.notes_empty", comment: "Meeting notes description"))
                     .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if isGeneratingArticle {
                 ProgressView(NSLocalizedString("detail.wiki.generating", comment: "Generating meeting notes"))
+                    .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
             } else if canGenerateArticle {
-                Button {
+                KnowledgeChipButton(title: NSLocalizedString(meeting.wikiArticle == nil ? "detail.wiki.generate" : "detail.wiki.regenerate",
+                                                             comment: "Generate notes"),
+                                    systemImage: "sparkles") {
                     Task { await coordinator.generateLocalMeetingNotes(meeting, wiki: wiki) }
-                } label: {
-                    Label(NSLocalizedString(meeting.wikiArticle == nil ? "detail.wiki.generate" : "detail.wiki.regenerate", comment: "Generate notes"),
-                        systemImage: "sparkles")
                 }
                 .accessibilityIdentifier("knowledge.generateNotes")
             }
         }
-        .padding(16)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .knowledgeCard()
+    }
+
+    private var notesTitle: some View {
+        HStack(spacing: 12) {
+            KnowledgeIconWell(systemImage: "book.pages")
+            Text(NSLocalizedString("detail.knowledge.notes", comment: "Meeting notes"))
+                .font(Theme.headline).foregroundStyle(Theme.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+        }
     }
 
     @ViewBuilder
@@ -88,6 +98,8 @@ struct MeetingKnowledgeView: View {
         switch state {
         case .idle, .loading:
             ProgressView(NSLocalizedString("detail.knowledge.loading", comment: "Loading contributions"))
+                .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+                .frame(maxWidth: .infinity).padding(.top, 24)
         case .unavailable:
             ContentUnavailableView(NSLocalizedString("detail.knowledge.unavailable", comment: "Knowledge unavailable"), systemImage: "lock.doc",
                 description: Text(NSLocalizedString("detail.knowledge.unavailable_detail", comment: "Access or source data changed")))
@@ -109,38 +121,52 @@ private struct MeetingContributionView: View {
     let onOpenEntity: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             Button(action: onOpenEntity) {
-                Label { Text(verbatim: contribution.name) } icon: { Image(systemName: "book.pages") }
-                    .font(Theme.headline)
+                HStack(spacing: 12) {
+                    KnowledgeIconWell(systemImage: "book.pages")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(verbatim: contribution.name).font(Theme.headline).foregroundStyle(Theme.textPrimary)
+                        Text(String(format: NSLocalizedString("detail.knowledge.claim_count", comment: "Claim count"), contribution.entries.count))
+                            .font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    KnowledgeChevron()
+                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .accessibilityIdentifier("knowledge.openEntity")
-            Text(String(format: NSLocalizedString("detail.knowledge.claim_count", comment: "Claim count"), contribution.entries.count))
-                .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
             ForEach(contribution.entries, id: \.fact.id) { entry in
+                Divider().overlay(Theme.separator).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 8) {
                     Text(verbatim: MeetingKnowledgeClaimPresentation.text(entry))
-                        .font(Theme.bodyEmphasized)
+                        .font(Theme.bodyEmphasized).foregroundStyle(Theme.textPrimary)
                         .accessibilityIdentifier("knowledge.claim")
-                    HStack {
+                    HStack(spacing: 6) {
                         Text(NSLocalizedString("knowledge.modality." + entry.fact.qualifiers.modality.rawValue, comment: "Claim modality"))
                         if entry.fact.qualifiers.polarity == .negative {
+                            Text(verbatim: "·")
                             Text(NSLocalizedString("detail.knowledge.negated", comment: "Negated claim"))
                         }
                     }
                     .font(Theme.caption2Emphasized).foregroundStyle(Theme.textSecondary)
                     ForEach(entry.fact.source.evidence, id: \.id) { evidence in
-                        Text(String(format: NSLocalizedString("detail.knowledge.attribution", comment: "Claim attribution"), evidence.attributedSpeaker))
-                            .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
-                        Text(verbatim: evidence.quote)
-                            .font(Theme.body).textSelection(.enabled)
-                            .accessibilityIdentifier("knowledge.quote")
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(verbatim: evidence.quote)
+                                .font(Theme.body).foregroundStyle(Theme.textPrimary).textSelection(.enabled)
+                                .accessibilityIdentifier("knowledge.quote")
+                            Text(String(format: NSLocalizedString("detail.knowledge.attribution", comment: "Claim attribution"), evidence.attributedSpeaker))
+                                .font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                        }
+                        .padding(.leading, 12)
+                        .overlay(alignment: .leading) {
+                            Capsule().fill(Theme.separator).frame(width: 3).accessibilityHidden(true)
+                        }
                     }
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .knowledgeCard()
     }
 }

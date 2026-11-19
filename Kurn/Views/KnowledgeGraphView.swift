@@ -45,38 +45,42 @@ struct KnowledgeGraphView: View {
     }
 
     private func content(_ scene: KnowledgeGraphPresentation.Scene, days: KnowledgeGraphPresentation.Days) -> some View {
-        List {
-            modeSection(days: days)
-            Section {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 12) {
+                modeCard(days: days)
+                if let legend = KnowledgeGraphPresentation.legend(exploration.mode) { footnote(legend) }
                 Picker(KnowledgeGraphPresentation.copy("view"), selection: Binding(get: { isList }, set: { exploration.showsList = $0 })) {
                     Text(KnowledgeGraphPresentation.copy("view.graph")).tag(false)
                     Text(KnowledgeGraphPresentation.copy("view.list")).tag(true)
                 }
                 .pickerStyle(.segmented)
+                .padding(.top, 4)
                 .accessibilityIdentifier("knowledge.graph.view")
                 if !isList {
                     KnowledgeGraphCanvas(scene: scene, selected: selected) { exploration.selected = $0 }
                         .aspectRatio(1, contentMode: .fit)
                         .frame(maxWidth: 520)
+                        .padding(8)
                         .frame(maxWidth: .infinity)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
-            } footer: {
-                footer(scene)
-            }
-            if isList {
-                ForEach(KnowledgeGraphPresentation.listSections(scene)) { item in
-                    nodeSection(item.node, edges: item.edges)
+                summary(scene)
+                if isList {
+                    ForEach(KnowledgeGraphPresentation.listSections(scene)) { item in
+                        nodeCard(item.node, edges: item.edges)
+                    }
+                } else if let node = scene.node(selected) ?? scene.node(scene.rootID) {
+                    nodeCard(node, edges: scene.edges(touching: node.id))
                 }
-            } else if let node = scene.node(selected) ?? scene.node(scene.rootID) {
-                nodeSection(node, edges: scene.edges(touching: node.id))
             }
+            .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
         }
+        .knowledgeReadingSurface()
     }
 
     /// The mode, and the days the evolution and compare modes read.
-    private func modeSection(days: KnowledgeGraphPresentation.Days) -> some View {
-        Section {
+    private func modeCard(days: KnowledgeGraphPresentation.Days) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
             Picker(KnowledgeGraphPresentation.copy("mode"), selection: $exploration.mode) {
                 ForEach(KnowledgeGraphPresentation.GraphMode.allCases) { Text($0.title).tag($0) }
             }
@@ -86,11 +90,13 @@ struct KnowledgeGraphView: View {
             case .relationships:
                 EmptyView()
             case .evolution:
+                Divider().overlay(Theme.separator).accessibilityHidden(true)
                 DatePicker(KnowledgeGraphPresentation.copy("on"),
                            selection: Binding(get: { days.day }, set: { exploration.day = $0 }), displayedComponents: .date)
                     .accessibilityIdentifier("knowledge.graph.day")
                 knownThenToggle
             case .compare:
+                Divider().overlay(Theme.separator).accessibilityHidden(true)
                 DatePicker(KnowledgeComparePresentation.copy("from"),
                            selection: Binding(get: { days.from }, set: { exploration.from = $0 }), displayedComponents: .date)
                     .accessibilityIdentifier("knowledge.graph.from")
@@ -99,9 +105,9 @@ struct KnowledgeGraphView: View {
                     .accessibilityIdentifier("knowledge.graph.to")
                 knownThenToggle
             }
-        } footer: {
-            if let legend = KnowledgeGraphPresentation.legend(exploration.mode) { Text(legend) }
         }
+        .font(Theme.subheadline)
+        .knowledgeCard()
     }
 
     private var knownThenToggle: some View {
@@ -109,53 +115,75 @@ struct KnowledgeGraphView: View {
             .accessibilityIdentifier("knowledge.graph.asKnownThen")
     }
 
+    private func footnote(_ text: String) -> some View {
+        Text(text).font(Theme.footnote).foregroundStyle(Theme.textSecondary).fixedSize(horizontal: false, vertical: true)
+    }
+
     @ViewBuilder
-    private func footer(_ scene: KnowledgeGraphPresentation.Scene) -> some View {
+    private func summary(_ scene: KnowledgeGraphPresentation.Scene) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: scene.summary)
-            if scene.isTruncated { Text(KnowledgeGraphPresentation.copy("truncated")) }
-            if scene.nodes.contains(where: \.hasMore) { Text(KnowledgeGraphPresentation.copy("has_more_footer")) }
+            footnote(scene.summary)
+            if scene.isTruncated { footnote(KnowledgeGraphPresentation.copy("truncated")) }
+            if scene.nodes.contains(where: \.hasMore) { footnote(KnowledgeGraphPresentation.copy("has_more_footer")) }
             ForEach(Array(scene.cycles.enumerated()), id: \.offset) { _, names in
-                Text(String(format: KnowledgeGraphPresentation.copy("cycle"), names.joined(separator: ", ")))
+                footnote(String(format: KnowledgeGraphPresentation.copy("cycle"), names.joined(separator: ", ")))
                     .accessibilityIdentifier("knowledge.graph.cycle")
             }
         }
     }
 
-    private func nodeSection(_ node: KnowledgeGraphPresentation.Node, edges: [KnowledgeGraphPresentation.Edge]) -> some View {
-        Section {
-            NavigationLink(value: KnowledgeBrowserRoute.entity(node.id)) {
-                Label(KnowledgeGraphPresentation.copy("open_page"), systemImage: "doc.text")
+    private func nodeCard(_ node: KnowledgeGraphPresentation.Node, edges: [KnowledgeGraphPresentation.Edge]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                KnowledgeIconWell(systemImage: node.isRoot ? "scope" : "circle.hexagongrid")
+                Text(verbatim: node.name).font(Theme.headline).foregroundStyle(Theme.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("knowledge.graph.selected")
             }
-            .accessibilityIdentifier("knowledge.graph.openPage")
-            if !node.isRoot {
-                Button { exploration.recentre(on: node.id) } label: {
-                    Label(KnowledgeGraphPresentation.copy("recentre"), systemImage: "scope")
+            HStack(spacing: 8) {
+                NavigationLink(value: KnowledgeBrowserRoute.entity(node.id)) {
+                    KnowledgeChipLabel(title: KnowledgeGraphPresentation.copy("open_page"), systemImage: "doc.text")
                 }
-                .accessibilityIdentifier("knowledge.graph.recentre")
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("knowledge.graph.openPage")
+                if !node.isRoot {
+                    KnowledgeChipButton(title: KnowledgeGraphPresentation.copy("recentre"), systemImage: "scope") {
+                        exploration.recentre(on: node.id)
+                    }
+                    .accessibilityIdentifier("knowledge.graph.recentre")
+                }
             }
-            ForEach(edges) { edge in edgeRow(edge) }
+            ForEach(edges) { edge in
+                Divider().overlay(Theme.separator).accessibilityHidden(true)
+                edgeRow(edge)
+            }
             if node.hasMore {
-                Text(KnowledgeGraphPresentation.copy("has_more")).font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+                Text(KnowledgeGraphPresentation.copy("has_more")).font(Theme.caption).foregroundStyle(Theme.textSecondary)
             }
-        } header: {
-            Text(verbatim: node.name).accessibilityAddTraits(.isHeader)
-                .accessibilityIdentifier("knowledge.graph.selected")
         }
+        .knowledgeCard()
     }
 
     @ViewBuilder
     private func edgeRow(_ edge: KnowledgeGraphPresentation.Edge) -> some View {
         let notes = KnowledgeGraphPresentation.notes(edge)
         let content = VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: edge.text).font(Theme.bodyEmphasized)
+            Text(verbatim: edge.text).font(Theme.subheadlineEmphasized).foregroundStyle(Theme.textPrimary)
             if !notes.isEmpty {
-                Text(verbatim: notes.joined(separator: " · ")).font(Theme.captionEmphasized)
+                Text(verbatim: notes.joined(separator: " · ")).font(Theme.caption2Emphasized).foregroundStyle(Theme.textSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         if let route = edge.evidence {
-            NavigationLink(value: route) { content }.accessibilityIdentifier("knowledge.graph.claim")
+            NavigationLink(value: route) {
+                HStack(spacing: 12) {
+                    content
+                    KnowledgeChevron()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("knowledge.graph.claim")
         } else {
             content.accessibilityIdentifier("knowledge.graph.claim")
         }

@@ -12,43 +12,17 @@ struct KnowledgeEntityPageView: View {
                 Text(KnowledgeBrowserCopy.text("overview")).tag(false).accessibilityIdentifier("knowledge.browser.overview")
                 Text(KnowledgeBrowserCopy.text("sources")).tag(true).accessibilityIdentifier("knowledge.browser.sources")
             }
-            .pickerStyle(.segmented).padding()
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 4)
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    if showsSources {
-                        ForEach(page.sections.flatMap(\.entries), id: \.fact.id) { entry in
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text(verbatim: meetingTitles[entry.fact.source.meetingID] ?? "").font(Theme.headline)
-                                    .accessibilityAddTraits(.isHeader)
-                                KnowledgeClaimReadView(entry: entry)
-                                ForEach(entry.fact.source.evidence, id: \.id) { evidence in
-                                    NavigationLink(value: KnowledgeBrowserRoute.evidence(assertionID: entry.fact.id, evidenceID: evidence.id)) {
-                                        VStack(alignment: .leading, spacing: 6) {
-                                            Text(verbatim: evidence.quote)
-                                            Text(verbatim: evidence.attributedSpeaker).font(Theme.footnote)
-                                        }
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                    }
-                                    .accessibilityIdentifier("knowledge.browser.evidence")
-                                }
-                            }
-                            .padding(16).background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
-                        }
-                    } else {
-                        if !page.entity.aliases.isEmpty {
-                            Text(verbatim: page.entity.aliases.joined(separator: " · ")).font(Theme.footnote)
-                        }
-                        ForEach(page.sections, id: \.kind) { section in
-                            Text(KnowledgeBrowserCopy.text("section." + section.kind.rawValue))
-                                .font(Theme.title3).accessibilityAddTraits(.isHeader)
-                            ForEach(section.entries, id: \.fact.id) { entry in KnowledgeClaimReadView(entry: entry) }
-                        }
-                        KnowledgeLateArrivalsView(page: page)
-                    }
+                VStack(alignment: .leading, spacing: 16) {
+                    if showsSources { sources } else { overview }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading).padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 24)
             }
         }
+        .knowledgeReadingSurface()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink(value: KnowledgeBrowserRoute.compare(page.entity.id)) {
@@ -64,22 +38,77 @@ struct KnowledgeEntityPageView: View {
             }
         }
     }
+
+    @ViewBuilder
+    private var overview: some View {
+        if !page.entity.aliases.isEmpty {
+            Text(verbatim: page.entity.aliases.joined(separator: " · "))
+                .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+        }
+        ForEach(page.sections, id: \.kind) { section in
+            KnowledgeSectionLabel(KnowledgeBrowserCopy.text("section." + section.kind.rawValue))
+                .padding(.top, 4)
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(Array(section.entries.enumerated()), id: \.element.fact.id) { index, entry in
+                    if index > 0 { Divider().overlay(Theme.separator).accessibilityHidden(true) }
+                    KnowledgeClaimReadView(entry: entry)
+                }
+            }
+            .knowledgeCard()
+        }
+        KnowledgeLateArrivalsView(page: page)
+    }
+
+    private var sources: some View {
+        ForEach(page.sections.flatMap(\.entries), id: \.fact.id) { entry in
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    KnowledgeIconWell(systemImage: "waveform", tint: Theme.info)
+                    Text(verbatim: meetingTitles[entry.fact.source.meetingID] ?? "")
+                        .font(Theme.headline).foregroundStyle(Theme.textPrimary)
+                        .accessibilityAddTraits(.isHeader)
+                }
+                KnowledgeClaimReadView(entry: entry)
+                ForEach(entry.fact.source.evidence, id: \.id) { evidence in
+                    NavigationLink(value: KnowledgeBrowserRoute.evidence(assertionID: entry.fact.id, evidenceID: evidence.id)) {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                KnowledgeQuote(text: evidence.quote)
+                                Text(verbatim: evidence.attributedSpeaker)
+                                    .font(Theme.caption).foregroundStyle(Theme.textSecondary).padding(.leading, 15)
+                            }
+                            KnowledgeChevron()
+                        }
+                        .padding(12)
+                        .background(Theme.fill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("knowledge.browser.evidence")
+                }
+            }
+            .knowledgeCard()
+        }
+    }
 }
 
 struct KnowledgeClaimReadView: View {
     let entry: KnowledgeWikiPage.Entry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(verbatim: MeetingKnowledgeClaimPresentation.text(entry)).font(Theme.bodyEmphasized)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(verbatim: MeetingKnowledgeClaimPresentation.text(entry))
+                .font(Theme.bodyEmphasized).foregroundStyle(Theme.textPrimary)
                 .accessibilityIdentifier("knowledge.browser.claim")
             Text(NSLocalizedString("knowledge.modality." + entry.fact.qualifiers.modality.rawValue, comment: "Claim modality"))
-                .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+                .font(Theme.caption2Emphasized).foregroundStyle(Theme.textSecondary)
             if let from = entry.fact.qualifiers.validFrom {
-                Text(String(format: KnowledgeBrowserCopy.text("valid_from"), from.text)).font(Theme.footnote)
+                Text(String(format: KnowledgeBrowserCopy.text("valid_from"), from.text))
+                    .font(Theme.caption).foregroundStyle(Theme.textSecondary)
             }
             if let to = entry.fact.qualifiers.validTo {
-                Text(String(format: KnowledgeBrowserCopy.text("valid_to"), to.text)).font(Theme.footnote)
+                Text(String(format: KnowledgeBrowserCopy.text("valid_to"), to.text))
+                    .font(Theme.caption).foregroundStyle(Theme.textSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

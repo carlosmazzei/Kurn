@@ -195,7 +195,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         source.tap()
         app.navigationBars.buttons["Cancel"].tap()
         XCTAssertTrue(app.buttons["knowledge.browser.entity"].firstMatch.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Selected meetings: 1")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Selected meetings: 1")).firstMatch.exists)
     }
 
     func testTimelineOpensFromHomeAndLeadsToEvidence() throws {
@@ -327,8 +327,9 @@ final class MeetingKnowledgeUITests: XCTestCase {
         XCTAssertTrue(merge.waitForExistence(timeout: 5))
         capture(app, named: "knowledge-review-identity")
         merge.tap()
-        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5))
-        app.alerts.buttons["knowledge.review.confirmMerge"].firstMatch.tap()
+        let confirm = app.buttons["dialog.primary"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
         let undo = app.buttons["knowledge.review.undo"].firstMatch
         XCTAssertTrue(undo.waitForExistence(timeout: 10))
         let list = app.descendants(matching: .any)["knowledge.review.inbox"].firstMatch

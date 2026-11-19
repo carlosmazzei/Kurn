@@ -20,12 +20,12 @@ struct KnowledgeSearchResultsView: View {
             if hits.isEmpty {
                 ContentUnavailableView.search(text: query)
             } else {
-                List {
-                    Section {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        KnowledgeSectionLabel(String(format: KnowledgeBrowserCopy.text("scope"), scopeCount))
                         ForEach(hits) { document in resultRow(document) }
-                    } header: {
-                        Text(String(format: KnowledgeBrowserCopy.text("scope"), scopeCount))
                     }
+                    .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 24)
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .accessibilityIdentifier("knowledge.search.results")
@@ -34,12 +34,17 @@ struct KnowledgeSearchResultsView: View {
     }
 
     private func resultRow(_ document: KnowledgeSearchDocument) -> some View {
-        NavigationLink(value: route(document)) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(verbatim: document.title).font(Theme.headline)
-                Text(KnowledgeBrowserCopy.text("search_" + document.kind.rawValue))
-                    .font(Theme.caption).foregroundStyle(.secondary)
-                Text(verbatim: document.snippet(query: query)).font(Theme.subheadline).lineLimit(3)
+        KnowledgeLinkCard(route: route(document)) {
+            HStack(alignment: .top, spacing: 12) {
+                KnowledgeIconWell(systemImage: document.assertionID == nil ? "book.pages" : "text.quote",
+                                  tint: document.assertionID == nil ? Theme.accent : Theme.info)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(verbatim: document.title).font(Theme.headline).foregroundStyle(Theme.textPrimary)
+                    Text(KnowledgeBrowserCopy.text("search_" + document.kind.rawValue))
+                        .font(Theme.caption2Emphasized).foregroundStyle(Theme.textSecondary)
+                    Text(verbatim: document.snippet(query: query))
+                        .font(Theme.subheadline).foregroundStyle(Theme.textSecondary).lineLimit(3)
+                }
             }
         }
         .accessibilityIdentifier("knowledge.search.result.\(document.kind.rawValue)")
