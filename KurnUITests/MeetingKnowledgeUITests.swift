@@ -282,6 +282,12 @@ final class MeetingKnowledgeUITests: XCTestCase {
         let inContext = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS %@", "Context: Example vendor sync")).firstMatch
         XCTAssertTrue(reveal(inContext, in: app))
+        capture(app, named: "knowledge-graph-lanes-list")
+        // The drawing: each node's label names its lane.
+        for _ in 0..<4 where !app.buttons["Graph"].firstMatch.isHittable { app.swipeDown() }
+        app.buttons["Graph"].firstMatch.tap()
+        let lanedNode = nodes.matching(NSPredicate(format: "label CONTAINS %@", "Context: Example vendor sync")).firstMatch
+        XCTAssertTrue(lanedNode.waitForExistence(timeout: 10))
         capture(app, named: "knowledge-graph-lanes")
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
     }
