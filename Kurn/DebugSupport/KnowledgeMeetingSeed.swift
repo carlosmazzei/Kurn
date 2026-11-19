@@ -17,7 +17,9 @@ enum KnowledgeMeetingSeed {
                 text: "Synthetic agenda passage \($0 + 1) before the portal update.") } : []
         let start = Double(prefix.count) * 4
         let reviewFixture = ProcessInfo.processInfo.arguments.contains("UI-Testing-KnowledgeReviewFixture")
-        let recording = Recording(meeting: meeting, fileName: "synthetic-knowledge.m4a", duration: start + (reviewFixture ? 12 : 4), transcriptionStatus: .done)
+        let graphFixture = ProcessInfo.processInfo.arguments.contains("UI-Testing-KnowledgeGraphFixture")
+        let recording = Recording(meeting: meeting, fileName: "synthetic-knowledge.m4a",
+            duration: start + (reviewFixture ? 12 : 4) + (graphFixture ? 4 : 0), transcriptionStatus: .done)
         context.insert(recording)
         let segment = TranscriptSegment(speakerLabel: "Speaker 1", startTime: start, endTime: start + 4,
             text: "The Example portal remains open for review.")
@@ -25,7 +27,9 @@ enum KnowledgeMeetingSeed {
             .init(speakerLabel: "Speaker 2", startTime: start + 4, endTime: start + 8, text: "The Example portal is not open for review."),
             .init(speakerLabel: "Speaker 1", startTime: start + 8, endTime: start + 12, text: "Target delivery is in November 2026.")
         ] : []
-        let segments = prefix + [segment] + extra
+        let blocker = graphFixture ? [TranscriptSegment(speakerLabel: "Speaker 2", startTime: start + 4 + Double(extra.count) * 4,
+            endTime: start + 8 + Double(extra.count) * 4, text: "The Example platform team blocks the Example portal.")] : []
+        let segments = prefix + [segment] + extra + blocker
         let transcript = Transcript(recording: recording, segments: segments, language: "en")
         context.insert(transcript)
         recording.transcript = transcript
@@ -68,6 +72,7 @@ enum KnowledgeMeetingSeed {
                 wire["assertions"] = [original, duplicate, opposing, dated]
             }
         }
+        if let blocker = blocker.first { addRelationship(to: &wire, segment: blocker) }
         let document = try JSONDecoder().decode(KnowledgeExtraction.self, from: JSONSerialization.data(withJSONObject: wire))
         guard let recordingSource = snapshot.recordings.first, let fingerprint = recordingSource.fingerprint else {
             throw KnowledgeStoreError.sourceMissing
@@ -77,6 +82,18 @@ enum KnowledgeMeetingSeed {
         let request = KnowledgeCommitRequest(snapshot: snapshot, extractorVersion: "synthetic-meeting-ui-v1", schemaVersion: 1,
             provider: .appleOnDevice, compilations: [try KnowledgeRecordingCompilation(recordingID: recording.id, result: result)])
         _ = try KnowledgeStoreRows.commit(request, auth: auth, container: container, beforeSave: {})
+    }
+
+    /// The graph fixture: a second entity related to the portal, so the
+    /// explorer has an edge to draw (K4.3).
+    private static func addRelationship(to wire: inout [String: Any], segment: TranscriptSegment) {
+        let anchor = segment.id.uuidString.lowercased()
+        wire["entities"] = (wire["entities"] as? [[String: Any]] ?? []) + [["ref": "e3", "kind": "team", "name": "Example platform team"]]
+        wire["assertions"] = (wire["assertions"] as? [[String: Any]] ?? []) + [[
+            "ref": "a5", "subject": "e3", "predicate": "blocks", "object": "e1",
+            "modality": "reported", "polarity": "positive", "claimKind": "internalStatusReport", "authorityStatus": "attributed",
+            "confidence": "medium", "attributedToSegmentID": anchor,
+            "evidence": [["segmentIDs": [anchor], "quote": segment.text]]]]
     }
 }
 #endif

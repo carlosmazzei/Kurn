@@ -36,6 +36,9 @@ final class KnowledgeGraphQueryService {
     private(set) var shownPositions: [UUID: KnowledgeGraphLayout.Point] = [:]
     /// The seed the cached layouts and shown positions were drawn with.
     private(set) var layoutSeed: UInt64 = 0
+    /// Each graph opened in this reader, by the entity it was opened from (K4.3).
+    /// IDs only; a new scope keeps them, since every answer is read again.
+    private var explorations: [UUID: KnowledgeGraphPresentation.Exploration] = [:]
     /// How many times an index was built, for tests.
     private(set) var indexBuilds = 0
 
@@ -91,8 +94,27 @@ final class KnowledgeGraphQueryService {
         return (graph, layout)
     }
 
+    /// Where the graph opened from `entityID` was left, or a fresh one centred on it.
+    func exploration(from entityID: UUID) -> KnowledgeGraphPresentation.Exploration {
+        explorations[entityID] ?? KnowledgeGraphPresentation.Exploration(root: entityID)
+    }
+
+    /// The graph an exploration shows: centred where it was left, or on the
+    /// entity it was opened from when that centre is no longer in the read.
+    func laidOut(_ exploration: KnowledgeGraphPresentation.Exploration, from entityID: UUID,
+                 in read: KnowledgeBrowserRead) -> (graph: KnowledgeGraph, layout: KnowledgeGraphLayout)? {
+        if let shown = laidOut(exploration.options.query(root: exploration.root), in: read) { return shown }
+        guard exploration.root != entityID else { return nil }
+        return laidOut(exploration.options.query(root: entityID), in: read)
+    }
+
+    func remember(_ exploration: KnowledgeGraphPresentation.Exploration, from entityID: UUID) {
+        explorations[entityID] = exploration
+    }
+
     /// Forgets everything, e.g. when the reader closes or its scope is revoked.
     func clear() {
+        explorations = [:]
         scope = nil
         index = nil
         answers = [:]

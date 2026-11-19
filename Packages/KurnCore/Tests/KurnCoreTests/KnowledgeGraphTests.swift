@@ -113,6 +113,12 @@ struct KnowledgeGraphTests {
         #expect(owned.nodes.map(\.id) == [root, owner] && owned.frontier.isEmpty)
         let established = try #require(index.query(Query(rootID: root, includesTentative: false, includesNegated: false)))
         #expect(Set(established.nodes.map(\.id)) == [root, owner])
+        let guess = graph.entity("Guess")
+        graph.fact(root, .dependsOn, guess, modality: .inferred)
+        let inferred = try graph.index()
+        #expect(try #require(inferred.query(Query(rootID: root))).nodes.contains { $0.id == guess })
+        let stated = try #require(inferred.query(Query(rootID: root, includesInferred: false)))
+        #expect(!stated.nodes.contains { $0.id == guess } && stated.nodes.count == 4 && stated.frontier.isEmpty)
     }
 
     @Test func aMergedIdentityIsOneNodeAndItsOwnLoopIsNotAnEdge() throws {

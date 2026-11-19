@@ -56,6 +56,12 @@ struct KnowledgeEntityPageView: View {
                 }
                 .accessibilityIdentifier("knowledge.browser.compare")
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink(value: KnowledgeBrowserRoute.graph(page.entity.id)) {
+                    Label(KnowledgeGraphPresentation.copy("title"), systemImage: "point.3.connected.trianglepath.dotted")
+                }
+                .accessibilityIdentifier("knowledge.browser.graph")
+            }
         }
     }
 }

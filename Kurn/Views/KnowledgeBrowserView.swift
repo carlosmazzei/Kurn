@@ -22,6 +22,7 @@ struct KnowledgeBrowserView: View {
     @State private var refresh = 0
     @State private var playRequest = 0
     @State private var showingReview = false
+    @State private var graphService = KnowledgeGraphQueryService()
 
     init(meetingIDs: Set<UUID>, initialEntityID: UUID? = nil, initialEvidenceSelection: KnowledgeEvidenceSelection? = nil,
          showsDone: Bool = true, onChooseSources: (() -> Void)? = nil) {
@@ -111,9 +112,9 @@ struct KnowledgeBrowserView: View {
             invalidateAndRefresh()
         }
         .onChange(of: phase) { _, phase in
-            if phase == .active { invalidateAndRefresh() } else { model.invalidate(); searchModel.invalidate() }
+            if phase == .active { invalidateAndRefresh() } else { model.invalidate(); searchModel.invalidate(); graphService.clear() }
         }
-        .onDisappear { model.invalidate(); searchModel.invalidate() }
+        .onDisappear { model.invalidate(); searchModel.invalidate(); graphService.clear() }
     }
 
     private func read() async throws -> KnowledgeBrowserRead {
@@ -167,6 +168,10 @@ struct KnowledgeBrowserView: View {
             if let page = read.pages.first(where: { $0.entity.id == id }) {
                 KnowledgeCompareView(page: page, pages: read.pages)
             } else { KnowledgeBrowserUnavailable() }
+        case let .graph(id):
+            if read.pages.contains(where: { $0.entity.id == id }) {
+                KnowledgeGraphView(read: read, entityID: id, service: graphService)
+            } else { KnowledgeBrowserUnavailable() }
         case .evidence:
             if let source = read.selectedEvidence { KnowledgeEvidenceDetailView(source: source) }
             else { KnowledgeBrowserUnavailable() }
@@ -186,6 +191,7 @@ struct KnowledgeBrowserView: View {
             return KnowledgeBrowserCopy.text("title")
         case .timeline: return KnowledgeBrowserCopy.text("timeline")
         case .compare: return KnowledgeComparePresentation.copy("title")
+        case .graph: return KnowledgeGraphPresentation.copy("title")
         case .evidence: return KnowledgeBrowserCopy.text("evidence")
         case .transcript: return KnowledgeBrowserCopy.text("transcript")
         case nil: return KnowledgeBrowserCopy.text("title")
