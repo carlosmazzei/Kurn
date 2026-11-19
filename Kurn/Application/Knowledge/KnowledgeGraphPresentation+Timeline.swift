@@ -11,15 +11,28 @@ extension KnowledgeGraphPresentation {
         case relationships, evolution, compare
 
         var id: String { rawValue }
-        var title: String { copy("mode." + rawValue) }
+        var displayName: String { copy("mode." + rawValue) }
     }
 
-    /// What a mode says about one edge; nil in relationships mode.
+    /// What a mode says about one edge; nil in relationships mode. Each case
+    /// keeps how certainly the edge held on the day or days it held.
     enum EdgeState: Equatable {
-        /// Evolution: it held on the day, definitely or only possibly.
+        /// Evolution: it held on the day.
         case holds(KnowledgeTemporalCertainty)
-        /// Compare: it held on the later day only, the earlier day only, or both.
-        case started, ended, kept
+        /// Compare: it held on the later day only (with that day's certainty).
+        case started(KnowledgeTemporalCertainty)
+        /// Compare: it held on the earlier day only (with that day's certainty).
+        case ended(KnowledgeTemporalCertainty)
+        /// Compare: it held on both days.
+        case kept(before: KnowledgeTemporalCertainty, after: KnowledgeTemporalCertainty)
+
+        /// It may not have held on a day it is shown for.
+        var isUncertain: Bool {
+            switch self {
+            case let .holds(certainty), let .started(certainty), let .ended(certainty): certainty == .possible
+            case let .kept(before, after): before == .possible || after == .possible
+            }
+        }
     }
 
     /// The days a mode reads: the reader's choice, else today and, for the
@@ -52,9 +65,9 @@ extension KnowledgeGraphPresentation {
                   let to = point(max(days.from, days.to), asKnownThen: exploration.asKnownThen, calendar: calendar) else { return [:] }
             return KnowledgeGraphTimeline.compare(graph, from: from, to: to, claims: claims()).mapValues { change -> EdgeState in
                 switch change.change {
-                case .started: .started
-                case .ended: .ended
-                case .kept: .kept
+                case .started: .started(change.after ?? .possible)
+                case .ended: .ended(change.before ?? .possible)
+                case .kept: .kept(before: change.before ?? .possible, after: change.after ?? .possible)
                 }
             }
         }
@@ -66,15 +79,21 @@ extension KnowledgeGraphPresentation {
             .flatMap { KnowledgeStateComparison.Point.endOfDay($0, knownAt: asKnownThen ? nil : .distantFuture) }
     }
 
-    /// The words for an edge's state; the drawing marks it with a shape too.
-    static func note(_ state: EdgeState?) -> String? {
-        switch state {
-        case .holds(.possible): copy("state.possible")
+    /// The words for an edge's state, and for its uncertainty when it may not
+    /// have held; the drawing marks both with a shape too.
+    static func notes(for state: EdgeState?) -> [String] {
+        guard let state else { return [] }
+        let change: String? = switch state {
+        case .holds: nil
         case .started: copy("state.started")
         case .ended: copy("state.ended")
         case .kept: copy("state.kept")
-        case .holds(.definite), nil: nil
         }
+        let doubt: String? = switch state {
+        case .holds: state.isUncertain ? copy("state.possible") : nil
+        default: state.isUncertain ? copy("state.uncertain") : nil
+        }
+        return [change, doubt].compactMap { $0 }
     }
 
     /// What the marks mean in a mode.

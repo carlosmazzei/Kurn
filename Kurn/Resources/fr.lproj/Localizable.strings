@@ -1494,11 +1494,12 @@
 "knowledge.graph.mode.compare" = "Comparer";
 "knowledge.graph.on" = "Le";
 "knowledge.graph.mode.evolution.footer" = "Relations valables à la fin du jour choisi. Un anneau signale une relation qui n’avait peut-être pas encore commencé.";
-"knowledge.graph.mode.compare.footer" = "Relations valables l’un ou l’autre jour. Un plus signale celle qui a commencé entre les deux, un carré celle qui a pris fin ; les autres valaient les deux jours.";
+"knowledge.graph.mode.compare.footer" = "Relations valables l’un ou l’autre jour. Un plus signale celle qui a commencé entre les deux, un carré celle qui a pris fin et un anneau celle qui ne valait peut-être pas l’un des jours ; les autres valaient les deux jours.";
 "knowledge.graph.state.possible" = "Ne valait peut-être pas encore ce jour-là";
 "knowledge.graph.state.started" = "A commencé";
 "knowledge.graph.state.ended" = "A pris fin";
 "knowledge.graph.state.kept" = "Valable les deux jours";
+"knowledge.graph.state.uncertain" = "Ne valait peut-être pas l’un des deux jours";
 "knowledge.graph.filter" = "Filtrer";
 "knowledge.graph.unnamed" = "Sans nom";
 "knowledge.late.header" = "Révisé ensuite";

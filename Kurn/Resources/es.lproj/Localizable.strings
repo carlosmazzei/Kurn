@@ -1494,11 +1494,12 @@
 "knowledge.graph.mode.compare" = "Comparar";
 "knowledge.graph.on" = "El";
 "knowledge.graph.mode.evolution.footer" = "Relaciones vigentes al final del día elegido. Un anillo marca una que quizá aún no había empezado.";
-"knowledge.graph.mode.compare.footer" = "Relaciones vigentes en alguno de los dos días. Un signo más marca la que empezó entre ellos, un cuadrado la que terminó; las demás estaban en ambos.";
+"knowledge.graph.mode.compare.footer" = "Relaciones vigentes en alguno de los dos días. Un signo más marca la que empezó entre ellos, un cuadrado la que terminó y un anillo la que quizá no estaba vigente en uno de los días; las demás estaban en ambos.";
 "knowledge.graph.state.possible" = "Quizá aún no estaba vigente este día";
 "knowledge.graph.state.started" = "Empezó";
 "knowledge.graph.state.ended" = "Terminó";
 "knowledge.graph.state.kept" = "Vigente en ambos días";
+"knowledge.graph.state.uncertain" = "Quizá no estaba vigente en uno de los días";
 "knowledge.graph.filter" = "Filtrar";
 "knowledge.graph.unnamed" = "Sin nombre";
 "knowledge.late.header" = "Revisado después";

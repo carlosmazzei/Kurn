@@ -1494,11 +1494,12 @@
 "knowledge.graph.mode.compare" = "比较";
 "knowledge.graph.on" = "日期";
 "knowledge.graph.mode.evolution.footer" = "所选日期结束时成立的关系。圆环表示当时可能尚未开始的关系。";
-"knowledge.graph.mode.compare.footer" = "在任一日期成立的关系。加号表示两日之间开始的关系，方块表示结束的关系；无标记的在两天都成立。";
+"knowledge.graph.mode.compare.footer" = "在任一日期成立的关系。加号表示两日之间开始的关系，方块表示结束的关系，圆环表示可能在其中一天不成立的关系；无标记的在两天都成立。";
 "knowledge.graph.state.possible" = "这一天可能尚未成立";
 "knowledge.graph.state.started" = "已开始";
 "knowledge.graph.state.ended" = "已结束";
 "knowledge.graph.state.kept" = "两天都成立";
+"knowledge.graph.state.uncertain" = "可能在其中一天不成立";
 "knowledge.graph.filter" = "筛选";
 "knowledge.graph.unnamed" = "未命名";
 "knowledge.late.header" = "之后修订";

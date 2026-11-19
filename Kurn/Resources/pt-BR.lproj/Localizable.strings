@@ -1494,11 +1494,12 @@
 "knowledge.graph.mode.compare" = "Comparar";
 "knowledge.graph.on" = "Em";
 "knowledge.graph.mode.evolution.footer" = "Relações que valiam ao fim do dia escolhido. Um anel marca uma que talvez ainda não tivesse começado.";
-"knowledge.graph.mode.compare.footer" = "Relações que valiam em um dos dois dias. Um sinal de mais marca a que começou entre eles, um quadrado a que terminou; as sem marca valiam nos dois.";
+"knowledge.graph.mode.compare.footer" = "Relações que valiam em um dos dois dias. Um sinal de mais marca a que começou entre eles, um quadrado a que terminou e um anel a que talvez não valesse em um dos dias; as sem marca valiam nos dois.";
 "knowledge.graph.state.possible" = "Talvez ainda não valesse neste dia";
 "knowledge.graph.state.started" = "Começou";
 "knowledge.graph.state.ended" = "Terminou";
 "knowledge.graph.state.kept" = "Valia nos dois dias";
+"knowledge.graph.state.uncertain" = "Talvez não valesse em um dos dias";
 "knowledge.graph.filter" = "Filtrar";
 "knowledge.graph.unnamed" = "Sem nome";
 "knowledge.late.header" = "Revisado depois";
