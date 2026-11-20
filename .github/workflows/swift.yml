@@ -127,6 +127,9 @@ jobs:
   # suite, or vice versa.
   unit-tests:
     runs-on: macos-26
+    # A healthy run takes about 20 minutes; the watchdog in "Build and test"
+    # stops a hung one at 40, and this is the backstop if it cannot.
+    timeout-minutes: 60
 
     env:
       XCODE_PROJECT: Kurn.xcodeproj
@@ -148,8 +151,27 @@ jobs:
       # resolve the same packages from the same scheme.
       - uses: ./.github/actions/cache-spm-packages
 
+      # A test that never returns used to keep this step running for hours
+      # without saying which one it was: Swift Testing runs suites in
+      # parallel, so the log shows every suite still started. The watchdog
+      # samples the test host's threads after 40 minutes (the stuck call is
+      # on its stack) and then stops xcodebuild, so the job fails with that
+      # evidence and the failure diagnostics below still run.
       - name: Build and test
         run: |
+          watchdog() {
+            sleep 2400
+            echo "::error::unit-tests ran past 40 minutes; sampling the test host before stopping it"
+            for pid in $(pgrep -x Kurn); do
+              echo "::group::sample of test host $pid"
+              sample "$pid" 5 2>&1 | head -1500
+              echo "::endgroup::"
+            done
+            pkill -x xcodebuild
+          }
+          watchdog &
+          watchdog_pid=$!
+          status=0
           xcodebuild \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -159,7 +181,10 @@ jobs:
             -enableCodeCoverage YES \
             -only-testing:KurnTests \
             -only-testing:KurnSwiftDataTests \
-            clean test
+            clean test || status=$?
+          pkill -P "$watchdog_pid" 2>/dev/null || true
+          kill "$watchdog_pid" 2>/dev/null || true
+          exit "$status"
 
       - name: Collect failure diagnostics
         if: failure()
