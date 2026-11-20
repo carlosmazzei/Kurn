@@ -71,7 +71,9 @@ extension AppSettings {
         summaryModels[provider.id] = nil
         transcriptionModels[provider.id] = nil
         if aiProviderID == provider.id {
+            isRepointingSelection = true
             aiProviderID = providers.first?.id ?? AIProvider.openAI.id
+            isRepointingSelection = false
         }
         if transcriptionProviderID == provider.id {
             transcriptionProviderID = providers.first(where: { $0.supportsTranscription })?.id

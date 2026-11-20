@@ -126,6 +126,23 @@ struct AppSettingsCloudConsentTests {
         #expect(settings.cloudConsents.destinations.isEmpty)
     }
 
+    @Test func aFallbackRecordsNoAutomaticGrant() throws {
+        let (defaults, suite) = try defaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(cloudStore: InMemoryCloudKeyValueStore(), defaults: defaults,
+                                   credentials: CredentialStore(keychain: ConsentTestKeychain()))
+        settings.credentials.saveKey("sk-openai", for: .openAI)
+        settings.credentials.saveKey("sk-anthropic", for: .anthropic)
+        settings.aiProviderID = AIProvider.anthropic.id
+        settings.wikiEnabled = true
+
+        settings.credentials.saveKey("", for: .anthropic)
+
+        #expect(settings.aiProviderID != AIProvider.anthropic.id)
+        #expect(!settings.allowsCloud(.openAI, for: .automatic))
+        if settings.aiProvider.kind != .appleOnDevice { #expect(!settings.wikiEnabled) }
+    }
+
     @Test func aFallbackNeverReselectsAWithdrawnProvider() throws {
         let (defaults, suite) = try defaults()
         defer { defaults.removePersistentDomain(forName: suite) }
