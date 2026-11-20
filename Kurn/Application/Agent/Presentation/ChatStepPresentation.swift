@@ -76,14 +76,6 @@ public struct ChatStepPresentation: Sendable, Equatable {
         return String(format: title, parameter)
     }
 
-    public static func visibleSteps(_ steps: [AgentRunStep]) -> [AgentRunStep] {
-        steps.filter { $0.kind != .turn && !($0.kind == .stop && $0.stopReason == .completed) }
-    }
-
-    public static func countLabel(_ count: Int, localize: (String) -> String) -> String {
-        count == 1 ? localize("chat.steps.one") : String(format: localize("chat.steps.count"), count)
-    }
-
     public static func preview(_ text: String, limit: Int = 2_000) -> String {
         let scalars = text.unicodeScalars
         let count = max(1, limit)

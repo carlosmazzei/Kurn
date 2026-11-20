@@ -1077,8 +1077,6 @@
 "chat.sources.parts.none" = "未选择内容";
 "chat.sources.summary.one" = "1 场会议 · %@";
 "chat.sources.summary" = "%d 场会议 · %@";
-"chat.steps.one" = "1 个步骤";
-"chat.steps.count" = "%d 个步骤";
 "chat.steps.arguments" = "参数";
 "chat.steps.output" = "结果";
 "chat.steps.compaction.detail" = "上下文：%d → %d 个令牌";
