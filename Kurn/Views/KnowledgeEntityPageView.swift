@@ -47,9 +47,9 @@ struct KnowledgeEntityPageView: View {
             if !sourceMeetingIDs.isEmpty {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showingAsk = true } label: {
-                        Label(KnowledgeBrowserCopy.text("ask"), systemImage: "bubble.left.and.text.bubble.right")
+                        Label(KnowledgeBrowserCopy.text("ask_entity"), systemImage: "bubble.left.and.text.bubble.right")
                     }
-                    .accessibilityIdentifier("knowledge.browser.ask")
+                    .accessibilityIdentifier("knowledge.entity.ask")
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {

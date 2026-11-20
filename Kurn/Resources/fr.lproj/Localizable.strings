@@ -1431,7 +1431,7 @@
 // Scoped knowledge reader
 "knowledge.browser.title" = "Connaissances";
 "knowledge.browser.refresh" = "Actualiser";
-"knowledge.browser.ask" = "Poser une question";
+"knowledge.browser.ask_entity" = "Poser une question";
 "knowledge.browser.ask_draft" = "Que savons-nous de %@ ?";
 "knowledge.browser.page" = "Section de la page";
 "knowledge.browser.overview" = "Vue générale";
