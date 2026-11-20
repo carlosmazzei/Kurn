@@ -54,9 +54,7 @@ extension MeetingDetailView {
                     }
                     .disabled(isGeneratingTitle)
                 }
-                // With Knowledge on, the wiki is read and generated in the Knowledge tab, like the
-                // transcript and summary in theirs; the menu keeps it only while no tab shows it.
-                if meeting.wikiArticle != nil && !settings.knowledgeEnabled {
+                if meeting.wikiArticle != nil && !wikiLivesInKnowledgeTab {
                     Button { showingWiki = true } label: {
                         Label(
                             NSLocalizedString("detail.wiki.view", comment: "View meeting wiki"),
@@ -64,7 +62,7 @@ extension MeetingDetailView {
                         )
                     }
                 }
-                if canGenerateWiki && !settings.knowledgeEnabled {
+                if canGenerateWiki && !wikiLivesInKnowledgeTab {
                     Button { regenerateWiki() } label: {
                         if isGeneratingWiki {
                             Label(NSLocalizedString("detail.wiki.generating", comment: "Generating wiki"), systemImage: "ellipsis")
@@ -108,5 +106,13 @@ extension MeetingDetailView {
             .accessibilityLabel(NSLocalizedString("detail.more_options", comment: "More options"))
             .accessibilityIdentifier("detail.more")
         }
+    }
+
+    /// The wiki is read and generated in the Knowledge tab, like the transcript and summary in
+    /// theirs, once that tab shows it: after an authorized read of this meeting. Until then — Knowledge
+    /// off, the meeting excluded, or the read unavailable — the menu keeps both actions.
+    private var wikiLivesInKnowledgeTab: Bool {
+        guard settings.knowledgeEnabled, case .loaded = meetingKnowledge.presentation(for: meeting.id) else { return false }
+        return true
     }
 }

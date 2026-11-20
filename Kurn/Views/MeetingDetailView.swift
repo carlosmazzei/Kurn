@@ -77,7 +77,7 @@ struct MeetingDetailView: View {
         )
     }
     @State private var tab: Tab = .recordings
-    @State private var meetingKnowledge = MeetingKnowledgeViewModel()
+    @State var meetingKnowledge = MeetingKnowledgeViewModel()
     @State private var knowledgeRefresh = 0
 
     /// Drives the full-screen photo viewer from the Recordings tab's photo

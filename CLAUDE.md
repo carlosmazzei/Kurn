@@ -3154,10 +3154,10 @@ unavailable copy without names, counts or raw errors. Disabling the flag hides
 the mode/header immediately and returns selection to Recordings.
 
 Inline article content/actions appear only after a current authorized read.
-With Knowledge on, the Knowledge tab is the wiki's only home, as the Transcript
-and Summary tabs are for theirs: the overflow menu drops "View wiki" and
-"Generate/Regenerate Wiki" (it keeps them while Knowledge is off, when no tab
-shows the wiki). The inline chip has the menu's gate (`canGenerateWiki`). With
+Once that read has loaded, the Knowledge tab is the wiki's only home, as the
+Transcript and Summary tabs are for theirs: the overflow menu drops "View wiki"
+and "Generate/Regenerate Wiki". It keeps them whenever no tab shows the wiki:
+Knowledge off, the meeting excluded from Knowledge, or the read unavailable. The inline chip has the menu's gate (`canGenerateWiki`). With
 Apple on-device it revalidates the meeting and calls the existing wiki queue with
 `localOnly: true`; that admission checks the selected provider before
 assembling/queuing work, whose immutable provider remains local on recovery.
