@@ -10,9 +10,10 @@ struct KnowledgeSettingsIntegrationTests {
     private actor Gate {
         var started = false
         private var released = false
-        private var continuation: CheckedContinuation<Void, Never>?
-        func wait() async { started = true; if !released { await withCheckedContinuation { continuation = $0 } } }
-        func release() { released = true; continuation?.resume(); continuation = nil }
+        // Every waiter is kept: two calls parked before `release` must both resume.
+        private var continuations: [CheckedContinuation<Void, Never>] = []
+        func wait() async { started = true; if !released { await withCheckedContinuation { continuations.append($0) } } }
+        func release() { released = true; continuations.forEach { $0.resume() }; continuations = [] }
     }
 
     private actor Provider: LLMProvider {
