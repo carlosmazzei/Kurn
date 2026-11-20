@@ -5,6 +5,8 @@ struct KnowledgeEntityPageView: View {
     let page: KnowledgeWikiPage
     let meetingTitles: [UUID: String]
     @State private var showsSources = false
+    /// Ask about the entity (K5.3). The browser presents it, so a reload of this page cannot dismiss it.
+    var onAsk: ((ChatSourceScope) -> Void)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,6 +26,14 @@ struct KnowledgeEntityPageView: View {
         }
         .knowledgeReadingSurface()
         .toolbar {
+            if let onAsk, let scope = KnowledgeEntityAsk.scope(page) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { onAsk(scope) } label: {
+                        Label(KnowledgeBrowserCopy.text("ask_entity"), systemImage: "bubble.left.and.text.bubble.right")
+                    }
+                    .accessibilityIdentifier("knowledge.entity.ask")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink(value: KnowledgeBrowserRoute.compare(page.entity.id)) {
                     Label(KnowledgeComparePresentation.copy("title"), systemImage: "calendar.badge.clock")

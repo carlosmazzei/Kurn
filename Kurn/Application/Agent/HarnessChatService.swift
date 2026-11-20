@@ -7,6 +7,7 @@ import SwiftData
 struct HarnessChatService {
     typealias ModelFactory = @Sendable (AIProvider, String) throws -> (any AgentModel)?
     var isWikiEnabled: @MainActor () -> Bool = { UserDefaults.standard.bool(forKey: AppSettings.Keys.wikiEnabled) }
+    var isKnowledgeEnabled: @MainActor () -> Bool = { UserDefaults.standard.bool(forKey: AppSettings.Keys.knowledgeEnabled) }
     /// nil plans from the authorized workload; explicit limits retain fixed-budget behavior.
     var limits: AgentLimits?
     var conversationID: UUID?
@@ -135,7 +136,10 @@ struct HarnessChatService {
             + ChatDocumentTools.make(workspace: workspace, mutation: { name, arguments, execution in
                 try await documents.execute(name, arguments: arguments, context: execution)
             })
-        if let knowledge, let meetings = ChatKnowledgeGate.meetings(ids, source: knowledge, provider: provider) {
+        // Knowledge is a source part (K5.3): only meetings whose parts select it are offered to the gate.
+        let knowledgeIDs = ids.filter { effective.parts(for: $0).contains(.knowledge) }
+        if let knowledge, !knowledgeIDs.isEmpty,
+           let meetings = ChatKnowledgeGate.meetings(knowledgeIDs, source: knowledge, provider: provider) {
             tools += ChatKnowledgeTools.make(source: knowledge, meetings: meetings, provider: provider)
         }
         try Task.checkCancellation()
@@ -184,7 +188,7 @@ struct HarnessChatService {
     }
 
     func effectiveScope(_ scope: ChatSourceScope) -> ChatSourceScope {
-        ChatSourcePresentation.effectiveScope(scope, wikiEnabled: isWikiEnabled())
+        ChatSourcePresentation.effectiveScope(scope, wikiEnabled: isWikiEnabled(), knowledgeEnabled: isKnowledgeEnabled())
     }
 
     /// The chat's system prompt as sections: `instructions` never changes between runs, so it is

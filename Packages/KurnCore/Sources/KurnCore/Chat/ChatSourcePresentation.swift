@@ -7,17 +7,20 @@ public enum ChatSourcePresentation {
         enabled && usesHarness
     }
 
-    public static func effectiveScope(_ scope: ChatSourceScope, wikiEnabled: Bool) -> ChatSourceScope {
-        guard !wikiEnabled else { return scope }
+    public static func effectiveScope(_ scope: ChatSourceScope, wikiEnabled: Bool, knowledgeEnabled: Bool = true) -> ChatSourceScope {
+        var hidden: Set<ChatSourcePart> = []
+        if !wikiEnabled { hidden.insert(.wiki) }
+        if !knowledgeEnabled { hidden.insert(.knowledge) }
+        guard !hidden.isEmpty else { return scope }
         var effective = scope
-        effective.parts.remove(.wiki)
-        effective.partOverrides = effective.partOverrides.mapValues { $0.subtracting([.wiki]) }
+        effective.parts.subtract(hidden)
+        effective.partOverrides = effective.partOverrides.mapValues { $0.subtracting(hidden) }
         return effective
     }
 
     public static func validation(_ scope: ChatSourceScope, resolvedMeetingIDs: Set<UUID>,
-                                  wikiEnabled: Bool) -> ChatSourceScopeEditor.Validation? {
-        ChatSourceScopeEditor(scope: effectiveScope(scope, wikiEnabled: wikiEnabled))
+                                  wikiEnabled: Bool, knowledgeEnabled: Bool = true) -> ChatSourceScopeEditor.Validation? {
+        ChatSourceScopeEditor(scope: effectiveScope(scope, wikiEnabled: wikiEnabled, knowledgeEnabled: knowledgeEnabled))
             .validation(resolvedMeetingIDs: resolvedMeetingIDs)
     }
 
@@ -36,9 +39,9 @@ public enum ChatSourcePresentation {
         return query.isEmpty || title.localizedCaseInsensitiveContains(query)
     }
 
-    public static func summary(_ scope: ChatSourceScope, resolvedMeetingIDs: Set<UUID>, wikiEnabled: Bool,
+    public static func summary(_ scope: ChatSourceScope, resolvedMeetingIDs: Set<UUID>, wikiEnabled: Bool, knowledgeEnabled: Bool = true,
                                localize: (String) -> String) -> String {
-        let effective = effectiveScope(scope, wikiEnabled: wikiEnabled)
+        let effective = effectiveScope(scope, wikiEnabled: wikiEnabled, knowledgeEnabled: knowledgeEnabled)
         let selected = scope.kind == .meetings ? resolvedMeetingIDs.intersection(scope.selectedIDs) : resolvedMeetingIDs
         let parts = selected.reduce(into: Set<ChatSourcePart>()) { $0.formUnion(effective.parts(for: $1)) }
         let labels = ChatSourcePart.allCases.filter { parts.contains($0) }.map { localize(partKey($0)) }

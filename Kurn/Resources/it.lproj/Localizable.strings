@@ -1073,6 +1073,7 @@
 "chat.sources.part.transcript" = "Trascrizione";
 "chat.sources.part.summary" = "Riepilogo";
 "chat.sources.part.wiki" = "Wiki";
+"chat.sources.part.knowledge" = "Conoscenza";
 "chat.sources.part.attachments" = "Allegati";
 "chat.sources.parts.none" = "Nessuna parte";
 "chat.sources.summary.one" = "1 riunione · %@";
@@ -1430,6 +1431,8 @@
 // Scoped knowledge reader
 "knowledge.browser.title" = "Conoscenza";
 "knowledge.browser.refresh" = "Aggiorna";
+"knowledge.browser.ask_entity" = "Chiedi su questo";
+"knowledge.browser.ask_draft" = "Cosa sappiamo di %@?";
 "knowledge.browser.page" = "Sezione della pagina";
 "knowledge.browser.overview" = "Panoramica";
 "knowledge.browser.sources" = "Fonti";
