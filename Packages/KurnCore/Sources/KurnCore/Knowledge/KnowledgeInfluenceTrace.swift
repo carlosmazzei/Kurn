@@ -15,12 +15,13 @@ public enum KnowledgeInfluenceTrace {
     public static func trace(entityID: UUID, pages: [KnowledgeWikiPage]) -> [Step] {
         var seen = Set<UUID>()
         let entries = pages.flatMap { $0.sections.flatMap(\.entries) }.filter {
-            ($0.fact.subjectID == entityID || $0.fact.objectID == entityID) && seen.insert($0.fact.id).inserted
+            // The projected subject/object, not the fact's raw IDs, so merged entities keep their history.
+            ($0.subject.id == entityID || $0.object?.id == entityID) && seen.insert($0.fact.id).inserted
         }.sorted(by: precedes)
         var steps: [Step] = []
         for entry in entries {
             let replaced = steps.reversed().filter {
-                $0.entry.fact.subjectID == entry.fact.subjectID && $0.entry.fact.predicate == entry.fact.predicate
+                $0.entry.subject.id == entry.subject.id && $0.entry.fact.predicate == entry.fact.predicate
             }.map(\.entry.fact.id)
             var speakers: [String] = []
             for evidence in entry.fact.source.evidence where !speakers.contains(evidence.attributedSpeaker) {
