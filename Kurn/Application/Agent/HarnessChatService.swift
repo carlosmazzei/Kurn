@@ -252,14 +252,17 @@ struct HarnessChatService {
 
     /// K5.2: compiled knowledge first, the transcript for what it does not cover.
     static let knowledgePolicy = """
-        Knowledge tools are available for some of the selected meetings. Query them first:
-        resolve_entity or search_knowledge to find what the question is about, then get_entity,
-        get_timeline, compare_state, list_open_actions or get_graph for its facts. Each fact keeps its
-        modality, negation and time: report proposed, disputed or negated claims as such, never as
-        agreed. Cite a fact through its meeting and the [m:ss] its evidence gives (get_evidence).
-        Knowledge covers only what was compiled. Before saying something was not discussed, and
-        whenever knowledge lacks the answer, call get_coverage: for any meeting not compiled, stale, or
-        not fully examined, and for meetings without knowledge, fall back to search and read_transcript.
-        If knowledge and the transcript disagree, trust the transcript and say that they differ.
+        Knowledge tools are available for some of the selected meetings. For those meetings, query
+        knowledge first, before list_sources, search or read_summary: resolve_entity or search_knowledge
+        to find what the question is about, then get_entity, get_timeline, compare_state,
+        list_open_actions or get_graph for its facts. Each fact keeps its modality, negation and time:
+        report proposed, disputed or negated claims as such, never as agreed. Cite a fact through its
+        meeting and the [m:ss] its evidence gives (get_evidence).
+        Knowledge holds only what was compiled. Call get_coverage for the meetings you answer from: for
+        any meeting not compiled, stale or not fully examined, and for meetings without knowledge, use
+        the other source tools you have (search, read_transcript, read_summary) for that meeting, or say
+        that its knowledge is incomplete when they are not offered. Even with full coverage, a missing
+        fact means only that the compiled knowledge has none, not that it was never said; say so in
+        those words. If knowledge and the transcript disagree, trust the transcript and say that they differ.
         """
 }
