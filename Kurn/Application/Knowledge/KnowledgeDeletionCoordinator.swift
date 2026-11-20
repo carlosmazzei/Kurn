@@ -22,9 +22,16 @@ final class KnowledgeDeletionCoordinator {
     private(set) var isDeletingCorpus = false
     private(set) var lastFailureCode: String?
 
-    init(queue: KnowledgeJobQueue, purge: @escaping Purge = { try await $0.purgeNextDeletion() }) {
+    init(queue: KnowledgeJobQueue, purge: @escaping Purge = KnowledgeDeletionCoordinator.purgeNext) {
         self.queue = queue
         self.purge = purge
+    }
+
+    /// The production purge, named rather than an inline default closure: the
+    /// compiler warned that the closure's `await` crossed no actor, which a
+    /// main-actor function calling the store's actor plainly does.
+    static func purgeNext(_ store: KnowledgeStore) async throws -> KnowledgeDeletionReceipt? {
+        try await store.purgeNextDeletion()
     }
 
     deinit {

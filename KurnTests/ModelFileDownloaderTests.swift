@@ -140,7 +140,7 @@ struct ModelFileDownloaderTests {
 
     @Test("rejects a file whose size does not match the declared Content-Length")
     func rejectsWhenSizeMismatches() async throws {
-        try await tempFileTestLock.run {
+        await tempFileTestLock.run {
             let downloader = makeDownloader()
             let destination = tempDestination()
             defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
@@ -193,7 +193,7 @@ struct ModelFileDownloaderTests {
 
     @Test("rejects a file whose SHA-256 does not match X-Linked-ETag")
     func rejectsWhenHashMismatches() async throws {
-        try await tempFileTestLock.run {
+        await tempFileTestLock.run {
             let downloader = makeDownloader()
             let destination = tempDestination()
             defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
@@ -249,7 +249,7 @@ struct ModelFileDownloaderTests {
     /// bytes, so only the pinned value can tell the file was swapped.
     @Test("rejects a swapped file even when the origin's digest header agrees with it")
     func rejectsSwappedFileDespiteMatchingHeader() async throws {
-        try await tempFileTestLock.run {
+        await tempFileTestLock.run {
             let downloader = makeDownloader()
             let destination = tempDestination()
             defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
@@ -278,7 +278,7 @@ struct ModelFileDownloaderTests {
 
     @Test("rejects a file whose SHA-256 does not match the pinned digest")
     func rejectsWhenPinMismatches() async throws {
-        try await tempFileTestLock.run {
+        await tempFileTestLock.run {
             let downloader = makeDownloader()
             let destination = tempDestination()
             defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
@@ -307,7 +307,7 @@ struct ModelFileDownloaderTests {
     /// transfer with neither a pin nor an `X-Linked-ETag` must not install.
     @Test("rejects a download when no checksum is available to verify it")
     func rejectsWhenNoHashIsAvailable() async throws {
-        try await tempFileTestLock.run {
+        await tempFileTestLock.run {
             let downloader = makeDownloader()
             let destination = tempDestination()
             defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
@@ -354,7 +354,7 @@ struct ModelFileDownloaderTests {
 
     @Test("a plain ETag is never treated as a hash to verify")
     func plainETagIsIgnored() async throws {
-        try await tempFileTestLock.run {
+        await tempFileTestLock.run {
             let downloader = makeDownloader()
             let destination = tempDestination()
             defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }

@@ -47,8 +47,9 @@ struct ModelPricingTests {
     @Test func costScalesWithTokenCount() {
         let single = TokenUsage(promptTokens: 1_000, completionTokens: 0)
         let double = TokenUsage(promptTokens: 2_000, completionTokens: 0)
-        let singleCost = try? #require(ModelPricing.estimatedCostUSD(model: "claude-3-5-sonnet", usage: single))
-        let doubleCost = try? #require(ModelPricing.estimatedCostUSD(model: "claude-3-5-sonnet", usage: double))
+        let singleCost = ModelPricing.estimatedCostUSD(model: "claude-3-5-sonnet", usage: single)
+        let doubleCost = ModelPricing.estimatedCostUSD(model: "claude-3-5-sonnet", usage: double)
+        #expect(singleCost != nil)
         #expect(doubleCost == singleCost.map { $0 * 2 })
     }
 
