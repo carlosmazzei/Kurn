@@ -186,7 +186,7 @@ public struct AgentSessionTree: Sendable {
         })
         var total: AgentUsage?
         var counted = Set<String>()
-        for entry in entries where entry.kind == "agent.usage.v1" {
+        for entry in entries where entry.kind == AgentRunBranch.usageType {
             guard let runID = entry.runID, runs.contains(runID),
                   case .custom(_, let data) = entry.payload, let usage = Self.usage(data),
                   AgentUsageEntry.isFirst(data, of: runID, among: &counted) else { continue }

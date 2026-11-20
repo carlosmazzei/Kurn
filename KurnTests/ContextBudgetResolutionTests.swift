@@ -89,10 +89,10 @@ struct ContextBudgetResolutionTests {
 
     @Test func theAgentPlansAgainstTheRealWindowWithoutACap() throws {
         let store = try isolatedStore()
-        #expect(store.agentContextWindow(for: .openAI, model: "gpt-5.4") == 1_050_000)
-        #expect(store.agentContextWindow(for: .openAI, model: "my-fine-tune") == ModelContextWindows.unknownWindow)
+        #expect(store.resolution(for: .openAI, model: "gpt-5.4").contextWindowTokens == 1_050_000)
+        #expect(store.resolution(for: .openAI, model: "my-fine-tune").contextWindowTokens == ModelContextWindows.unknownWindow)
         store.record(["gemini-2.5-pro": 1_048_576], provider: .google)
-        #expect(store.agentContextWindow(for: .google, model: "gemini-2.5-pro") == 1_048_576)
+        #expect(store.resolution(for: .google, model: "gemini-2.5-pro").contextWindowTokens == 1_048_576)
     }
 
     @Test func endpointChangesAndExactModelIDsDoNotReuseAnotherCapacity() throws {

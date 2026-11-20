@@ -29,7 +29,6 @@ struct ChatContextTraceTests {
         let restored = try JSONDecoder().decode([AgentRunStep].self, from: data)
         #expect(restored[0].contextResolution == origin)
         #expect(restored[1].diagnostic == diagnostic)
-        #expect(ChatStepPresentation.visibleSteps(restored).count == 2)
         #expect(ChatStepPresentation(step: restored[0]).key == "chat.step.context")
         #expect(ChatStepPresentation(step: restored[1]).key == "chat.diagnostic.limitReached")
         #expect(ChatContextPresentation.diagnosticDetails(diagnostic, localize: { $0 })

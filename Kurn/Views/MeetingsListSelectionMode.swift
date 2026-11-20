@@ -79,21 +79,9 @@ extension MeetingsListView {
                 .accessibilityIdentifier("meetings.selection.done")
         }
 
-        if usesRootTabs {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    exportSelectionButton
-                    deleteSelectionButton
-                } label: {
-                    Label(NSLocalizedString("meetings.selection.actions", comment: "Selection actions"), systemImage: "ellipsis.circle")
-                }
-                .accessibilityIdentifier("meetings.selection.actions")
-            }
-        } else {
-            ToolbarItem(placement: .bottomBar) { exportSelectionButton }
-            ToolbarSpacer(.flexible, placement: .bottomBar)
-            ToolbarItem(placement: .bottomBar) { deleteSelectionButton }
-        }
+        ToolbarItem(placement: .bottomBar) { exportSelectionButton }
+        ToolbarSpacer(.flexible, placement: .bottomBar)
+        ToolbarItem(placement: .bottomBar) { deleteSelectionButton }
     }
 
     private var exportSelectionButton: some View {

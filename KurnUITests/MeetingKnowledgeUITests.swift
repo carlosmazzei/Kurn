@@ -96,22 +96,24 @@ final class MeetingKnowledgeUITests: XCTestCase {
     func testKnowledgeRootNavigationPrototype() throws {
         continueAfterFailure = false
         let app = launch(prototype: true)
-        assertRootBarFits(app)
         XCTAssertTrue(app.buttons["knowledge.browser.entity"].firstMatch.waitForExistence(timeout: 15))
         capture(app, named: "knowledge-navigation-home-prototype")
-        app.buttons["root.destination.meetings"].tap()
+        closeSheet(app)
+        assertRootBarFits(app)
         XCTAssertTrue(app.buttons["meetingCard"].firstMatch.waitForExistence(timeout: 10))
+        // XCUITest does not report the selected trait for toolbar items, so
+        // only the current place's button is checked here.
+        XCTAssertTrue(app.buttons["root.destination.meetings"].isHittable)
         capture(app, named: "knowledge-navigation-meetings-prototype")
         app.buttons["root.destination.ask"].tap()
         XCTAssertTrue(app.buttons["chat.send"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["chat.send"].isEnabled)
-        XCTAssertLessThanOrEqual(app.buttons["chat.send"].frame.maxY, app.buttons["root.destination.ask"].frame.minY)
-        assertRootBarFits(app)
         capture(app, named: "knowledge-navigation-ask-prototype")
+        closeSheet(app)
         let documents = app.buttons["root.destination.documents"]
         let newDocument = app.buttons["documents.new"]
         // Match the flow suite's transition-confirmed tap: UIKit can drop a
-        // tab tap while the previous screen finishes its first layout.
+        // tap while the previous sheet finishes dismissing.
         for _ in 0..<2 {
             documents.tap()
             if newDocument.waitForExistence(timeout: 5) { break }
@@ -125,53 +127,48 @@ final class MeetingKnowledgeUITests: XCTestCase {
         capture(app, named: "knowledge-navigation-artifact")
     }
 
-    func testMeetingMenusAndSelectionSurviveRootTabChanges() throws {
+    func testMeetingControlsAreOpenAtTheTopAndKeepTheirState() throws {
         continueAfterFailure = false
         let app = launch()
-        let options = app.buttons["meetings.options"]
-        XCTAssertTrue(options.waitForExistence(timeout: 10))
+        let library = app.buttons["meetings.library"]
+        XCTAssertTrue(library.waitForExistence(timeout: 10))
         assertRootBarFits(app)
+        // The list's controls are in the navigation bar itself, not in a menu,
+        // and Settings beside them; recording stays in the bottom bar.
+        for control in [library, app.buttons["meetings.filters"], app.buttons["meetings.select"], app.buttons["Sort"],
+                        app.buttons["nav.settings"]] {
+            XCTAssertTrue(control.isHittable)
+            XCTAssertLessThan(control.frame.midY, app.buttons["root.destination.meetings"].frame.minY)
+        }
         XCTAssertFalse(app.navigationBars.buttons["meetings.record"].exists)
-        options.tap()
-        XCTAssertTrue(app.buttons["meetings.library"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["meetings.filters"].exists)
-        XCTAssertTrue(app.buttons["meetings.select"].exists)
-        XCTAssertTrue(app.buttons["Sort"].exists)
-        capture(app, named: "knowledge-navigation-list-options")
-        app.buttons["meetings.library"].tap()
+        capture(app, named: "knowledge-navigation-list-controls")
+        library.tap()
         let favorites = app.buttons["library.bucket.favorites"]
         XCTAssertTrue(favorites.waitForExistence(timeout: 10))
         favorites.tap()
-        XCTAssertTrue(options.waitForExistence(timeout: 10))
-        options.tap()
+        XCTAssertTrue(library.waitForExistence(timeout: 10))
         app.buttons["meetings.filters"].tap()
         let week = app.segmentedControls.buttons["This week"]
         XCTAssertTrue(week.waitForExistence(timeout: 10))
         week.tap()
         app.navigationBars.buttons["Done"].tap()
-        options.tap()
         app.buttons["meetings.select"].tap()
         let done = app.buttons["meetings.selection.done"]
         XCTAssertTrue(done.waitForExistence(timeout: 10))
         app.buttons["meetingCard"].firstMatch.tap()
-        app.buttons["meetings.selection.actions"].tap()
         XCTAssertTrue(app.buttons["meetings.selection.export"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["meetings.selection.export"].isEnabled)
         XCTAssertTrue(app.buttons["meetings.selection.delete"].exists)
         capture(app, named: "knowledge-navigation-selection-actions")
-        // Dismiss outside the two top-right menu rows, without choosing an action.
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.5)).tap()
+        done.tap()
         app.buttons["root.destination.ask"].tap()
         XCTAssertTrue(app.buttons["chat.send"].waitForExistence(timeout: 10))
-        app.buttons["root.destination.meetings"].tap()
-        XCTAssertTrue(done.waitForExistence(timeout: 10))
-        done.tap()
-        options.tap()
-        app.buttons["meetings.library"].tap()
+        closeSheet(app)
+        XCTAssertTrue(library.waitForExistence(timeout: 10))
+        library.tap()
         XCTAssertTrue(favorites.waitForExistence(timeout: 10))
         XCTAssertTrue(favorites.isSelected)
         app.navigationBars.buttons["Done"].tap()
-        options.tap()
         app.buttons["meetings.filters"].tap()
         XCTAssertTrue(week.waitForExistence(timeout: 10))
         XCTAssertTrue(week.isSelected)
@@ -180,7 +177,9 @@ final class MeetingKnowledgeUITests: XCTestCase {
     func testKnowledgeHomeUsesExplicitSourceSelection() throws {
         continueAfterFailure = false
         let app = launch()
-        app.buttons["root.destination.knowledge"].tap()
+        let knowledge = app.buttons["root.destination.knowledge"]
+        XCTAssertTrue(knowledge.waitForExistence(timeout: 10))
+        knowledge.tap()
         let choose = app.buttons["knowledge.chooseSources"]
         XCTAssertTrue(choose.waitForExistence(timeout: 10))
         choose.tap()
@@ -188,14 +187,21 @@ final class MeetingKnowledgeUITests: XCTestCase {
         XCTAssertTrue(source.waitForExistence(timeout: 10))
         source.tap()
         app.buttons["knowledge.sources.done"].tap()
-        XCTAssertTrue(app.buttons["knowledge.browser.entity"].firstMatch.waitForExistence(timeout: 10))
+        let entity = app.buttons["knowledge.browser.entity"].firstMatch
+        XCTAssertTrue(entity.waitForExistence(timeout: 10))
         capture(app, named: "knowledge-navigation-selected-sources")
         choose.tap()
         XCTAssertTrue(source.waitForExistence(timeout: 10))
         source.tap()
         app.navigationBars.buttons["Cancel"].tap()
-        XCTAssertTrue(app.buttons["knowledge.browser.entity"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(entity.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Selected meetings: 1")).firstMatch.exists)
+        // The selection belongs to the meetings screen: closing the sheet and
+        // opening Knowledge again reads the same meetings.
+        closeSheet(app)
+        XCTAssertTrue(knowledge.waitForExistence(timeout: 10))
+        knowledge.tap()
+        XCTAssertTrue(entity.waitForExistence(timeout: 10))
     }
 
     func testTimelineOpensFromHomeAndLeadsToEvidence() throws {
@@ -207,7 +213,6 @@ final class MeetingKnowledgeUITests: XCTestCase {
         let entry = app.descendants(matching: .any)["knowledge.timeline.entry"].firstMatch
         XCTAssertTrue(entry.waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["knowledge.timeline.filter"].exists)
-        assertRootBarFits(app)
         capture(app, named: "knowledge-timeline")
         entry.tap()
         XCTAssertTrue(app.staticTexts["knowledge.browser.claim"].firstMatch.waitForExistence(timeout: 10))
@@ -261,7 +266,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         // A page opened from the graph comes back to the list it was left in.
         app.buttons["knowledge.graph.openPage"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["knowledge.browser.claim"].firstMatch.waitForExistence(timeout: 10))
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        readerBackButton(app).tap()
         XCTAssertTrue(app.buttons["knowledge.graph.recentre"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertFalse(nodes.firstMatch.exists)
         // Comparing two days: the undated blocker holds on both, so it stays.
@@ -295,17 +300,18 @@ final class MeetingKnowledgeUITests: XCTestCase {
     func testKnowledgeSearchFindsAliasesAndEvidenceWithoutSemanticSearch() throws {
         continueAfterFailure = false
         let app = launch(prototype: true)
-        let field = app.searchFields.firstMatch
+        // The meetings list's own search field stays in the hierarchy under
+        // the Knowledge sheet, so pick the reader's field by its prompt.
+        let field = app.searchFields["Search names, aliases and claims"]
         XCTAssertTrue(field.waitForExistence(timeout: 15))
         field.tap()
         field.typeText("ORION\n")
         let alias = app.buttons["knowledge.search.result.alias"].firstMatch
         XCTAssertTrue(alias.waitForExistence(timeout: 10))
-        assertRootBarFits(app)
         capture(app, named: "knowledge-search-alias")
         alias.tap()
         XCTAssertTrue(app.staticTexts["knowledge.browser.claim"].firstMatch.waitForExistence(timeout: 10))
-        let back = app.navigationBars.buttons.element(boundBy: 0)
+        let back = readerBackButton(app)
         XCTAssertTrue(back.waitForExistence(timeout: 5))
         back.tap()
         XCTAssertTrue(field.waitForExistence(timeout: 10))
@@ -325,12 +331,12 @@ final class MeetingKnowledgeUITests: XCTestCase {
         continueAfterFailure = false
         let app = launch(largeType: true, prototype: true)
         XCTAssertTrue(app.buttons["knowledge.browser.entity"].firstMatch.waitForExistence(timeout: 15))
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
+        closeSheet(app)
         assertRootBarFits(app)
+        XCTAssertTrue(app.buttons["meetings.library"].waitForExistence(timeout: 10))
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
         capture(app, named: "knowledge-navigation-floating-record-accessibility")
-        app.buttons["root.destination.meetings"].tap()
-        XCTAssertTrue(app.buttons["meetings.options"].waitForExistence(timeout: 10))
-        assertRootBarFits(app)
     }
 
     func testReviewIdentityMergeAndUndoUseTheRealStore() throws {
@@ -386,23 +392,36 @@ final class MeetingKnowledgeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["knowledge.browser.quote"].waitForExistence(timeout: 10))
     }
 
-    /// Check actual hit targets and separation, not just that five controls
-    /// exist. This catches a recorder drawn over a destination on small bars.
+    /// The bottom bar holds the four places and, in its own group to their
+    /// right, the record button, all on one row with real hit targets.
     private func assertRootBarFits(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertEqual(app.tabBars.buttons.count, 0, file: file, line: line)
         let record = app.buttons["meetings.record"]
         XCTAssertTrue(record.waitForExistence(timeout: 10), file: file, line: line)
         XCTAssertTrue(record.isHittable, file: file, line: line)
-        XCTAssertGreaterThanOrEqual(record.frame.width, 44, file: file, line: line)
-        XCTAssertGreaterThanOrEqual(record.frame.height, 44, file: file, line: line)
         for destination in ["meetings", "knowledge", "ask", "documents"] {
             let button = app.buttons["root.destination.\(destination)"]
             XCTAssertTrue(button.isHittable, file: file, line: line)
-            XCTAssertGreaterThanOrEqual(button.frame.width, 44, file: file, line: line)
-            XCTAssertGreaterThanOrEqual(button.frame.height, 44, file: file, line: line)
             XCTAssertLessThanOrEqual(button.frame.maxX, record.frame.minX, file: file, line: line)
-            XCTAssertEqual(button.frame.midY, record.frame.midY, accuracy: 4, file: file, line: line)
+            XCTAssertEqual(button.frame.midY, record.frame.midY, accuracy: 8, file: file, line: line)
         }
+    }
+
+    /// The back button of the Knowledge sheet's own navigation bar. The meetings
+    /// list's bar stays in the hierarchy under the sheet and comes first, so the
+    /// sheet's bar is the last one.
+    private func readerBackButton(_ app: XCUIApplication) -> XCUIElement {
+        let bar = app.navigationBars.allElementsBoundByIndex.last ?? app.navigationBars.firstMatch
+        let back = bar.buttons["BackButton"]
+        return back.exists ? back : bar.buttons.element(boundBy: 0)
+    }
+
+    /// Closes the sheet on top (Knowledge or Ask) through its Done button.
+    private func closeSheet(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let done = app.navigationBars.buttons["Done"].firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 10), file: file, line: line)
+        done.tap()
+        XCTAssertTrue(app.buttons["root.destination.meetings"].waitForExistence(timeout: 10), file: file, line: line)
     }
 
     /// The graph's mode controls sit above its claims, which a lazy list

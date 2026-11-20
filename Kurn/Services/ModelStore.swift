@@ -150,8 +150,6 @@ enum ModelStore {
         /// of the last check. `.unverified` for every "other" (unclaimed)
         /// folder — those have no group, so no probe or record applies.
         var verificationState: ModelVerificationState = .unverified
-
-        var isOther: Bool { group == nil }
     }
 
     struct Snapshot {

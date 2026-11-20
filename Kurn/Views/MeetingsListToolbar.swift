@@ -2,10 +2,11 @@
 //  MeetingsListToolbar.swift
 //  Kurn
 //
-//  In the four-destination root, Library / Filters / Sort / Select share the
-//  upper options menu; Settings remains a direct upper action. The root owns its
-//  bottom navigation and floating recorder. The feature-off layout keeps
-//  the existing standalone toolbar placements.
+//  One meetings screen in both layouts. With Knowledge on, the bottom bar
+//  holds the four places (Meetings, Knowledge, Ask, Documents) beside the
+//  record button, and the list's own controls (Library, Filters, Sort,
+//  Select) move up beside Settings, each open in the navigation bar. With
+//  Knowledge off, the original placements stay.
 //
 //  This lives in its own file because `MeetingsListView.swift` is already close
 //  to the SwiftLint file-length limit. The members it reaches for are therefore
@@ -29,28 +30,64 @@ extension MeetingsListView {
 
     @ToolbarContentBuilder
     var browsingToolbar: some ToolbarContent {
-        if usesRootTabs {
-            rootBrowsingToolbar
+        if settings.knowledgeEnabled {
+            knowledgeBrowsingToolbar
         } else {
             legacyBrowsingToolbar
         }
     }
 
+    /// The original toolbar with its buttons moved: the list's controls share
+    /// one glass group at the top, Settings has its own, and the bottom bar
+    /// reaches the other places the way it reached Ask and Documents.
     @ToolbarContentBuilder
-    private var rootBrowsingToolbar: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            Menu {
-                libraryButton
-                filterButton
-                sortMenu
-                selectButton
-            } label: {
-                Label(NSLocalizedString("meetings.options", comment: "List options"), systemImage: "ellipsis.circle")
-            }
-            .accessibilityValue(selectionTitle)
-            .accessibilityIdentifier("meetings.options")
+    private var knowledgeBrowsingToolbar: some ToolbarContent {
+        knowledgeTopToolbar
+        knowledgeBottomToolbar
+    }
+
+    @ToolbarContentBuilder
+    private var knowledgeTopToolbar: some ToolbarContent {
+        // On iPad-regular width the sidebar column already shows the library.
+        if horizontalSizeClass != .regular {
+            ToolbarItem(placement: .topBarTrailing) { libraryButton(showsTitle: false) }
         }
+        ToolbarItem(placement: .topBarTrailing) { filterButton }
+        ToolbarItem(placement: .topBarTrailing) { sortMenu }
+        ToolbarItem(placement: .topBarTrailing) { selectButton }
+        ToolbarSpacer(.fixed, placement: .topBarTrailing)
         ToolbarItem(placement: .topBarTrailing) { settingsButton }
+    }
+
+    @ToolbarContentBuilder
+    private var knowledgeBottomToolbar: some ToolbarContent {
+        ToolbarItem(placement: .bottomBar) { destinationButton(.meetings) {} }
+        ToolbarItem(placement: .bottomBar) { destinationButton(.knowledge) { showingKnowledge = true } }
+        ToolbarItem(placement: .bottomBar) { destinationButton(.ask) { showingAsk = true } }
+        ToolbarItem(placement: .bottomBar) { destinationButton(.documents) { showingDocuments = true } }
+        ToolbarSpacer(.flexible, placement: .bottomBar)
+        // At accessibility text sizes the title would crowd the four places
+        // out of the bar; the accessibility label still names the action.
+        ToolbarItem(placement: .bottomBar) {
+            if dynamicTypeSize.isAccessibilitySize {
+                recordButton.labelStyle(.iconOnly)
+            } else {
+                recordButton.labelStyle(.titleAndIcon)
+            }
+        }
+    }
+
+    /// A place in the bottom bar. Meetings is the screen itself, so it is
+    /// marked as the current one by its filled symbol, the accent colour and
+    /// the selected trait, never by colour alone.
+    private func destinationButton(_ destination: AppRootDestination, action: @escaping () -> Void) -> some View {
+        let isCurrent = destination == .meetings
+        return Button(action: action) {
+            Label(destination.title, systemImage: isCurrent ? destination.systemImage + ".fill" : destination.systemImage)
+        }
+        .tint(isCurrent ? Theme.accent : nil)
+        .accessibilityAddTraits(isCurrent ? .isSelected : [])
+        .accessibilityIdentifier("root.destination.\(destination.rawValue)")
     }
 
     @ToolbarContentBuilder
@@ -67,7 +104,7 @@ extension MeetingsListView {
         // button would just open a sheet duplicating what's already on
         // screen — hidden there rather than left as a redundant control.
         if horizontalSizeClass != .regular {
-            ToolbarItem(placement: .bottomBar) { libraryButton }
+            ToolbarItem(placement: .bottomBar) { libraryButton(showsTitle: true) }
         }
         ToolbarItem(placement: .bottomBar) { filterButton }
         if settings.semanticSearchEnabled {
@@ -90,11 +127,13 @@ extension MeetingsListView {
     /// Opens `FolderSidebarView`. The label mirrors the active selection
     /// (built-in bucket icon or folder icon + name) so the user always sees
     /// what they're looking at.
-    var libraryButton: some View {
+    /// At the top (Knowledge on) only the icon fits beside the other controls;
+    /// the accessibility value still names the selection.
+    func libraryButton(showsTitle: Bool) -> some View {
         Button { showingSidebar = true } label: {
-            Label(usesRootTabs ? NSLocalizedString("meetings.bucket", comment: "Library") : selectionTitle, systemImage: selectionSystemImage)
+            Label(selectionTitle, systemImage: selectionSystemImage)
+                .labelStyle(LibraryLabelStyle(showsTitle: showsTitle))
         }
-        .labelStyle(.titleAndIcon)
         .accessibilityLabel(NSLocalizedString("meetings.bucket", comment: "Library"))
         .accessibilityValue(selectionTitle)
         .accessibilityIdentifier("meetings.library")
@@ -105,8 +144,7 @@ extension MeetingsListView {
     var filterButton: some View {
         Button { showingFilterBar = true } label: {
             if filter.isActive {
-                Label(usesRootTabs ? "\(NSLocalizedString("filter.title", comment: "Filters")) (\(filter.activeCount))" : "\(filter.activeCount)",
-                    systemImage: "line.3.horizontal.decrease")
+                Label("\(filter.activeCount)", systemImage: "line.3.horizontal.decrease")
                     .labelStyle(.titleAndIcon)
             } else {
                 Label(
@@ -175,5 +213,19 @@ extension MeetingsListView {
         // `ScreenshotUITests.testSettings` taps this by identifier; it moved
         // here from the old hand-rolled bottom bar and must keep the name.
         .accessibilityIdentifier("nav.settings")
+    }
+}
+
+/// The library button's label: the selection's name beside its icon in the
+/// bottom bar, the icon alone at the top.
+private struct LibraryLabelStyle: LabelStyle {
+    let showsTitle: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        if showsTitle {
+            Label(configuration).labelStyle(.titleAndIcon)
+        } else {
+            Label(configuration).labelStyle(.iconOnly)
+        }
     }
 }

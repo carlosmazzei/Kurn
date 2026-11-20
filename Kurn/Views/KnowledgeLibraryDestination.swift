@@ -1,11 +1,13 @@
 import SwiftData
 import SwiftUI
 
+/// The library's Knowledge reader, presented over the meetings list. Its
+/// source selection belongs to the list (`meetingIDs`), so closing and
+/// reopening the sheet keeps the meetings it was reading.
 struct KnowledgeLibraryDestination: View {
-    @State private var meetingIDs: Set<UUID>
+    @Binding var meetingIDs: Set<UUID>
+    @Environment(\.dismiss) private var dismiss
     @State private var showingSources = false
-
-    init(initialMeetingIDs: Set<UUID> = []) { _meetingIDs = State(initialValue: initialMeetingIDs) }
 
     var body: some View {
         ZStack {
@@ -19,10 +21,14 @@ struct KnowledgeLibraryDestination: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .knowledgeReadingSurface()
                     .navigationTitle(KnowledgeBrowserCopy.text("title"))
-                    .toolbar(.hidden, for: .tabBar)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
+                        }
+                    }
                 }
             } else {
-                KnowledgeBrowserView(meetingIDs: meetingIDs, showsDone: false, onChooseSources: { showingSources = true })
+                KnowledgeBrowserView(meetingIDs: meetingIDs, showsDone: true, onChooseSources: { showingSources = true })
                     .id(meetingIDs)
             }
         }

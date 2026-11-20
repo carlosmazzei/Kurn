@@ -14,6 +14,12 @@
 "error.network_policy_restricted" = "Uploads and model downloads are set to Wi-Fi only, and this device is on cellular data or Low Data Mode. Connect to Wi-Fi, or allow cellular and Low Data Mode under Large Transfers in Transcription settings, then try again.";
 "error.network_policy_restricted.title" = "Wi-Fi Required";
 "error.network_policy_restricted.open_settings" = "Open Settings";
+"error.recovery.retry" = "Try Again";
+"error.recovery.open_settings" = "Open Settings";
+"error.recovery.free_space" = "Manage Storage";
+"error.recovery.change_model" = "Change Model";
+"error.recovery.recover_audio" = "Recover Audio";
+"error.recovery.export_diagnostics" = "Export Diagnostics";
 "error.cloud_transcription_consent_required" = "Cloud transcription requires upload consent. Review the destination and transfer policy in Transcription settings.";
 "settings.network.large_transfers" = "Large Transfers";
 "settings.network.allow_expensive" = "Allow Cellular Transfers";
@@ -1071,8 +1077,6 @@
 "chat.sources.parts.none" = "No parts";
 "chat.sources.summary.one" = "1 meeting · %@";
 "chat.sources.summary" = "%d meetings · %@";
-"chat.steps.one" = "1 step";
-"chat.steps.count" = "%d steps";
 "chat.steps.arguments" = "Arguments";
 "chat.steps.output" = "Result";
 "chat.steps.compaction.detail" = "Context: %d → %d tokens";
@@ -1537,9 +1541,7 @@
 "knowledge.browser.meetings" = "Meetings";
 "knowledge.browser.ask" = "Ask";
 
-// Four root destinations and source selection
-"meetings.options" = "List options";
-"meetings.selection.actions" = "Selection actions";
+// Knowledge source selection
 "knowledge.browser.choose_sources" = "Choose meetings";
 "knowledge.browser.choose_sources_detail" = "Choose up to 16 meetings to browse their knowledge.";
 

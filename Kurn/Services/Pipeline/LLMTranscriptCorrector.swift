@@ -96,9 +96,7 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
     }
 
     /// Greedily packs whole segments into batches bounded by both a character
-    /// budget and a count cap, never splitting a segment — same shape as
-    /// `SummaryService.packWholeItems`, applied to segments instead of
-    /// markdown strings.
+    /// budget and a count cap, never splitting a segment.
     static func batches(_ segments: [TranscriptSegment], maxChars: Int, maxCount: Int) -> [[TranscriptSegment]] {
         var result: [[TranscriptSegment]] = []
         var current: [TranscriptSegment] = []

@@ -35,12 +35,15 @@ extension View {
     /// Shows the mini bar inside this screen's safe area instead of at the
     /// root, for a screen whose bottom toolbar the root bar would cover.
     func hostsRecordingMiniBar() -> some View {
-        modifier(HostedRecordingMiniBar())
+        modifier(HostedRecordingMiniBar(closesSheetToExpand: false))
     }
 
-    @ViewBuilder
-    func hostsRecordingMiniBar(when enabled: Bool) -> some View {
-        if enabled { hostsRecordingMiniBar() } else { self }
+    /// The mini bar inside a sheet the meetings list presents (Knowledge,
+    /// Ask), which covers the list's own. The recorder is presented from the
+    /// root, which cannot present over this sheet, so expanding closes the
+    /// sheet first.
+    func hostsRecordingMiniBarInSheet() -> some View {
+        modifier(HostedRecordingMiniBar(closesSheetToExpand: true))
     }
 }
 
@@ -57,10 +60,12 @@ final class RecordingMiniBarPlacement {
 private struct MiniBarSlot: View {
     @Environment(RecordingSessionController.self) private var session
     @Environment(RecordingMiniBarPlacement.self) private var placement
+    /// Replaces expanding in place (a sheet closes itself first).
+    var expand: (() -> Void)?
 
     var body: some View {
         if let vm = session.viewModel, !session.isExpanded, !placement.isKeyboardVisible {
-            RecordingMiniBar(vm: vm, onExpand: { session.expand() })
+            RecordingMiniBar(vm: vm, onExpand: { if let expand { expand() } else { session.expand() } })
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -69,13 +74,24 @@ private struct MiniBarSlot: View {
 }
 
 private struct HostedRecordingMiniBar: ViewModifier {
+    let closesSheetToExpand: Bool
+    @Environment(RecordingSessionController.self) private var session
     @Environment(RecordingMiniBarPlacement.self) private var placement
+    @Environment(\.dismiss) private var dismiss
     @State private var isHosting = false
+    /// Set when the bar in a sheet asked to expand: the recorder opens once
+    /// the sheet is gone, never while its dismissal is still running.
+    @State private var expandsWhenGone = false
 
     func body(content: Content) -> some View {
         content
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if isHosting { MiniBarSlot() }
+                if isHosting {
+                    MiniBarSlot(expand: closesSheetToExpand ? {
+                        expandsWhenGone = true
+                        dismiss()
+                    } : nil)
+                }
             }
             .onAppear {
                 guard !isHosting else { return }
@@ -83,6 +99,10 @@ private struct HostedRecordingMiniBar: ViewModifier {
                 placement.hostCount += 1
             }
             .onDisappear {
+                if expandsWhenGone {
+                    expandsWhenGone = false
+                    session.expand()
+                }
                 guard isHosting else { return }
                 isHosting = false
                 placement.hostCount -= 1

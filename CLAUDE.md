@@ -1555,7 +1555,7 @@ transcript.
   confidence and ≤ 160 characters of the neighbouring segments' text
   (`before`/`after`, read-only), so a word is judged in the conversation it was
   said in.
-- **Batching** reuses the shape of `SummaryService.packWholeItems`: greedy packs
+- **Batching** greedy-packs segments
   bounded by both `maxBatchChars` (6,000) and `maxSegmentsPerBatch` (40), never
   splitting a segment.
 - **Vocabulary.** `MeetingVocabularyExtractor` (`Pipeline/`) collects the
@@ -3202,38 +3202,37 @@ no native text-copy/export actions that would bypass the corporate export policy
 The fake audio adapter tests these boundaries without opening the
 simulator's audio session; real playback remains a physical-device check.
 
-The navigation review selected four destinations: Meetings / Knowledge / Ask /
-Documents. `KnowledgeRootNavigationView` is active under `knowledgeEnabled` and
-keeps a separate stack per tab. Meetings' upper options menu contains Library,
-Filters, Sort and Select; Settings remains a direct upper action. A separate
-prominent red Record button, titled like the legacy toolbar's, floats to the
-right of the four root destinations in the bottom safe area, using the same
-action as the legacy toolbar. It starts a meeting or reopens the active recording. The four stacks
-still belong to `TabView`; its built-in tab bar is hidden because it cannot
-reserve a separate slot for this action. `KnowledgeRootNavigationView` uses
-system-glass groups for the destination capsule and the recorder, without
-overlapping their hit targets. The destinations look like the legacy bottom
-toolbar's buttons — regular-weight icons with no title beneath, the selected
-one in the accent colour on a light capsule, so selection is never colour
-only — and the recorder's title gives way to its icon below
-360 points or at accessibility text sizes; localized accessibility names and
-selected traits remain available. Each tab reserves the measured bar height within its host,
-so chat composers, source-audio controls and mini bars stay above it even
-inside a pushed navigation stack. An inset outside TabView does not reach
-those UIKit-hosted stacks. The root bar and its reserved space step aside
-for the keyboard.
-Bulk Export/Delete move to the upper selection-actions menu, so no bottom
-meetings toolbar overlaps the root tabs. Library scope, structured filters,
-sorting and picked rows retain their existing state and action boundaries when
-switching tabs. The feature-off compact stack/regular sidebar stays available.
+With `knowledgeEnabled` there is still one main screen, the meetings list in
+its original stack (the compact stack, or the regular-width sidebar), with its
+buttons moved (`MeetingsListToolbar`). The bottom bar holds the four places —
+Meetings / Knowledge / Ask / Documents — in one glass group and, after a
+flexible `ToolbarSpacer`, the red Record button in its own (its title gives
+way to its icon at accessibility text sizes). Meetings is the screen itself,
+marked current by its filled symbol, the accent colour and the selected trait
+(never colour alone). The list's controls — Library, Filters, Sort and Select
+— are each open in the navigation bar, not collapsed into a menu, and Settings
+has its own group after a fixed spacer; on regular width the sidebar replaces
+the Library button. Selection mode keeps its bottom Export/Delete, as without
+Knowledge. With the feature off the original placements stay (Library, Filters,
+Ask and Documents at the bottom, Select and Sort beside Settings at the top).
+The navigation review first chose a `TabView` with a custom root bar; it was
+replaced by this single screen, so there is no tab bar to hide.
 
-Ask reuses `MeetingChatView(meeting: nil)` and the app-owned library conversation;
-provider/source validation, history, draft and artifact behavior are unchanged.
-It is reachable even with semantic search off, while a provider without agent
-support still disables the composer. Documents uses `DocumentsListView` and its
-existing artifact detail/create flows. No chat/provider capability is enabled
-by navigation. Each visible tab hosts the recording mini bar above its safe
-area; the meetings list skips its own host in this layout to avoid duplication.
+Knowledge opens `KnowledgeLibraryDestination` as a sheet with a Done button;
+Ask opens the library conversation in its existing sheet
+(`MeetingChatView(meeting: nil)`, the app-owned conversation; provider/source
+validation, history, draft and artifact behaviour are unchanged, and it is
+offered even with semantic search off, while a provider without agent support
+still disables the composer); Documents pushes `DocumentsListView` with its
+artifact detail/create flows. No chat/provider capability is enabled by
+navigation. The list hosts the recording mini bar as before, and so do the
+Knowledge and Ask sheets that cover it (`hostsRecordingMiniBarInSheet`):
+there, expanding the recorder closes the sheet and opens the recorder once the
+sheet has disappeared, since the recorder is presented from the root and cannot
+present over it or during its dismissal. The Knowledge
+sheet's source selection belongs to the list (`knowledgeSourceIDs`), so closing
+and reopening the sheet keeps it; turning Knowledge off closes the sheet and
+forgets the selection.
 
 `KnowledgeLibraryDestination` starts without an inferred library source scope.
 Its picker requires an explicit selection of up to 16 meetings and disables
@@ -3244,10 +3243,12 @@ policy checks; the picker never turns an accessible meeting title into a grant
 for canonical knowledge. Scope is session-local, not a persisted authorization.
 
 `KnowledgeNavigationPrototype` is a DEBUG-only deterministic launch of that same
-layout, with the synthetic meeting preselected for captures. Ask and Documents
-are real destinations rather than preview placeholders. `MeetingKnowledgeUITests`
-checks all four tabs, artifact access, upper list controls, retained filters/
-bucket/selection across tab changes, and explicit Knowledge source selection.
+screen, opened on the Knowledge sheet with the synthetic meeting preselected for
+captures (`MeetingsListView.initialKnowledgeSourceIDs`). Ask and Documents are
+the real screens rather than preview placeholders. `MeetingKnowledgeUITests`
+checks the four places and the record button on one bottom row, artifact access,
+the open top controls with Settings apart, retained filters/bucket after Ask,
+and explicit Knowledge source selection kept across closing the sheet.
 CI exports the captures as `ui-review-previews`; copy is localized in seven
 languages. Wider-layout and physical-device recording/audio checks remain part
 of release validation.
@@ -3967,22 +3968,19 @@ toolbar would be the wrong control**:
   `MeetingsListView`'s members are non-private — a `private` member is invisible
   to an extension in another file.
 - **`ToolbarSpacer` is how glass groups are split.** In `listToolbar`, the
-  library/filter/Ask items share one glass capsule and
+  bottom items (library/filter/Ask/Documents, or with Knowledge on the four
+  places) share one glass capsule and
   `ToolbarSpacer(.flexible, placement: .bottomBar)` gives the record button
   (`.buttonStyle(.glassProminent)`, `.tint(Theme.accent)`) a capsule of its own.
   `MeetingDetailView`'s `toolbarContent` uses `ToolbarSpacer(.fixed,
   placement: .topBarTrailing)` the same way to separate the favorite toggle from
   the overflow menu.
-- Four places deliberately stay custom content: `RecorderView`'s transport
+- Three places deliberately stay custom content: `RecorderView`'s transport
   controls (full-width, thumb-sized targets mid-recording — they take
   `.buttonStyle(.glass)`/`.glassProminent` but are not toolbar items), the
   minimized recorder's mini bar (`RecordingMiniBar`, a `.glassEffect` capsule in
   a root `.safeAreaInset`, since it has to float over every screen's own
   toolbar rather than belong to one),
-  the four-destination root bar plus a separate prominent recorder (a native
-  tab bar has no adjacent action slot; both use system glass, with measured
-  space reserved inside each tab host so pushed screens/composers do not
-  overlap the root controls, and the underlying tab stacks retain state), and
   `MeetingChatView`'s composer (an input surface: an inset glass card laid
   over the transcript with `.overlay(alignment: .bottom)` rather than a
   `.safeAreaBar`, so the conversation keeps scrolling beneath both the card
@@ -4037,6 +4035,19 @@ toolbar would be the wrong control**:
   text link; a screen's one decision (merging two identities, choosing sources) takes
   `.glassProminent` + `Theme.accent`, and confirmations use `kurnDialog`. Settings keep the native
   `Form`, like every other settings screen.
+- **Error dialogs offer the error's recovery action.** `errorAlert` reads
+  `AppError.recoveryAction` (`ErrorRecovery` in `View+ErrorAlert.swift`) and
+  makes it the primary button beside OK: Try Again only when the caller passes
+  `onRetry`; Open Settings, Manage Storage, Change Model, Recover Audio and
+  Export Diagnostics open Providers, Transcription, Summary, Storage, Health
+  or Diagnostics in a sheet, and a passcode error opens the app's page in the
+  Settings app. `permissionDenied` opens Transcription (cloud consent), while a
+  refused iOS speech recognition permission is its own case,
+  `speechRecognitionDenied`, and opens the app's page in the Settings app, the
+  only place it can be granted again. The Wi-Fi-only error is offered only
+  through `onOpenNetworkSettings`. The
+  decision lives in `Application/ErrorRecovery.swift` so coverage measures it.
+  A screen that is itself the destination passes `offersRecovery: false`.
 - **Fixed font sizes need a reason.** `.font(.system(size:))` appears only on
   icons constrained by a small fixed well or grid cell, each with an inline
   comment saying so; everything else uses a `Theme` font or a scalable

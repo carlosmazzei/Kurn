@@ -2,10 +2,10 @@
 //  ContentView.swift
 //  Kurn
 //
-//  With Knowledge enabled, the reviewed root has Meetings / Knowledge / Ask /
-//  Documents, each retaining its own navigation stack. Meetings owns its
-//  library/filter/sort/selection controls in the upper menu. With the feature
-//  disabled, the existing compact stack / regular-width sidebar remains.
+//  One meetings screen with or without Knowledge: with it, the list's bottom
+//  bar reaches Meetings / Knowledge / Ask / Documents and its controls move
+//  to the top (`MeetingsListToolbar`). The compact stack / regular-width
+//  sidebar is the same either way.
 //  Recording presentation, review prompts and incoming-file handling stay
 //  above both layouts so navigation cannot orphan an active recording.
 //
@@ -17,7 +17,6 @@ struct ContentView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.modelContext) private var modelContext
     @Environment(IncomingFileInbox.self) private var incomingFiles
-    @Environment(AppSettings.self) private var settings
     @State private var selection: LibrarySelection = .allMeetings
 
     var body: some View {
@@ -44,13 +43,7 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder
     private var appNavigation: some View {
-        if settings.knowledgeEnabled { KnowledgeRootNavigationView() }
-        else { meetingsNavigation }
-    }
-
-    private var meetingsNavigation: some View {
         Group {
             if horizontalSizeClass == .regular {
                 NavigationSplitView {
