@@ -1623,3 +1623,28 @@
 "knowledge.settings.delete_footer" = "Rimuove solo il Knowledge compilato. Eliminando una riunione o una registrazione viene rimosso anche tutto ciò che Knowledge ne ha compilato.";
 "knowledge.settings.deleted" = "Knowledge è stato eliminato.";
 "knowledge.settings.delete_failed" = "Non è stato possibile eliminare completamente Knowledge. L’eliminazione verrà completata automaticamente alla prossima apertura dell’app.";
+
+/* Privacy and cloud settings */
+"privacy.cloud.title" = "Privacy e cloud";
+"privacy.cloud.rule" = "I contenuti lasciano questo dispositivo solo verso un fornitore che hai autorizzato. Su richiesta: solo quando lo chiedi (riepiloghi, chat, documenti). Automatico: a ogni registrazione (titoli automatici, wiki, correzione, Knowledge). Invio audio: trascrizione cloud, con un’autorizzazione propria.";
+"privacy.cloud.none" = "Nessun fornitore cloud è autorizzato. Tutto resta su questo dispositivo.";
+"privacy.cloud.other" = "Altre condivisioni";
+"privacy.cloud.downloads" = "I download dei modelli sul dispositivo scaricano solo file di modello; nessun tuo contenuto viene inviato. Gestiscili in Archiviazione.";
+"privacy.cloud.on_request" = "Su richiesta";
+"privacy.cloud.automatic" = "Automatico";
+"privacy.cloud.features" = "Usato da";
+"privacy.cloud.allowed" = "Consentito";
+"privacy.cloud.not_allowed" = "Non consentito";
+"privacy.cloud.removed_provider" = "Fornitore rimosso";
+"privacy.cloud.revoke_title" = "Interrompere l’invio automatico?";
+"privacy.cloud.revoke_automatic" = "Interrompi invio automatico";
+"privacy.cloud.revoke_detail" = "Trascrizione cloud, titoli automatici, wiki, correzione e Knowledge smettono di inviare a questo fornitore e vengono disattivati per esso. Chiedere un riepilogo o una risposta in chat continua a funzionare.";
+"privacy.cloud.feature.transcription" = "Trascrizione cloud";
+"privacy.cloud.feature.title" = "Titoli automatici";
+"privacy.cloud.feature.wiki" = "Wiki delle riunioni";
+"privacy.cloud.feature.correction" = "Correzione della trascrizione";
+"privacy.cloud.feature.knowledge" = "Knowledge";
+"privacy.cloud.revoke_all" = "Rimuovi tutte le autorizzazioni";
+"privacy.cloud.revoke_all_title" = "Rimuovere tutte le autorizzazioni per questo fornitore?";
+"privacy.cloud.revoke_all_detail" = "Non viene più inviato nulla a questo fornitore, né su richiesta né automaticamente. Riepiloghi e Knowledge che lo usavano passano all’elaborazione sul dispositivo.";
+"privacy.cloud.audio" = "Invio audio";

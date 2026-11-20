@@ -3876,6 +3876,41 @@ control whose text failed — an alert could land behind the wiki sheet).
   owns. This is also why `NowPlayingController` removes only the command
   targets it added — `removeTarget(nil)` would detach the other owner.
 
+### Cloud consent
+
+One rule covers every feature that sends content to a cloud provider: content
+leaves the device only under a grant for that provider's destination
+(`provider.id|baseURLString`) and purpose. KurnCore's `CloudConsentLedger`
+(`Consent/CloudConsentLedger.swift`, stored by `AppSettings+CloudConsent.swift`
+under `settings.cloudConsents.v1`) holds the grants. There are two purposes:
+`onRequest` (summaries, chat, documents, regenerating a title) and `automatic`
+(per-recording: cloud transcription, automatic titles, wiki, correction, Knowledge
+extraction). An automatic grant also covers on-request use. A changed endpoint is
+a new destination, and the on-device provider never needs a grant. Feature
+toggles still choose which features run, and `wikiEnabled`, `correctionEnabled`
+and `aiTitleCloudEnabled` mean "send to my summary provider": turning one on, or
+choosing a summary provider while one is on, records that provider's automatic
+grant, so the ledger always shows where they send. Audio keeps its own
+per-destination upload consent (`hasCloudTranscriptionConsent`, the cloud-upload
+dialog): audio and text consent never authorize each other.
+`revokeAutomaticCloudConsent` withdraws the grant, clears the legacy transcription
+consent key and turns off the summary provider's per-recording features. Choosing a cloud summary provider
+records its on-request grant, and `revokeAllCloudConsent` (Privacy & Cloud's "Remove
+all permissions") also moves the summary and Knowledge providers on that
+destination, and Read Aloud on it, to on-device. A summary-provider fallback
+(`ensureProviderSelectionsAreUsable`) never picks a destination marked withdrawn
+(`CloudConsentLedger.withdrawn`, set by removing all permissions, cleared by a new grant). The
+first launch with no stored ledger migrates what was already allowed (a keyed
+cloud summary provider and its enabled per-recording features; audio consent is
+kept as it was), so an upgrade asks nothing again. Settings → Privacy & Cloud
+(`PrivacyCloudSettingsView`) lists each destination's grants, its audio upload
+consent and the features using it, plus the non-AI sharing (template sync, diagnostic reports).
+Consent is enforced when work starts: work already running (a multi-chunk upload,
+a staged summary, a conversation's earlier tool results) finishes under the
+consent it started with.
+On-device model downloads keep their own per-model consent because none of
+the user's content is sent.
+
 ### Settings & secrets
 
 `AppSettings` (`@MainActor @Observable`) holds non-secret preferences in

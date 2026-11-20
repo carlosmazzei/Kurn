@@ -38,9 +38,28 @@ final class AppSettings {
         didSet { persistProviders() }
     }
 
+    /// Choosing a summary provider is its on-request grant, and, while a
+    /// per-recording feature is on, its automatic grant too: those toggles mean
+    /// "send to my summary provider" (CLAUDE.md, "Cloud consent").
+    /// A fallback the app makes on its own (a removed key or provider) is not
+    /// a choice: it records no automatic grant, and the per-recording features
+    /// turn off unless the replacement already holds one.
     var aiProviderID: String {
-        didSet { defaults.set(aiProviderID, forKey: Keys.provider) }
+        didSet {
+            defaults.set(aiProviderID, forKey: Keys.provider)
+            grantCloudConsent(aiProvider, for: .onRequest)
+            guard wikiEnabled || correctionEnabled || aiTitleCloudEnabled else { return }
+            if !isRepointingSelection {
+                grantCloudConsent(aiProvider, for: .automatic)
+            } else if !allowsCloud(aiProvider, for: .automatic) {
+                wikiEnabled = false
+                correctionEnabled = false
+                aiTitleCloudEnabled = false
+            }
+        }
     }
+
+    @ObservationIgnored var isRepointingSelection = false
 
     /// Provider used for cloud (Whisper) transcription, chosen independently of
     /// the summary `aiProvider`. Only meaningful when `transcriptionEngine` is
@@ -111,7 +130,7 @@ final class AppSettings {
     /// "synthesis" questions are answered over the articles instead of raw
     /// passages.
     var wikiEnabled: Bool {
-        didSet { defaults.set(wikiEnabled, forKey: Keys.wikiEnabled) }
+        didSet { defaults.set(wikiEnabled, forKey: Keys.wikiEnabled); if wikiEnabled { grantCloudConsent(aiProvider, for: .automatic) } }
     }
 
     /// Whether the opt-in LLM transcription-correction stage runs after fusion,
@@ -120,7 +139,7 @@ final class AppSettings {
     /// `wikiEnabled`, it makes cloud LLM calls per transcription and needs
     /// explicit opt-in. See `LLMTranscriptCorrector`.
     var correctionEnabled: Bool {
-        didSet { defaults.set(correctionEnabled, forKey: Keys.correctionEnabled) }
+        didSet { defaults.set(correctionEnabled, forKey: Keys.correctionEnabled); if correctionEnabled { grantCloudConsent(aiProvider, for: .automatic) } }
     }
 
     /// Whether a meeting's title is generated automatically after
@@ -130,7 +149,7 @@ final class AppSettings {
     /// not imply. The on-device provider is never gated, and an explicit
     /// "regenerate title" always runs. See `AITitleCoordinator`.
     var aiTitleCloudEnabled: Bool {
-        didSet { defaults.set(aiTitleCloudEnabled, forKey: Keys.aiTitleCloudEnabled) }
+        didSet { defaults.set(aiTitleCloudEnabled, forKey: Keys.aiTitleCloudEnabled); if aiTitleCloudEnabled { grantCloudConsent(aiProvider, for: .automatic) } }
     }
 
     /// Whether custom summary templates sync via iCloud key-value storage, so
@@ -320,12 +339,24 @@ final class AppSettings {
         }
     }
 
+    /// Audio is a different kind of content than the text other automatic
+    /// features send, so it keeps its own per-destination upload consent and
+    /// the two never authorize each other; revoking automatic sending in
+    /// Privacy & Cloud clears both (`AppSettings+CloudConsent.swift`).
     func hasCloudTranscriptionConsent(for provider: AIProvider) -> Bool {
         cloudTranscriptionConsentKeys.contains(cloudTranscriptionConsentKey(for: provider))
     }
 
     func recordCloudTranscriptionConsent(for provider: AIProvider) {
         cloudTranscriptionConsentKeys.insert(cloudTranscriptionConsentKey(for: provider))
+    }
+
+    func hasCloudTranscriptionConsent(destination: String) -> Bool {
+        cloudTranscriptionConsentKeys.contains(destination)
+    }
+
+    func removeCloudTranscriptionConsent(_ destination: String) {
+        cloudTranscriptionConsentKeys.remove(destination)
     }
 
     private func cloudTranscriptionConsentKey(for provider: AIProvider) -> String {
@@ -568,6 +599,7 @@ final class AppSettings {
             : (loadedTemplates.first?.id ?? SummaryTemplate.general.id)
         templatesSyncEnabled = defaults.bool(forKey: Keys.templatesSyncEnabled, default: false)
 
+        migrateCloudConsentsIfNeeded()
         if templatesSyncEnabled {
             reconcileTemplatesWithCloud()
         }

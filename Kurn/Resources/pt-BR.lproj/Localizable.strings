@@ -1623,3 +1623,28 @@
 "knowledge.settings.delete_footer" = "Remove apenas o Knowledge compilado. Excluir uma reunião ou uma gravação também remove tudo o que o Knowledge compilou a partir dela.";
 "knowledge.settings.deleted" = "O Knowledge foi excluído.";
 "knowledge.settings.delete_failed" = "Não foi possível excluir todo o Knowledge. A exclusão será concluída automaticamente na próxima vez que o app for aberto.";
+
+/* Privacy and cloud settings */
+"privacy.cloud.title" = "Privacidade e nuvem";
+"privacy.cloud.rule" = "O conteúdo só sai deste aparelho para um provedor que você permitiu. Quando eu pedir: só quando você pede (resumos, chat, documentos). Automático: a cada gravação (títulos automáticos, wiki, correção, Knowledge). Envio de áudio: transcrição em nuvem, com permissão própria.";
+"privacy.cloud.none" = "Nenhum provedor de nuvem está permitido. Tudo fica neste aparelho.";
+"privacy.cloud.other" = "Outros compartilhamentos";
+"privacy.cloud.downloads" = "Downloads de modelos on-device só baixam arquivos de modelo; nenhum conteúdo seu é enviado. Gerencie em Armazenamento.";
+"privacy.cloud.on_request" = "Quando eu pedir";
+"privacy.cloud.automatic" = "Automático";
+"privacy.cloud.features" = "Usado por";
+"privacy.cloud.allowed" = "Permitido";
+"privacy.cloud.not_allowed" = "Não permitido";
+"privacy.cloud.removed_provider" = "Provedor removido";
+"privacy.cloud.revoke_title" = "Parar o envio automático?";
+"privacy.cloud.revoke_automatic" = "Parar envio automático";
+"privacy.cloud.revoke_detail" = "Transcrição em nuvem, títulos automáticos, wiki, correção e Knowledge param de enviar a este provedor e são desligados para ele. Pedir um resumo ou uma resposta no chat continua funcionando.";
+"privacy.cloud.feature.transcription" = "Transcrição em nuvem";
+"privacy.cloud.feature.title" = "Títulos automáticos";
+"privacy.cloud.feature.wiki" = "Wiki da reunião";
+"privacy.cloud.feature.correction" = "Correção da transcrição";
+"privacy.cloud.feature.knowledge" = "Knowledge";
+"privacy.cloud.revoke_all" = "Remover todas as permissões";
+"privacy.cloud.revoke_all_title" = "Remover todas as permissões deste provedor?";
+"privacy.cloud.revoke_all_detail" = "Nada mais é enviado a este provedor, nem quando você pede nem automaticamente. Resumos e Knowledge que o usavam passam para o processamento no aparelho.";
+"privacy.cloud.audio" = "Envio de áudio";

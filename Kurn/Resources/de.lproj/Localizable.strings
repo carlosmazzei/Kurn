@@ -1623,3 +1623,28 @@
 "knowledge.settings.delete_footer" = "Entfernt nur das kompilierte Knowledge. Wenn du ein Meeting oder eine Aufnahme löschst, wird auch alles entfernt, was Knowledge daraus kompiliert hat.";
 "knowledge.settings.deleted" = "Knowledge wurde gelöscht.";
 "knowledge.settings.delete_failed" = "Knowledge konnte nicht vollständig gelöscht werden. Das Löschen wird beim nächsten Öffnen der App automatisch abgeschlossen.";
+
+/* Privacy and cloud settings */
+"privacy.cloud.title" = "Datenschutz & Cloud";
+"privacy.cloud.rule" = "Inhalte verlassen dieses Gerät nur zu einem Anbieter, den du erlaubt hast. Auf Anfrage: nur wenn du es anforderst (Zusammenfassungen, Chat, Dokumente). Automatisch: bei jeder Aufnahme (automatische Titel, Wiki, Korrektur, Knowledge). Audio-Upload: Cloud-Transkription, mit eigener Berechtigung.";
+"privacy.cloud.none" = "Kein Cloud-Anbieter ist erlaubt. Alles bleibt auf diesem Gerät.";
+"privacy.cloud.other" = "Weitere Freigaben";
+"privacy.cloud.downloads" = "Downloads von On-Device-Modellen laden nur Modelldateien; keine deiner Inhalte werden gesendet. Verwalte sie unter Speicher.";
+"privacy.cloud.on_request" = "Auf Anfrage";
+"privacy.cloud.automatic" = "Automatisch";
+"privacy.cloud.features" = "Verwendet von";
+"privacy.cloud.allowed" = "Erlaubt";
+"privacy.cloud.not_allowed" = "Nicht erlaubt";
+"privacy.cloud.removed_provider" = "Entfernter Anbieter";
+"privacy.cloud.revoke_title" = "Automatisches Senden beenden?";
+"privacy.cloud.revoke_automatic" = "Automatisches Senden beenden";
+"privacy.cloud.revoke_detail" = "Cloud-Transkription, automatische Titel, Wiki, Korrektur und Knowledge senden nicht mehr an diesen Anbieter und werden für ihn ausgeschaltet. Zusammenfassungen und Chat-Antworten auf Anfrage funktionieren weiter.";
+"privacy.cloud.feature.transcription" = "Cloud-Transkription";
+"privacy.cloud.feature.title" = "Automatische Titel";
+"privacy.cloud.feature.wiki" = "Meeting-Wiki";
+"privacy.cloud.feature.correction" = "Transkriptkorrektur";
+"privacy.cloud.feature.knowledge" = "Knowledge";
+"privacy.cloud.revoke_all" = "Alle Berechtigungen entfernen";
+"privacy.cloud.revoke_all_title" = "Alle Berechtigungen für diesen Anbieter entfernen?";
+"privacy.cloud.revoke_all_detail" = "An diesen Anbieter wird nichts mehr gesendet, weder auf Anfrage noch automatisch. Zusammenfassungen und Knowledge, die ihn nutzten, wechseln zur Verarbeitung auf dem Gerät.";
+"privacy.cloud.audio" = "Audio-Upload";
