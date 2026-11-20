@@ -3859,6 +3859,31 @@ control whose text failed — an alert could land behind the wiki sheet).
   owns. This is also why `NowPlayingController` removes only the command
   targets it added — `removeTarget(nil)` would detach the other owner.
 
+### Cloud consent
+
+One rule covers every feature that sends content to a cloud provider: content
+leaves the device only under a grant for that provider's destination
+(`provider.id|baseURLString`) and purpose. KurnCore's `CloudConsentLedger`
+(`Consent/CloudConsentLedger.swift`, stored by `AppSettings+CloudConsent.swift`
+under `settings.cloudConsents.v1`) holds the grants. There are two purposes:
+`onRequest` (summaries, chat, documents, regenerating a title) and `automatic`
+(per-recording: cloud transcription, automatic titles, wiki, correction, Knowledge
+extraction). An automatic grant also covers on-request use. A changed endpoint is
+a new destination, and the on-device provider never needs a grant. Feature
+toggles still choose which features run. Turning on `wikiEnabled`,
+`correctionEnabled` or `aiTitleCloudEnabled` records the automatic grant for the
+summary provider, and confirming the cloud-upload dialog records it for the
+transcription provider (`hasCloudTranscriptionConsent` reads the ledger).
+`revokeAutomaticCloudConsent` withdraws the grant, clears the legacy transcription
+consent key and turns off the summary provider's per-recording features. The
+first launch with no stored ledger migrates what was already allowed (legacy
+transcription keys, a keyed cloud summary provider and its enabled per-recording
+features), so an upgrade asks nothing again. Settings → Privacy & Cloud
+(`PrivacyCloudSettingsView`) lists each destination's grants and the features
+using it, plus the non-AI sharing (template sync, diagnostic reports).
+On-device model downloads keep their own per-model consent because none of
+the user's content is sent.
+
 ### Settings & secrets
 
 `AppSettings` (`@MainActor @Observable`) holds non-secret preferences in

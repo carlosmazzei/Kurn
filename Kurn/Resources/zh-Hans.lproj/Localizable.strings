@@ -1623,3 +1623,24 @@
 "knowledge.settings.delete_footer" = "仅删除已编译的 Knowledge。删除会议或录音时，也会删除 Knowledge 由其编译出的全部内容。";
 "knowledge.settings.deleted" = "Knowledge 已删除。";
 "knowledge.settings.delete_failed" = "无法完全删除 Knowledge。下次打开应用时将自动完成删除。";
+
+/* Privacy and cloud settings */
+"privacy.cloud.title" = "隐私与云端";
+"privacy.cloud.rule" = "内容只会发送到你允许的提供商。按需：仅在你请求时（摘要、聊天、文档）。自动：每次录音时（云端转写、自动标题、Wiki、校正、Knowledge）。";
+"privacy.cloud.none" = "未允许任何云端提供商。所有内容都保留在此设备上。";
+"privacy.cloud.other" = "其他共享";
+"privacy.cloud.downloads" = "设备端模型下载只获取模型文件，不会发送你的任何内容。可在“存储”中管理。";
+"privacy.cloud.on_request" = "按需";
+"privacy.cloud.automatic" = "自动";
+"privacy.cloud.features" = "使用者";
+"privacy.cloud.allowed" = "已允许";
+"privacy.cloud.not_allowed" = "未允许";
+"privacy.cloud.removed_provider" = "已移除的提供商";
+"privacy.cloud.revoke_title" = "停止自动发送？";
+"privacy.cloud.revoke_automatic" = "停止自动发送";
+"privacy.cloud.revoke_detail" = "云端转写、自动标题、Wiki、校正和 Knowledge 将停止向此提供商发送并对其关闭。按需请求摘要或聊天回答仍可使用。";
+"privacy.cloud.feature.transcription" = "云端转写";
+"privacy.cloud.feature.title" = "自动标题";
+"privacy.cloud.feature.wiki" = "会议 Wiki";
+"privacy.cloud.feature.correction" = "转写校正";
+"privacy.cloud.feature.knowledge" = "Knowledge";

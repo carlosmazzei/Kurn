@@ -1623,3 +1623,24 @@
 "knowledge.settings.delete_footer" = "Removes the compiled Knowledge only. Deleting a meeting or a recording also removes everything Knowledge compiled from it.";
 "knowledge.settings.deleted" = "Knowledge was deleted.";
 "knowledge.settings.delete_failed" = "Knowledge could not be fully deleted. It will finish automatically the next time the app opens.";
+
+/* Privacy and cloud settings */
+"privacy.cloud.title" = "Privacy & Cloud";
+"privacy.cloud.rule" = "Content leaves this device only for a provider you allowed. On request: only when you ask (summaries, chat, documents). Automatic: on every recording (cloud transcription, automatic titles, wiki, correction, Knowledge).";
+"privacy.cloud.none" = "No cloud provider is allowed. Everything stays on this device.";
+"privacy.cloud.other" = "Other sharing";
+"privacy.cloud.downloads" = "On-device model downloads only fetch model files; none of your content is sent. Manage them in Storage.";
+"privacy.cloud.on_request" = "On request";
+"privacy.cloud.automatic" = "Automatic";
+"privacy.cloud.features" = "Used by";
+"privacy.cloud.allowed" = "Allowed";
+"privacy.cloud.not_allowed" = "Not allowed";
+"privacy.cloud.removed_provider" = "Removed provider";
+"privacy.cloud.revoke_title" = "Stop automatic sending?";
+"privacy.cloud.revoke_automatic" = "Stop automatic sending";
+"privacy.cloud.revoke_detail" = "Cloud transcription, automatic titles, wiki, correction and Knowledge stop sending to this provider and are turned off for it. Asking for a summary or a chat answer still works.";
+"privacy.cloud.feature.transcription" = "Cloud transcription";
+"privacy.cloud.feature.title" = "Automatic titles";
+"privacy.cloud.feature.wiki" = "Meeting wiki";
+"privacy.cloud.feature.correction" = "Transcript correction";
+"privacy.cloud.feature.knowledge" = "Knowledge";

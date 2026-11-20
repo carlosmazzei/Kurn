@@ -71,6 +71,9 @@ struct SettingsView: View {
                 link(KnowledgeSettingsCopy.text("title"), systemImage: "book.pages", identifier: "settings.link.knowledge") {
                     KnowledgeSettingsView()
                 }
+                link(PrivacyCloudCopy.text("title"), systemImage: "lock.shield", identifier: "settings.link.privacyCloud") {
+                    PrivacyCloudSettingsView()
+                }
                 link(
                     NSLocalizedString("settings.read_aloud.title", comment: "Read Aloud"),
                     systemImage: "speaker.wave.2",

@@ -1623,3 +1623,24 @@
 "knowledge.settings.delete_footer" = "Solo elimina el Knowledge compilado. Al eliminar una reunión o una grabación también se elimina todo lo que Knowledge compiló a partir de ella.";
 "knowledge.settings.deleted" = "Se eliminó Knowledge.";
 "knowledge.settings.delete_failed" = "No se pudo eliminar todo el Knowledge. Terminará automáticamente la próxima vez que se abra la app.";
+
+/* Privacy and cloud settings */
+"privacy.cloud.title" = "Privacidad y nube";
+"privacy.cloud.rule" = "El contenido solo sale de este dispositivo hacia un proveedor que permitiste. A petición: solo cuando lo pides (resúmenes, chat, documentos). Automático: en cada grabación (transcripción en la nube, títulos automáticos, wiki, corrección, Knowledge).";
+"privacy.cloud.none" = "Ningún proveedor en la nube está permitido. Todo se queda en este dispositivo.";
+"privacy.cloud.other" = "Otros usos compartidos";
+"privacy.cloud.downloads" = "Las descargas de modelos en el dispositivo solo obtienen archivos de modelo; no se envía nada de tu contenido. Gestiónalas en Almacenamiento.";
+"privacy.cloud.on_request" = "A petición";
+"privacy.cloud.automatic" = "Automático";
+"privacy.cloud.features" = "Usado por";
+"privacy.cloud.allowed" = "Permitido";
+"privacy.cloud.not_allowed" = "No permitido";
+"privacy.cloud.removed_provider" = "Proveedor eliminado";
+"privacy.cloud.revoke_title" = "¿Detener el envío automático?";
+"privacy.cloud.revoke_automatic" = "Detener envío automático";
+"privacy.cloud.revoke_detail" = "La transcripción en la nube, los títulos automáticos, la wiki, la corrección y Knowledge dejan de enviar a este proveedor y se desactivan para él. Pedir un resumen o una respuesta en el chat sigue funcionando.";
+"privacy.cloud.feature.transcription" = "Transcripción en la nube";
+"privacy.cloud.feature.title" = "Títulos automáticos";
+"privacy.cloud.feature.wiki" = "Wiki de reuniones";
+"privacy.cloud.feature.correction" = "Corrección de la transcripción";
+"privacy.cloud.feature.knowledge" = "Knowledge";
