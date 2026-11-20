@@ -101,7 +101,9 @@ final class MeetingKnowledgeUITests: XCTestCase {
         closeSheet(app)
         assertRootBarFits(app)
         XCTAssertTrue(app.buttons["meetingCard"].firstMatch.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["root.destination.meetings"].isSelected)
+        // XCUITest does not report the selected trait for toolbar items, so
+        // only the current place's button is checked here.
+        XCTAssertTrue(app.buttons["root.destination.meetings"].isHittable)
         capture(app, named: "knowledge-navigation-meetings-prototype")
         app.buttons["root.destination.ask"].tap()
         XCTAssertTrue(app.buttons["chat.send"].waitForExistence(timeout: 10))
@@ -264,7 +266,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         // A page opened from the graph comes back to the list it was left in.
         app.buttons["knowledge.graph.openPage"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["knowledge.browser.claim"].firstMatch.waitForExistence(timeout: 10))
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        readerBackButton(app).tap()
         XCTAssertTrue(app.buttons["knowledge.graph.recentre"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertFalse(nodes.firstMatch.exists)
         // Comparing two days: the undated blocker holds on both, so it stays.
@@ -298,7 +300,9 @@ final class MeetingKnowledgeUITests: XCTestCase {
     func testKnowledgeSearchFindsAliasesAndEvidenceWithoutSemanticSearch() throws {
         continueAfterFailure = false
         let app = launch(prototype: true)
-        let field = app.searchFields.firstMatch
+        // The meetings list's own search field stays in the hierarchy under
+        // the Knowledge sheet, so pick the reader's field by its prompt.
+        let field = app.searchFields["Search names, aliases and claims"]
         XCTAssertTrue(field.waitForExistence(timeout: 15))
         field.tap()
         field.typeText("ORION\n")
@@ -307,7 +311,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         capture(app, named: "knowledge-search-alias")
         alias.tap()
         XCTAssertTrue(app.staticTexts["knowledge.browser.claim"].firstMatch.waitForExistence(timeout: 10))
-        let back = app.navigationBars.buttons.element(boundBy: 0)
+        let back = readerBackButton(app)
         XCTAssertTrue(back.waitForExistence(timeout: 5))
         back.tap()
         XCTAssertTrue(field.waitForExistence(timeout: 10))
@@ -401,6 +405,15 @@ final class MeetingKnowledgeUITests: XCTestCase {
             XCTAssertLessThanOrEqual(button.frame.maxX, record.frame.minX, file: file, line: line)
             XCTAssertEqual(button.frame.midY, record.frame.midY, accuracy: 8, file: file, line: line)
         }
+    }
+
+    /// The back button of the Knowledge sheet's own navigation bar. The meetings
+    /// list's bar stays in the hierarchy under the sheet and comes first, so the
+    /// sheet's bar is the last one.
+    private func readerBackButton(_ app: XCUIApplication) -> XCUIElement {
+        let bar = app.navigationBars.allElementsBoundByIndex.last ?? app.navigationBars.firstMatch
+        let back = bar.buttons["BackButton"]
+        return back.exists ? back : bar.buttons.element(boundBy: 0)
     }
 
     /// Closes the sheet on top (Knowledge or Ask) through its Done button.
