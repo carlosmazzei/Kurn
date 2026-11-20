@@ -7,11 +7,14 @@ public enum ChatSourcePresentation {
         enabled && usesHarness
     }
 
-    public static func effectiveScope(_ scope: ChatSourceScope, wikiEnabled: Bool) -> ChatSourceScope {
-        guard !wikiEnabled else { return scope }
+    public static func effectiveScope(_ scope: ChatSourceScope, wikiEnabled: Bool, knowledgeEnabled: Bool = true) -> ChatSourceScope {
+        var hidden: Set<ChatSourcePart> = []
+        if !wikiEnabled { hidden.insert(.wiki) }
+        if !knowledgeEnabled { hidden.insert(.knowledge) }
+        guard !hidden.isEmpty else { return scope }
         var effective = scope
-        effective.parts.remove(.wiki)
-        effective.partOverrides = effective.partOverrides.mapValues { $0.subtracting([.wiki]) }
+        effective.parts.subtract(hidden)
+        effective.partOverrides = effective.partOverrides.mapValues { $0.subtracting(hidden) }
         return effective
     }
 

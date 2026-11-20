@@ -13,7 +13,21 @@ import Testing
         let data = try JSONEncoder().encode(scope)
         #expect(try JSONDecoder().decode(ChatSourceScope.self, from: data) == scope)
         #expect(!String(decoding: data, as: UTF8.self).contains("includeWikis"))
-        #expect(Set(ChatSourcePart.allCases) == [.transcript, .summary, .wiki, .attachments])
+        #expect(Set(ChatSourcePart.allCases) == [.transcript, .summary, .wiki, .attachments, .knowledge])
+    }
+
+    @Test func knowledgeIsAPartAndLegacyScopesKeepOfferingIt() throws {
+        let kept = UUID(), excluded = UUID()
+        let without = ChatSourceScope(kind: .meetings, selectedIDs: [kept], parts: [.transcript], partOverrides: [kept: [.summary]])
+        #expect(try JSONDecoder().decode(ChatSourceScope.self, from: JSONEncoder().encode(without)) == without)
+        let legacy = "{\"kind\":\"meetings\",\"parts\":[\"transcript\"],"
+            + "\"partOverrides\":{\"\(kept)\":[\"summary\"],\"\(excluded)\":[]}}"
+        let decoded = try JSONDecoder().decode(ChatSourceScope.self, from: Data(legacy.utf8))
+        #expect(decoded.parts == [.transcript, .knowledge])
+        #expect(decoded.parts(for: kept) == [.summary, .knowledge])
+        #expect(decoded.parts(for: excluded).isEmpty)
+        let hidden = ChatSourcePresentation.effectiveScope(decoded, wikiEnabled: true, knowledgeEnabled: false)
+        #expect(hidden.parts == [.transcript] && hidden.parts(for: kept) == [.summary])
     }
 
     @Test(arguments: [true, false]) func legacyDecode(wiki: Bool) throws {
