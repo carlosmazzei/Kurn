@@ -14,6 +14,11 @@ import ImageIO
 import Vision
 
 enum PhotoTextRecognizer {
+    /// One recognition at a time: concurrent `.accurate` requests compete for
+    /// the same engine, and on the simulator (no Neural Engine) they ran for
+    /// many minutes in parallel test runs instead of seconds.
+    private static let lock = NSLock()
+
     /// Recognize text in the image at `url`. Returns `nil` on any failure or
     /// when nothing was recognized — OCR is best-effort context, never a
     /// reason to fail the photo capture itself.
@@ -28,7 +33,13 @@ enum PhotoTextRecognizer {
     /// Synchronous: Vision's `perform` blocks, so call it off the main actor.
     static func recognizeText(in cgImage: CGImage) -> String? {
         let request = VNRecognizeTextRequest()
+        #if targetEnvironment(simulator)
+        // The simulator runs `.accurate` on the CPU only; `.fast` reads the
+        // test fixtures' printed text just as well in a fraction of the time.
+        request.recognitionLevel = .fast
+        #else
         request.recognitionLevel = .accurate
+        #endif
         // Language correction nudges each recognized token toward the
         // closest dictionary-like word — helpful for a photographed page of
         // prose, actively harmful for the case this feature is really for
@@ -39,6 +50,8 @@ enum PhotoTextRecognizer {
         // "sucesftry"). Off, so the result is what the glyphs actually say.
         request.usesLanguageCorrection = false
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        lock.lock()
+        defer { lock.unlock() }
         do {
             try handler.perform([request])
         } catch {
