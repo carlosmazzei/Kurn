@@ -13,8 +13,9 @@ import KurnCore
 import Testing
 @testable import Kurn
 
-// A Vision or pasteboard service that stops answering fails here in minutes,
-// naming the test, instead of stalling the job until its 40-minute watchdog.
+// Records a failure naming the test once it runs past the limit. The limit is
+// cooperative: a Vision call that never returns still ends at the job's watchdog,
+// which is why `PhotoTextRecognizer` serializes recognition in the first place.
 @Suite(.timeLimit(.minutes(3)))
 struct PDFTextExtractorTests {
 
