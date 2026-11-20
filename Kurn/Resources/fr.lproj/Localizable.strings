@@ -1626,7 +1626,7 @@
 
 /* Privacy and cloud settings */
 "privacy.cloud.title" = "Confidentialité et cloud";
-"privacy.cloud.rule" = "Le contenu ne quitte cet appareil que vers un fournisseur que vous avez autorisé. Sur demande : seulement quand vous le demandez (résumés, chat, documents). Automatique : à chaque enregistrement (transcription cloud, titres automatiques, wiki, correction, Knowledge).";
+"privacy.cloud.rule" = "Le contenu ne quitte cet appareil que vers un fournisseur que vous avez autorisé. Sur demande : seulement quand vous le demandez (résumés, chat, documents). Automatique : à chaque enregistrement (titres automatiques, wiki, correction, Knowledge). Envoi audio : transcription cloud, avec sa propre autorisation.";
 "privacy.cloud.none" = "Aucun fournisseur cloud n’est autorisé. Tout reste sur cet appareil.";
 "privacy.cloud.other" = "Autres partages";
 "privacy.cloud.downloads" = "Les téléchargements de modèles sur l’appareil ne récupèrent que des fichiers de modèle ; aucun de vos contenus n’est envoyé. Gérez-les dans Stockage.";

@@ -1626,7 +1626,7 @@
 
 /* Privacy and cloud settings */
 "privacy.cloud.title" = "Privacidad y nube";
-"privacy.cloud.rule" = "El contenido solo sale de este dispositivo hacia un proveedor que permitiste. A petición: solo cuando lo pides (resúmenes, chat, documentos). Automático: en cada grabación (transcripción en la nube, títulos automáticos, wiki, corrección, Knowledge).";
+"privacy.cloud.rule" = "El contenido solo sale de este dispositivo hacia un proveedor que permitiste. A petición: solo cuando lo pides (resúmenes, chat, documentos). Automático: en cada grabación (títulos automáticos, wiki, corrección, Knowledge). Envío de audio: transcripción en la nube, con su propio permiso.";
 "privacy.cloud.none" = "Ningún proveedor en la nube está permitido. Todo se queda en este dispositivo.";
 "privacy.cloud.other" = "Otros usos compartidos";
 "privacy.cloud.downloads" = "Las descargas de modelos en el dispositivo solo obtienen archivos de modelo; no se envía nada de tu contenido. Gestiónalas en Almacenamiento.";

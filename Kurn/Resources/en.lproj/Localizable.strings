@@ -1626,7 +1626,7 @@
 
 /* Privacy and cloud settings */
 "privacy.cloud.title" = "Privacy & Cloud";
-"privacy.cloud.rule" = "Content leaves this device only for a provider you allowed. On request: only when you ask (summaries, chat, documents). Automatic: on every recording (cloud transcription, automatic titles, wiki, correction, Knowledge).";
+"privacy.cloud.rule" = "Content leaves this device only for a provider you allowed. On request: only when you ask (summaries, chat, documents). Automatic: on every recording (automatic titles, wiki, correction, Knowledge). Audio upload: cloud transcription, with its own permission.";
 "privacy.cloud.none" = "No cloud provider is allowed. Everything stays on this device.";
 "privacy.cloud.other" = "Other sharing";
 "privacy.cloud.downloads" = "On-device model downloads only fetch model files; none of your content is sent. Manage them in Storage.";
