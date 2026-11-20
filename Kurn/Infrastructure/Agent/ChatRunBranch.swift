@@ -10,7 +10,6 @@ import KurnCore
 /// by a run. Its entries carry the run's `ChatRunRecord` ID as `runID` metadata.
 enum ChatRunBranch {
     static let startType = "agent.run-start.v1"
-    static let usageType = "agent.usage.v1"
     static let endType = "agent.run-end.v1"
 
     /// The tools whose successful result changed a document in the workspace.
