@@ -3739,6 +3739,30 @@ On a day (evolution), Compare and Contexts (lanes).
   what All shows.
 - Not yet: graph performance targets measured on a physical device.
 
+### Knowledge tools for Ask (K5.1)
+
+Ask can read canonical knowledge through four read-only tools (`Application/Agent/Tools/ChatKnowledgeTools`):
+`search_knowledge`, `get_entity` (an entity's page), `get_timeline` (claims by stated time, undated last) and
+`get_evidence` (one cited passage). They read through `ChatKnowledgeSource`, the same authorized,
+evidence-checked read the Knowledge reader shows (`KnowledgeCompilationCoordinator.readKnowledgeBrowser`),
+never a second store, and answer in `ChatSourceToolText`'s compact form (`ChatKnowledgeToolText`): one line per
+item with the IDs the model passes back, vocabulary raw values (modality, polarity as a leading `NOT`, review
+state, stated validity), each name and quote clipped to one line, a `page:` line and a final `revision:` line.
+
+- **Sending knowledge to the model that answers is `answerSynthesis`** under the default-deny policy
+  (ADR-008). `ChatKnowledgeGate` offers the tools only when the feature is on, the source controls allow
+  1–16 of the run's meetings, and `KnowledgePolicyEvaluator` allows the operation for the run's provider: for a
+  cloud provider the policy must name it, cover the sources' classification and have the person's consent.
+  No consent screen exists until the K5 cloud review, so `ChatKnowledgeSource(coordinator:)` answers no and
+  production never offers the tools to a cloud model; a policy alone never stands in for consent.
+- **Every call is authorized again**: before the read, and after it with the read's own source
+  classifications (`KnowledgeBrowserRead.sourceClassifications`, from each meeting's context), so a context
+  reclassified or consent withdrawn since the run started sends nothing. A refused or failed read is a
+  recoverable tool error with a fixed message, never source text.
+- Not yet: the other K5.1 tools (`resolve_entity`, `get_graph`, `compare_state`, `get_coverage`,
+  `list_open_actions`, `list_contexts`, `get_context`, `trace_influence`), the consent screen, K5.2's
+  wiki-first query policy and K5.3's knowledge parts in `ChatSourceScope`.
+
 ### Attached documents (PDFs)
 
 A meeting can carry PDFs as reference material for its summaries

@@ -44,6 +44,8 @@ struct KnowledgeBrowserContext: Equatable, Sendable {
     let id: UUID?
     let kind: KnowledgeContextKind
     let name: String
+    /// What its sources inherit; a meeting with no context is internal.
+    var classification: KnowledgeClassification = .internal
 
     static let unknown = KnowledgeBrowserContext(id: nil, kind: .unknown, name: "")
 }
@@ -54,6 +56,14 @@ struct KnowledgeBrowserRead: Equatable, Sendable {
     let meetingTitles: [UUID: String]
     /// Each meeting's context; a meeting missing here is in context `unknown`.
     let meetingContexts: [UUID: KnowledgeBrowserContext]
+
+    /// The classification every selected meeting's knowledge inherits.
+    var sourceClassifications: [KnowledgeClassification] {
+        meetingIDs.sorted { $0.uuidString < $1.uuidString }.map { meetingContexts[$0]?.classification ?? .internal }
+    }
+
+    /// The canonical revision the read was taken at, kept even when it holds no visible claim.
+    let revision: Int
     let selectedEvidence: KnowledgeEvidenceRead?
     let policyRevisionKey: String
     let allowsEmbedding: Bool
@@ -83,6 +93,7 @@ struct KnowledgeBrowserRead: Equatable, Sendable {
         }
         self.meetingTitles = meetingTitles
         self.meetingContexts = meetingContexts
+        revision = wiki.revision
         self.selectedEvidence = selectedEvidence
         self.policyRevisionKey = policyRevisionKey
         self.allowsEmbedding = allowsEmbedding
