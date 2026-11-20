@@ -51,6 +51,9 @@ final class MeetingKnowledgeUITests: XCTestCase {
         notes.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "The team reported")).firstMatch.waitForExistence(timeout: 5))
         capture(app, named: "knowledge-meeting-notes")
+        app.buttons["detail.more"].tap()
+        XCTAssertTrue(app.buttons["Archive"].firstMatch.waitForExistence(timeout: 5))
+        for label in ["View wiki", "Generate Wiki", "Regenerate Wiki"] { XCTAssertFalse(app.buttons[label].exists, label) }
     }
 
     func testKnowledgeAtAccessibilityTextSize() throws {

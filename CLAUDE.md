@@ -3154,9 +3154,14 @@ unavailable copy without names, counts or raw errors. Disabling the flag hides
 the mode/header immediately and returns selection to Recordings.
 
 Inline article content/actions appear only after a current authorized read.
-Explicit inline generation revalidates the meeting and calls the existing wiki
-queue with `localOnly: true`; that admission checks the selected provider before
+With Knowledge on, the Knowledge tab is the wiki's only home, as the Transcript
+and Summary tabs are for theirs: the overflow menu drops "View wiki" and
+"Generate/Regenerate Wiki" (it keeps them while Knowledge is off, when no tab
+shows the wiki). The inline chip has the menu's gate (`canGenerateWiki`). With
+Apple on-device it revalidates the meeting and calls the existing wiki queue with
+`localOnly: true`; that admission checks the selected provider before
 assembling/queuing work, whose immutable provider remains local on recovery.
+With another provider it runs the menu's explicit, forced episodic generation.
 Provider changes obsolete the work rather than switching destinations. Existing
 episodic wiki consent/legacy shortcuts remain independent. This step enables no
 canonical cloud processing or automatic generation.

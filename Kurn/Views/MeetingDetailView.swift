@@ -363,7 +363,7 @@ struct MeetingDetailView: View {
         case .knowledge:
             if settings.knowledgeEnabled {
                 MeetingKnowledgeView(meeting: meeting, state: meetingKnowledge.presentation(for: meeting.id), isGeneratingArticle: isGeneratingWiki,
-                    canGenerateArticle: canGenerateWiki && settings.aiProvider.kind == .appleOnDevice, onRefresh: {
+                    canGenerateArticle: canGenerateWiki, generatesLocally: settings.aiProvider.kind == .appleOnDevice, onRefresh: {
                         meetingKnowledge.invalidate()
                         knowledgeRefresh += 1
                     })

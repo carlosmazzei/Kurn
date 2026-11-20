@@ -54,7 +54,9 @@ extension MeetingDetailView {
                     }
                     .disabled(isGeneratingTitle)
                 }
-                if meeting.wikiArticle != nil {
+                // With Knowledge on, the wiki is read and generated in the Knowledge tab, like the
+                // transcript and summary in theirs; the menu keeps it only while no tab shows it.
+                if meeting.wikiArticle != nil && !settings.knowledgeEnabled {
                     Button { showingWiki = true } label: {
                         Label(
                             NSLocalizedString("detail.wiki.view", comment: "View meeting wiki"),
@@ -62,7 +64,7 @@ extension MeetingDetailView {
                         )
                     }
                 }
-                if canGenerateWiki {
+                if canGenerateWiki && !settings.knowledgeEnabled {
                     Button { regenerateWiki() } label: {
                         if isGeneratingWiki {
                             Label(NSLocalizedString("detail.wiki.generating", comment: "Generating wiki"), systemImage: "ellipsis")
