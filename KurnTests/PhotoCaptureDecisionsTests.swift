@@ -157,7 +157,7 @@ struct PhotoCaptureDecisionsTests {
 
     // MARK: - OCR never fails a capture
 
-    @Test func anUnreadableOrBlankPhotoYieldsNoText() async throws {
+    @Test(.timeLimit(.minutes(3))) func anUnreadableOrBlankPhotoYieldsNoText() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("PhotoCaptureDecisionsTests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
