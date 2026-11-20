@@ -1073,6 +1073,7 @@
 "chat.sources.part.transcript" = "转录";
 "chat.sources.part.summary" = "摘要";
 "chat.sources.part.wiki" = "Wiki";
+"chat.sources.part.knowledge" = "知识";
 "chat.sources.part.attachments" = "附件";
 "chat.sources.parts.none" = "未选择内容";
 "chat.sources.summary.one" = "1 场会议 · %@";

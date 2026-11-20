@@ -1073,6 +1073,7 @@
 "chat.sources.part.transcript" = "Trascrizione";
 "chat.sources.part.summary" = "Riepilogo";
 "chat.sources.part.wiki" = "Wiki";
+"chat.sources.part.knowledge" = "Conoscenza";
 "chat.sources.part.attachments" = "Allegati";
 "chat.sources.parts.none" = "Nessuna parte";
 "chat.sources.summary.one" = "1 riunione · %@";

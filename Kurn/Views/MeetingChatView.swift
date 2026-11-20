@@ -546,11 +546,13 @@ struct MeetingChatConversationView: View {
     }
 
     private var sourceValidation: ChatSourceScopeEditor.Validation? {
-        ChatSourcePresentation.validation(vm.scope, resolvedMeetingIDs: resolvedMeetingIDs, wikiEnabled: settings.wikiEnabled)
+        ChatSourcePresentation.validation(vm.scope, resolvedMeetingIDs: resolvedMeetingIDs, wikiEnabled: settings.wikiEnabled,
+                                          knowledgeEnabled: settings.knowledgeEnabled)
     }
 
     private var sourceSummary: String {
-        ChatSourcePresentation.summary(vm.scope, resolvedMeetingIDs: resolvedMeetingIDs, wikiEnabled: settings.wikiEnabled) {
+        ChatSourcePresentation.summary(vm.scope, resolvedMeetingIDs: resolvedMeetingIDs, wikiEnabled: settings.wikiEnabled,
+                                       knowledgeEnabled: settings.knowledgeEnabled) {
             NSLocalizedString($0, comment: "Chat sources")
         }
     }
