@@ -380,6 +380,185 @@ Connect or a decision the repository cannot make:
 - **Apple Search Ads** on the brand term and on the long-tail terms the
   listing already targets, once there is a rating count worth showing.
 
+## UI simplification and accessibility (U-track)
+
+Goal: fewer decisions per screen, with no regression in the HIG, WCAG 2.2 AA or
+the Accessibility Nutrition Labels. The baseline below was measured on the
+tip of `claude/sweet-hamilton-g6ae6c` (merge of PR #444, 2026-11-20; iOS 26 deployment target). The external
+specification this track follows targets iOS 27 / Xcode 27 and cites WWDC26
+material; those APIs and the session-220 patterns are **not verified here**.
+Each U-phase that depends on one starts by checking Apple's documentation, and
+the iOS 26 floor in `CLAUDE.md` stays until a deployment-target change is
+decided separately. `UIDesignRequiresCompatibility` is not set anywhere, so
+there is nothing to remove for the iOS 27 SDK.
+
+### Baseline (what the code does today)
+
+| Area | Measured | Reading |
+| --- | --- | --- |
+| Liquid Glass layering | one `.glassEffect` (`RecordingMiniBar`, a control) | Matches the control/content split; no content surface uses glass |
+| Contrast | `Theme.textTertiary` is white at 30% in dark: **2.45:1** on `#0A0A0F`/black and 2.71:1 on `#1C1C1E`; used in **71** places | Fails 4.5:1 for text; `textSecondary` (50%) passes at 5.2–5.3:1 |
+| Contrast | white on `Theme.accent` 3.55:1, on `Theme.info` 3.65:1 | Documented exception (bold ≥ 14 pt); keep it bold and never shrink it |
+| System display settings | 0 reads of Reduce Transparency, Increase Contrast, Differentiate Without Color, Button Shapes, Smart Invert | Only native controls adapt; custom cards, chips and the mini bar do not |
+| Dynamic Type | 17 `.font(.system(size:))` in 10 files; 19 `.lineLimit(1)` in 14 files; 9 fixed `.frame(height:)` in 4 files; 5 `GeometryReader`; 0 `minimumScaleFactor`, 0 `scrollDisabled(true)`; `ViewThatFits` in 1 file, `AnyLayout` in none | Several fixed sizes are legitimate (recorder timer, 6 pt bullets); the chips, rows and `MeetingDetailTabs` heights are not |
+| Motion | `accessibilityReduceMotion` in 7 files, `kurnAnimation` in 10; 5 `withAnimation` and 4 `.animation(` calls outside it | Unaudited call sites |
+| VoiceOver | 90 `accessibilityLabel` in 37 files; 5 `isHeader`; 1 adjustable action; 0 rotors, 0 `AccessibilityNotification`, 0 `AccessibilityFocusState`, 0 `accessibilityInputLabels` | Icon-only controls are labelled (lint enforces it); structure, focus and error announcements are not |
+| Voice Control | Three menu rows use the `ellipsis` glyph as a "generating" label; the detail toolbar's menu is labelled "More options" | The glyph is not a name; the menu label is ambiguous beside the chat menu's `ellipsis.circle` |
+| Automated audits | `performAccessibilityAudit(for: [.sufficientElementDescription, .trait])` only; `continueAfterFailure = false` | `.contrast`, `.dynamicType`, `.hitRegion`, `.textClipped` never run; the first failure hides the rest |
+| Complexity | Meetings list: 10 controls with Knowledge on; detail overflow menu: up to 10 conditional rows; detail modes: 5; Settings hub: 15 rows; `TranscriptionSettingsView`: 13 controls | The simplification targets |
+
+### U0 · Measure before changing (1 sprint)
+
+1. Widen the audit to `[.contrast, .dynamicType, .hitRegion, .sufficientElementDescription, .textClipped, .trait]`
+   on the screens `AccessibilityAuditUITests` and `MeetingKnowledgeUITests`
+   already seed, with `continueAfterFailure = true` in the audit tests only
+   (flows keep `false`). Upload the `.xcresult` when the job fails. First run
+   is a measurement: record the findings here, do not fix inside this step.
+2. Add a launch argument (DEBUG, `UITestLaunchOptions`) that sets a content size
+   category, so one seeded run audits at default and at `accessibilityExtraExtraExtraLarge`
+   (AX5). This closes the "no automated check at large text" gap.
+3. Bring `RecorderView` and `FolderFormView` into the audit (existing gap).
+4. Write the **common-task list** (record and stop; find a meeting; read a
+   summary; ask a question; export; change provider; delete) as
+   `docs/release-physical-checklist.md` rows. Nutrition Labels may only be
+   declared for features completed end to end on a device with VoiceOver and
+   Screen Curtain, then Voice Control alone.
+Exit: a dated findings table per screen; no code behaviour changes.
+
+### U1 · Simplify the structure (2 sprints)
+
+Each item is a product decision first; the control/content layering and the
+existing identifiers (`nav.settings`, `meetingCard`, `settings.link.*`) must
+survive. Items that revisit a `CLAUDE.md` decision are marked **review**.
+
+1. **Meetings list toolbar (review).** Today with Knowledge on: Library, Filter,
+   Sort, Select, Settings on top; four places and Record at the bottom. Fold
+   Sort into the Filter sheet and make Select a long-press/`EditMode` entry, leaving Library,
+   Filter and Settings on top. This reverses the "each control open in the bar"
+   choice from the K0.5 review, so it needs that review again and a usability
+   check (task: "sort by duration") before it ships.
+2. **Meeting detail overflow menu.** Group the up to 10 rows into three
+   `Section`s: *Create* (title, wiki, tags), *Manage* (edit, add PDF, share) and
+   *Reprocess* (re-transcribe); replace the `ellipsis` "generating" glyph with a
+   `ProgressView` label; rename the menu to name its content ("Meeting actions")
+   and give it an `accessibilityInputLabels`.
+3. **Detail modes.** Keep Recordings / Transcript / Summary / Chat; decide
+   whether Knowledge (off by default) stays a fifth segment or moves into the
+   Summary tab's footer. Measure with the segmented control at AX3, where five
+   segments cannot fit one row.
+4. **Settings hub 15 → 9 rows.** Privacy & Cloud first (it is the consent
+   surface). Merge Wiki into Knowledge (already planned: "Settings → Wiki
+   becomes Settings → Knowledge"), Search into Library, and Usage, Health and
+   Diagnostics into one *Health & diagnostics* screen. Keep the old
+   `settings.link.*` identifiers on the destinations so the flow UI tests only
+   change their path, not their handles.
+5. **Transcription settings: presets plus Advanced.** Offer *Recommended*,
+   *Most accurate* and *Fully offline* above the 13 controls, which move under a
+   collapsed Advanced `DisclosureGroup`. A preset writes the same `AppSettings`
+   properties; no new persisted engine IDs.
+6. **One words-pass.** Short sentences, error messages that say how to fix the
+   problem (`AppError` descriptions first), one name per concept (wiki /
+   Knowledge / documents). Use the `design:ux-copy` skill; all seven locales,
+   enforced by the existing localization check.
+Exit: the common-task list needs equal or fewer taps than before, measured by
+the UI flows; nothing removed that the flows or the roadmap rely on.
+
+### U2 · Contrast and display settings (1 sprint)
+
+1. **Fix `Theme.textTertiary`** for text: dark ≥ 4.5:1 on both backgrounds
+   (about white at 62%), light stays `tertiaryLabel` only for non-text
+   decoration. Split a `Theme.decorationTertiary` for the places where 2.5:1 is
+   acceptable (disabled chevrons, dividers), and migrate the 71 uses by hand:
+   anything a user must read moves to `textSecondary`.
+2. **Central environment tokens.** Add `Theme` modifiers reading
+   `accessibilityReduceTransparency` (opaque `Theme.surface`),
+   `colorSchemeContrast == .increased` (stronger stroke, `textPrimary`),
+   `accessibilityDifferentiateWithoutColor` (symbol or text beside any
+   colour-only state: tag and folder colours already carry names via
+   `ColorAccessibility`; check status dots and the graph's states) and
+   `accessibilityShowButtonShapes` (outline for `.plain` chips such as
+   `KnowledgeChipButton`). `KnowledgeCard`, `kurnCard`, `RecordingMiniBar` and the
+   chat composer card are the only custom surfaces that need them.
+3. **`.accessibilityIgnoresInvertColors(true)`** on meeting photos, the photo
+   viewer and any avatar.
+4. A screenshot matrix test for the six system states × the screens that scroll
+   under a toolbar (list, transcript, chat), kept as `ui-review-previews`.
+   The 30-frame matrix of the specification is the manual release version of it.
+Exit: `.contrast` audit clean on every audited screen in both appearances.
+
+### U3 · Elastic layout to AX5 (2 sprints)
+
+Work through the baseline counts, not the whole list of anti-patterns:
+1. Replace the 8 non-exempt fixed sizes with `Theme` fonts or `@ScaledMetric`
+   (`PhotoCaptureView`, `DesignComponents`, `TemplateEditorView`, `FolderFormView`,
+   `MeetingDetailTabs`, `MeetingChatView`, `TranscriptView`). Each remaining
+   `.system(size:)` keeps its inline reason.
+2. Remove `.lineLimit(1)` on content (list rows, chips, `ChatSessionListView`,
+   `DocumentsListView`, `MeetingsListComponents`); chips wrap or move to a
+   vertical layout.
+3. Make `MeetingDetailTabs` heights (42/54 pt) `minHeight` scaled with
+   `@ScaledMetric`; `TagChipsView`, tab picker and `FilterBarView` use
+   `ViewThatFits` with a vertical fallback. The recorder and mini bar keep their
+   capped `dynamicTypeSize(...accessibility2)` and gain a Large Content Viewer
+   (`accessibilityShowsLargeContentViewer`) for their icon-only transport
+   controls.
+4. Hit targets: every icon-only control ≥ 44×44 pt (`SegmentPlaybackScrubber`
+   at 24 pt is the known one) via `contentShape`, not a bigger glyph.
+5. `GeometryReader` stays for the scrubber, graph canvas and chat sizing; none
+   decides a text layout.
+Exit: `.dynamicType`, `.textClipped` and `.hitRegion` audits clean at AX5.
+
+### U4 · VoiceOver, Voice Control and motion (2 sprints)
+
+1. **Structure.** `isHeader` on every section title (`KnowledgeSectionLabel`,
+   settings headers, summary section titles); `.accessibilityElement(children: .combine)`
+   on meeting rows and knowledge cards; `accessibilityCustomContent` for list
+   metadata (duration, language, status) so the label stays short; rotors for
+   transcript speakers/timestamps and for summary sections.
+2. **Focus and announcements.** Post `AccessibilityNotification.Announcement`
+   for transcription finished, summary ready, copy done and validation errors;
+   use `@AccessibilityFocusState` to land focus on the error or the first new
+   result. Throttle progress announcements (not per-percent).
+3. **Controls.** The scrubber and any custom slider use `accessibilityRepresentation`
+   or `accessibilityAdjustableAction`; the graph canvas keeps its 44 pt overlay
+   buttons and gains a list-first default under VoiceOver (already done).
+   Verify the session-220 patterns against Apple's published guidance before
+   adopting any of them.
+4. **Voice Control.** `accessibilityInputLabels` on the record button, the
+   toolbar controls, "Meeting actions" and the chat menu; no two visible
+   buttons share the label "More".
+5. **Motion.** Route the 5 `withAnimation` and 4 `.animation(` call sites
+   through `kurnAnimation`; the minimized recorder's morph and the sheet-to-bar
+   handoff get a fade-only variant; add a static check to
+   `Tools/check_static_policy.py` that rejects a bare `withAnimation` in `Views/`.
+6. **Charts and media.** The graph and the audio level meter expose a
+   `accessibilityChartDescriptor`-style summary only if the visual carries
+   information the list view does not (it does not today: record why).
+   Read-aloud already offers audio; transcripts are the captions alternative.
+Exit: all common tasks complete with VoiceOver and Screen Curtain on a device.
+
+### U5 · Device certification and governance (1 sprint)
+
+1. Run the common-task list on a physical iPhone: VoiceOver + Screen Curtain,
+   Voice Control only, AX5, Dark, Reduce Transparency, Increase Contrast,
+   Reduce Motion, and Liquid Glass at both ends of its slider if the OS has one.
+   One matrix row per feature: build, device, result, evidence link.
+2. Make the widened audit a required PR check (it is today a required job, but
+   only for two audit types) and archive the `.xcresult` on failure.
+3. Fill `fastlane/accessibility.json` only for rows with evidence;
+   `Tools/validate_store_metadata.py` stays the gate; publish the accessibility
+   page and add EAA-relevant limits to it.
+4. Every release re-evaluates the labels when navigation, authentication,
+   playback or the design tokens change.
+
+### Order and risks
+
+U0 → U2 and U1 in parallel (U1 touches structure, U2 tokens) → U3 → U4 → U5.
+Risks: U1.1 and U1.4 change what users have learned, so they ship behind the
+usability check, not with the accessibility fixes; U2.1 changes 71 call sites,
+so migrate by screen with the screenshot matrix; the simulator cannot run
+VoiceOver, so no U-phase is "done" on audits alone.
+
 ## Follow-ups on shipped work
 
 Gaps each shipped track recorded about itself. None blocks feature work; each
@@ -477,6 +656,9 @@ The H1–H10 hardening track is closed; its invariants and types are in
   build-once/test-many — see "UI test stability and speed").
 
 ### Design and accessibility
+
+The larger UI track is "UI simplification and accessibility (U-track)" above; the
+items here that it does not cover:
 
 - **iPad split view needs a hands-on pass.** `ContentView`'s
   `NavigationSplitView` on regular width is structurally complete but has never
@@ -582,8 +764,10 @@ stay on device and leave only through an explicit share.
 4. **F5 · Reminders and F6 · Import.** Independent of each other and of the
    rest; slot them in as room appears. F6 widens the capture surface, so it
    lands with the same fault-injection discipline as capture itself.
-5. **D4's per-file measurement**, on its own clock — it is a dispatch, not code.
-6. **Reassess F7–F10.** F7 after the on-device availability number exists.
+5. **U0–U5 · UI simplification and accessibility.** U0 measures first and
+   needs no feature work, so it can start at any point; U1 waits for its review.
+6. **D4's per-file measurement**, on its own clock — it is a dispatch, not code.
+7. **Reassess F7–F10.** F7 after the on-device availability number exists.
 
 The follow-ups above are picked up opportunistically, ahead of any feature that
 widens the surface they concern.
