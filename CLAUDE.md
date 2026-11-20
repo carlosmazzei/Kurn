@@ -3782,8 +3782,15 @@ state, stated validity), each name and quote clipped to one line, a `page:` line
   that hold at that moment (`KnowledgeTemporalReducer`, proposals marked tentative) and lifecycle anomalies; an entity filter keeps actions with a claim naming it. `list_contexts`/`get_context`
   group the selected meetings by `KnowledgeBrowserContext` in the Graph Explorer's lane order, meetings with
   none under context `unknown`.
-- Not yet: `get_coverage` and `trace_influence` (they need store semantics not defined yet), the consent
-  screen, K5.2's wiki-first query policy and K5.3's knowledge parts in `ChatSourceScope`.
+- **`get_coverage` is the K2.2 coverage measure**, not a projection of the browser read: `ChatKnowledgeSource.coverage`
+  reads `KnowledgeStore.coverageRead` (the maintenance report's per-recording examined/total segment counts and
+  state, grouped by meeting, under the same `.semanticLint` source authorization, without the wiki, catalog or
+  review reads). It is authorized like the other tools before and after its read, with each meeting's context
+  classification, and carries no names or quotes. The counts say how much the latest compilation read, not how
+  accurate it was; the description tells the model to check it before saying something was not discussed.
+- Not yet: `get_wiki_page` (pages carry no narrative until K2's narrative generation is wired, so it would
+  repeat `get_entity`), `trace_influence` (no influence semantics are defined), K5.2's wiki-first query policy
+  and K5.3's knowledge parts in `ChatSourceScope`.
 
 ### Attached documents (PDFs)
 
