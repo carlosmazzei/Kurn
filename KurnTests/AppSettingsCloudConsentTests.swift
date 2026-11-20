@@ -46,30 +46,70 @@ struct AppSettingsCloudConsentTests {
         #expect(!AppSettings(defaults: defaults).cloudConsents.allows(destination, for: .automatic))
     }
 
-    @Test func enablingTheWikiGrantsAutomaticSendingToTheSummaryProvider() {
+    /// Isolated settings start on the exempt on-device provider; these tests
+    /// need a cloud one so every grant assertion runs.
+    private func cloudSettings() -> AppSettings {
         let settings = MeetingFixtures.isolatedSettings()
-        let provider = settings.aiProvider
-        settings.wikiEnabled = true
-        #expect(settings.allowsCloud(provider, for: .automatic) || provider.kind == .appleOnDevice)
+        settings.aiProviderID = AIProvider.openAI.id
+        return settings
     }
 
-    @Test func revokingAutomaticTurnsItsFeaturesOff() {
-        let settings = MeetingFixtures.isolatedSettings()
-        let provider = settings.aiProvider
+    @Test func choosingACloudSummaryProviderGrantsOnRequestOnly() {
+        let settings = cloudSettings()
+        #expect(settings.aiProvider == .openAI)
+        #expect(settings.allowsCloud(.openAI, for: .onRequest))
+        #expect(!settings.allowsCloud(.openAI, for: .automatic))
+    }
+
+    @Test func enablingTheWikiGrantsAutomaticSendingToTheSummaryProvider() {
+        let settings = cloudSettings()
+        settings.wikiEnabled = true
+        #expect(settings.allowsCloud(.openAI, for: .automatic))
+        #expect(settings.wikiAutomaticAllowed)
+    }
+
+    @Test func aTextGrantNeverAuthorizesAnAudioUpload() {
+        let settings = cloudSettings()
+        settings.aiTitleCloudEnabled = true
+        #expect(settings.allowsCloud(.openAI, for: .automatic))
+        #expect(!settings.hasCloudTranscriptionConsent(for: .openAI))
+    }
+
+    @Test func switchingSummaryProvidersDoesNotCarryTheAutomaticGrant() {
+        let settings = cloudSettings()
+        settings.wikiEnabled = true
+        let other = AIProvider(id: "other-test", displayName: "Other", kind: .openAICompatible,
+                               baseURLString: "https://other.example.com/v1")
+        settings.addProvider(other)
+        #expect(settings.aiProvider.id == other.id)
+        #expect(settings.wikiEnabled && !settings.wikiAutomaticAllowed)
+    }
+
+    @Test func revokingAutomaticTurnsItsFeaturesOffAndFallsBackToOnDeviceTranscription() {
+        let settings = cloudSettings()
         settings.wikiEnabled = true
         settings.correctionEnabled = true
         settings.aiTitleCloudEnabled = true
-        settings.recordCloudTranscriptionConsent(for: provider)
-        settings.grantCloudConsent(provider, for: .onRequest)
+        settings.recordCloudTranscriptionConsent(for: .openAI)
+        settings.transcriptionProviderID = AIProvider.openAI.id
+        settings.transcriptionEngine = .whisperAPI
 
-        settings.revokeAutomaticCloudConsent(settings.cloudConsentDestination(for: provider))
+        settings.revokeAutomaticCloudConsent(settings.cloudConsentDestination(for: .openAI))
 
         #expect(!settings.wikiEnabled)
         #expect(!settings.correctionEnabled)
         #expect(!settings.aiTitleCloudEnabled)
-        if provider.kind != .appleOnDevice {
-            #expect(!settings.hasCloudTranscriptionConsent(for: provider))
-            #expect(settings.allowsCloud(provider, for: .onRequest))
-        }
+        #expect(!settings.hasCloudTranscriptionConsent(for: .openAI))
+        #expect(settings.transcriptionEngine == .appleSpeech)
+        #expect(settings.allowsCloud(.openAI, for: .onRequest))
+        #expect(!settings.allowsCloud(.openAI, for: .automatic))
+    }
+
+    @Test func removingAllPermissionsMovesTheSummaryProviderOnDevice() {
+        let settings = cloudSettings()
+        settings.revokeAllCloudConsent(settings.cloudConsentDestination(for: .openAI))
+        #expect(settings.aiProviderID == AIProvider.appleOnDevice.id)
+        #expect(!settings.allowsCloud(.openAI, for: .onRequest))
+        #expect(settings.cloudConsents.destinations.isEmpty)
     }
 }

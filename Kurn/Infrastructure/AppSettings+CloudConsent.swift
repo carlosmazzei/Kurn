@@ -22,6 +22,10 @@ extension AppSettings {
         provider.kind == .appleOnDevice || cloudConsents.allows(cloudConsentDestination(for: provider), for: purpose)
     }
 
+    /// The meeting wiki runs per recording only under the summary provider's
+    /// automatic grant; switching providers does not carry the grant over.
+    var wikiAutomaticAllowed: Bool { wikiEnabled && allowsCloud(aiProvider, for: .automatic) }
+
     func grantCloudConsent(_ provider: AIProvider, for purpose: CloudConsentPurpose, at date: Date = Date()) {
         guard provider.kind != .appleOnDevice else { return }
         var ledger = cloudConsents
@@ -36,6 +40,11 @@ extension AppSettings {
         ledger.revoke(destination, for: .automatic)
         saveCloudConsents(ledger)
         removeCloudTranscriptionConsent(destination)
+        // Fall back to on-device transcription rather than leave an engine
+        // selected that can no longer upload.
+        if transcriptionEngine == .whisperAPI, cloudConsentDestination(for: transcriptionProvider) == destination {
+            transcriptionEngine = .appleSpeech
+        }
         if cloudConsentDestination(for: aiProvider) == destination {
             wikiEnabled = false
             correctionEnabled = false
@@ -43,8 +52,19 @@ extension AppSettings {
         }
     }
 
+    /// Withdrawing every grant also moves the summary and Knowledge providers
+    /// that use this destination to on-device, since choosing a provider is
+    /// what grants on-request use.
     func revokeAllCloudConsent(_ destination: String) {
         revokeAutomaticCloudConsent(destination)
+        if cloudConsentDestination(for: aiProvider) == destination {
+            aiProviderID = AIProvider.appleOnDevice.id
+        }
+        if var controls = knowledgeControls, let provider = knowledgeProvider,
+           cloudConsentDestination(for: provider) == destination {
+            controls.providerID = AIProvider.appleOnDevice.id
+            try? saveKnowledgeControls(controls)
+        }
         var ledger = cloudConsents
         ledger.revokeAll(destination)
         saveCloudConsents(ledger)

@@ -1648,3 +1648,6 @@
 "privacy.cloud.feature.wiki" = "Wiki des réunions";
 "privacy.cloud.feature.correction" = "Correction de la transcription";
 "privacy.cloud.feature.knowledge" = "Knowledge";
+"privacy.cloud.revoke_all" = "Retirer toutes les autorisations";
+"privacy.cloud.revoke_all_title" = "Retirer toutes les autorisations de ce fournisseur ?";
+"privacy.cloud.revoke_all_detail" = "Plus rien n’est envoyé à ce fournisseur, ni sur demande ni automatiquement. Les résumés et Knowledge qui l’utilisaient passent au traitement sur l’appareil.";
