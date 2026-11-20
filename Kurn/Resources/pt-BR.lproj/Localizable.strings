@@ -1647,3 +1647,4 @@
 "privacy.cloud.revoke_all" = "Remover todas as permissões";
 "privacy.cloud.revoke_all_title" = "Remover todas as permissões deste provedor?";
 "privacy.cloud.revoke_all_detail" = "Nada mais é enviado a este provedor, nem quando você pede nem automaticamente. Resumos e Knowledge que o usavam passam para o processamento no aparelho.";
+"privacy.cloud.audio" = "Envio de áudio";

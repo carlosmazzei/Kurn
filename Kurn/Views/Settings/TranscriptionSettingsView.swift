@@ -352,7 +352,7 @@ struct TranscriptionSettingsView: View {
             Toggle(
                 NSLocalizedString("settings.correction", comment: "AI transcription correction toggle"),
                 isOn: Binding(
-                    get: { settings.correctionEnabled && hasSummaryProviderKey && settings.allowsCloud(settings.aiProvider, for: .automatic) },
+                    get: { settings.correctionEnabled && hasSummaryProviderKey },
                     set: { settings.correctionEnabled = $0 }
                 )
             )

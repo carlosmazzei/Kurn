@@ -1647,3 +1647,4 @@
 "privacy.cloud.revoke_all" = "Remove all permissions";
 "privacy.cloud.revoke_all_title" = "Remove all permissions for this provider?";
 "privacy.cloud.revoke_all_detail" = "Nothing is sent to this provider anymore, on request or automatically. Summaries and Knowledge that used it switch to on-device processing.";
+"privacy.cloud.audio" = "Audio upload";

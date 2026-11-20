@@ -38,9 +38,15 @@ final class AppSettings {
         didSet { persistProviders() }
     }
 
-    /// Choosing a cloud summary provider is its on-request grant (CLAUDE.md, "Cloud consent").
+    /// Choosing a summary provider is its on-request grant, and, while a
+    /// per-recording feature is on, its automatic grant too: those toggles mean
+    /// "send to my summary provider" (CLAUDE.md, "Cloud consent").
     var aiProviderID: String {
-        didSet { defaults.set(aiProviderID, forKey: Keys.provider); grantCloudConsent(aiProvider, for: .onRequest) }
+        didSet {
+            defaults.set(aiProviderID, forKey: Keys.provider)
+            grantCloudConsent(aiProvider, for: .onRequest)
+            if wikiEnabled || correctionEnabled || aiTitleCloudEnabled { grantCloudConsent(aiProvider, for: .automatic) }
+        }
     }
 
     /// Provider used for cloud (Whisper) transcription, chosen independently of
@@ -322,17 +328,15 @@ final class AppSettings {
     }
 
     /// Audio is a different kind of content than the text other automatic
-    /// features send, so it keeps its own per-destination upload consent; a
-    /// text grant (wiki, titles, correction) never authorizes an audio upload.
-    /// Confirming it also records the ledger's automatic grant, and revoking
-    /// that grant clears it (`AppSettings+CloudConsent.swift`).
+    /// features send, so it keeps its own per-destination upload consent and
+    /// the two never authorize each other; revoking automatic sending in
+    /// Privacy & Cloud clears both (`AppSettings+CloudConsent.swift`).
     func hasCloudTranscriptionConsent(for provider: AIProvider) -> Bool {
         cloudTranscriptionConsentKeys.contains(cloudTranscriptionConsentKey(for: provider))
     }
 
     func recordCloudTranscriptionConsent(for provider: AIProvider) {
         cloudTranscriptionConsentKeys.insert(cloudTranscriptionConsentKey(for: provider))
-        grantCloudConsent(provider, for: .automatic)
     }
 
     func removeCloudTranscriptionConsent(_ destination: String) {

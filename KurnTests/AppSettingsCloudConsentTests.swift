@@ -34,16 +34,19 @@ struct AppSettingsCloudConsentTests {
         defaults.set([destination], forKey: AppSettings.Keys.cloudTranscriptionConsentKeys)
         let settings = AppSettings(defaults: defaults)
         #expect(settings.hasCloudTranscriptionConsent(for: .openAI))
-        #expect(settings.cloudConsents.allows(destination, for: .automatic))
+        // Audio consent never becomes a text grant.
+        #expect(!settings.cloudConsents.allows(destination, for: .automatic))
+        #expect(settings.cloudConsentDestinationsForDisplay == [destination])
     }
 
     @Test func migrationRunsOnce() throws {
         let (defaults, suite) = try defaults()
         defer { defaults.removePersistentDomain(forName: suite) }
-        let settings = AppSettings(defaults: defaults)
-        let destination = settings.cloudConsentDestination(for: .openAI)
-        defaults.set([destination], forKey: AppSettings.Keys.cloudTranscriptionConsentKeys)
-        #expect(!AppSettings(defaults: defaults).cloudConsents.allows(destination, for: .automatic))
+        _ = AppSettings(defaults: defaults)
+        let stored = try #require(defaults.data(forKey: AppSettings.cloudConsentsKey))
+        defaults.set(true, forKey: AppSettings.Keys.wikiEnabled)
+        _ = AppSettings(defaults: defaults)
+        #expect(defaults.data(forKey: AppSettings.cloudConsentsKey) == stored)
     }
 
     /// Isolated settings start on the exempt on-device provider; these tests
@@ -65,7 +68,6 @@ struct AppSettingsCloudConsentTests {
         let settings = cloudSettings()
         settings.wikiEnabled = true
         #expect(settings.allowsCloud(.openAI, for: .automatic))
-        #expect(settings.wikiAutomaticAllowed)
     }
 
     @Test func aTextGrantNeverAuthorizesAnAudioUpload() {
@@ -75,15 +77,23 @@ struct AppSettingsCloudConsentTests {
         #expect(!settings.hasCloudTranscriptionConsent(for: .openAI))
     }
 
-    @Test func switchingSummaryProvidersDoesNotCarryTheAutomaticGrant() {
+    @Test func anAudioConsentNeverAuthorizesTextFeatures() {
+        let settings = cloudSettings()
+        settings.recordCloudTranscriptionConsent(for: .openAI)
+        #expect(settings.hasCloudTranscriptionConsent(for: .openAI))
+        #expect(!settings.allowsCloud(.openAI, for: .automatic))
+    }
+
+    @Test func switchingSummaryProvidersWithAFeatureOnGrantsTheNewOne() {
         let settings = cloudSettings()
         settings.wikiEnabled = true
         let other = AIProvider(id: "other-test", displayName: "Other", kind: .openAICompatible,
                                baseURLString: "https://other.example.com/v1")
         settings.addProvider(other)
         #expect(settings.aiProvider.id == other.id)
-        // The toggle stays on, so explicit wiki builds keep working; automatic runs pause.
-        #expect(settings.wikiEnabled && !settings.wikiAutomaticAllowed)
+        // The toggle means "send to my summary provider"; the grant is recorded and revocable.
+        #expect(settings.wikiEnabled)
+        #expect(settings.allowsCloud(other, for: .automatic))
     }
 
     @Test func revokingAutomaticTurnsItsFeaturesOffAndFallsBackToOnDeviceTranscription() {
