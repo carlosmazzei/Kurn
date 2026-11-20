@@ -7,7 +7,7 @@ struct KnowledgeEntityAskTests {
 
     private func fact(meeting: UUID) -> KnowledgeWikiSnapshot.Fact {
         .init(id: UUID(), subjectID: subject, predicate: .hasStatus, value: .enumeration("open"),
-            qualifiers: .init(modality: .asserted, polarity: .positive, claimKind: .internalProposal,
+            qualifiers: .init(modality: .reported, polarity: .positive, claimKind: .internalProposal,
                 authority: .unverified, confidence: .low, review: .machineExtracted),
             source: .init(meetingID: meeting, recordedAt: Date(timeIntervalSince1970: 1_000), evidence: [
                 .init(id: UUID(), recordingID: UUID(), segmentIDs: ["anchor"], quote: "Open.",
@@ -29,6 +29,7 @@ struct KnowledgeEntityAskTests {
     }
 
     @Test func aPageWithoutFactsHasNothingToAskOver() throws {
-        #expect(KnowledgeEntityAsk.scope(try page([])) == nil)
+        let entity = KnowledgeWikiSnapshot.Entity(id: subject, kind: .project, name: "Example")
+        #expect(KnowledgeEntityAsk.scope(KnowledgeWikiPage(entity: entity, revision: 1, sections: [], narrative: nil)) == nil)
     }
 }
