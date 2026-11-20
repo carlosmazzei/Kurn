@@ -15,7 +15,7 @@ extension ChatKnowledgeTools {
         try Task.checkCancellation()
         guard read.meetingIDs == meetings else { throw Invalid("Knowledge is not authorized for these sources.") }
         try await authorize(meetings, source: source, provider: provider, classifications: read.sourceClassifications)
-        let shown = read.meetings.filter { meeting.map { id in $0.meetingID == id } ?? true }
+        let shown = read.meetings.filter { item in meeting.map { $0 == item.meetingID } ?? true }
             .sorted { $0.meetingID.uuidString < $1.meetingID.uuidString }
         let recordings = shown.flatMap { item in item.recordings.map { (item.meetingID, $0) } }
         let header = ChatKnowledgeToolText.coverageHeader(recordings.map(\.1), meetings: shown.count, isComplete: read.isComplete)
