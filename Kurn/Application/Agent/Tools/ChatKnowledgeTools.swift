@@ -76,7 +76,8 @@ enum ChatKnowledgeGate {
 /// (`ChatKnowledgeToolText`) ending with a `page:` line and a `revision:` line.
 enum ChatKnowledgeTools {
     static let names = ["search_knowledge", "get_entity", "get_timeline", "get_evidence", "resolve_entity", "get_graph",
-                        "compare_state", "list_open_actions", "list_contexts", "get_context", "get_coverage"]
+                        "compare_state", "list_open_actions", "list_contexts", "get_context", "get_coverage",
+                        "trace_influence"]
     /// The ranked window search pages, the index's own maximum.
     static let searchWindow = 100
 

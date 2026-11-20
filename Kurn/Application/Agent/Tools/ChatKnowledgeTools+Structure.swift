@@ -15,6 +15,7 @@ extension ChatKnowledgeTools {
         "list_open_actions": ["entityID", "offset", "limit"],
         "list_contexts": ["offset", "limit"],
         "get_context": ["contextID", "offset", "limit"],
+        "trace_influence": ["entityID", "offset", "limit"],
     ]
 
     /// Action statuses after which nothing is left to do, unless reopened.
@@ -28,6 +29,7 @@ extension ChatKnowledgeTools {
         case "compare_state": return try compareState(params, read: read, now: now)
         case "list_open_actions": return try openActions(params, read: read, now: now)
         case "list_contexts": return contexts(params, read: read)
+        case "trace_influence": return try traceInfluence(params, read: read)
         default: return try context(params, read: read)
         }
     }
@@ -112,6 +114,18 @@ extension ChatKnowledgeTools {
             + " | from \(first.text) to \(second.text) (end of each day, \(known))"
             + "\nchanges (kind | claim | before | certainty | assertions), then conflicts:"
         return ChatKnowledgeToolText.output(header: header, lines: lines, offset: params.offset, limit: params.limit, read: read)
+    }
+
+    // MARK: - trace_influence
+
+    private static func traceInfluence(_ params: Parameters, read: KnowledgeBrowserRead) throws -> AgentToolOutput {
+        let id = try params.uuid("entityID")
+        guard let page = read.pages.first(where: { $0.entity.id == id }) else { throw Invalid("Unknown entityID.") }
+        let steps = KnowledgeInfluenceTrace.trace(entityID: id, pages: read.pages)
+        let header = "influence on entity \(id.uuidString) | \(ChatSourceToolText.field(page.entity.name, limit: 200))"
+            + "\nsteps in stated order (assertion | claim | qualifiers | meeting | speakers | replaces | evidence):"
+        return ChatKnowledgeToolText.output(header: header, lines: steps.map(ChatKnowledgeToolText.influence),
+                                            offset: params.offset, limit: params.limit, read: read)
     }
 
     // MARK: - list_open_actions
@@ -212,6 +226,11 @@ extension ChatKnowledgeTools {
                     ["entityID", "from", "to"],
                     "Compare what held for one entity at the end of two days (yyyy-MM-dd): what changed, started, ended "
                         + "or stayed, as known now or, with asKnownThen, as known on each day; conflicts stay conflicts.")
+        case "trace_influence":
+            return (["entityID": uuid], ["entityID"],
+                    "Trace what shaped one entity's current state, in stated order: each claim about or naming it, "
+                        + "the earlier claims on the same subject and predicate it replaces, its meeting, speakers and "
+                        + "evidence IDs.")
         case "list_open_actions":
             return (["entityID": uuid], [],
                     "List action items not definitely completed or cancelled, with status, assignees and due dates, "
