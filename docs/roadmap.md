@@ -447,13 +447,10 @@ survive. Items that revisit a `CLAUDE.md` decision are marked **review**.
    review and a usability check (task: "sort by duration"). Identifiers
    (`meetings.library`, `meetings.filters`, `nav.settings`,
    `root.destination.*`) stay, so flows change their path, not their handles.
-   **Icon size and spacing.** `MeetingsListToolbar` sets no frame or font on
-   the icons: size and the gap between buttons in a glass group are the
-   system's. To get smaller icons, try `.imageScale(.small)` or a smaller
-   `.font` on the toolbar labels; the gap cannot be set, only reduced by
-   having fewer items. Not verified on a device: check it there first, keep the
-   hit area at 44 × 44 pt and make sure the glyphs still grow with Dynamic Type
-   (do not cap them with `dynamicTypeSize`).
+   **Icon size and spacing stay the system's.** No frame, font or
+   `imageScale` on the toolbar icons and no custom spacing: the glass group
+   sizes them, they scale with Dynamic Type and keep the 44 × 44 pt hit area.
+   The bar gets lighter by having fewer items, not by shrinking them.
 2. **Meeting detail overflow menu.** Group the up to 10 rows into three
    `Section`s: *Create* (title, wiki, tags), *Manage* (edit, add PDF, share) and
    *Reprocess* (re-transcribe); replace the `ellipsis` "generating" glyph with a
