@@ -59,10 +59,9 @@ struct KnowledgeSettingsView: View {
                             PrivacyCloudCopy.host(of: pendingCloudProvider?.baseURLString ?? "")),
             primaryTitle: KnowledgeSettingsCopy.text("cloud_allow"),
             primaryAction: {
-                guard let provider = pendingCloudProvider, let controls = settings.knowledgeControls else { return }
-                settings.grantCloudConsent(provider, for: .automatic)
+                guard let provider = pendingCloudProvider else { return }
                 pendingCloudProvider = nil
-                choose(provider.id, controls: controls)
+                Task { await allowCloud(provider) }
             },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
         )
@@ -203,6 +202,19 @@ struct KnowledgeSettingsView: View {
             return KnowledgeSettingsCopy.text("local_cost")
         }
         return String(format: KnowledgeSettingsCopy.text("cloud_cost"), provider.displayName)
+    }
+
+    /// Redirecting future transcripts off the device re-authenticates like
+    /// "Delete all data", so an unlocked library alone is not enough.
+    private func allowCloud(_ provider: AIProvider) async {
+        switch await SensitiveActionAuthorizer().authorize(requireAuth: settings.requireAuthForRecordings) {
+        case .authorized:
+            guard let controls = settings.knowledgeControls else { return }
+            settings.grantCloudConsent(provider, for: .automatic)
+            choose(provider.id, controls: controls)
+        case .cancelled: return
+        case .denied(let error): model.error = error
+        }
     }
 
     /// A cloud provider without the automatic grant asks first (CLAUDE.md, "Cloud consent").
