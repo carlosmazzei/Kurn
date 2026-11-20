@@ -156,6 +156,23 @@ struct AppSettingsCloudConsentTests {
         if settings.aiProvider.kind != .appleOnDevice { #expect(!settings.wikiEnabled) }
     }
 
+    @Test func aFallbackPrefersAProviderThatKeepsAutomationRunning() throws {
+        let (defaults, suite) = try defaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(cloudStore: InMemoryCloudKeyValueStore(), defaults: defaults,
+                                   credentials: CredentialStore(keychain: ConsentTestKeychain()))
+        settings.credentials.saveKey("sk-openai", for: .openAI)
+        settings.aiProviderID = AIProvider.openAI.id
+        settings.wikiEnabled = true
+        settings.addProvider(AIProvider(id: "keyless-test", displayName: "Keyless", kind: .openAICompatible,
+                                        baseURLString: "https://keyless.example.com/v1"))
+
+        settings.ensureProviderSelectionsAreUsable()
+
+        #expect(settings.aiProviderID != "keyless-test")
+        #expect(settings.wikiEnabled)
+    }
+
     @Test func aFallbackNeverReselectsAWithdrawnProvider() throws {
         let (defaults, suite) = try defaults()
         defer { defaults.removePersistentDomain(forName: suite) }
