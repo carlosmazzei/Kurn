@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 @testable import Kurn
 
 @MainActor
+@Suite(.timeLimit(.minutes(3)))
 struct MeetingPasteboardTests {
 
     @Test func copiesAreLocalOnlyAndExpire() {

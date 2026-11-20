@@ -13,6 +13,10 @@ import KurnCore
 import Testing
 @testable import Kurn
 
+// Records a failure naming the test once it runs past the limit. The limit is
+// cooperative: a Vision call that never returns still ends at the job's watchdog,
+// which is why `PhotoTextRecognizer` serializes recognition in the first place.
+@Suite(.timeLimit(.minutes(3)))
 struct PDFTextExtractorTests {
 
     @Test func readsTheTextOfEveryPageInOrder() throws {
