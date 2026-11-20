@@ -14,6 +14,12 @@
 "error.network_policy_restricted" = "Audio-Uploads und Modelldownloads sind auf WLAN beschränkt, und dieses Gerät nutzt Mobilfunk oder den Datensparmodus. Stellen Sie eine WLAN-Verbindung her oder erlauben Sie Mobilfunk und den Datensparmodus unter „Große Übertragungen“ in den Transkriptionseinstellungen und versuchen Sie es erneut.";
 "error.network_policy_restricted.title" = "WLAN erforderlich";
 "error.network_policy_restricted.open_settings" = "Einstellungen öffnen";
+"error.recovery.retry" = "Erneut versuchen";
+"error.recovery.open_settings" = "Einstellungen öffnen";
+"error.recovery.free_space" = "Speicher verwalten";
+"error.recovery.change_model" = "Modell ändern";
+"error.recovery.recover_audio" = "Audio wiederherstellen";
+"error.recovery.export_diagnostics" = "Diagnose exportieren";
 "error.cloud_transcription_consent_required" = "Cloud-Transkription erfordert Ihre Zustimmung zum Audio-Upload. Prüfen Sie Ziel und Richtlinie in den Transkriptionseinstellungen.";
 "settings.network.large_transfers" = "Große Übertragungen";
 "settings.network.allow_expensive" = "Mobilfunk erlauben";

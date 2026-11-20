@@ -4,11 +4,9 @@
 //
 //  H9 PR 21: presentation metadata around `AppError`, extracted from
 //  `AppError.swift` to keep that file to its own concerns (case list plus
-//  `logCode`/`errorDescription`) as this grows. None of this is new UI —
-//  wiring `recoveryAction` into actual contextual buttons (Retry, Free Space,
-//  Open Settings, ...) is H9 item 2, a later PR; this only names, per case,
-//  which single action would apply, so that PR has something to switch on
-//  instead of re-deriving it from scratch.
+//  `logCode`/`errorDescription`) as this grows. `recoveryAction` names, per
+//  case, the single action that applies; the app's shared `errorAlert`
+//  offers it as the dialog's primary button (`ErrorRecovery`).
 //
 
 import Foundation

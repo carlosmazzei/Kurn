@@ -51,7 +51,7 @@ struct ProvidersSettingsView: View {
         }
         .accessibilityIdentifier("settings.providers.form")
         .navigationTitle(NSLocalizedString("settings.providers", comment: "AI Providers"))
-        .errorAlert($keychainError)
+        .errorAlert($keychainError, offersRecovery: false)
         .sheet(isPresented: $showingAddProvider) {
             NavigationStack {
                 AddProviderView { provider, key in

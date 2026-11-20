@@ -453,8 +453,9 @@ The H1–H10 hardening track is closed; its invariants and types are in
   mid-transfer network path changes are unobservable (the library exposes no
   session to preflight against); background cloud upload stays off while
   origin-lock cannot be guaranteed there.
-- **Error UX.** Contextual recovery actions reading `AppErrorMetadata.recoveryAction`
-  (the data exists, no UI reads it); a short reference ID shared by an error
+- **Error UX.** Retry from the error dialog is wired only where a caller
+  passes `onRetry`, and no case maps to `recoverQuarantinedAudio` or
+  `exportDiagnostics` yet; a short reference ID shared by an error
   dialog and the reliability-events list (needs widening `errorAlert`'s shared
   binding at ~19 call sites); optimistic-UI rollback; `persist()` and AI-title
   errors are not yet recording-scoped; the non-`AppError` raw-log sweep (~46

@@ -29,7 +29,7 @@ struct DiagnosticsSettingsView: View {
         .sheet(item: $shareItem) { item in
             ActivityView(items: item.urls)
         }
-        .errorAlert($logExportError)
+        .errorAlert($logExportError, offersRecovery: false)
         .kurnDialog(
             isPresented: $showingDiagnosticReportsConsent,
             iconSystemName: "exclamationmark.triangle.fill",
