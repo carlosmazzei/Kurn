@@ -30,6 +30,18 @@ struct ChatPromptContextTests {
         #expect(prompt.patch(to: tomorrow).changes.map(\.name) == ["user_context"])
     }
 
+    @Test func theKnowledgePolicyFollowsTheInstructionsOnlyWhenKnowledgeIsOffered() throws {
+        let prompt = try HarnessChatService.system(artifacts: [], knowledge: true, now: now, timeZone: .gmt,
+                                                   locale: Locale(identifier: "en_US"))
+        #expect(prompt.sections.map(\.name) == ["instructions", "knowledge_policy", "user_context", "documents"])
+        #expect(prompt.sections[1].text == HarnessChatService.knowledgePolicy)
+        for tool in ["get_coverage", "search_knowledge", "read_transcript"] {
+            #expect(HarnessChatService.knowledgePolicy.contains(tool))
+        }
+        let without = try HarnessChatService.system(artifacts: [], now: now, timeZone: .gmt, locale: Locale(identifier: "en_US"))
+        #expect(!without.sections.map(\.name).contains("knowledge_policy"))
+    }
+
     private func isolatedStore(_ name: String) throws -> (ModelContextWindowStore, UserDefaults) {
         let defaults = try #require(UserDefaults(suiteName: name))
         defaults.removePersistentDomain(forName: name)

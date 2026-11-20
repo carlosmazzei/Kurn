@@ -3801,7 +3801,12 @@ state, stated validity), each name and quote clipped to one line, a `page:` line
   knowledge; an empty selection stays empty. An entity page's Ask button opens a separate library conversation
   scoped to the meetings its facts come from, with a drafted question.
 - Not yet: `get_wiki_page` (pages carry no narrative until K2's narrative generation is wired, so it would
-  repeat `get_entity`), `trace_influence` (no influence semantics are defined) and K5.2's wiki-first query policy.
+  repeat `get_entity`) and `trace_influence` (no influence semantics are defined).
+- **Knowledge-first query policy (K5.2)**: when a run offers the knowledge tools, `HarnessChatService.system(knowledge:)`
+  adds a `knowledge_policy` section after `instructions` (`HarnessChatService.knowledgePolicy`): query knowledge
+  first, keep modality/negation, cite through evidence, call `get_coverage` before saying something was not
+  discussed and fall back to `search`/`read_transcript` for meetings that are not compiled, stale, not fully examined
+  or without knowledge; the transcript wins a disagreement. Runs without knowledge tools keep the old prompt.
 
 ### Attached documents (PDFs)
 
