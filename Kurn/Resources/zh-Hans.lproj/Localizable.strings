@@ -1630,7 +1630,7 @@
 
 /* Privacy and cloud settings */
 "privacy.cloud.title" = "隐私与云端";
-"privacy.cloud.rule" = "内容只会发送到你允许的提供商。按需：仅在你请求时（摘要、聊天、文档）。自动：每次录音时（云端转写、自动标题、Wiki、校正、Knowledge）。";
+"privacy.cloud.rule" = "内容只会发送到你允许的提供商。按需：仅在你请求时（摘要、聊天、文档）。自动：每次录音时（自动标题、Wiki、校正、Knowledge）。音频上传：云端转写，需单独授权。";
 "privacy.cloud.none" = "未允许任何云端提供商。所有内容都保留在此设备上。";
 "privacy.cloud.other" = "其他共享";
 "privacy.cloud.downloads" = "设备端模型下载只获取模型文件，不会发送你的任何内容。可在“存储”中管理。";

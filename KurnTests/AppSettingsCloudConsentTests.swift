@@ -126,6 +126,36 @@ struct AppSettingsCloudConsentTests {
         #expect(settings.cloudConsents.destinations.isEmpty)
     }
 
+    @Test func editingTheSummaryEndpointRecordsTheNewDestination() {
+        let settings = MeetingFixtures.isolatedSettings()
+        let custom = AIProvider(id: "custom-edit", displayName: "Custom", kind: .openAICompatible,
+                                baseURLString: "https://one.example.com/v1")
+        settings.addProvider(custom)
+        settings.aiTitleCloudEnabled = true
+        var moved = custom
+        moved.baseURLString = "https://two.example.com/v1"
+        settings.updateProvider(moved)
+        #expect(settings.allowsCloud(moved, for: .automatic))
+        #expect(settings.cloudConsentDestinationsForDisplay.contains(settings.cloudConsentDestination(for: moved)))
+    }
+
+    @Test func aFallbackRecordsNoAutomaticGrant() throws {
+        let (defaults, suite) = try defaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(cloudStore: InMemoryCloudKeyValueStore(), defaults: defaults,
+                                   credentials: CredentialStore(keychain: ConsentTestKeychain()))
+        settings.credentials.saveKey("sk-openai", for: .openAI)
+        settings.credentials.saveKey("sk-anthropic", for: .anthropic)
+        settings.aiProviderID = AIProvider.anthropic.id
+        settings.wikiEnabled = true
+
+        settings.credentials.saveKey("", for: .anthropic)
+
+        #expect(settings.aiProviderID != AIProvider.anthropic.id)
+        #expect(!settings.allowsCloud(.openAI, for: .automatic))
+        if settings.aiProvider.kind != .appleOnDevice { #expect(!settings.wikiEnabled) }
+    }
+
     @Test func aFallbackNeverReselectsAWithdrawnProvider() throws {
         let (defaults, suite) = try defaults()
         defer { defaults.removePersistentDomain(forName: suite) }

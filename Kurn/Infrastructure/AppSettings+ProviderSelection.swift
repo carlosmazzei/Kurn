@@ -47,7 +47,9 @@ extension AppSettings {
     func ensureProviderSelectionsAreUsable() {
         let summaryProviders = configuredSummaryProviders.filter { !cloudConsents.isWithdrawn(cloudConsentDestination(for: $0)) }
         if !summaryProviders.isEmpty, !summaryProviders.contains(where: { $0.id == aiProviderID }) {
+            isRepointingSelection = true
             aiProviderID = summaryProviders[0].id
+            isRepointingSelection = false
         }
 
         guard transcriptionEngine == .whisperAPI else { return }

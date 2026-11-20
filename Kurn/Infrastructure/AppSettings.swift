@@ -41,13 +41,25 @@ final class AppSettings {
     /// Choosing a summary provider is its on-request grant, and, while a
     /// per-recording feature is on, its automatic grant too: those toggles mean
     /// "send to my summary provider" (CLAUDE.md, "Cloud consent").
+    /// A fallback the app makes on its own (a removed key or provider) is not
+    /// a choice: it records no automatic grant, and the per-recording features
+    /// turn off unless the replacement already holds one.
     var aiProviderID: String {
         didSet {
             defaults.set(aiProviderID, forKey: Keys.provider)
             grantCloudConsent(aiProvider, for: .onRequest)
-            if wikiEnabled || correctionEnabled || aiTitleCloudEnabled { grantCloudConsent(aiProvider, for: .automatic) }
+            guard wikiEnabled || correctionEnabled || aiTitleCloudEnabled else { return }
+            if !isRepointingSelection {
+                grantCloudConsent(aiProvider, for: .automatic)
+            } else if !allowsCloud(aiProvider, for: .automatic) {
+                wikiEnabled = false
+                correctionEnabled = false
+                aiTitleCloudEnabled = false
+            }
         }
     }
+
+    @ObservationIgnored var isRepointingSelection = false
 
     /// Provider used for cloud (Whisper) transcription, chosen independently of
     /// the summary `aiProvider`. Only meaningful when `transcriptionEngine` is
@@ -337,6 +349,10 @@ final class AppSettings {
 
     func recordCloudTranscriptionConsent(for provider: AIProvider) {
         cloudTranscriptionConsentKeys.insert(cloudTranscriptionConsentKey(for: provider))
+    }
+
+    func hasCloudTranscriptionConsent(destination: String) -> Bool {
+        cloudTranscriptionConsentKeys.contains(destination)
     }
 
     func removeCloudTranscriptionConsent(_ destination: String) {

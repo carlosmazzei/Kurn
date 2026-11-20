@@ -1630,7 +1630,7 @@
 
 /* Privacy and cloud settings */
 "privacy.cloud.title" = "Datenschutz & Cloud";
-"privacy.cloud.rule" = "Inhalte verlassen dieses Gerät nur zu einem Anbieter, den du erlaubt hast. Auf Anfrage: nur wenn du es anforderst (Zusammenfassungen, Chat, Dokumente). Automatisch: bei jeder Aufnahme (Cloud-Transkription, automatische Titel, Wiki, Korrektur, Knowledge).";
+"privacy.cloud.rule" = "Inhalte verlassen dieses Gerät nur zu einem Anbieter, den du erlaubt hast. Auf Anfrage: nur wenn du es anforderst (Zusammenfassungen, Chat, Dokumente). Automatisch: bei jeder Aufnahme (automatische Titel, Wiki, Korrektur, Knowledge). Audio-Upload: Cloud-Transkription, mit eigener Berechtigung.";
 "privacy.cloud.none" = "Kein Cloud-Anbieter ist erlaubt. Alles bleibt auf diesem Gerät.";
 "privacy.cloud.other" = "Weitere Freigaben";
 "privacy.cloud.downloads" = "Downloads von On-Device-Modellen laden nur Modelldateien; keine deiner Inhalte werden gesendet. Verwalte sie unter Speicher.";

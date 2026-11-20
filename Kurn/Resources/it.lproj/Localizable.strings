@@ -1630,7 +1630,7 @@
 
 /* Privacy and cloud settings */
 "privacy.cloud.title" = "Privacy e cloud";
-"privacy.cloud.rule" = "I contenuti lasciano questo dispositivo solo verso un fornitore che hai autorizzato. Su richiesta: solo quando lo chiedi (riepiloghi, chat, documenti). Automatico: a ogni registrazione (trascrizione cloud, titoli automatici, wiki, correzione, Knowledge).";
+"privacy.cloud.rule" = "I contenuti lasciano questo dispositivo solo verso un fornitore che hai autorizzato. Su richiesta: solo quando lo chiedi (riepiloghi, chat, documenti). Automatico: a ogni registrazione (titoli automatici, wiki, correzione, Knowledge). Invio audio: trascrizione cloud, con un’autorizzazione propria.";
 "privacy.cloud.none" = "Nessun fornitore cloud è autorizzato. Tutto resta su questo dispositivo.";
 "privacy.cloud.other" = "Altre condivisioni";
 "privacy.cloud.downloads" = "I download dei modelli sul dispositivo scaricano solo file di modello; nessun tuo contenuto viene inviato. Gestiscili in Archiviazione.";
