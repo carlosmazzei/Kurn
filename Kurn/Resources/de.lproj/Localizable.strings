@@ -1597,6 +1597,10 @@
 "knowledge.settings.provider" = "Verarbeitungsanbieter";
 "knowledge.settings.unavailable" = "Die lokale Verarbeitung ist nicht verfügbar";
 "knowledge.settings.use_local" = "Lokale Verarbeitung verwenden";
+"knowledge.settings.cloud_title" = "Knowledge in der Cloud kompilieren?";
+"knowledge.settings.cloud_message" = "Die Transkripte der betroffenen Besprechungen werden bei jeder Kompilierung an %1$@ unter %2$@ gesendet, auch automatisch für neue Aufnahmen. Es fallen Anbietergebühren an. Du kannst das unter Datenschutz & Cloud beenden.";
+"knowledge.settings.cloud_allow" = "Automatisches Senden erlauben";
+"knowledge.settings.cloud_cost" = "Die Verarbeitung sendet diese Transkripte an %@; es fallen Anbietergebühren an.";
 "knowledge.settings.scope" = "Umfang und Ausschlüsse";
 "knowledge.settings.automatic_detail" = "Die automatische Kompilierung gilt für künftige Transkripte. Die Aktivierung verarbeitet keine alten Besprechungen. Bereits genehmigte Aufgaben können fortgesetzt werden; mit Pause stoppst du die Kompilierung.";
 "knowledge.settings.choose" = "Besprechungen auswählen";
@@ -1605,7 +1609,7 @@
 "knowledge.settings.preview" = "Kompilierungsvorschau";
 "knowledge.settings.coverage" = "Abdeckung";
 "knowledge.settings.pages" = "Gespeicherte Seiten neu aufbauen";
-"knowledge.settings.selection_detail" = "Wähle bis zu 16 Besprechungen für diesen Vorgang. Cloud-Verarbeitung ist für Knowledge nicht verfügbar.";
+"knowledge.settings.selection_detail" = "Wähle bis zu 16 Besprechungen für diesen Vorgang.";
 "knowledge.settings.no_transcript" = "Kein fertiges Transkript";
 "knowledge.settings.current" = "Kompilierung ist aktuell";
 "knowledge.settings.needs_work" = "Kompilierung oder Prüfung erforderlich";

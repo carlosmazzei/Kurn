@@ -67,7 +67,7 @@ struct ChatKnowledgeStructureToolsTests {
                     KnowledgeProcessingPolicy(allowedRemoteProviderIDs: [AIProvider.openAI.id], maxRemoteClassification: .internal),
                 ], sourceClassifications: [.internal])
             },
-            remoteConsent: { true })
+            remoteConsent: { _ in true })
     }
 
     private func run(_ name: String, _ arguments: [String: JSONValue]) async throws -> AgentToolOutput {

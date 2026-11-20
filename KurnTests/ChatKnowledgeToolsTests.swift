@@ -68,7 +68,7 @@ struct ChatKnowledgeToolsTests {
                 KnowledgeSourceAuthorization(featureEnabled: enabled, meetingIDs: allowed ?? ids, policies: [policy],
                                              sourceClassifications: [.internal])
             },
-            remoteConsent: { consent })
+            remoteConsent: { _ in consent })
     }
 
     private func run(_ name: String, _ arguments: [String: JSONValue],
@@ -160,16 +160,18 @@ struct ChatKnowledgeToolsTests {
                                          source: Self.source(classification: .confidential))
         #expect(reclassified.isError && !reclassified.content.contains("Example portal"))
         let readFails = ChatKnowledgeSource(read: { _, _ in throw KnowledgeWikiStoreError.scopeDenied },
-                                            authorization: Self.source().authorization, remoteConsent: { true })
+                                            authorization: Self.source().authorization, remoteConsent: { _ in true })
         let failed = try await run("get_timeline", [:], source: readFails)
         #expect(failed.isError && failed.content == "Knowledge tool error: Knowledge is unavailable for these sources.")
     }
 
-    @Test func theProductionSourceNeverConsentsToSendingKnowledge() async throws {
+    @Test func theProductionSourceConsentsOnlyUnderTheOnRequestGrant() async throws {
         let settings = MeetingFixtures.isolatedSettings()
         let coordinator = KnowledgeCompilationCoordinator(queue: KnowledgeJobQueue(container: TestModelContainer.make()), settings: settings)
         let source = ChatKnowledgeSource(coordinator: coordinator)
-        #expect(!source.remoteConsent())
+        #expect(!source.remoteConsent(.openAI))
+        settings.grantCloudConsent(.openAI, for: .onRequest)
+        #expect(source.remoteConsent(.openAI))
         // Knowledge is off by default, so nothing is authorized or offered.
         #expect(!source.authorization([Self.meeting]).featureEnabled)
         #expect(ChatKnowledgeGate.meetings([Self.meeting], source: source, provider: .openAI) == nil)
@@ -198,7 +200,7 @@ struct ChatKnowledgeToolsTests {
         }
         let large = try KnowledgeBrowserRead(meetingIDs: [Self.meeting], wiki: .init(revision: 3, entities: entities, facts: facts),
                                              meetingTitles: [Self.meeting: "Weekly review"])
-        let source = ChatKnowledgeSource(read: { _, _ in large }, authorization: Self.source().authorization, remoteConsent: { true })
+        let source = ChatKnowledgeSource(read: { _, _ in large }, authorization: Self.source().authorization, remoteConsent: { _ in true })
         let first = try await run("search_knowledge", ["query": .string("portal")], source: source)
         #expect(first.content.hasPrefix("knowledge search results (best first; top 100 shown; refine the query for more):"))
         #expect(first.metrics[.searchWindowFull] == 1 && first.metrics[.searchResultLimit] == 100)

@@ -1597,6 +1597,10 @@
 "knowledge.settings.provider" = "Processing provider";
 "knowledge.settings.unavailable" = "On-device processing is unavailable";
 "knowledge.settings.use_local" = "Use on-device processing";
+"knowledge.settings.cloud_title" = "Compile Knowledge in the cloud?";
+"knowledge.settings.cloud_message" = "The transcripts of the meetings in scope are sent to %1$@ at %2$@ on every compilation, including automatic ones for new recordings. Provider fees apply. You can stop this in Privacy & Cloud.";
+"knowledge.settings.cloud_allow" = "Allow automatic sending";
+"knowledge.settings.cloud_cost" = "Processing sends these transcripts to %@; provider fees apply.";
 "knowledge.settings.scope" = "Scope and exclusions";
 "knowledge.settings.automatic_detail" = "Automatic compilation applies to future transcriptions. Enabling Knowledge does not process older meetings. Approved pending work may resume; use Pause to stop compilation.";
 "knowledge.settings.choose" = "Choose meetings";
@@ -1605,7 +1609,7 @@
 "knowledge.settings.preview" = "Preview compilation";
 "knowledge.settings.coverage" = "Coverage";
 "knowledge.settings.pages" = "Rebuild saved pages";
-"knowledge.settings.selection_detail" = "Select up to 16 meetings for this operation. Cloud processing is not available for Knowledge.";
+"knowledge.settings.selection_detail" = "Select up to 16 meetings for this operation.";
 "knowledge.settings.no_transcript" = "No transcript ready";
 "knowledge.settings.current" = "Compilation is current";
 "knowledge.settings.needs_work" = "Compilation or inspection needed";

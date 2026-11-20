@@ -1597,6 +1597,10 @@
 "knowledge.settings.provider" = "Provedor de processamento";
 "knowledge.settings.unavailable" = "O processamento local está indisponível";
 "knowledge.settings.use_local" = "Usar processamento local";
+"knowledge.settings.cloud_title" = "Compilar o Knowledge na nuvem?";
+"knowledge.settings.cloud_message" = "As transcrições das reuniões no escopo são enviadas a %1$@ em %2$@ a cada compilação, inclusive as automáticas de novas gravações. Há cobrança do provedor. Você pode interromper isso em Privacidade e nuvem.";
+"knowledge.settings.cloud_allow" = "Permitir envio automático";
+"knowledge.settings.cloud_cost" = "O processamento envia estas transcrições a %@; há cobrança do provedor.";
 "knowledge.settings.scope" = "Escopo e exclusões";
 "knowledge.settings.automatic_detail" = "A compilação automática vale para futuras transcrições. Ativar o Knowledge não processa reuniões antigas. Trabalhos pendentes já autorizados podem continuar; use Pausar para interromper a compilação.";
 "knowledge.settings.choose" = "Escolher reuniões";
@@ -1605,7 +1609,7 @@
 "knowledge.settings.preview" = "Prévia da compilação";
 "knowledge.settings.coverage" = "Cobertura";
 "knowledge.settings.pages" = "Reconstruir páginas salvas";
-"knowledge.settings.selection_detail" = "Selecione até 16 reuniões para esta operação. O processamento em nuvem não está disponível para o Knowledge.";
+"knowledge.settings.selection_detail" = "Selecione até 16 reuniões para esta operação.";
 "knowledge.settings.no_transcript" = "Nenhuma transcrição pronta";
 "knowledge.settings.current" = "Compilação atualizada";
 "knowledge.settings.needs_work" = "Compilação ou inspeção necessária";

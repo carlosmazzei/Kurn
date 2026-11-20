@@ -1597,6 +1597,10 @@
 "knowledge.settings.provider" = "Fournisseur de traitement";
 "knowledge.settings.unavailable" = "Le traitement local est indisponible";
 "knowledge.settings.use_local" = "Utiliser le traitement local";
+"knowledge.settings.cloud_title" = "Compiler Knowledge dans le cloud ?";
+"knowledge.settings.cloud_message" = "Les transcriptions des réunions concernées sont envoyées à %1$@ sur %2$@ à chaque compilation, y compris les compilations automatiques des nouveaux enregistrements. Des frais du fournisseur s’appliquent. Vous pouvez l’arrêter dans Confidentialité et cloud.";
+"knowledge.settings.cloud_allow" = "Autoriser l’envoi automatique";
+"knowledge.settings.cloud_cost" = "Le traitement envoie ces transcriptions à %@ ; des frais du fournisseur s’appliquent.";
 "knowledge.settings.scope" = "Périmètre et exclusions";
 "knowledge.settings.automatic_detail" = "La compilation automatique concerne les futures transcriptions. Activer Knowledge ne traite pas les anciennes réunions. Les travaux autorisés en attente peuvent reprendre ; utilisez Suspendre pour les arrêter.";
 "knowledge.settings.choose" = "Choisir les réunions";
@@ -1605,7 +1609,7 @@
 "knowledge.settings.preview" = "Aperçu de la compilation";
 "knowledge.settings.coverage" = "Couverture";
 "knowledge.settings.pages" = "Reconstruire les pages enregistrées";
-"knowledge.settings.selection_detail" = "Sélectionnez au plus 16 réunions pour cette opération. Le traitement cloud n’est pas disponible pour Knowledge.";
+"knowledge.settings.selection_detail" = "Sélectionnez au plus 16 réunions pour cette opération.";
 "knowledge.settings.no_transcript" = "Aucune transcription prête";
 "knowledge.settings.current" = "Compilation à jour";
 "knowledge.settings.needs_work" = "Compilation ou inspection nécessaire";

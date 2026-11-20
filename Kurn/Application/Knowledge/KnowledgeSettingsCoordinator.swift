@@ -16,11 +16,15 @@ final class KnowledgeSettingsCoordinator {
 
     init(compilation: KnowledgeCompilationCoordinator) { self.compilation = compilation }
 
-    var canCompile: Bool { settings.knowledgeProvider?.kind == .appleOnDevice && ProviderFactory.liveUsability(.appleOnDevice) }
+    /// On-device needs the model; a cloud provider needs its key and the automatic grant (CLAUDE.md, "Cloud consent").
+    var canCompile: Bool {
+        guard let provider = settings.knowledgeProvider else { return false }
+        return settings.allowsCloud(provider, for: .automatic) && ProviderFactory.liveUsability(provider)
+    }
 
     func preview(meetingIDs: Set<UUID>, rebuild: Bool) async throws -> KnowledgeBackfillPlan {
-        guard settings.knowledgeEnabled, let controls = settings.knowledgeControls,
-              settings.knowledgeProvider?.kind == .appleOnDevice else { throw KnowledgeSettingsError.unavailable }
+        guard settings.knowledgeEnabled, let controls = settings.knowledgeControls, let provider = settings.knowledgeProvider,
+              settings.allowsCloud(provider, for: .automatic) else { throw KnowledgeSettingsError.unavailable }
         let read = try await read(meetingIDs: meetingIDs)
         guard settings.knowledgeControls == controls, settings.knowledgeEnabled else { throw KnowledgeSettingsError.stalePreview }
         return KnowledgeBackfillPlan(id: UUID(), controls: controls, read: read, rebuild: rebuild)

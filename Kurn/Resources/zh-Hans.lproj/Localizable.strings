@@ -1597,6 +1597,10 @@
 "knowledge.settings.provider" = "处理提供商";
 "knowledge.settings.unavailable" = "设备端处理不可用";
 "knowledge.settings.use_local" = "使用设备端处理";
+"knowledge.settings.cloud_title" = "在云端编译 Knowledge？";
+"knowledge.settings.cloud_message" = "每次编译（包括新录音的自动编译）都会将范围内会议的转写发送到 %2$@ 上的 %1$@。将产生提供商费用。你可以在“隐私与云端”中停止。";
+"knowledge.settings.cloud_allow" = "允许自动发送";
+"knowledge.settings.cloud_cost" = "处理会将这些转写发送到 %@，并产生提供商费用。";
 "knowledge.settings.scope" = "范围和排除项";
 "knowledge.settings.automatic_detail" = "自动编译适用于未来的转录。启用 Knowledge 不会处理旧会议。已获授权的待处理任务可能继续；请使用暂停来停止编译。";
 "knowledge.settings.choose" = "选择会议";
@@ -1605,7 +1609,7 @@
 "knowledge.settings.preview" = "编译预览";
 "knowledge.settings.coverage" = "覆盖率";
 "knowledge.settings.pages" = "重建已保存页面";
-"knowledge.settings.selection_detail" = "此操作最多可选择 16 个会议。Knowledge 不支持云端处理。";
+"knowledge.settings.selection_detail" = "此操作最多可选择 16 个会议。";
 "knowledge.settings.no_transcript" = "没有就绪的转录";
 "knowledge.settings.current" = "编译已更新";
 "knowledge.settings.needs_work" = "需要编译或检查";

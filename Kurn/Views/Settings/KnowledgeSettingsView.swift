@@ -17,6 +17,7 @@ struct KnowledgeSettingsView: View {
     @State private var confirming = false
     @State private var resetting = false
     @State private var deleting = false
+    @State private var pendingCloudProvider: AIProvider?
 
     var body: some View {
         @Bindable var presentation = model
@@ -50,11 +51,26 @@ struct KnowledgeSettingsView: View {
         .onDisappear { invalidate() }
         .errorAlert($presentation.error)
         .kurnDialog(
+            isPresented: Binding(get: { pendingCloudProvider != nil }, set: { if !$0 { pendingCloudProvider = nil } }),
+            iconSystemName: "icloud.and.arrow.up",
+            iconTint: Theme.info,
+            title: KnowledgeSettingsCopy.text("cloud_title"),
+            message: String(format: KnowledgeSettingsCopy.text("cloud_message"), pendingCloudProvider?.displayName ?? "",
+                            PrivacyCloudCopy.host(of: pendingCloudProvider?.baseURLString ?? "")),
+            primaryTitle: KnowledgeSettingsCopy.text("cloud_allow"),
+            primaryAction: {
+                guard let provider = pendingCloudProvider else { return }
+                pendingCloudProvider = nil
+                Task { await allowCloud(provider) }
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
+        .kurnDialog(
             isPresented: $confirming,
             iconSystemName: "books.vertical",
             iconTint: Theme.info,
             title: KnowledgeSettingsCopy.text("confirm"),
-            message: KnowledgeSettingsCopy.text("local_cost"),
+            message: costText,
             primaryTitle: KnowledgeSettingsCopy.text("start"),
             primaryAction: { if let plan = model.plan { management?.start(plan) } },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
@@ -104,10 +120,13 @@ struct KnowledgeSettingsView: View {
                     .disabled(!settings.knowledgeEnabled).accessibilityIdentifier("knowledge.settings.automatic")
                 Toggle(KnowledgeSettingsCopy.text("pause"), isOn: binding(controls, \.isPaused))
                     .disabled(!settings.knowledgeEnabled).accessibilityIdentifier("knowledge.settings.paused")
-                LabeledContent(KnowledgeSettingsCopy.text("provider"), value: settings.knowledgeProvider?.displayName ?? KnowledgeSettingsCopy.text("unavailable"))
-                if controls.providerID != AIProvider.appleOnDevice.id {
-                    Button(KnowledgeSettingsCopy.text("use_local")) { var next = controls; next.providerID = AIProvider.appleOnDevice.id; save(next) }
+                Picker(KnowledgeSettingsCopy.text("provider"), selection: Binding(
+                    get: { controls.providerID },
+                    set: { id in choose(id, controls: controls) }
+                )) {
+                    ForEach(knowledgeProviders) { Text(verbatim: $0.displayName).tag($0.id) }
                 }
+                .accessibilityIdentifier("knowledge.settings.provider")
                 NavigationLink(KnowledgeSettingsCopy.text("scope")) { KnowledgeScopeSettingsView(controls: controls) }
                     .accessibilityIdentifier("knowledge.settings.scope")
             } footer: { Text(KnowledgeSettingsCopy.text("automatic_detail")) }
@@ -136,7 +155,7 @@ struct KnowledgeSettingsView: View {
                     }
                     Text(String(format: KnowledgeSettingsCopy.text("planned"), plan.pending.count))
                         .accessibilityIdentifier("knowledge.settings.plan")
-                    Text(KnowledgeSettingsCopy.text("local_cost"))
+                    Text(costText)
                     if plan.requiresRebuild { Text(KnowledgeSettingsCopy.text("recompile_required")) }
                     Button(KnowledgeSettingsCopy.text("start")) { confirming = true }
                         .disabled(plan.pending.isEmpty || plan.requiresRebuild || controls.isPaused || !management.canCompile || management.progress?.isRunning == true)
@@ -170,6 +189,43 @@ struct KnowledgeSettingsView: View {
     private func binding(_ controls: KnowledgeControls, _ key: WritableKeyPath<KnowledgeControls, Bool>) -> Binding<Bool> {
         Binding(get: { settings.knowledgeControls?[keyPath: key] ?? false }, set: { value in var next = controls; next[keyPath: key] = value; save(next) })
     }
+    /// On-device plus every keyed cloud provider that can generate text with a model set.
+    private var knowledgeProviders: [AIProvider] {
+        settings.providers.filter {
+            $0.kind == .appleOnDevice
+                || ($0.supportsSummarization && settings.credentials.hasKey(for: $0) && !settings.summaryModel(for: $0).isEmpty)
+        }
+    }
+
+    private var costText: String {
+        guard let provider = settings.knowledgeProvider, provider.kind != .appleOnDevice else {
+            return KnowledgeSettingsCopy.text("local_cost")
+        }
+        return String(format: KnowledgeSettingsCopy.text("cloud_cost"), provider.displayName)
+    }
+
+    /// Redirecting future transcripts off the device re-authenticates like
+    /// "Delete all data", so an unlocked library alone is not enough.
+    private func allowCloud(_ provider: AIProvider) async {
+        switch await SensitiveActionAuthorizer().authorize(requireAuth: settings.requireAuthForRecordings) {
+        case .authorized:
+            guard let controls = settings.knowledgeControls else { return }
+            settings.grantCloudConsent(provider, for: .automatic)
+            choose(provider.id, controls: controls)
+        case .cancelled: return
+        case .denied(let error): model.error = error
+        }
+    }
+
+    /// A cloud provider without the automatic grant asks first (CLAUDE.md, "Cloud consent").
+    private func choose(_ id: String, controls: KnowledgeControls) {
+        guard let provider = settings.providers.first(where: { $0.id == id }) else { return }
+        guard settings.allowsCloud(provider, for: .automatic) else { pendingCloudProvider = provider; return }
+        var next = controls
+        next.providerID = id
+        save(next)
+    }
+
     private func save(_ controls: KnowledgeControls) { do { try settings.saveKnowledgeControls(controls) } catch { model.reportError() } }
     private func invalidate() { action = nil; model.invalidate() }
 }
