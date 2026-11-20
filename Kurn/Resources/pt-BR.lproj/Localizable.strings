@@ -1071,8 +1071,6 @@
 "chat.sources.parts.none" = "Nenhuma parte";
 "chat.sources.summary.one" = "1 reunião · %@";
 "chat.sources.summary" = "%d reuniões · %@";
-"chat.steps.one" = "1 passo";
-"chat.steps.count" = "%d passos";
 "chat.steps.arguments" = "Argumentos";
 "chat.steps.output" = "Resultado";
 "chat.steps.compaction.detail" = "Contexto: %d → %d tokens";

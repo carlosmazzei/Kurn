@@ -63,13 +63,6 @@ struct ChatStepPresentationTests {
             stop.stopReason = reason
             #expect(ChatStepPresentation(step: stop).key == "chat.step.stop.\(reason.rawValue)")
         }
-        let tool = AgentRunStep(kind: .tool)
-        #expect(ChatStepPresentation.visibleSteps([turn, tool, compaction, stop]) == [tool, compaction, stop])
-        stop.stopReason = .completed
-        #expect(ChatStepPresentation.visibleSteps([turn, stop]).isEmpty)
-        #expect(ChatStepPresentation.visibleSteps([]).isEmpty)
-        #expect(ChatStepPresentation.countLabel(1) { _ in "1 step" } == "1 step")
-        #expect(ChatStepPresentation.countLabel(3) { _ in "%d steps" } == "3 steps")
     }
 
     @Test func previewsAreBoundedByScalarsAndHandleEmptyAndInvalidLimits() {
