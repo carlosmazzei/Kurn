@@ -20,9 +20,11 @@ import Testing
         let kept = UUID(), excluded = UUID()
         let without = ChatSourceScope(kind: .meetings, selectedIDs: [kept], parts: [.transcript], partOverrides: [kept: [.summary]])
         #expect(try JSONDecoder().decode(ChatSourceScope.self, from: JSONEncoder().encode(without)) == without)
-        let legacy = "{\"kind\":\"meetings\",\"parts\":[\"transcript\"],"
-            + "\"partOverrides\":{\"\(kept)\":[\"summary\"],\"\(excluded)\":[]}}"
-        let decoded = try JSONDecoder().decode(ChatSourceScope.self, from: Data(legacy.utf8))
+        let saved = ChatSourceScope(kind: .meetings, parts: [.transcript], partOverrides: [kept: [.summary], excluded: []])
+        var object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(saved)) as? [String: Any])
+        object["knowledgeSelectable"] = nil
+        let legacy = try JSONSerialization.data(withJSONObject: object)
+        let decoded = try JSONDecoder().decode(ChatSourceScope.self, from: legacy)
         #expect(decoded.parts == [.transcript, .knowledge])
         #expect(decoded.parts(for: kept) == [.summary, .knowledge])
         #expect(decoded.parts(for: excluded).isEmpty)
