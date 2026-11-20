@@ -52,8 +52,19 @@ extension AppSettings {
         }
     }
 
+    /// Withdrawing every grant also moves the summary and Knowledge providers
+    /// that use this destination to on-device, since choosing a provider is
+    /// what grants on-request use.
     func revokeAllCloudConsent(_ destination: String) {
         revokeAutomaticCloudConsent(destination)
+        if cloudConsentDestination(for: aiProvider) == destination {
+            aiProviderID = AIProvider.appleOnDevice.id
+        }
+        if var controls = knowledgeControls, let provider = knowledgeProvider,
+           cloudConsentDestination(for: provider) == destination {
+            controls.providerID = AIProvider.appleOnDevice.id
+            try? saveKnowledgeControls(controls)
+        }
         var ledger = cloudConsents
         ledger.revokeAll(destination)
         saveCloudConsents(ledger)

@@ -38,8 +38,9 @@ final class AppSettings {
         didSet { persistProviders() }
     }
 
+    /// Choosing a cloud summary provider is its on-request grant (CLAUDE.md, "Cloud consent").
     var aiProviderID: String {
-        didSet { defaults.set(aiProviderID, forKey: Keys.provider) }
+        didSet { defaults.set(aiProviderID, forKey: Keys.provider); grantCloudConsent(aiProvider, for: .onRequest) }
     }
 
     /// Provider used for cloud (Whisper) transcription, chosen independently of
