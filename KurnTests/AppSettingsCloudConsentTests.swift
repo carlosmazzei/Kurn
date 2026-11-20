@@ -108,7 +108,9 @@ struct AppSettingsCloudConsentTests {
 
     @Test func removingAllPermissionsMovesTheSummaryProviderOnDevice() {
         let settings = cloudSettings()
+        settings.readAloud.providerID = AIProvider.openAI.id
         settings.revokeAllCloudConsent(settings.cloudConsentDestination(for: .openAI))
+        #expect(settings.readAloud.providerID == AIProvider.appleOnDevice.id)
         #expect(settings.aiProviderID == AIProvider.appleOnDevice.id)
         #expect(!settings.allowsCloud(.openAI, for: .onRequest))
         #expect(settings.cloudConsents.destinations.isEmpty)
