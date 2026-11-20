@@ -82,8 +82,8 @@ struct AppSettingsCloudConsentTests {
                                baseURLString: "https://other.example.com/v1")
         settings.addProvider(other)
         #expect(settings.aiProvider.id == other.id)
-        #expect(!settings.wikiAutomaticAllowed)
-        #expect(!settings.wikiEnabled)
+        // The toggle stays on, so explicit wiki builds keep working; automatic runs pause.
+        #expect(settings.wikiEnabled && !settings.wikiAutomaticAllowed)
     }
 
     @Test func revokingAutomaticTurnsItsFeaturesOffAndFallsBackToOnDeviceTranscription() {

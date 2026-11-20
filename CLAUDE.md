@@ -3880,7 +3880,8 @@ toggles still choose which features run. Turning on `wikiEnabled`,
 summary provider, and those features run per recording only while the current
 summary provider holds that grant (`wikiAutomaticAllowed`, `AITitleCoordinator`,
 `correctionConsented`), so switching summary providers does not carry it over;
-explicit requests still run. Confirming the cloud-upload dialog records it for the
+explicit requests still run, and the toggles show the automatic state, so turning
+one on again records the grant for the new provider. Confirming the cloud-upload dialog records it for the
 transcription provider. Audio keeps its own per-destination upload consent
 (`hasCloudTranscriptionConsent`): a text grant never authorizes an audio upload.
 `revokeAutomaticCloudConsent` withdraws the grant, clears the legacy transcription
@@ -3895,6 +3896,9 @@ transcription keys, a keyed cloud summary provider and its enabled per-recording
 features), so an upgrade asks nothing again. Settings → Privacy & Cloud
 (`PrivacyCloudSettingsView`) lists each destination's grants and the features
 using it, plus the non-AI sharing (template sync, diagnostic reports).
+Consent is enforced when work starts: work already running (a multi-chunk upload,
+a staged summary, a conversation's earlier tool results) finishes under the
+consent it started with.
 Knowledge uses the same grants: Settings → Knowledge lists on-device and every
 keyed cloud provider, and choosing a cloud provider without the automatic grant
 asks first (`knowledge.settings.cloud_message`). Extraction needs the automatic
