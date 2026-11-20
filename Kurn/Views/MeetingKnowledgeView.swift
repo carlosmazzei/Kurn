@@ -6,6 +6,9 @@ struct MeetingKnowledgeView: View {
     let state: MeetingKnowledgeState
     let isGeneratingArticle: Bool
     let canGenerateArticle: Bool
+    /// Apple on-device generation revalidates the canonical read first; another provider uses the
+    /// same explicit wiki generation the summary and transcript tabs' siblings use.
+    let generatesLocally: Bool
     let onRefresh: () -> Void
     @Environment(KnowledgeCompilationCoordinator.self) private var coordinator
     @Environment(WikiCoordinator.self) private var wiki
@@ -76,7 +79,13 @@ struct MeetingKnowledgeView: View {
                 KnowledgeChipButton(title: NSLocalizedString(meeting.wikiArticle == nil ? "detail.wiki.generate" : "detail.wiki.regenerate",
                                                              comment: "Generate notes"),
                                     systemImage: "sparkles") {
-                    Task { await coordinator.generateLocalMeetingNotes(meeting, wiki: wiki) }
+                    Task {
+                        if generatesLocally {
+                            await coordinator.generateLocalMeetingNotes(meeting, wiki: wiki)
+                        } else {
+                            await wiki.generate(meeting, trigger: .explicit, force: true)
+                        }
+                    }
                 }
                 .accessibilityIdentifier("knowledge.generateNotes")
             }

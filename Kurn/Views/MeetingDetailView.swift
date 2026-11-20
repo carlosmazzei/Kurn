@@ -77,7 +77,7 @@ struct MeetingDetailView: View {
         )
     }
     @State private var tab: Tab = .recordings
-    @State private var meetingKnowledge = MeetingKnowledgeViewModel()
+    @State var meetingKnowledge = MeetingKnowledgeViewModel()
     @State private var knowledgeRefresh = 0
 
     /// Drives the full-screen photo viewer from the Recordings tab's photo
@@ -363,7 +363,7 @@ struct MeetingDetailView: View {
         case .knowledge:
             if settings.knowledgeEnabled {
                 MeetingKnowledgeView(meeting: meeting, state: meetingKnowledge.presentation(for: meeting.id), isGeneratingArticle: isGeneratingWiki,
-                    canGenerateArticle: canGenerateWiki && settings.aiProvider.kind == .appleOnDevice, onRefresh: {
+                    canGenerateArticle: canGenerateWiki, generatesLocally: settings.aiProvider.kind == .appleOnDevice, onRefresh: {
                         meetingKnowledge.invalidate()
                         knowledgeRefresh += 1
                     })

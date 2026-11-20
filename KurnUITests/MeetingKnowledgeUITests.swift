@@ -51,6 +51,14 @@ final class MeetingKnowledgeUITests: XCTestCase {
         notes.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "The team reported")).firstMatch.waitForExistence(timeout: 5))
         capture(app, named: "knowledge-meeting-notes")
+        app.buttons["detail.more"].tap()
+        XCTAssertTrue(app.buttons["Archive"].firstMatch.waitForExistence(timeout: 5))
+        // The Knowledge tab's own "Regenerate Wiki" chip stays; the menu has no wiki items.
+        XCTAssertTrue(app.buttons["knowledge.generateNotes"].exists)
+        for label in ["View wiki", "Generate Wiki", "Regenerate Wiki"] {
+            let menuItem = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", label, "knowledge.generateNotes"))
+            XCTAssertEqual(menuItem.count, 0, label)
+        }
     }
 
     func testKnowledgeAtAccessibilityTextSize() throws {
