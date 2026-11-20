@@ -234,7 +234,7 @@ public actor AgentSession {
             "runID": .string(runID.uuidString), "end": .string(end.rawValue),
             "stopReason": outcome.map { .string($0.stopReason.rawValue) } ?? .null
         ])
-        terminalPayload = .custom(type: "agent.run-end.v1", data: data)
+        terminalPayload = .custom(type: AgentRunBranch.endType, data: data)
         do {
             try await commitTerminal()
         } catch {
@@ -288,7 +288,7 @@ public actor AgentSession {
                 "cacheReadTokens": usage.cacheReadTokens.map { .number(Double($0)) } ?? .null,
                 "cacheWriteTokens": usage.cacheWriteTokens.map { .number(Double($0)) } ?? .null
             ])
-            try await append(payload: .custom(type: "agent.usage.v1", data: data))
+            try await append(payload: .custom(type: AgentRunBranch.usageType, data: data))
         } catch { persistenceFailed = true; throw AgentSessionOwnerError.persistenceFailed }
     }
 

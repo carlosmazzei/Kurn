@@ -5,6 +5,7 @@ import Foundation
 /// read from the log as values; nothing here writes or resumes a run.
 public struct AgentRunBranch: Sendable, Equatable {
     public static let startType = "agent.run-start.v1"
+    public static let usageType = "agent.usage.v1"
     public static let endType = "agent.run-end.v1"
 
     public let runID: String

@@ -9,9 +9,9 @@ import KurnCore
 /// leaf, so the presentation path the chat shows and the compatibility writer diffs is unchanged
 /// by a run. Its entries carry the run's `ChatRunRecord` ID as `runID` metadata.
 enum ChatRunBranch {
-    static let startType = "agent.run-start.v1"
-    static let usageType = "agent.usage.v1"
-    static let endType = "agent.run-end.v1"
+    static let startType = AgentRunBranch.startType
+    static let usageType = AgentRunBranch.usageType
+    static let endType = AgentRunBranch.endType
 
     /// The tools whose successful result changed a document in the workspace.
     static let documentTools: Set<String> = ["create_document", "update_document", "append_to_document"]
