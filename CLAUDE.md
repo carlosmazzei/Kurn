@@ -3227,8 +3227,9 @@ still disables the composer); Documents pushes `DocumentsListView` with its
 artifact detail/create flows. No chat/provider capability is enabled by
 navigation. The list hosts the recording mini bar as before, and so do the
 Knowledge and Ask sheets that cover it (`hostsRecordingMiniBarInSheet`):
-there, expanding the recorder closes the sheet first, since the recorder is
-presented from the root and cannot present over it. The Knowledge
+there, expanding the recorder closes the sheet and opens the recorder once the
+sheet has disappeared, since the recorder is presented from the root and cannot
+present over it or during its dismissal. The Knowledge
 sheet's source selection belongs to the list (`knowledgeSourceIDs`), so closing
 and reopening the sheet keeps it; turning Knowledge off closes the sheet and
 forgets the selection.
