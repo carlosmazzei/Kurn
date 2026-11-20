@@ -331,11 +331,5 @@ final class ResourcePressureMonitor {
             }
         }
     }
-
-    #if DEBUG
-    func markMemoryWarningForTesting(at time: TimeInterval? = nil) {
-        lastWarningObservedAt = time ?? clock.now
-    }
-    #endif
 }
 #endif
