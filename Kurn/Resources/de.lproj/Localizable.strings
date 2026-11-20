@@ -1644,3 +1644,6 @@
 "privacy.cloud.feature.wiki" = "Meeting-Wiki";
 "privacy.cloud.feature.correction" = "Transkriptkorrektur";
 "privacy.cloud.feature.knowledge" = "Knowledge";
+"privacy.cloud.revoke_all" = "Alle Berechtigungen entfernen";
+"privacy.cloud.revoke_all_title" = "Alle Berechtigungen für diesen Anbieter entfernen?";
+"privacy.cloud.revoke_all_detail" = "An diesen Anbieter wird nichts mehr gesendet, weder auf Anfrage noch automatisch. Zusammenfassungen und Knowledge, die ihn nutzten, wechseln zur Verarbeitung auf dem Gerät.";

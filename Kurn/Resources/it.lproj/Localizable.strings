@@ -1644,3 +1644,6 @@
 "privacy.cloud.feature.wiki" = "Wiki delle riunioni";
 "privacy.cloud.feature.correction" = "Correzione della trascrizione";
 "privacy.cloud.feature.knowledge" = "Knowledge";
+"privacy.cloud.revoke_all" = "Rimuovi tutte le autorizzazioni";
+"privacy.cloud.revoke_all_title" = "Rimuovere tutte le autorizzazioni per questo fornitore?";
+"privacy.cloud.revoke_all_detail" = "Non viene più inviato nulla a questo fornitore, né su richiesta né automaticamente. Riepiloghi e Knowledge che lo usavano passano all’elaborazione sul dispositivo.";

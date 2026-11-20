@@ -1644,3 +1644,6 @@
 "privacy.cloud.feature.wiki" = "会议 Wiki";
 "privacy.cloud.feature.correction" = "转写校正";
 "privacy.cloud.feature.knowledge" = "Knowledge";
+"privacy.cloud.revoke_all" = "移除所有权限";
+"privacy.cloud.revoke_all_title" = "移除此提供商的所有权限？";
+"privacy.cloud.revoke_all_detail" = "将不再向此提供商发送任何内容，无论按需还是自动。使用它的摘要和 Knowledge 将改为在设备端处理。";

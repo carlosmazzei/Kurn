@@ -12,7 +12,12 @@ import SwiftUI
 
 struct PrivacyCloudSettingsView: View {
     @Environment(AppSettings.self) private var settings
-    @State private var pendingRevocation: String?
+    @State private var pendingRevocation: Revocation?
+
+    private struct Revocation: Equatable {
+        let destination: String
+        let everything: Bool
+    }
 
     var body: some View {
         Form {
@@ -43,18 +48,25 @@ struct PrivacyCloudSettingsView: View {
             }
         }
         .navigationTitle(PrivacyCloudCopy.text("title"))
-        .confirmationDialog(
-            PrivacyCloudCopy.text("revoke_title"),
+        .kurnDialog(
             isPresented: Binding(get: { pendingRevocation != nil }, set: { if !$0 { pendingRevocation = nil } }),
-            titleVisibility: .visible
-        ) {
-            Button(PrivacyCloudCopy.text("revoke_automatic"), role: .destructive) {
-                if let pendingRevocation { settings.revokeAutomaticCloudConsent(pendingRevocation) }
-                pendingRevocation = nil
-            }
-        } message: {
-            Text(PrivacyCloudCopy.text("revoke_detail"))
-        }
+            iconSystemName: "icloud.slash",
+            iconTint: Theme.warning,
+            title: PrivacyCloudCopy.text(pendingRevocation?.everything == true ? "revoke_all_title" : "revoke_title"),
+            message: PrivacyCloudCopy.text(pendingRevocation?.everything == true ? "revoke_all_detail" : "revoke_detail"),
+            primaryTitle: PrivacyCloudCopy.text(pendingRevocation?.everything == true ? "revoke_all" : "revoke_automatic"),
+            primaryRole: .destructive,
+            primaryAction: {
+                guard let pendingRevocation else { return }
+                if pendingRevocation.everything {
+                    settings.revokeAllCloudConsent(pendingRevocation.destination)
+                } else {
+                    settings.revokeAutomaticCloudConsent(pendingRevocation.destination)
+                }
+                self.pendingRevocation = nil
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
     }
 
     private func providerSection(_ destination: String) -> some View {
@@ -73,14 +85,18 @@ struct PrivacyCloudSettingsView: View {
             }
             if automatic {
                 Button(PrivacyCloudCopy.text("revoke_automatic"), role: .destructive) {
-                    pendingRevocation = destination
+                    pendingRevocation = Revocation(destination: destination, everything: false)
                 }
                 .accessibilityIdentifier("privacy.cloud.revoke")
             }
+            Button(PrivacyCloudCopy.text("revoke_all"), role: .destructive) {
+                pendingRevocation = Revocation(destination: destination, everything: true)
+            }
+            .accessibilityIdentifier("privacy.cloud.revokeAll")
         } header: {
             Text(provider?.displayName ?? PrivacyCloudCopy.text("removed_provider"))
         } footer: {
-            Text(PrivacyCloudCopy.host(of: destination))
+            Text(verbatim: PrivacyCloudCopy.endpoint(of: destination))
         }
     }
 }
@@ -92,8 +108,14 @@ enum PrivacyCloudCopy {
 
     static func state(_ allowed: Bool) -> String { text(allowed ? "allowed" : "not_allowed") }
 
+    /// The full endpoint (scheme, host, port and path), since any of them
+    /// distinguishes one grant from another.
+    static func endpoint(of destination: String) -> String {
+        destination.split(separator: "|", maxSplits: 1).last.map(String.init) ?? destination
+    }
+
     static func host(of destination: String) -> String {
-        let endpoint = destination.split(separator: "|", maxSplits: 1).last.map(String.init) ?? destination
+        let endpoint = endpoint(of: destination)
         return URLComponents(string: endpoint)?.host ?? endpoint
     }
 
