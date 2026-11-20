@@ -432,11 +432,16 @@ existing identifiers (`nav.settings`, `meetingCard`, `settings.link.*`) must
 survive. Items that revisit a `CLAUDE.md` decision are marked **review**.
 
 1. **Meetings list toolbar (review).** Today with Knowledge on: Library, Filter,
-   Sort, Select, Settings on top; four places and Record at the bottom. Fold
-   Sort into the Filter sheet and make Select a long-press/`EditMode` entry, leaving Library,
-   Filter and Settings on top. This reverses the "each control open in the bar"
-   choice from the K0.5 review, so it needs that review again and a usability
-   check (task: "sort by duration") before it ships.
+   Sort, Select, Settings on top; four places and Record at the bottom. Keep
+   Select as its own button (a long press is not discoverable and is harder
+   with VoiceOver and Voice Control). Fold Sort into the Filter sheet, leaving
+   Library, Filter, Select and Settings on top: one control fewer, with no
+   hidden gesture. This still reverses part of the "each control open in the
+   bar" choice from the K0.5 review, so it needs that review and a usability
+   check (task: "sort by duration"). The icons themselves are system-sized
+   (no custom frames or fonts in `MeetingsListToolbar`); the heaviness comes
+   from the count of glass buttons, not from their size. Check it on a device
+   before changing anything else.
 2. **Meeting detail overflow menu.** Group the up to 10 rows into three
    `Section`s: *Create* (title, wiki, tags), *Manage* (edit, add PDF, share) and
    *Reprocess* (re-transcribe); replace the `ellipsis` "generating" glyph with a
