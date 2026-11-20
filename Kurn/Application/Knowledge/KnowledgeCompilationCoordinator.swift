@@ -27,7 +27,8 @@ final class KnowledgeCompilationCoordinator {
         self.settings = settings
         self.authorization = authorization ?? {
             KnowledgeExtractionAuthorization(featureEnabled: settings.knowledgeEnabled,
-                policies: [.defaultDeny(id: Self.localPolicyID)], sourceClassifications: [.internal])
+                policies: [Self.localPolicy(settings)], sourceClassifications: [.internal],
+                userConsentedToRemote: settings.knowledgeProvider.map { settings.allowsCloud($0, for: .automatic) } ?? false)
         }
         self.resolveProvider = resolveProvider
         self.isProviderUsable = isProviderUsable
@@ -36,6 +37,35 @@ final class KnowledgeCompilationCoordinator {
             try await self.perform(handle)
         }
         observeControls()
+    }
+
+    /// The local policy follows the shared cloud-consent ledger (CLAUDE.md,
+    /// "Cloud consent"): it names every remote provider the person allowed,
+    /// for `.internal` sources, and its revision changes with that set so work
+    /// queued under an earlier set is refused as obsolete. Consent is still
+    /// checked per operation: extraction needs the automatic grant, Ask the
+    /// on-request one.
+    static func localPolicy(_ settings: AppSettings) -> KnowledgeProcessingPolicy {
+        let remote = settings.providers
+            .filter { $0.kind != .appleOnDevice && settings.allowsCloud($0, for: .onRequest) }
+            .map(\.id)
+        guard !remote.isEmpty else { return .defaultDeny(id: localPolicyID) }
+        return KnowledgeProcessingPolicy(id: localPolicyID, revision: policyRevision(remote), allowedRemoteProviderIDs: Set(remote),
+            allowedOperations: KnowledgeProcessingPolicy.onDeviceOperations, maxRemoteClassification: .internal)
+    }
+
+    /// A launch-stable revision (FNV-1a) for a set of provider IDs; 1 is the default-deny revision.
+    static func policyRevision(_ providerIDs: [String]) -> Int {
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        for byte in providerIDs.sorted().joined(separator: "\n").utf8 {
+            hash = (hash ^ UInt64(byte)) &* 0x0000_0100_0000_01B3
+        }
+        return 2 + Int(hash % UInt64(Int32.max))
+    }
+
+    /// Whether Ask may send knowledge to this provider: the on-request grant.
+    func allowsRemoteAnswers(with provider: AIProvider) -> Bool {
+        settings.allowsCloud(provider, for: .onRequest)
     }
 
     /// A rebuild's generation is an explicit operation identity retained by its
@@ -112,9 +142,9 @@ final class KnowledgeCompilationCoordinator {
         guard let controls = settings.knowledgeControls else { throw KnowledgeJobDeferred(reason: .policyDenied) }
         guard !controls.isPaused else { throw KnowledgeJobDeferred(reason: .paused) }
         guard settings.knowledgeProvider == provider, settings.summaryModel(for: provider) == model else { throw KnowledgeWorkObsolete.providerChanged }
-        // This is a release gate, independent of even an injected permissive
-        // policy or wiki consent. No canonical transcript egress ships in K1.6.
-        guard provider.kind == .appleOnDevice else { throw KnowledgeJobDeferred(reason: .cloudReviewRequired) }
+        // Independent of even an injected permissive policy: transcript
+        // content reaches a cloud provider only under its automatic grant.
+        guard settings.allowsCloud(provider, for: .automatic) else { throw KnowledgeJobDeferred(reason: .cloudReviewRequired) }
         var auth = authorization()
         auth.featureEnabled = auth.featureEnabled && settings.knowledgeEnabled
         guard auth.decision(for: provider).isAllowed else { throw KnowledgeJobDeferred(reason: .policyDenied) }
@@ -197,7 +227,8 @@ final class KnowledgeCompilationCoordinator {
                 let context = KnowledgeExtractionContext(recordedAt: source.recordedAt.ISO8601Format(),
                     timeZone: handle.work.compilation?.timeZone ?? "UTC", kind: snapshot.contextKind)
                 let result = try await KnowledgeExtractionService().extract(segments: source.segments, language: source.language,
-                    context: context, llm: llm, budget: .onDevice, authorization: authorize)
+                    context: context, llm: llm, budget: handle.work.provider.kind == .appleOnDevice ? .onDevice : .conservative,
+                    authorization: authorize)
                 _ = try await currentSource(handle)
                 progress.recordings.append(try KnowledgeRecordingCompilation(recordingID: source.id, result: result))
                 try await jobQueue.checkpoint(KnowledgeStoreRows.authoritativeData(progress), for: handle)
@@ -229,7 +260,7 @@ final class KnowledgeCompilationCoordinator {
     private func allowsQueuedCompilation(_ work: KnowledgeQueuedWork) -> Bool {
         guard settings.knowledgeEnabled, let controls = settings.knowledgeControls, !controls.isPaused,
               controls.allows(work.meetingID), let provider = settings.knowledgeProvider,
-              provider.kind == .appleOnDevice, provider == work.provider else { return false }
+              settings.allowsCloud(provider, for: .automatic), provider == work.provider else { return false }
         return true
     }
 

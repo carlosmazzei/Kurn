@@ -2921,13 +2921,17 @@ hold for every phase; code comments cite this section.
   is retained by `AppEnvironment` and shares the article queue/writer. Successful
   transcription submits canonical work only while `knowledgeEnabled`; there is
   no implicit library backfill or new Settings/navigation UI. The selected
-  summary provider/model is captured, and only Apple on-device is admitted:
-  a hard release gate blocks canonical cloud compilation even if policy and
-  personal consent permit it. No model download is triggered. The stable
-  host-owned workspace policy defaults to on-device/internal; named context
+  Knowledge provider/model is captured. A cloud provider is admitted only under
+  its automatic grant in the cloud-consent ledger (see "Cloud consent"), checked
+  at submission, before every request and in the queue's eligibility, even if an
+  injected policy permits more; on-device needs no grant. A cloud run uses the
+  `.conservative` context budget, on-device keeps `.onDevice`. No model download
+  is triggered. The stable host-owned workspace policy (`localPolicy`) names every
+  provider with a grant for `.internal` sources, with a revision derived from that
+  set, and is default-deny without one; named context
   policies must be supplied explicitly, never silently replaced by that default.
   Local scope/control preferences and backfill UI are described in K2.7 below;
-  corporate-policy editing and canonical cloud consent remain gated.
+  corporate-policy editing remains gated.
   `KnowledgeCompilationIdentity` retains exact v1 keys and adds reversible v2
   keys with a generation digest covering provider configuration, model, policy
   revisions and an explicit rebuild operation UUID. Retries keep their operation
@@ -3753,8 +3757,8 @@ state, stated validity), each name and quote clipped to one line, a `page:` line
   (ADR-008). `ChatKnowledgeGate` offers the tools only when the feature is on, the source controls allow
   1–16 of the run's meetings, and `KnowledgePolicyEvaluator` allows the operation for the run's provider: for a
   cloud provider the policy must name it, cover the sources' classification and have the person's consent.
-  No consent screen exists until the K5 cloud review, so `ChatKnowledgeSource(coordinator:)` answers no and
-  production never offers the tools to a cloud model; a policy alone never stands in for consent.
+  `ChatKnowledgeSource(coordinator:)` reads that consent from the provider's on-request grant in the
+  cloud-consent ledger ("Cloud consent"); a policy alone never stands in for consent.
 - **Every call is authorized again**: before the read, and after it with the read's own source
   classifications (`KnowledgeBrowserRead.sourceClassifications`, from each meeting's context), so a context
   reclassified or consent withdrawn since the run started sends nothing. A refused or failed read is a
@@ -3881,6 +3885,10 @@ transcription keys, a keyed cloud summary provider and its enabled per-recording
 features), so an upgrade asks nothing again. Settings → Privacy & Cloud
 (`PrivacyCloudSettingsView`) lists each destination's grants and the features
 using it, plus the non-AI sharing (template sync, diagnostic reports).
+Knowledge uses the same grants: Settings → Knowledge lists on-device and every
+keyed cloud provider, and choosing a cloud provider without the automatic grant
+asks first (`knowledge.settings.cloud_message`). Extraction needs the automatic
+grant and Ask the on-request one.
 On-device model downloads keep their own per-model consent because none of
 the user's content is sent.
 

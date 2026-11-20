@@ -10,21 +10,20 @@ struct ChatKnowledgeSource: Sendable {
     let read: @Sendable (Set<UUID>, KnowledgeEvidenceSelection?) async throws -> KnowledgeBrowserRead
     /// The host's live authorization: feature flag, source controls, policies, classifications.
     let authorization: @MainActor @Sendable (Set<UUID>) -> KnowledgeSourceAuthorization
-    /// Whether the person agreed to send knowledge to a remote provider to answer. No consent
-    /// screen exists until the K5 cloud review, so production answers no and the tools are never
-    /// offered to a cloud model; a policy alone never stands in for consent.
-    let remoteConsent: @MainActor @Sendable () -> Bool
+    /// Whether the person agreed to send knowledge to this remote provider to answer: its
+    /// on-request grant in the cloud-consent ledger. A policy alone never stands in for consent.
+    let remoteConsent: @MainActor @Sendable (AIProvider) -> Bool
 
     @MainActor
     init(coordinator: KnowledgeCompilationCoordinator) {
         read = { meetings, selection in try await coordinator.readKnowledgeBrowser(meetingIDs: meetings, selection: selection) }
         authorization = { coordinator.browserReadAuthorization(meetingIDs: $0) }
-        remoteConsent = { false }
+        remoteConsent = { coordinator.allowsRemoteAnswers(with: $0) }
     }
 
     init(read: @escaping @Sendable (Set<UUID>, KnowledgeEvidenceSelection?) async throws -> KnowledgeBrowserRead,
          authorization: @escaping @MainActor @Sendable (Set<UUID>) -> KnowledgeSourceAuthorization,
-         remoteConsent: @escaping @MainActor @Sendable () -> Bool) {
+         remoteConsent: @escaping @MainActor @Sendable (AIProvider) -> Bool) {
         self.read = read
         self.authorization = authorization
         self.remoteConsent = remoteConsent
@@ -47,7 +46,7 @@ enum ChatKnowledgeGate {
         let auth = source.authorization(ids)
         let allowed = auth.meetingIDs.intersection(ids)
         guard auth.featureEnabled, !allowed.isEmpty, allowed.count <= meetingLimit,
-              decision(auth, provider: provider, consent: source.remoteConsent(), classifications: classifications).isAllowed else {
+              decision(auth, provider: provider, consent: source.remoteConsent(provider), classifications: classifications).isAllowed else {
             return nil
         }
         return allowed
