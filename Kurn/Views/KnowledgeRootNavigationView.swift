@@ -37,10 +37,15 @@ struct KnowledgeRootNavigationView: View {
         }
     }
 
+    /// The native tab bar is hidden twice per tab: on the tab's host and on
+    /// its stack's root. A navigation stack publishes its root's tab-bar
+    /// visibility itself, so the host's alone was intermittently overridden
+    /// (UI tests found the four native tab buttons back on Ask), the same
+    /// failure the Knowledge reader's stack had.
     private var destinations: some View {
         TabView(selection: $tab) {
             ZStack {
-                NavigationStack { MeetingsListView(selection: $selection, usesRootTabs: true) }
+                NavigationStack { MeetingsListView(selection: $selection, usesRootTabs: true).toolbar(.hidden, for: .tabBar) }
             }
             .hostsRecordingMiniBar()
             .toolbar(.hidden, for: .tabBar)
@@ -60,6 +65,7 @@ struct KnowledgeRootNavigationView: View {
                     MeetingChatView(meeting: nil)
                         .navigationTitle(NSLocalizedString("chat.ask.title", comment: "Ask across meetings"))
                         .navigationBarTitleDisplayMode(.inline)
+                        .toolbar(.hidden, for: .tabBar)
                 }
             }
             .hostsRecordingMiniBar()
@@ -68,7 +74,7 @@ struct KnowledgeRootNavigationView: View {
             .tabItem { Label(AppRootDestination.ask.title, systemImage: AppRootDestination.ask.systemImage) }
             .tag(AppRootDestination.ask)
 
-            ZStack { NavigationStack { DocumentsListView() } }
+            ZStack { NavigationStack { DocumentsListView().toolbar(.hidden, for: .tabBar) } }
                 .hostsRecordingMiniBar()
                 .toolbar(.hidden, for: .tabBar)
                 .padding(.bottom, keyboardVisible ? 0 : rootBarHeight)
