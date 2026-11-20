@@ -40,6 +40,7 @@ struct AppErrorTests {
             .audioError("mic busy"),
             .decodingError("bad json"),
             .permissionDenied("speech"),
+            .speechRecognitionDenied,
             .persistenceFailed("disk full"),
             .protectedStorageUnavailable("attribute rejected"),
             .modelDownloadRequired("diarization"),

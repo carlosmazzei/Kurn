@@ -22,6 +22,9 @@ public enum AppError: LocalizedError, Identifiable {
     case audioError(String)
     case decodingError(String)
     case permissionDenied(String)
+    /// The person refused speech recognition in iOS (Apple Speech). Unlike
+    /// `permissionDenied`, only the system Settings app can grant it again.
+    case speechRecognitionDenied
     case persistenceFailed(String)
     case protectedStorageUnavailable(String)
     case modelDownloadRequired(String)
@@ -86,6 +89,7 @@ public enum AppError: LocalizedError, Identifiable {
         case .audioError: return "audio"
         case .decodingError: return "decoding"
         case .permissionDenied: return "permission"
+        case .speechRecognitionDenied: return "speech_permission"
         case .persistenceFailed: return "persistence"
         case .protectedStorageUnavailable: return "protected_storage"
         case .modelDownloadRequired: return "model_download_required"
@@ -175,6 +179,11 @@ public enum AppError: LocalizedError, Identifiable {
             return String(
                 format: NSLocalizedString("error.permission", comment: "Permission denied"),
                 detail
+            )
+        case .speechRecognitionDenied:
+            return String(
+                format: NSLocalizedString("error.permission", comment: "Permission denied"),
+                NSLocalizedString("error.speech_permission", comment: "Speech permission")
             )
         case .persistenceFailed(let detail):
             return String(

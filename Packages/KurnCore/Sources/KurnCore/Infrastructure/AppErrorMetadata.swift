@@ -64,7 +64,7 @@ extension AppError {
         case .decodingError, .persistenceFailed, .protectedStorageUnavailable, .logExportFailed,
              .attachmentImportFailed:
             return .storage
-        case .permissionDenied:
+        case .permissionDenied, .speechRecognitionDenied:
             return .permission
         case .authenticationRequired, .authenticationFailed, .authenticationNotAvailable, .keychainAccessFailed:
             return .authentication
@@ -125,7 +125,7 @@ extension AppError {
              .speechSynthesisFailed:
             return .retry
         case .noAPIKey, .invalidProviderURL, .networkPolicyRestricted, .permissionDenied,
-             .authenticationNotAvailable:
+             .speechRecognitionDenied, .authenticationNotAvailable:
             return .openSettings
         case .resourceUnavailable:
             return .freeSpace
