@@ -246,7 +246,7 @@ struct ChatSessionTreeTests {
                                                       blocks: [AgentContentBlock(id: "text", content: .text("Q"))])))
         }
         func usage(_ input: Int) -> AgentSessionEntry.Payload {
-            .custom(type: "agent.usage.v1", data: .object(["inputTokens": .number(Double(input)), "outputTokens": .number(10)]))
+            .custom(type: ChatRunBranch.usageType, data: .object(["inputTokens": .number(Double(input)), "outputTokens": .number(10)]))
         }
         let (first, second) = (UUID(), UUID())
         let entries = [try entry("q1", parent: nil, ordinal: 1, question(first)),
