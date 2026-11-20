@@ -42,6 +42,12 @@ extension MeetingsListView {
     /// reaches the other places the way it reached Ask and Documents.
     @ToolbarContentBuilder
     private var knowledgeBrowsingToolbar: some ToolbarContent {
+        knowledgeTopToolbar
+        knowledgeBottomToolbar
+    }
+
+    @ToolbarContentBuilder
+    private var knowledgeTopToolbar: some ToolbarContent {
         // On iPad-regular width the sidebar column already shows the library.
         if horizontalSizeClass != .regular {
             ToolbarItem(placement: .topBarTrailing) { libraryButton(showsTitle: false) }
@@ -51,7 +57,10 @@ extension MeetingsListView {
         ToolbarItem(placement: .topBarTrailing) { selectButton }
         ToolbarSpacer(.fixed, placement: .topBarTrailing)
         ToolbarItem(placement: .topBarTrailing) { settingsButton }
+    }
 
+    @ToolbarContentBuilder
+    private var knowledgeBottomToolbar: some ToolbarContent {
         ToolbarItem(placement: .bottomBar) { destinationButton(.meetings) {} }
         ToolbarItem(placement: .bottomBar) { destinationButton(.knowledge) { showingKnowledge = true } }
         ToolbarItem(placement: .bottomBar) { destinationButton(.ask) { showingAsk = true } }
