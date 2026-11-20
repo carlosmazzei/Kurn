@@ -653,7 +653,11 @@ store-metadata checks), `static-policy` (`Tools/check_static_policy.py`, Linux),
 `ui-accessibility-tests` (`KurnUITests` minus the screenshot suite, run as two
 `ui-tests` shards — `main` and `flows` — on separate runners and reported as
 this one check) and `kurncore-linux` (a matrix running `swift test` and exporting
-coverage separately for `Packages/KurnCore` and `Packages/AgentHarness`). The `release` job
+coverage separately for `Packages/KurnCore` and `Packages/AgentHarness`). `unit-tests` and both `ui-tests` shards compile nothing: they `needs:` the
+`build-for-testing` job, which builds once and uploads the products and
+`.xctestrun` (artifact `test-products`), and run `test-without-building`, so a
+compile error shows up in `build-for-testing`. A cancelled or timed-out shard still fails
+`ui-accessibility-tests`. The `release` job
 needs all six. The weekly/on-demand `reliability-hardening.yml` adds a Thread
 Sanitizer run over the concurrency-sensitive suites, a Release-configuration
 test run and a UI-test flake measurement. The test jobs also upload
