@@ -502,12 +502,10 @@ measured `ui-flake-rate` lane. Open, in the order they pay off:
    `reliability-hardening.yml` on the branch that adds it; 5/5 green attempts
    is the bar the existing suites met. A suite that later flakes is demoted with
    a `-skip-testing` line in `swift.yml` and fixed, never retried into green.
-2. **Build once, test many.** Each `ui-tests` shard and `unit-tests` runs its
-   own `clean test`, so the app and test bundles are compiled three times per
-   PR — most of each job's wall time. `build-for-testing` in one job, the
-   `.xctestrun` plus products uploaded as an artifact, and
-   `test-without-building` in the shards removes two builds; the artifact
-   transfer has to be measured against the build it saves.
+2. **Build once, test many** (done). `build-for-testing` compiles the app and
+   test bundles once and uploads the products and `.xctestrun`; `unit-tests`
+   and both `ui-tests` shards run `test-without-building`. A UI shard used to
+   spend about 15 minutes compiling beside its booted simulator.
 3. **Fewer launches per suite.** Each test relaunches the app (~10–15 s on a
    CI runner); checks that share a screen belong in one test, as
    `testMeetingDetailTabs` already does for the audit. Separate tests only
