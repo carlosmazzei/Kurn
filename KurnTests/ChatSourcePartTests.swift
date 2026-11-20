@@ -64,6 +64,7 @@ private actor PartSourceReader: ChatSourceReader {
         case .summary: expected = ["list_sources", "read_summary"]
         case .wiki: expected = ["list_sources", "read_wiki"]
         case .attachments: expected = ["list_sources", "read_attachment"]
+        case .knowledge: expected = ["list_sources"]
         }
         #expect(names == expected)
         #expect(tools.allSatisfy { !$0.requiresConfirmation })
