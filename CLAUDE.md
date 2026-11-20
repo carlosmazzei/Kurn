@@ -38,8 +38,8 @@ tested with `swift test` on Linux, no Xcode needed; see
 agent loop, context compaction and vendor wire formats, with no dependencies),
 and `Packages/WhisperCpp`, whose only target
 is a `.binaryTarget` pointing at whisper.cpp's official prebuilt XCFramework
-release asset (see "On-device Whisper (whisper.cpp)" below). The only remote
-package is FluidAudio.
+release asset (see "On-device Whisper (whisper.cpp)" below). The remote
+packages are FluidAudio and sherpa-onnx.
 
 ### Agent harness (`Packages/AgentHarness/`)
 
@@ -710,7 +710,7 @@ runs in `static-policy`.
 How coverage was raised to target, and how to keep it there:
 
 - **Seams before tests, as constructor parameters with the production default**
-  (`isProviderUsable`, `service`, `indexService`, `chatService`, an injected
+  (`isProviderUsable`, `service`, `indexService`, `harnessService`, an injected
   `LLMProvider` exercised with `KurnTests/Support/ScriptedLLMProvider`) — never
   `#if DEBUG` inside logic, and no test that needs the network, a downloaded
   model or the microphone.
@@ -3064,7 +3064,7 @@ toolbar would be the wrong control**:
   on `Theme.accent`/`Theme.info` measures ~3.55:1 / ~3.65:1 — under AA for
   normal text, above the 3:1 large-text floor that ≥14 pt bold qualifies for.
 - **Error dialogs offer the error's recovery action.** `errorAlert` reads
-  `AppError.recoveryAction` (`ErrorRecovery` in `View+ErrorAlert.swift`) and
+  `AppError.recoveryAction` (through `Application/ErrorRecovery.swift`) and
   makes it the primary button beside OK: Try Again only when the caller passes
   `onRetry`; Open Settings, Manage Storage, Change Model, Recover Audio and
   Export Diagnostics open Providers, Transcription, Summary, Storage, Health
@@ -3183,7 +3183,7 @@ enforced by lint and by a CI audit test, not just convention:
 
 ## Conventions
 
-- **Errors:** surface recoverable failures as `AppError` (`Infrastructure/AppError.swift`),
+- **Errors:** surface recoverable failures as `AppError` (`Packages/KurnCore/Sources/KurnCore/Infrastructure/AppError.swift`),
   a `LocalizedError` whose messages come from `NSLocalizedString`. New error cases
   must add a matching localization key.
 - **Localization:** user-facing strings use `NSLocalizedString`; the app ships
