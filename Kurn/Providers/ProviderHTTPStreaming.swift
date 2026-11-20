@@ -158,7 +158,6 @@ final class StreamingAccumulator: @unchecked Sendable {
     }
 
     var value: String { lock.withLock { text } }
-    var receivedText: Bool { lock.withLock { !text.isEmpty } }
 }
 
 /// Thread-safe holder for the reason a streamed generation stopped, which
