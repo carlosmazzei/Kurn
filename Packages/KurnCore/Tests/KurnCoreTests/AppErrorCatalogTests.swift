@@ -34,6 +34,7 @@ struct AppErrorCatalogTests {
         .audioError(detail),
         .decodingError(detail),
         .permissionDenied(detail),
+        .speechRecognitionDenied,
         .persistenceFailed(detail),
         .protectedStorageUnavailable(detail),
         .modelDownloadRequired(detail),
@@ -63,7 +64,7 @@ struct AppErrorCatalogTests {
     @Test func catalogCoversEveryLogCode() {
         let codes = Self.allCases.map(\.logCode)
         #expect(Set(codes).count == codes.count, "every case has its own log code")
-        #expect(codes.count == 36)
+        #expect(codes.count == 37)
     }
 
     @Test func logCodesAreClosedVocabularyAndNeverCarryDetail() {
@@ -100,6 +101,9 @@ struct AppErrorCatalogTests {
     @Test func settingsAndProviderActionsMatchTheirCases() {
         #expect(AppError.noAPIKey(provider: "x").recoveryAction == .openSettings)
         #expect(AppError.permissionDenied("x").recoveryAction == .openSettings)
+        #expect(AppError.speechRecognitionDenied.recoveryAction == .openSettings)
+        #expect(AppError.speechRecognitionDenied.category == .permission)
+        #expect(AppError.speechRecognitionDenied.privateContext == nil)
         #expect(AppError.authenticationNotAvailable.recoveryAction == .openSettings)
         #expect(AppError.summarizationUnsupported(provider: "x").recoveryAction == .changeProviderOrModel)
         #expect(AppError.transcriptionLanguageUnsupported(.english, .whisperCpp).recoveryAction == .changeProviderOrModel)

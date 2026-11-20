@@ -32,10 +32,12 @@ struct ErrorRecovery: Equatable {
             destination = .retry
         case .openSettings:
             switch error {
-            // Every `permissionDenied` today is cloud-transcription consent or an
-            // engine permission, both granted in Transcription settings.
+            // `permissionDenied` is cloud-transcription consent or an engine
+            // permission, both granted in Transcription settings. A refused iOS
+            // speech recognition permission is granted only in the system
+            // Settings app, like a missing passcode.
             case .permissionDenied: destination = .screen(.transcription)
-            case .authenticationNotAvailable: destination = .systemSettings
+            case .speechRecognitionDenied, .authenticationNotAvailable: destination = .systemSettings
             // Only the caller's `onOpenNetworkSettings` shortcut offers this one:
             // the Transcription screen shows the error with the switches on screen.
             case .networkPolicyRestricted: return nil

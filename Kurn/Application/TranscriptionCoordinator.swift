@@ -311,12 +311,10 @@ final class TranscriptionCoordinator {
                 // H9 PR 22: recording-scoped like the two failure paths
                 // below (PR 21) — this is also a per-attempt failure tied
                 // to one recording, not a `persist()`-shaped generic one.
-                errorsByRecording[recordingID] = .permissionDenied(
-                    NSLocalizedString("error.speech_permission", comment: "Speech permission")
-                )
+                errorsByRecording[recordingID] = .speechRecognitionDenied
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "transcription", outcome: .failed,
-                    elapsedSeconds: Date().timeIntervalSince(startedAt), code: AppError.permissionDenied("").logCode
+                    elapsedSeconds: Date().timeIntervalSince(startedAt), code: AppError.speechRecognitionDenied.logCode
                 ))
                 return
             }

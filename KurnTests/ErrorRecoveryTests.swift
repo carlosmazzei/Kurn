@@ -19,6 +19,9 @@ struct ErrorRecoveryTests {
         #expect(ErrorRecovery(error: .noAPIKey(provider: "x"), canRetry: false)?.destination == .screen(.providers))
         #expect(ErrorRecovery(error: .invalidProviderURL, canRetry: false)?.destination == .screen(.providers))
         #expect(ErrorRecovery(error: .permissionDenied("x"), canRetry: false)?.destination == .screen(.transcription))
+        // A refused iOS speech permission can only be granted again in the
+        // system Settings app, not in the app's Transcription screen.
+        #expect(ErrorRecovery(error: .speechRecognitionDenied, canRetry: false)?.destination == .systemSettings)
         #expect(ErrorRecovery(error: .authenticationNotAvailable, canRetry: false)?.destination == .systemSettings)
     }
 

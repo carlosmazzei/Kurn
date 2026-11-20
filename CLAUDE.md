@@ -4041,8 +4041,11 @@ toolbar would be the wrong control**:
   `onRetry`; Open Settings, Manage Storage, Change Model, Recover Audio and
   Export Diagnostics open Providers, Transcription, Summary, Storage, Health
   or Diagnostics in a sheet, and a passcode error opens the app's page in the
-  Settings app. `permissionDenied` opens Transcription (cloud consent), and the
-  Wi-Fi-only error is offered only through `onOpenNetworkSettings`. The
+  Settings app. `permissionDenied` opens Transcription (cloud consent), while a
+  refused iOS speech recognition permission is its own case,
+  `speechRecognitionDenied`, and opens the app's page in the Settings app, the
+  only place it can be granted again. The Wi-Fi-only error is offered only
+  through `onOpenNetworkSettings`. The
   decision lives in `Application/ErrorRecovery.swift` so coverage measures it.
   A screen that is itself the destination passes `offersRecovery: false`.
 - **Fixed font sizes need a reason.** `.font(.system(size:))` appears only on
