@@ -10,6 +10,7 @@ import Testing
 struct ChatKnowledgeStructureToolsTests {
     private nonisolated static let review = UUID(), planning = UUID(), sync = UUID(), recording = UUID()
     private nonisolated static let project = UUID(), team = UUID(), person = UUID(), migrate = UUID(), runbook = UUID()
+    private nonisolated static let proposedOwner = UUID(), formerOwner = UUID()
     private nonisolated static let now = Date(timeIntervalSince1970: 1_795_600_000)
 
     private nonisolated static func day(_ text: String) -> KnowledgeTemporalValue? {
@@ -36,6 +37,8 @@ struct ChatKnowledgeStructureToolsTests {
             .init(id: person, kind: .person, name: "Avery Example"),
             .init(id: migrate, kind: .actionItem, name: "Migrate billing"),
             .init(id: runbook, kind: .actionItem, name: "Write runbook"),
+            .init(id: proposedOwner, kind: .person, name: "Riley Example"),
+            .init(id: formerOwner, kind: .person, name: "Former owner"),
         ]
         let facts = [
             fact(team, .blocks, object: project, from: KnowledgeTemporalValue(text: "2026-09", precision: .month),
@@ -43,6 +46,8 @@ struct ChatKnowledgeStructureToolsTests {
             fact(project, .hasStatus, value: .enumeration("open"), from: day("2026-10-05")),
             fact(project, .hasStatus, value: .enumeration("blocked"), from: day("2026-11-10"), meeting: planning),
             fact(migrate, .assignedTo, object: person, meeting: planning),
+            fact(migrate, .assignedTo, object: proposedOwner, modality: .proposed, meeting: planning),
+            fact(migrate, .assignedTo, object: formerOwner, to: day("2026-10-01"), meeting: planning),
             fact(migrate, .partOf, object: project, meeting: planning),
             fact(migrate, .hasStatus, value: .enumeration("committed"), from: day("2026-10-20"), meeting: planning),
             fact(migrate, .dueOn, value: day("2026-12-01").map { .date($0) }, meeting: planning),
@@ -113,7 +118,9 @@ struct ChatKnowledgeStructureToolsTests {
     @Test func openActionsLeaveOutDefinitelyCompletedOnes() async throws {
         let output = try await run("list_open_actions", [:])
         #expect(output.content.contains("- action \(Self.migrate.uuidString) | Migrate billing | status: committed (definite, since 2026-10-20)"
-            + " | assigned: Avery Example | due: 2026-12-01"))
+            + " | assigned: Avery Example, Riley Example (tentative) | due: 2026-12-01"))
+        // An assignment that ended is not a current detail.
+        #expect(!output.content.contains("Former owner"))
         #expect(!output.content.contains("Write runbook"))
         // Linked through its assignee or the project it is part of; not through an unrelated team.
         #expect(try await run("list_open_actions", ["entityID": .string(Self.person.uuidString)]).content.contains("Migrate billing"))
@@ -133,7 +140,7 @@ struct ChatKnowledgeStructureToolsTests {
         #expect(context.content.hasPrefix("context \(Self.sync.uuidString) | kind: vendorDiscussion | Sync | meetings: 1"))
         #expect(context.content.contains("- meeting \(Self.review.uuidString) | Weekly review | claims: 4"))
         let none = try await run("get_context", ["contextID": .string("unknown")])
-        #expect(none.content.contains("- meeting \(Self.planning.uuidString) | Planning | claims: 5"))
+        #expect(none.content.contains("- meeting \(Self.planning.uuidString) | Planning | claims: 7"))
         #expect(try await run("get_context", ["contextID": .string(UUID().uuidString)]).isError)
         #expect(try await run("get_context", ["contextID": .string("nope")]).isError)
         #expect(try await run("list_contexts", ["extra": .number(1)]).isError)

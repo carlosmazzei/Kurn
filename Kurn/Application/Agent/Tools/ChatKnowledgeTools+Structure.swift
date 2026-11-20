@@ -129,11 +129,13 @@ extension ChatKnowledgeTools {
             let state = projection.state(at: now)
             // Only a definite completion or cancellation closes an action; a possible one is listed.
             if let state, state.certainty == .definite, closedActionStatuses.contains(state.status) { return nil }
-            return ChatKnowledgeToolText.OpenAction(page: page, projection: projection, state: state)
+            let holdings = KnowledgeTemporalReducer.state(of: page.entity.id, validAt: now, knownAt: now, claims: claims)
+            return ChatKnowledgeToolText.OpenAction(page: page, projection: projection, state: state, holdings: holdings)
         }
+        let names = ChatKnowledgeToolText.names(read.pages)
         return ChatKnowledgeToolText.output(
             header: "open actions as of \(ChatSourceToolText.date(now)) (action | name | status | assigned | due | anomalies):",
-            lines: actions.map(ChatKnowledgeToolText.openAction), offset: params.offset, limit: params.limit, read: read)
+            lines: actions.map { ChatKnowledgeToolText.openAction($0, names: names) }, offset: params.offset, limit: params.limit, read: read)
     }
 
     // MARK: - list_contexts / get_context

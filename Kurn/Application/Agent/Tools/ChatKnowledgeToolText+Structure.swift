@@ -91,11 +91,13 @@ extension ChatKnowledgeToolText {
         let page: KnowledgeWikiPage
         let projection: KnowledgeLifecycleProjection
         let state: KnowledgeLifecycleProjection.Snapshot?
+        /// What holds for the action at the same moment, so former assignees and superseded due
+        /// dates are left out and proposals stay marked.
+        let holdings: KnowledgeTemporalState
     }
 
-    static func openAction(_ action: OpenAction) -> Rendered {
+    static func openAction(_ action: OpenAction, names: [UUID: String]) -> Rendered {
         let entity = action.page.entity
-        let entries = action.page.sections.flatMap(\.entries).filter { $0.fact.qualifiers.polarity == .positive }
         let name = ChatSourceToolText.renderedField(entity.name, limit: 200)
         var line = "- action \(entity.id.uuidString) | \(name.text) | status: "
         if let state = action.state {
@@ -104,16 +106,19 @@ extension ChatKnowledgeToolText {
         } else {
             line += "unknown"
         }
-        let assigned = entries.compactMap { entry -> String? in
-            if entry.fact.predicate == .assignedTo, entry.subject.id == entity.id { return entry.object?.name }
-            if entry.fact.predicate == .owns, entry.object?.id == entity.id { return entry.subject.name }
-            return nil
+        let held = action.holdings.holdings.filter { $0.polarity == .positive }
+        func shown(_ text: String, _ holding: KnowledgeTemporalState.Holding) -> String {
+            holding.isTentative ? text + " (tentative)" : text
         }
-        if !assigned.isEmpty {
-            line += " | assigned: " + Array(Set(assigned)).sorted().prefix(5).map { ChatSourceToolText.field($0, limit: 100) }
-                .joined(separator: ", ")
+        let assigned = held.compactMap { holding -> String? in
+            guard (holding.predicate == .assignedTo && holding.direction == .outgoing)
+                    || (holding.predicate == .owns && holding.direction == .incoming),
+                  let other = holding.otherEntityID else { return nil }
+            return shown(ChatSourceToolText.field(names[other] ?? "", limit: 100), holding)
         }
-        let due = entries.filter { $0.fact.predicate == .dueOn && $0.subject.id == entity.id }.compactMap { $0.fact.value.map(valueText) }
+        if !assigned.isEmpty { line += " | assigned: " + Array(Set(assigned)).sorted().prefix(5).joined(separator: ", ") }
+        let due = held.filter { $0.predicate == .dueOn && $0.direction == .outgoing }
+            .compactMap { holding in holding.value.map { shown(valueText($0), holding) } }
         if !due.isEmpty { line += " | due: " + Array(Set(due)).sorted().prefix(3).joined(separator: ", ") }
         let anomalies = Set(action.projection.anomalies.map(\.code.rawValue)).sorted()
         if !anomalies.isEmpty { line += " | anomalies: " + anomalies.joined(separator: ", ") }
