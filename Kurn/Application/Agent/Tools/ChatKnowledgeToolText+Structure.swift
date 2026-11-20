@@ -141,7 +141,9 @@ extension ChatKnowledgeToolText {
         let fact = step.entry.fact
         let text = ChatSourceToolText.renderedField(claimText(step.entry), limit: 400)
         let speakers = step.speakers.map { ChatSourceToolText.field($0, limit: 100) }.joined(separator: ", ")
-        let replaces = step.replaces.isEmpty ? "none" : step.replaces.map(\.uuidString).joined(separator: ", ")
+        // The claim it directly updates; older ones are counted, so a long history stays within the budget.
+        let replaces = step.replaces.first.map { $0.uuidString + (step.replaces.count > 1 ? " (+\(step.replaces.count - 1) earlier)" : "") }
+            ?? "none"
         let evidence = fact.source.evidence.map { "\($0.id.uuidString) \(timestamp($0.startMs))" }.joined(separator: ", ")
         let line = "- \(fact.id.uuidString) | \(text.text) | \(qualifiers(fact.qualifiers)) | meeting "
             + "\(fact.source.meetingID.uuidString) | speakers \(speakers.isEmpty ? "none" : speakers) | replaces \(replaces)"
