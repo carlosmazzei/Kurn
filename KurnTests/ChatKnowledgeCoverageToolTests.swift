@@ -16,11 +16,11 @@ struct ChatKnowledgeCoverageToolTests {
         KnowledgeCoverageRead(revision: 7, isComplete: complete, meetings: [
             .init(meetingID: review, recordings: [
                 .init(recordingID: first, totalSegments: 40, examinedSegments: 38, state: .current),
-                .init(recordingID: second, totalSegments: 10, examinedSegments: 0, state: .sourceChanged),
+                .init(recordingID: second, totalSegments: 10, examinedSegments: 0, state: .sourceChanged)
             ], classification: classification),
             .init(meetingID: planning, recordings: [
-                .init(recordingID: third, totalSegments: 12, examinedSegments: 0, state: .missingCompilation),
-            ], classification: .internal),
+                .init(recordingID: third, totalSegments: 12, examinedSegments: 0, state: .missingCompilation)
+            ], classification: .internal)
         ])
     }
 
@@ -29,7 +29,7 @@ struct ChatKnowledgeCoverageToolTests {
             read: { _, _ in throw KnowledgeWikiStoreError.scopeDenied },
             authorization: { ids in
                 KnowledgeSourceAuthorization(featureEnabled: true, meetingIDs: ids, policies: [
-                    KnowledgeProcessingPolicy(allowedRemoteProviderIDs: [AIProvider.openAI.id], maxRemoteClassification: .internal),
+                    KnowledgeProcessingPolicy(allowedRemoteProviderIDs: [AIProvider.openAI.id], maxRemoteClassification: .internal)
                 ], sourceClassifications: [.internal])
             },
             remoteConsent: { _ in consent },
