@@ -190,9 +190,12 @@ struct KnowledgeSettingsView: View {
     private func binding(_ controls: KnowledgeControls, _ key: WritableKeyPath<KnowledgeControls, Bool>) -> Binding<Bool> {
         Binding(get: { settings.knowledgeControls?[keyPath: key] ?? false }, set: { value in var next = controls; next[keyPath: key] = value; save(next) })
     }
-    /// On-device plus every cloud provider with a key.
+    /// On-device plus every keyed cloud provider that can generate text with a model set.
     private var knowledgeProviders: [AIProvider] {
-        settings.providers.filter { $0.kind == .appleOnDevice || settings.credentials.hasKey(for: $0) }
+        settings.providers.filter {
+            $0.kind == .appleOnDevice
+                || ($0.supportsSummarization && settings.credentials.hasKey(for: $0) && !settings.summaryModel(for: $0).isEmpty)
+        }
     }
 
     private var costText: String {
