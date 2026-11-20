@@ -38,9 +38,15 @@ final class AppSettings {
         didSet { persistProviders() }
     }
 
-    /// Choosing a cloud summary provider is its on-request grant (CLAUDE.md, "Cloud consent").
+    /// Choosing a cloud summary provider is its on-request grant (CLAUDE.md,
+    /// "Cloud consent"); its per-recording features stay on only if it also
+    /// holds the automatic grant, so no toggle shows On while paused.
     var aiProviderID: String {
-        didSet { defaults.set(aiProviderID, forKey: Keys.provider); grantCloudConsent(aiProvider, for: .onRequest) }
+        didSet {
+            defaults.set(aiProviderID, forKey: Keys.provider)
+            grantCloudConsent(aiProvider, for: .onRequest)
+            if !allowsCloud(aiProvider, for: .automatic) { wikiEnabled = false; correctionEnabled = false; aiTitleCloudEnabled = false }
+        }
     }
 
     /// Provider used for cloud (Whisper) transcription, chosen independently of

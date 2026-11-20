@@ -60,6 +60,10 @@ extension AppSettings {
         if cloudConsentDestination(for: aiProvider) == destination {
             aiProviderID = AIProvider.appleOnDevice.id
         }
+        if let speech = providers.first(where: { $0.id == readAloud.providerID }),
+           cloudConsentDestination(for: speech) == destination {
+            readAloud.providerID = AIProvider.appleOnDevice.id
+        }
         if var controls = knowledgeControls, let provider = knowledgeProvider,
            cloudConsentDestination(for: provider) == destination {
             controls.providerID = AIProvider.appleOnDevice.id

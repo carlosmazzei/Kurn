@@ -3887,7 +3887,9 @@ transcription provider. Audio keeps its own per-destination upload consent
 consent key and turns off the summary provider's per-recording features. Choosing a cloud summary provider
 records its on-request grant, and `revokeAllCloudConsent` (Privacy & Cloud's "Remove
 all permissions") also moves the summary and Knowledge providers on that
-destination to on-device. The
+destination, and Read Aloud on it, to on-device. A summary-provider fallback
+(`ensureProviderSelectionsAreUsable`) never picks a destination marked withdrawn
+(`CloudConsentLedger.withdrawn`, set by removing all permissions, cleared by a new grant). The
 first launch with no stored ledger migrates what was already allowed (legacy
 transcription keys, a keyed cloud summary provider and its enabled per-recording
 features), so an upgrade asks nothing again. Settings → Privacy & Cloud

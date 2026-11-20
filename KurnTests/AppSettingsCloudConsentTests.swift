@@ -82,7 +82,8 @@ struct AppSettingsCloudConsentTests {
                                baseURLString: "https://other.example.com/v1")
         settings.addProvider(other)
         #expect(settings.aiProvider.id == other.id)
-        #expect(settings.wikiEnabled && !settings.wikiAutomaticAllowed)
+        #expect(!settings.wikiAutomaticAllowed)
+        #expect(!settings.wikiEnabled)
     }
 
     @Test func revokingAutomaticTurnsItsFeaturesOffAndFallsBackToOnDeviceTranscription() {
@@ -107,9 +108,43 @@ struct AppSettingsCloudConsentTests {
 
     @Test func removingAllPermissionsMovesTheSummaryProviderOnDevice() {
         let settings = cloudSettings()
+        settings.readAloud.providerID = AIProvider.openAI.id
         settings.revokeAllCloudConsent(settings.cloudConsentDestination(for: .openAI))
+        #expect(settings.readAloud.providerID == AIProvider.appleOnDevice.id)
         #expect(settings.aiProviderID == AIProvider.appleOnDevice.id)
         #expect(!settings.allowsCloud(.openAI, for: .onRequest))
         #expect(settings.cloudConsents.destinations.isEmpty)
+    }
+
+    @Test func aFallbackNeverReselectsAWithdrawnProvider() throws {
+        let (defaults, suite) = try defaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(cloudStore: InMemoryCloudKeyValueStore(), defaults: defaults,
+                                   credentials: CredentialStore(keychain: ConsentTestKeychain()))
+        settings.credentials.saveKey("sk-test", for: .openAI)
+        settings.aiProviderID = AIProvider.openAI.id
+        settings.revokeAllCloudConsent(settings.cloudConsentDestination(for: .openAI))
+        settings.ensureProviderSelectionsAreUsable()
+        #expect(settings.aiProviderID != AIProvider.openAI.id)
+    }
+}
+
+private final class ConsentTestKeychain: KeychainAccessing, @unchecked Sendable {
+    private var storage: [String: String] = [:]
+
+    func get(_ account: String) -> KeychainReadOutcome {
+        storage[account].map { .found($0) } ?? .absent
+    }
+
+    @discardableResult
+    func set(_ value: String, for account: String) -> KeychainWriteOutcome {
+        storage[account] = value
+        return .success
+    }
+
+    @discardableResult
+    func delete(_ account: String) -> KeychainWriteOutcome {
+        storage[account] = nil
+        return .success
     }
 }

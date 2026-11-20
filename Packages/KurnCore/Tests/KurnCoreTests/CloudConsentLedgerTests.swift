@@ -48,6 +48,9 @@ struct CloudConsentLedgerTests {
         #expect(!ledger.allows(destination, for: .automatic))
         ledger.revokeAll(destination)
         #expect(ledger.destinations.isEmpty)
+        #expect(ledger.isWithdrawn(destination))
+        ledger.grant(destination, for: .onRequest, at: date)
+        #expect(!ledger.isWithdrawn(destination))
     }
 
     @Test func roundTripsAndRefusesAFutureVersion() throws {

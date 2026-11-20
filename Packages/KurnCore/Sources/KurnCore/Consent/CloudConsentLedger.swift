@@ -32,6 +32,9 @@ public struct CloudConsentGrant: Codable, Sendable, Hashable {
 public struct CloudConsentLedger: Codable, Sendable, Equatable {
     public private(set) var version = 1
     public private(set) var grants: [CloudConsentGrant] = []
+    /// Destinations whose every permission was removed. A fallback never
+    /// selects one of these on its own; a new grant clears the mark.
+    public private(set) var withdrawn: [String] = []
 
     public init() {}
 
@@ -52,7 +55,10 @@ public struct CloudConsentLedger: Codable, Sendable, Equatable {
         Array(Set(grants.map(\.destination))).sorted()
     }
 
+    public func isWithdrawn(_ destination: String) -> Bool { withdrawn.contains(destination) }
+
     public mutating func grant(_ destination: String, for purpose: CloudConsentPurpose, at date: Date) {
+        withdrawn.removeAll { $0 == destination }
         guard grant(for: destination, purpose: purpose) == nil else { return }
         grants.append(CloudConsentGrant(destination: destination, purpose: purpose, grantedAt: date))
     }
@@ -63,6 +69,7 @@ public struct CloudConsentLedger: Codable, Sendable, Equatable {
 
     public mutating func revokeAll(_ destination: String) {
         grants.removeAll { $0.destination == destination }
+        if !withdrawn.contains(destination) { withdrawn.append(destination) }
     }
 
     public func encoded() throws -> Data {
