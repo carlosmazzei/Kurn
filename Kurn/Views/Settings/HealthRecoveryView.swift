@@ -87,7 +87,7 @@ struct HealthRecoveryView: View {
         .navigationDestination(item: $selectedMeeting) { meeting in
             MeetingDetailView(meeting: meeting)
         }
-        .errorAlert($actionError)
+        .errorAlert($actionError, offersRecovery: false)
         .sheet(item: $quarantineShareItem) { item in
             ActivityView(items: item.urls)
         }

@@ -3063,6 +3063,14 @@ toolbar would be the wrong control**:
   `.subheadline` because white
   on `Theme.accent`/`Theme.info` measures ~3.55:1 / ~3.65:1 — under AA for
   normal text, above the 3:1 large-text floor that ≥14 pt bold qualifies for.
+- **Error dialogs offer the error's recovery action.** `errorAlert` reads
+  `AppError.recoveryAction` (`ErrorRecovery` in `View+ErrorAlert.swift`) and
+  makes it the primary button beside OK: Try Again only when the caller passes
+  `onRetry`; Open Settings, Manage Storage, Change Model, Recover Audio and
+  Export Diagnostics open Providers, Transcription, Summary, Storage, Health
+  or Diagnostics in a sheet, and a permission or passcode error opens the
+  app's page in the Settings app. A screen that is itself the destination
+  passes `offersRecovery: false`.
 - **Fixed font sizes need a reason.** `.font(.system(size:))` appears only on
   icons constrained by a small fixed well or grid cell, each with an inline
   comment saying so; everything else uses a `Theme` font or a scalable

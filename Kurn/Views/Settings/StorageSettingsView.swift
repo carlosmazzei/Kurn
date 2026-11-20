@@ -109,7 +109,7 @@ struct StorageSettingsView: View {
             quarantineItems = await loadQuarantineItems()
             downloads.refreshInstalledModels()
         }
-        .errorAlert($quarantineError)
+        .errorAlert($quarantineError, offersRecovery: false)
         .sheet(item: $quarantineShareItem) { item in
             ActivityView(items: item.urls)
         }
@@ -138,11 +138,11 @@ struct StorageSettingsView: View {
         .errorAlert(Binding(
             get: { compaction?.error },
             set: { compaction?.error = $0 }
-        ))
+        ), offersRecovery: false)
         .errorAlert(Binding(
             get: { enhancement.error },
             set: { enhancement.error = $0 }
-        ))
+        ), offersRecovery: false)
         .kurnDialog(
             isPresented: $showingCompactConfirm,
             iconSystemName: "arrow.down.circle.fill",

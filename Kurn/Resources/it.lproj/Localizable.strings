@@ -14,6 +14,12 @@
 "error.network_policy_restricted" = "Upload audio e download dei modelli sono impostati solo su Wi-Fi, e questo dispositivo è su rete cellulare o in modalità Dati ridotti. Connettiti al Wi-Fi, oppure consenti rete cellulare e modalità Dati ridotti in Trasferimenti di grandi dimensioni nelle impostazioni Trascrizione, poi riprova.";
 "error.network_policy_restricted.title" = "Wi-Fi necessario";
 "error.network_policy_restricted.open_settings" = "Apri impostazioni";
+"error.recovery.retry" = "Riprova";
+"error.recovery.open_settings" = "Apri impostazioni";
+"error.recovery.free_space" = "Gestisci spazio";
+"error.recovery.change_model" = "Cambia modello";
+"error.recovery.recover_audio" = "Recupera audio";
+"error.recovery.export_diagnostics" = "Esporta diagnostica";
 "error.cloud_transcription_consent_required" = "La trascrizione cloud richiede il consenso all’invio dell’audio. Verifica destinazione e politica nelle impostazioni Trascrizione.";
 "settings.network.large_transfers" = "Trasferimenti di grandi dimensioni";
 "settings.network.allow_expensive" = "Consenti rete cellulare";
