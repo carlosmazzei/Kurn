@@ -26,10 +26,10 @@ struct PrivacyCloudSettingsView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-            if settings.cloudConsents.destinations.isEmpty {
+            if settings.cloudConsentDestinationsForDisplay.isEmpty {
                 Section { Text(PrivacyCloudCopy.text("none")) }
             }
-            ForEach(settings.cloudConsents.destinations, id: \.self) { destination in
+            ForEach(settings.cloudConsentDestinationsForDisplay, id: \.self) { destination in
                 providerSection(destination)
             }
             Section {
@@ -73,17 +73,19 @@ struct PrivacyCloudSettingsView: View {
         let provider = settings.provider(forCloudConsent: destination)
         let ledger = settings.cloudConsents
         let automatic = ledger.allows(destination, for: .automatic)
+        let audio = provider.map { settings.hasCloudTranscriptionConsent(for: $0) } ?? false
         return Section {
             LabeledContent(PrivacyCloudCopy.text("on_request"),
                            value: PrivacyCloudCopy.state(ledger.allows(destination, for: .onRequest)))
             LabeledContent(PrivacyCloudCopy.text("automatic"), value: PrivacyCloudCopy.state(automatic))
+            LabeledContent(PrivacyCloudCopy.text("audio"), value: PrivacyCloudCopy.state(audio))
             if let provider {
                 let features = PrivacyCloudCopy.features(using: provider, settings: settings)
                 if !features.isEmpty {
                     LabeledContent(PrivacyCloudCopy.text("features"), value: features.joined(separator: ", "))
                 }
             }
-            if automatic {
+            if automatic || audio {
                 Button(PrivacyCloudCopy.text("revoke_automatic"), role: .destructive) {
                     pendingRevocation = Revocation(destination: destination, everything: false)
                 }

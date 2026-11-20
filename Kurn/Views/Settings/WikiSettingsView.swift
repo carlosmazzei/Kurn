@@ -41,8 +41,7 @@ struct WikiSettingsView: View {
             Section {
                 Toggle(
                     isOn: Binding(
-                        // Shows the automatic state; turning it on records the grant.
-                        get: { settings.wikiAutomaticAllowed && hasKey },
+                        get: { settings.wikiEnabled && hasKey },
                         set: { settings.wikiEnabled = $0 }
                     )
                 ) {

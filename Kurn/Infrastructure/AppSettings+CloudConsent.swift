@@ -22,10 +22,6 @@ extension AppSettings {
         provider.kind == .appleOnDevice || cloudConsents.allows(cloudConsentDestination(for: provider), for: purpose)
     }
 
-    /// The meeting wiki runs per recording only under the summary provider's
-    /// automatic grant; switching providers does not carry the grant over.
-    var wikiAutomaticAllowed: Bool { wikiEnabled && allowsCloud(aiProvider, for: .automatic) }
-
     func grantCloudConsent(_ provider: AIProvider, for purpose: CloudConsentPurpose, at date: Date = Date()) {
         guard provider.kind != .appleOnDevice else { return }
         var ledger = cloudConsents
@@ -74,6 +70,11 @@ extension AppSettings {
         saveCloudConsents(ledger)
     }
 
+    /// Every destination with a text grant or an audio upload consent, for Privacy & Cloud.
+    var cloudConsentDestinationsForDisplay: [String] {
+        Array(Set(cloudConsents.destinations).union(cloudTranscriptionConsentKeys)).sorted()
+    }
+
     /// The provider configured for a destination, if it still exists.
     func provider(forCloudConsent destination: String) -> AIProvider? {
         providers.first { cloudConsentDestination(for: $0) == destination }
@@ -84,9 +85,6 @@ extension AppSettings {
     func migrateCloudConsentsIfNeeded(now: Date = Date()) {
         guard defaults.object(forKey: Self.cloudConsentsKey) == nil else { return }
         var ledger = CloudConsentLedger()
-        for destination in cloudTranscriptionConsentKeys {
-            ledger.grant(destination, for: .automatic, at: now)
-        }
         let summary = aiProvider
         if summary.kind != .appleOnDevice, credentials.hasKey(for: summary) {
             let destination = cloudConsentDestination(for: summary)

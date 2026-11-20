@@ -3875,15 +3875,12 @@ under `settings.cloudConsents.v1`) holds the grants. There are two purposes:
 (per-recording: cloud transcription, automatic titles, wiki, correction, Knowledge
 extraction). An automatic grant also covers on-request use. A changed endpoint is
 a new destination, and the on-device provider never needs a grant. Feature
-toggles still choose which features run. Turning on `wikiEnabled`,
-`correctionEnabled` or `aiTitleCloudEnabled` records the automatic grant for the
-summary provider, and those features run per recording only while the current
-summary provider holds that grant (`wikiAutomaticAllowed`, `AITitleCoordinator`,
-`correctionConsented`), so switching summary providers does not carry it over;
-explicit requests still run, and the toggles show the automatic state, so turning
-one on again records the grant for the new provider. Confirming the cloud-upload dialog records it for the
-transcription provider. Audio keeps its own per-destination upload consent
-(`hasCloudTranscriptionConsent`): a text grant never authorizes an audio upload.
+toggles still choose which features run, and `wikiEnabled`, `correctionEnabled`
+and `aiTitleCloudEnabled` mean "send to my summary provider": turning one on, or
+choosing a summary provider while one is on, records that provider's automatic
+grant, so the ledger always shows where they send. Audio keeps its own
+per-destination upload consent (`hasCloudTranscriptionConsent`, the cloud-upload
+dialog): audio and text consent never authorize each other.
 `revokeAutomaticCloudConsent` withdraws the grant, clears the legacy transcription
 consent key and turns off the summary provider's per-recording features. Choosing a cloud summary provider
 records its on-request grant, and `revokeAllCloudConsent` (Privacy & Cloud's "Remove
@@ -3891,11 +3888,11 @@ all permissions") also moves the summary and Knowledge providers on that
 destination, and Read Aloud on it, to on-device. A summary-provider fallback
 (`ensureProviderSelectionsAreUsable`) never picks a destination marked withdrawn
 (`CloudConsentLedger.withdrawn`, set by removing all permissions, cleared by a new grant). The
-first launch with no stored ledger migrates what was already allowed (legacy
-transcription keys, a keyed cloud summary provider and its enabled per-recording
-features), so an upgrade asks nothing again. Settings → Privacy & Cloud
-(`PrivacyCloudSettingsView`) lists each destination's grants and the features
-using it, plus the non-AI sharing (template sync, diagnostic reports).
+first launch with no stored ledger migrates what was already allowed (a keyed
+cloud summary provider and its enabled per-recording features; audio consent is
+kept as it was), so an upgrade asks nothing again. Settings → Privacy & Cloud
+(`PrivacyCloudSettingsView`) lists each destination's grants, its audio upload
+consent and the features using it, plus the non-AI sharing (template sync, diagnostic reports).
 Consent is enforced when work starts: work already running (a multi-chunk upload,
 a staged summary, a conversation's earlier tool results) finishes under the
 consent it started with.

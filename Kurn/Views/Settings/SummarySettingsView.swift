@@ -75,10 +75,7 @@ struct SummarySettingsView: View {
             Section {
                 Toggle(
                     NSLocalizedString("settings.ai_title_cloud", comment: "Automatic titles with cloud providers"),
-                    isOn: Binding(
-                        get: { settings.aiTitleCloudEnabled && settings.allowsCloud(settings.aiProvider, for: .automatic) },
-                        set: { settings.aiTitleCloudEnabled = $0 }
-                    )
+                    isOn: $settings.aiTitleCloudEnabled
                 )
             } footer: {
                 Text(NSLocalizedString("settings.ai_title_cloud_footer", comment: "Explains automatic titles send the transcript to the cloud provider"))
