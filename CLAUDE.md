@@ -3807,7 +3807,11 @@ state, stated validity), each name and quote clipped to one line, a `page:` line
   (`HarnessChatService.knowledgePolicy`): query knowledge first, keep modality/negation, cite through evidence, call
   `get_coverage` for the meetings it answers from and use the offered source tools for meetings not compiled, stale,
   not fully examined or without knowledge; a missing fact is reported as absent from the compiled knowledge, never as
-  never said; the transcript wins a disagreement. Runs without knowledge tools keep the old prompt.
+  never said; the transcript wins a disagreement.
+- **Knowledge egress (K6.1)**: the `knowledge-network` rule in `Tools/check_static_policy.py` rejects `URLSession`,
+  `URLRequest`, `LLMHTTP`, `ProviderHTTPTransport`, `NWConnection` and CloudKit/iCloud key-value stores in Knowledge
+  code (`Application/Knowledge/`, `ChatKnowledgeTools*`, `Views/Knowledge*`, `Views/MeetingKnowledge*`, KurnCore
+  `Knowledge/`); its only egress is the provider call admitted by the policy and the consent ledger. Runs without knowledge tools keep the old prompt.
 
 ### Attached documents (PDFs)
 
