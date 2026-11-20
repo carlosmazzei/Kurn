@@ -82,7 +82,8 @@ struct AppSettingsCloudConsentTests {
                                baseURLString: "https://other.example.com/v1")
         settings.addProvider(other)
         #expect(settings.aiProvider.id == other.id)
-        #expect(settings.wikiEnabled && !settings.wikiAutomaticAllowed)
+        #expect(!settings.wikiAutomaticAllowed)
+        #expect(!settings.wikiEnabled)
     }
 
     @Test func revokingAutomaticTurnsItsFeaturesOffAndFallsBackToOnDeviceTranscription() {
