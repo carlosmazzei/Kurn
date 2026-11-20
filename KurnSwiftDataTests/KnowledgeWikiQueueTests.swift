@@ -50,18 +50,18 @@ struct KnowledgeWikiQueueTests {
     }
 
     private actor Gate {
-        private var continuation: CheckedContinuation<Void, Never>?
+        private var continuations: [CheckedContinuation<Void, Never>] = []
         private var open = false
         var started = false
         func wait() async {
             started = true
             guard !open else { return }
-            await withCheckedContinuation { continuation = $0 }
+            await withCheckedContinuation { continuations.append($0) }
         }
         func release() {
             open = true
-            continuation?.resume()
-            continuation = nil
+            continuations.forEach { $0.resume() }
+            continuations = []
         }
     }
 
