@@ -1555,7 +1555,7 @@ transcript.
   confidence and ≤ 160 characters of the neighbouring segments' text
   (`before`/`after`, read-only), so a word is judged in the conversation it was
   said in.
-- **Batching** reuses the shape of `SummaryService.packWholeItems`: greedy packs
+- **Batching** greedy-packs segments
   bounded by both `maxBatchChars` (6,000) and `maxSegmentsPerBatch` (40), never
   splitting a segment.
 - **Vocabulary.** `MeetingVocabularyExtractor` (`Pipeline/`) collects the
@@ -4035,6 +4035,16 @@ toolbar would be the wrong control**:
   text link; a screen's one decision (merging two identities, choosing sources) takes
   `.glassProminent` + `Theme.accent`, and confirmations use `kurnDialog`. Settings keep the native
   `Form`, like every other settings screen.
+- **Error dialogs offer the error's recovery action.** `errorAlert` reads
+  `AppError.recoveryAction` (`ErrorRecovery` in `View+ErrorAlert.swift`) and
+  makes it the primary button beside OK: Try Again only when the caller passes
+  `onRetry`; Open Settings, Manage Storage, Change Model, Recover Audio and
+  Export Diagnostics open Providers, Transcription, Summary, Storage, Health
+  or Diagnostics in a sheet, and a passcode error opens the app's page in the
+  Settings app. `permissionDenied` opens Transcription (cloud consent), and the
+  Wi-Fi-only error is offered only through `onOpenNetworkSettings`. The
+  decision lives in `Application/ErrorRecovery.swift` so coverage measures it.
+  A screen that is itself the destination passes `offersRecovery: false`.
 - **Fixed font sizes need a reason.** `.font(.system(size:))` appears only on
   icons constrained by a small fixed well or grid cell, each with an inline
   comment saying so; everything else uses a `Theme` font or a scalable

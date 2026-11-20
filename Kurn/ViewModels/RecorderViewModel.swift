@@ -134,7 +134,6 @@ final class RecorderViewModel {
     }
 
     var livePartialText: String { liveTranscription.partialText }
-    var isLiveTranscriptionActive: Bool { liveTranscription.isActive }
     var isLiveTranscriptionLoading: Bool { liveTranscription.isLoading }
     var isLiveTranscriptionUnavailable: Bool { liveTranscription.isUnavailable }
     /// True whenever the recorder was launched with the live preview enabled —

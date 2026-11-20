@@ -14,6 +14,12 @@
 "error.network_policy_restricted" = "Envios de áudio e downloads de modelos estão configurados para usar só Wi-Fi, e este aparelho está na rede celular ou no Modo de Poucos Dados. Conecte-se ao Wi-Fi ou permita rede celular e Modo de Poucos Dados em Transferências grandes, nos ajustes de Transcrição, e tente de novo.";
 "error.network_policy_restricted.title" = "Wi-Fi necessário";
 "error.network_policy_restricted.open_settings" = "Abrir ajustes";
+"error.recovery.retry" = "Tentar de novo";
+"error.recovery.open_settings" = "Abrir ajustes";
+"error.recovery.free_space" = "Gerenciar armazenamento";
+"error.recovery.change_model" = "Trocar modelo";
+"error.recovery.recover_audio" = "Recuperar áudio";
+"error.recovery.export_diagnostics" = "Exportar diagnóstico";
 "error.cloud_transcription_consent_required" = "A transcrição em nuvem exige consentimento para envio. Revise o destino e a política de transferência nos ajustes de Transcrição.";
 "settings.network.large_transfers" = "Transferências grandes";
 "settings.network.allow_expensive" = "Permitir rede celular";
@@ -1071,8 +1077,6 @@
 "chat.sources.parts.none" = "Nenhuma parte";
 "chat.sources.summary.one" = "1 reunião · %@";
 "chat.sources.summary" = "%d reuniões · %@";
-"chat.steps.one" = "1 passo";
-"chat.steps.count" = "%d passos";
 "chat.steps.arguments" = "Argumentos";
 "chat.steps.output" = "Resultado";
 "chat.steps.compaction.detail" = "Contexto: %d → %d tokens";

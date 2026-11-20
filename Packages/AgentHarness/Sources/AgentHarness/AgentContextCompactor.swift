@@ -39,8 +39,6 @@ public struct AgentContextPolicy: Sendable, Equatable {
     /// explicit 4k fallback as normal requests.
     public var historySummaryMaxOutputTokens: Int { maxOutputTokens ?? 4_096 }
     public var turnPrefixSummaryMaxOutputTokens: Int { maxOutputTokens ?? 4_096 }
-
-    func needsCompaction(_ tokens: Int) -> Bool { tokens > compactionThreshold }
 }
 
 /// What one compaction replaces and keeps. The newest messages from the cut point on are kept

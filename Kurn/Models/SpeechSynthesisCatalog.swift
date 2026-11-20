@@ -46,9 +46,6 @@ extension AIProvider {
         }
     }
 
-    /// Whether this provider can read text aloud at all.
-    var supportsSpeechSynthesis: Bool { speechSynthesisAPI != nil }
-
     /// Whether this provider can read aloud *right now*. Unlike `isUsable`,
     /// the on-device case does not depend on Apple Intelligence: the system
     /// speech synthesizer exists on every device.

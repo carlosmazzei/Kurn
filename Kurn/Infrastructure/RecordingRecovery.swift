@@ -273,14 +273,4 @@ enum RecordingRecovery {
         guard let underscoreIndex = fileName.firstIndex(of: "_") else { return nil }
         return UUID(uuidString: String(fileName[..<underscoreIndex]))
     }
-
-    /// A file abandoned mid-write by `AVAudioFile` may still have a readable
-    /// sample table; if not, this returns nil and the caller discards it.
-    private static func readableDuration(of url: URL) -> TimeInterval? {
-        guard let file = try? AVAudioFile(forReading: url), file.processingFormat.sampleRate > 0 else {
-            return nil
-        }
-        let duration = Double(file.length) / file.processingFormat.sampleRate
-        return duration.isFinite ? duration : nil
-    }
 }

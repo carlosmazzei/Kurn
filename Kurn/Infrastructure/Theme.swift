@@ -76,7 +76,6 @@ enum Theme {
     static let captionEmphasized = Font.system(.caption, design: .default, weight: .semibold)
     static let caption2 = Font.system(.caption2, design: .default)
     static let caption2Emphasized = Font.system(.caption2, design: .default, weight: .semibold)
-    static let caption2Bold = Font.system(.caption2, design: .default, weight: .bold)
 
     // MARK: - Button language
     //

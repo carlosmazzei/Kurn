@@ -233,14 +233,14 @@ extension AgentRunTrace {
                 }
             case .message(.tool(let result)):
                 trace.restoreResult(callID: result.invocation.callID, name: result.invocation.toolName, isError: result.isError)
-            case .custom(type: "agent.usage.v1", data: .object(let fields))
+            case .custom(type: AgentRunBranch.usageType, data: .object(let fields))
                 where AgentUsageEntry.isFirst(.object(fields), of: runID, among: &counted):
                 trace.apply(.usage(AgentUsage(inputTokens: count(fields["inputTokens"]) ?? 0,
                                               outputTokens: count(fields["outputTokens"]) ?? 0,
                                               reasoningTokens: count(fields["reasoningTokens"]),
                                               cacheReadTokens: count(fields["cacheReadTokens"]),
                                               cacheWriteTokens: count(fields["cacheWriteTokens"]))))
-            case .custom(type: "agent.run-end.v1", data: .object(let fields)):
+            case .custom(type: AgentRunBranch.endType, data: .object(let fields)):
                 if case .string(let raw)? = fields["stopReason"], let reason = AgentRunStopReason(rawValue: raw) {
                     var step = AgentRunStep(kind: .stop, status: .finished)
                     step.stopReason = reason
@@ -299,7 +299,7 @@ extension AgentSessionEntry {
 
     /// The command a run-start entry was written for (`AgentSession.start(commandID:)`), if any.
     public var commandID: String? {
-        guard case .custom(type: "agent.run-start.v1", data: .object(let fields)) = payload,
+        guard case .custom(type: AgentRunBranch.startType, data: .object(let fields)) = payload,
               case .string(let id)? = fields["commandID"] else { return nil }
         return id
     }

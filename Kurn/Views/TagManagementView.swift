@@ -20,7 +20,6 @@ struct TagManagementView: View {
     @State private var newTagName = ""
     @State private var editingTag: Tag?
     @State private var pendingDelete: Tag?
-    @State private var mergeTarget: Tag?
     @State private var mergeSource: Tag?
     /// Set when a tag create/delete/merge save fails, surfaced via `.errorAlert`.
     @State private var saveError: AppError?
