@@ -58,6 +58,9 @@ struct CloudConsentLedgerTests {
         ledger.grant(destination, for: .automatic, at: date)
         #expect(try CloudConsentLedger.decode(ledger.encoded()) == ledger)
 
+        let withoutWithdrawn = Data(#"{"version":1,"grants":[]}"#.utf8)
+        #expect(try CloudConsentLedger.decode(withoutWithdrawn) == CloudConsentLedger())
+
         let future = Data(#"{"version":2,"grants":[]}"#.utf8)
         #expect(throws: CloudConsentLedgerError.unsupportedVersion) { try CloudConsentLedger.decode(future) }
     }

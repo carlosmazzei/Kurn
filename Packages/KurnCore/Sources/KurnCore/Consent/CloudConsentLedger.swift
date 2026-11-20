@@ -38,6 +38,18 @@ public struct CloudConsentLedger: Codable, Sendable, Equatable {
 
     public init() {}
 
+    private enum CodingKeys: String, CodingKey { case version, grants, withdrawn }
+
+    /// Reads the version first so a future document is refused as such, and
+    /// treats a missing `withdrawn` list as empty.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decode(Int.self, forKey: .version)
+        guard version == 1 else { throw CloudConsentLedgerError.unsupportedVersion }
+        grants = try container.decode([CloudConsentGrant].self, forKey: .grants)
+        withdrawn = try container.decodeIfPresent([String].self, forKey: .withdrawn) ?? []
+    }
+
     public static func destination(providerID: String, endpoint: String) -> String {
         "\(providerID)|\(endpoint)"
     }
