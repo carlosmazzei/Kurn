@@ -351,6 +351,10 @@ final class AppSettings {
         cloudTranscriptionConsentKeys.insert(cloudTranscriptionConsentKey(for: provider))
     }
 
+    func hasCloudTranscriptionConsent(destination: String) -> Bool {
+        cloudTranscriptionConsentKeys.contains(destination)
+    }
+
     func removeCloudTranscriptionConsent(_ destination: String) {
         cloudTranscriptionConsentKeys.remove(destination)
     }

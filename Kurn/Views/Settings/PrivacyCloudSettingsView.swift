@@ -73,7 +73,8 @@ struct PrivacyCloudSettingsView: View {
         let provider = settings.provider(forCloudConsent: destination)
         let ledger = settings.cloudConsents
         let automatic = ledger.allows(destination, for: .automatic)
-        let audio = provider.map { settings.hasCloudTranscriptionConsent(for: $0) } ?? false
+        // By destination, so an old endpoint's consent stays visible and revocable.
+        let audio = settings.hasCloudTranscriptionConsent(destination: destination)
         return Section {
             LabeledContent(PrivacyCloudCopy.text("on_request"),
                            value: PrivacyCloudCopy.state(ledger.allows(destination, for: .onRequest)))
