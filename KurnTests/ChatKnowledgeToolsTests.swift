@@ -216,6 +216,6 @@ struct ChatKnowledgeToolsTests {
         #expect(ChatKnowledgeToolText.valueText(.string("quoted")) == "quoted")
         let date = KnowledgeTemporalValue(text: "2026-11-12", precision: .day)
         #expect(date.map { ChatKnowledgeToolText.valueText(.date($0)) } == "2026-11-12")
-        #expect(ChatKnowledgeTools.names.count == 4)
+        #expect(ChatKnowledgeTools.names.count == 10)
     }
 }

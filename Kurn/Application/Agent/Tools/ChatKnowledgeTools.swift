@@ -61,23 +61,27 @@ enum ChatKnowledgeGate {
     }
 }
 
-/// Read-only knowledge tools (K5.1): search, an entity's page, a timeline and one cited passage.
+/// Read-only knowledge tools (K5.1): search, an entity's page, a timeline, one cited passage and
+/// the structure tools of `ChatKnowledgeTools+Structure`.
 /// Each call re-authorizes, reads afresh and re-checks the policy against the read's own source
 /// classifications before anything reaches the model. Results are compact text
 /// (`ChatKnowledgeToolText`) ending with a `page:` line and a `revision:` line.
 enum ChatKnowledgeTools {
-    static let names = ["search_knowledge", "get_entity", "get_timeline", "get_evidence"]
+    static let names = ["search_knowledge", "get_entity", "get_timeline", "get_evidence", "resolve_entity", "get_graph",
+                        "compare_state", "list_open_actions", "list_contexts", "get_context"]
     /// The ranked window search pages, the index's own maximum.
     static let searchWindow = 100
 
-    static func make(source: ChatKnowledgeSource, meetings: Set<UUID>, provider: AIProvider) -> [AgentTool] {
+    /// `now` is the moment open actions are judged at.
+    static func make(source: ChatKnowledgeSource, meetings: Set<UUID>, provider: AIProvider,
+                     now: @escaping @Sendable () -> Date = { Date() }) -> [AgentTool] {
         names.map { name in
             AgentTool(spec: spec(name), scheduling: .parallelRead) { arguments in
                 do {
                     let params = try Parameters(arguments, name: name)
                     let read = try await authorizedRead(source: source, meetings: meetings, provider: provider,
                                                         selection: params.selection)
-                    return try execute(name, params: params, read: read)
+                    return try execute(name, params: params, read: read, now: now())
                 } catch is CancellationError {
                     throw CancellationError()
                 } catch {
@@ -107,7 +111,7 @@ enum ChatKnowledgeTools {
         return read
     }
 
-    private static func execute(_ name: String, params: Parameters, read: KnowledgeBrowserRead) throws -> AgentToolOutput {
+    private static func execute(_ name: String, params: Parameters, read: KnowledgeBrowserRead, now: Date) throws -> AgentToolOutput {
         switch name {
         case "search_knowledge":
             let query = try params.string("query", limit: KnowledgeSearchIndex.queryLimit)
@@ -139,10 +143,12 @@ enum ChatKnowledgeTools {
             return ChatKnowledgeToolText.output(header: "timeline (by stated time; undated last):",
                                                 lines: entries.map { ChatKnowledgeToolText.timeline($0) },
                                                 offset: params.offset, limit: params.limit, read: read)
-        default:
+        case "get_evidence":
             guard let evidence = read.selectedEvidence else { throw Invalid("Unknown assertionID or evidenceID.") }
             return ChatKnowledgeToolText.output(header: "evidence:", lines: [ChatKnowledgeToolText.evidence(evidence)],
                                                 offset: 0, limit: 1, read: read)
+        default:
+            return try executeStructure(name, params: params, read: read, now: now)
         }
     }
 
@@ -167,10 +173,15 @@ enum ChatKnowledgeTools {
         case "get_timeline":
             properties["entityID"] = uuid
             description = "Read claims ordered by their stated (valid) time, optionally only those about one entity."
-        default:
+        case "get_evidence":
             properties = ["assertionID": uuid, "evidenceID": uuid]
             required = [.string("assertionID"), .string("evidenceID")]
             description = "Read the transcript passage one claim cites: meeting, speaker, time and verbatim quote."
+        default:
+            let schema = structureSchema(name)
+            properties.merge(schema.properties) { _, new in new }
+            required = schema.required.map { .string($0) }
+            description = schema.description
         }
         return AgentToolSpec(name: name, description: description + """
              Results are plain text and end with a "page:" line (pass its next offset to continue) and a \
@@ -197,7 +208,8 @@ enum ChatKnowledgeTools {
             let permitted: Set<String> = switch name {
             case "search_knowledge": ["query", "offset", "limit"]
             case "get_entity", "get_timeline": ["entityID", "offset", "limit"]
-            default: ["assertionID", "evidenceID"]
+            case "get_evidence": ["assertionID", "evidenceID"]
+            default: ChatKnowledgeTools.structureArguments[name] ?? []
             }
             guard Set(values.keys).isSubset(of: permitted) else { throw Invalid("Unknown argument.") }
             self.values = values
