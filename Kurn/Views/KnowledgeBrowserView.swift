@@ -23,6 +23,8 @@ struct KnowledgeBrowserView: View {
     @State private var playRequest = 0
     @State private var showingReview = false
     @State private var graphService = KnowledgeGraphQueryService()
+    @State private var entityAsk: KnowledgeEntityAskRequest?
+    @Environment(ChatConversationHost.self) private var conversations: ChatConversationHost?
 
     init(meetingIDs: Set<UUID>, initialEntityID: UUID? = nil, initialEvidenceSelection: KnowledgeEvidenceSelection? = nil,
          showsDone: Bool = true, onChooseSources: (() -> Void)? = nil) {
@@ -82,6 +84,19 @@ struct KnowledgeBrowserView: View {
             }
         }
         .sheet(isPresented: $showingReview) { KnowledgeReviewInboxView(meetingIDs: meetingIDs) }
+        .sheet(item: $entityAsk) { request in
+            NavigationStack {
+                MeetingChatView(meeting: nil, conversation: request.conversation, initialScope: request.scope,
+                                initialDraft: String(format: KnowledgeBrowserCopy.text("ask_draft"), request.name))
+                    .navigationTitle(request.name)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(NSLocalizedString("common.done", comment: "Done")) { entityAsk = nil }
+                        }
+                    }
+            }
+        }
         .task(id: requestKey) {
             if refresh > 0 {
                 do { try await Task.sleep(for: .milliseconds(150)) } catch { return }
@@ -160,7 +175,10 @@ struct KnowledgeBrowserView: View {
             }
         case let .entity(id):
             if let page = read.pages.first(where: { $0.entity.id == id }) {
-                KnowledgeEntityPageView(page: page, meetingTitles: read.meetingTitles)
+                KnowledgeEntityPageView(page: page, meetingTitles: read.meetingTitles) { scope in
+                    entityAsk = KnowledgeEntityAskRequest(name: page.entity.name, scope: scope,
+                        conversation: conversations?.standaloneConversation() ?? MeetingChatViewModel())
+                }
             } else { KnowledgeBrowserUnavailable() }
         case .timeline:
             KnowledgeTimelineView(read: read)
@@ -197,6 +215,14 @@ struct KnowledgeBrowserView: View {
         case nil: return KnowledgeBrowserCopy.text("title")
         }
     }
+}
+
+/// An Ask about an entity, in a conversation of its own so the library Ask keeps its scope.
+struct KnowledgeEntityAskRequest: Identifiable {
+    let id = UUID()
+    let name: String
+    let scope: ChatSourceScope
+    let conversation: MeetingChatViewModel
 }
 
 enum KnowledgeBrowserCopy {

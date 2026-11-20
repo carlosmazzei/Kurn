@@ -23,8 +23,9 @@ struct MeetingChatView: View {
     /// Invoked when the user taps a cited `[m:ss]` in an answer; the host seeks that absolute
     /// meeting time. Per-meeting scope only.
     var onJumpToTime: ((TimeInterval) -> Void)?
-    /// A library question pre-scoped by its caller (Ask from a Knowledge entity, K5.3). It gets a
-    /// conversation of its own so the library Ask keeps its scope.
+    /// A conversation the caller owns (Ask from a Knowledge entity, K5.3), so the library Ask keeps its
+    /// scope; `initialScope`/`initialDraft` are applied to it once.
+    var conversation: MeetingChatViewModel?
     var initialScope: ChatSourceScope?
     var initialDraft: String?
 
@@ -35,7 +36,7 @@ struct MeetingChatView: View {
 
     var body: some View {
         MeetingChatConversationView(meeting: meeting, onJumpToTime: onJumpToTime,
-                                    vm: initialScope == nil ? conversations?.conversation(for: meeting?.id) ?? detached : detached,
+                                    vm: conversation ?? conversations?.conversation(for: meeting?.id) ?? detached,
                                     initialScope: initialScope, initialDraft: initialDraft)
     }
 }
