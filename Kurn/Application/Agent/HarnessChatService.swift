@@ -202,16 +202,16 @@ struct HarnessChatService {
             .object(["id": .string($0.id.uuidString), "title": .string($0.title), "version": .number(Double($0.version))])
         }).encodedString()
         let policy: [AgentSystemPrompt.Section] = knowledge ? [.init(name: "knowledge_policy", text: knowledgePolicy)] : []
+        // Last, where a patch that adds or removes it replays it (`AgentSystemPrompt.patch`).
         return try AgentSystemPrompt(sections: [
-            .init(name: "instructions", text: instructions)
-        ] + policy + [
+            .init(name: "instructions", text: instructions),
             // After the stable instructions, so a new day changes only this section.
             .init(name: "user_context", text: userContext(now: now, timeZone: timeZone, locale: locale)),
             .init(name: "documents", text: """
                 Existing document metadata (use read_document to inspect contents):
                 \(index)
                 """)
-        ])
+        ] + policy)
     }
 
     /// Today's date, time zone and locale, so "yesterday" or "last week" resolve against the

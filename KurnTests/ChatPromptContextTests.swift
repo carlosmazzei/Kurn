@@ -33,13 +33,16 @@ struct ChatPromptContextTests {
     @Test func theKnowledgePolicyFollowsTheInstructionsOnlyWhenKnowledgeIsOffered() throws {
         let prompt = try HarnessChatService.system(artifacts: [], knowledge: true, now: now, timeZone: .gmt,
                                                    locale: Locale(identifier: "en_US"))
-        #expect(prompt.sections.map(\.name) == ["instructions", "knowledge_policy", "user_context", "documents"])
-        #expect(prompt.sections[1].text == HarnessChatService.knowledgePolicy)
+        #expect(prompt.sections.map(\.name) == ["instructions", "user_context", "documents", "knowledge_policy"])
+        #expect(prompt.sections[3].text == HarnessChatService.knowledgePolicy)
         for tool in ["get_coverage", "search_knowledge", "read_transcript"] {
             #expect(HarnessChatService.knowledgePolicy.contains(tool))
         }
         let without = try HarnessChatService.system(artifacts: [], now: now, timeZone: .gmt, locale: Locale(identifier: "en_US"))
         #expect(!without.sections.map(\.name).contains("knowledge_policy"))
+        // Gaining or losing knowledge patches only the policy section, which replay appends last.
+        #expect(without.patch(to: prompt).changes.map(\.name) == ["knowledge_policy"])
+        #expect(prompt.patch(to: without).changes.map { $0.text == nil } == [true])
     }
 
     private func isolatedStore(_ name: String) throws -> (ModelContextWindowStore, UserDefaults) {
