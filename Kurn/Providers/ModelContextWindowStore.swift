@@ -40,10 +40,6 @@ final class ModelContextWindowStore: @unchecked Sendable {
         ModelContextWindows.resolve(model: model, reported: limits(for: provider, model: model), now: now(), metadataRefresh: metadataRefresh)
     }
 
-    func agentContextWindow(for provider: AIProvider, model: String) -> Int {
-        resolution(for: provider, model: model).contextWindowTokens
-    }
-
     func hasFreshCompleteLimits(for provider: AIProvider, model: String) -> Bool {
         guard let value = limits(for: provider, model: model) else { return false }
         return value.contextWindowTokens != nil && value.maxOutputTokens != nil
