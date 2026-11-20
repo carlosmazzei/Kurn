@@ -63,7 +63,7 @@ extension AppSettings {
         providers[index] = provider
         // Editing the summary provider's endpoint is choosing a new
         // destination, recorded like selecting a provider (CLAUDE.md, "Cloud consent").
-        if movedDestination, provider.id == aiProviderID {
+        if movedDestination, provider.id == aiProviderID, provider.supportsSummarization {
             grantCloudConsent(provider, for: .onRequest)
             if wikiEnabled || correctionEnabled || aiTitleCloudEnabled { grantCloudConsent(provider, for: .automatic) }
         }
