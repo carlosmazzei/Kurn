@@ -3873,7 +3873,8 @@ a new destination, and the on-device provider never needs a grant. Feature
 toggles still choose which features run. Turning on `wikiEnabled`,
 `correctionEnabled` or `aiTitleCloudEnabled` records the automatic grant for the
 summary provider, and confirming the cloud-upload dialog records it for the
-transcription provider (`hasCloudTranscriptionConsent` reads the ledger).
+transcription provider. Audio keeps its own per-destination upload consent
+(`hasCloudTranscriptionConsent`): a text grant never authorizes an audio upload.
 `revokeAutomaticCloudConsent` withdraws the grant, clears the legacy transcription
 consent key and turns off the summary provider's per-recording features. The
 first launch with no stored ledger migrates what was already allowed (legacy

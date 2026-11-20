@@ -320,10 +320,13 @@ final class AppSettings {
         }
     }
 
-    /// Cloud transcription is automatic, per-recording sending, so it reads
-    /// the shared ledger's automatic grant (`AppSettings+CloudConsent.swift`).
+    /// Audio is a different kind of content than the text other automatic
+    /// features send, so it keeps its own per-destination upload consent; a
+    /// text grant (wiki, titles, correction) never authorizes an audio upload.
+    /// Confirming it also records the ledger's automatic grant, and revoking
+    /// that grant clears it (`AppSettings+CloudConsent.swift`).
     func hasCloudTranscriptionConsent(for provider: AIProvider) -> Bool {
-        allowsCloud(provider, for: .automatic)
+        cloudTranscriptionConsentKeys.contains(cloudTranscriptionConsentKey(for: provider))
     }
 
     func recordCloudTranscriptionConsent(for provider: AIProvider) {
