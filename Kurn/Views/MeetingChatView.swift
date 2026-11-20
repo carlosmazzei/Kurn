@@ -23,6 +23,10 @@ struct MeetingChatView: View {
     /// Invoked when the user taps a cited `[m:ss]` in an answer; the host seeks that absolute
     /// meeting time. Per-meeting scope only.
     var onJumpToTime: ((TimeInterval) -> Void)?
+    /// A library question pre-scoped by its caller (Ask from a Knowledge entity, K5.3). It gets a
+    /// conversation of its own so the library Ask keeps its scope.
+    var initialScope: ChatSourceScope?
+    var initialDraft: String?
 
     /// The app-wide owner of conversations (NH05): a run outlives this view. Optional only so a
     /// view built outside the app environment still works, with a conversation of its own.
@@ -31,7 +35,8 @@ struct MeetingChatView: View {
 
     var body: some View {
         MeetingChatConversationView(meeting: meeting, onJumpToTime: onJumpToTime,
-                                    vm: conversations?.conversation(for: meeting?.id) ?? detached)
+                                    vm: initialScope == nil ? conversations?.conversation(for: meeting?.id) ?? detached : detached,
+                                    initialScope: initialScope, initialDraft: initialDraft)
     }
 }
 
@@ -40,6 +45,9 @@ struct MeetingChatConversationView: View {
     let meeting: Meeting?
     var onJumpToTime: ((TimeInterval) -> Void)?
     @Bindable var vm: MeetingChatViewModel
+    var initialScope: ChatSourceScope?
+    var initialDraft: String?
+    @State private var appliedInitialScope = false
 
     @Environment(AppSettings.self) private var settings
     @Environment(\.modelContext) private var modelContext
@@ -136,6 +144,11 @@ struct MeetingChatConversationView: View {
         // state to guard against `meeting`/`modelContext` changing under it.
         .onAppear {
             vm.configure(meeting: meeting, modelContext: modelContext)
+            if let initialScope, !appliedInitialScope {
+                appliedInitialScope = true
+                vm.updateScope(initialScope)
+                if vm.draft.isEmpty, let initialDraft { vm.draft = initialDraft }
+            }
             takeRestoredDraft()
         }
         // Queued input a stop or a failed run did not answer comes back into the composer (NH08).

@@ -1431,6 +1431,8 @@
 // Scoped knowledge reader
 "knowledge.browser.title" = "知识";
 "knowledge.browser.refresh" = "刷新";
+"knowledge.browser.ask" = "就此提问";
+"knowledge.browser.ask_draft" = "关于%@我们知道什么？";
 "knowledge.browser.page" = "页面部分";
 "knowledge.browser.overview" = "概览";
 "knowledge.browser.sources" = "来源";

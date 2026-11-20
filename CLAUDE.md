@@ -80,7 +80,7 @@ production with awaited barriers (NH05) and canonical tool replay (NH06) are des
 contract-version, JSONStorage-envelope, SwiftData-schema and pi-JSONL versions distinct.
 
 `ChatSourceScope` persists meeting/tag/folder/library selection,
-global transcript/summary/wiki/attachment parts and optional per-meeting overrides
+global transcript/summary/wiki/attachment/knowledge parts and optional per-meeting overrides
 (including an empty selection). Legacy `includeWikis` payloads decode to the old defaults.
 `ChatSourceTools` exposes bounded, paginated read-only source tools, validating
 arguments and enforcing a fixed allowed-meeting/part snapshot on reads and search results.
@@ -3793,9 +3793,15 @@ state, stated validity), each name and quote clipped to one line, a `page:` line
   review reads). It is authorized like the other tools before and after its read, with each meeting's context
   classification, and carries no names or quotes. The counts say how much the latest compilation read, not how
   accurate it was; the description tells the model to check it before saying something was not discussed.
+- **Knowledge is a chat source part (K5.3)**: `ChatSourcePart.knowledge` is in `ChatSourceScope.defaultParts`, and
+  `HarnessChatService` offers the knowledge tools only for meetings whose effective parts select it, before
+  `ChatKnowledgeGate` authorizes them; the part is removed with the feature off (`effectiveScope(knowledgeEnabled:)`)
+  and hidden from `ChatSourceSheet`. It is never a readable part of the source tools. A scope saved without the
+  `knowledgeSelectable` marker (before K5.3) gains it wherever parts were selected, so old chats keep offering
+  knowledge; an empty selection stays empty. An entity page's Ask button opens a separate library conversation
+  scoped to the meetings its facts come from, with a drafted question.
 - Not yet: `get_wiki_page` (pages carry no narrative until K2's narrative generation is wired, so it would
-  repeat `get_entity`), `trace_influence` (no influence semantics are defined), K5.2's wiki-first query policy
-  and K5.3's knowledge parts in `ChatSourceScope`.
+  repeat `get_entity`), `trace_influence` (no influence semantics are defined) and K5.2's wiki-first query policy.
 
 ### Attached documents (PDFs)
 

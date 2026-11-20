@@ -5,6 +5,12 @@ struct KnowledgeEntityPageView: View {
     let page: KnowledgeWikiPage
     let meetingTitles: [UUID: String]
     @State private var showsSources = false
+    @State private var showingAsk = false
+
+    /// The meetings this page's facts come from; Ask about the entity is scoped to them (K5.3).
+    private var sourceMeetingIDs: Set<UUID> {
+        Set(page.sections.flatMap(\.entries).map(\.fact.source.meetingID))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,7 +29,29 @@ struct KnowledgeEntityPageView: View {
             }
         }
         .knowledgeReadingSurface()
+        .sheet(isPresented: $showingAsk) {
+            NavigationStack {
+                MeetingChatView(meeting: nil,
+                                initialScope: ChatSourceScope(kind: .meetings, selectedIDs: sourceMeetingIDs),
+                                initialDraft: String(format: KnowledgeBrowserCopy.text("ask_draft"), page.entity.name))
+                    .navigationTitle(page.entity.name)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(NSLocalizedString("common.done", comment: "Done")) { showingAsk = false }
+                        }
+                    }
+            }
+        }
         .toolbar {
+            if !sourceMeetingIDs.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showingAsk = true } label: {
+                        Label(KnowledgeBrowserCopy.text("ask"), systemImage: "bubble.left.and.text.bubble.right")
+                    }
+                    .accessibilityIdentifier("knowledge.browser.ask")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink(value: KnowledgeBrowserRoute.compare(page.entity.id)) {
                     Label(KnowledgeComparePresentation.copy("title"), systemImage: "calendar.badge.clock")
