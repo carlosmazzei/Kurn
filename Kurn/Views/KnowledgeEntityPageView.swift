@@ -26,13 +26,6 @@ struct KnowledgeEntityPageView: View {
         }
         .knowledgeReadingSurface()
         .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button(NSLocalizedString("common.done", comment: "Done")) { showingAsk = false }
-                        }
-                    }
-            }
-        }
-        .toolbar {
             if let onAsk, let scope = KnowledgeEntityAsk.scope(page) {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { onAsk(scope) } label: {
