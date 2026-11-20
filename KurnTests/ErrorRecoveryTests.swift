@@ -18,8 +18,7 @@ struct ErrorRecoveryTests {
     @Test func settingsErrorsOpenTheScreenThatFixesThem() {
         #expect(ErrorRecovery(error: .noAPIKey(provider: "x"), canRetry: false)?.destination == .screen(.providers))
         #expect(ErrorRecovery(error: .invalidProviderURL, canRetry: false)?.destination == .screen(.providers))
-        #expect(ErrorRecovery(error: .networkPolicyRestricted, canRetry: false)?.destination == .screen(.transcription))
-        #expect(ErrorRecovery(error: .permissionDenied("x"), canRetry: false)?.destination == .systemSettings)
+        #expect(ErrorRecovery(error: .permissionDenied("x"), canRetry: false)?.destination == .screen(.transcription))
         #expect(ErrorRecovery(error: .authenticationNotAvailable, canRetry: false)?.destination == .systemSettings)
     }
 
@@ -31,6 +30,7 @@ struct ErrorRecoveryTests {
     }
 
     @Test func errorsWithoutAnActionOfferOnlyOK() {
+        #expect(ErrorRecovery(error: .networkPolicyRestricted, canRetry: true) == nil)
         #expect(ErrorRecovery(error: .wikiUnavailable, canRetry: true) == nil)
         #expect(ErrorRecovery(error: .summaryTruncated, canRetry: true) == nil)
     }

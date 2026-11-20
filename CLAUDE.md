@@ -3068,9 +3068,11 @@ toolbar would be the wrong control**:
   makes it the primary button beside OK: Try Again only when the caller passes
   `onRetry`; Open Settings, Manage Storage, Change Model, Recover Audio and
   Export Diagnostics open Providers, Transcription, Summary, Storage, Health
-  or Diagnostics in a sheet, and a permission or passcode error opens the
-  app's page in the Settings app. A screen that is itself the destination
-  passes `offersRecovery: false`.
+  or Diagnostics in a sheet, and a passcode error opens the app's page in the
+  Settings app. `permissionDenied` opens Transcription (cloud consent), and the
+  Wi-Fi-only error is offered only through `onOpenNetworkSettings`. The
+  decision lives in `Application/ErrorRecovery.swift` so coverage measures it.
+  A screen that is itself the destination passes `offersRecovery: false`.
 - **Fixed font sizes need a reason.** `.font(.system(size:))` appears only on
   icons constrained by a small fixed well or grid cell, each with an inline
   comment saying so; everything else uses a `Theme` font or a scalable
