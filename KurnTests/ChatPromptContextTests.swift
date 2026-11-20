@@ -43,6 +43,9 @@ struct ChatPromptContextTests {
         // Gaining or losing knowledge patches only the policy section, which replay appends last.
         #expect(without.patch(to: prompt).changes.map(\.name) == ["knowledge_policy"])
         #expect(prompt.patch(to: without).changes.map { $0.text == nil } == [true])
+        // Replaying each patch rebuilds the target prompt, order and removal included.
+        #expect(without.applying(without.patch(to: prompt)) == prompt)
+        #expect(prompt.applying(prompt.patch(to: without)) == without)
     }
 
     private func isolatedStore(_ name: String) throws -> (ModelContextWindowStore, UserDefaults) {
