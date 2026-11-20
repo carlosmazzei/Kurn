@@ -126,6 +126,19 @@ struct AppSettingsCloudConsentTests {
         #expect(settings.cloudConsents.destinations.isEmpty)
     }
 
+    @Test func editingTheSummaryEndpointRecordsTheNewDestination() {
+        let settings = MeetingFixtures.isolatedSettings()
+        let custom = AIProvider(id: "custom-edit", displayName: "Custom", kind: .openAICompatible,
+                                baseURLString: "https://one.example.com/v1")
+        settings.addProvider(custom)
+        settings.aiTitleCloudEnabled = true
+        var moved = custom
+        moved.baseURLString = "https://two.example.com/v1"
+        settings.updateProvider(moved)
+        #expect(settings.allowsCloud(moved, for: .automatic))
+        #expect(settings.cloudConsentDestinationsForDisplay.contains(settings.cloudConsentDestination(for: moved)))
+    }
+
     @Test func aFallbackRecordsNoAutomaticGrant() throws {
         let (defaults, suite) = try defaults()
         defer { defaults.removePersistentDomain(forName: suite) }
