@@ -35,10 +35,12 @@ flowchart TB
         WCPP["WhisperCpp<br/>binary XCFramework"]
     end
     FA["FluidAudio<br/>(remote package)"]
+    SH["sherpa-onnx<br/>(remote package)"]
     APP --> CORE
     APP --> AH
     APP --> WCPP
     APP --> FA
+    APP --> SH
     LA -. "shares RecordingActivityAttributes" .- APP
     WATCH -. "WatchConnectivity, duplicated wire constants" .- APP
 ```

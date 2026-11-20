@@ -451,7 +451,8 @@ Use another simulator name if `iPhone 17` is not installed locally.
 
 ## Running Tests
 
-Tests use Swift Testing and are split across four targets:
+Unit tests use Swift Testing; UI tests use XCTest. Suites are split across app
+test targets and two Foundation-only packages:
 
 - `KurnTests` — unit tests for JSON parsing, Markdown export, SwiftData model
   helpers, audio chunking and preprocessing, provider setup, formatting
@@ -463,6 +464,10 @@ Tests use Swift Testing and are split across four targets:
   which only runs via `fastlane screenshots`).
 - `Packages/KurnCore/Tests` — the pure-Foundation package, runnable without
   Xcode: `(cd Packages/KurnCore && swift test)`.
+- `Packages/AgentHarness/Tests` — the agent runtime and vendor wire formats:
+  `(cd Packages/AgentHarness && swift test)`.
+- `KurnWatchUITests` — Watch accessibility and screenshots, run through the
+  `KurnWatchUITests` scheme.
 
 Run tests from Xcode with `Cmd + U`, or from the terminal:
 
@@ -475,7 +480,7 @@ xcodebuild \
 ```
 
 CI is configured in `.github/workflows/swift.yml` (`iOS CI`) and runs on every
-push to `main` and every pull request targeting it, as five independent jobs
+push to `main` and every pull request, regardless of target branch, as five independent jobs
 followed by a `coverage-gate`:
 `lint-and-validate` (SwiftLint, localization and store-metadata checks),
 `static-policy` (`python3 Tools/check_static_policy.py` — bans unchecked
@@ -483,7 +488,7 @@ followed by a `coverage-gate`:
 logs, against an allow-list baseline that fails when it goes stale),
 `unit-tests` (`KurnTests` + `KurnSwiftDataTests` on a macOS simulator),
 `ui-accessibility-tests` (`KurnUITests`, sharded across two runners) and `kurncore-linux` (`swift test`
-for `Packages/KurnCore` on Ubuntu).
+for both `Packages/KurnCore` and `Packages/AgentHarness` on Ubuntu).
 
 ### Coverage
 
@@ -491,18 +496,18 @@ The three test jobs export lcov reports (`Tools/xccov_to_lcov.py` reading
 the `.xcresult` coverage archive on macOS, `llvm-cov export` from SwiftPM's
 profile data on Linux) and upload
 them to [Codecov](https://codecov.io/gh/carlosmazzei/Kurn) under the
-`unittests`, `uitests` and `kurncore` flags, which is what the badge at the
+`unittests`, `uitests`, `kurncore` and `agentharness` flags, which is what the badge at the
 top of this file reports. Third-party SwiftPM checkouts and test sources are
 excluded so the number describes first-party production code. Codecov's own
 statuses stay informational (`codecov.yml` marks every status
 `informational: true`); the blocking check is the in-repo `coverage-gate` job
 (`Tools/coverage_gate.py`), which requires a PR's new in-scope lines to be at
 least 80% covered and holds the in-scope total and each layer at the ratchet
-recorded in `Tools/coverage_floor.json`. The scope — app logic and KurnCore,
+recorded in `Tools/coverage_floor.json`. The scope — app logic, KurnCore and AgentHarness,
 without SwiftUI view bodies and a short, justified list of exclusions — is
 `Tools/coverage_scope.json`; the target for it is 80%. `codecov.yml` also
 declares one Codecov *component* per architectural layer (Infrastructure,
-Providers, Models, Services, ViewModels, Views, KurnCore) so the PR comment
+Providers, Models, Services, Application, ViewModels, Views, KurnCore, AgentHarness) so the PR comment
 shows where coverage moved, and `Tools/coverage_report.py` writes the same
 per-layer table plus the top uncovered files to each test job's summary.
 The watch app, the Live Activity extension and the App Intents are ignored
@@ -634,11 +639,12 @@ Kurn/
 ├── Models/                      # SwiftData @Model types and shared value types
 ├── Views/                       # SwiftUI screens and reusable views
 ├── ViewModels/                  # Main-actor observable coordinators
+├── Application/                 # Use cases, agent composition, generation budgets
 ├── Services/                    # Audio, diarization, live preview, summaries, folder analytics
 │   └── Pipeline/                # Transcription pipeline stages (protocol seams,
-│                                 # each with a built-in and a FluidAudio engine)
+│                                 # VAD, ASR, diarization, fusion and correction)
 ├── Providers/                   # Apple Foundation Models, OpenAI, Anthropic, Google AI,
-│                                 # Groq, and ElevenLabs clients behind one LLMProvider seam
+│                                 # Groq, and ElevenLabs clients behind capability-specific protocols
 ├── AppIntents/                  # Siri / Shortcuts start-recording intent
 ├── Infrastructure/              # Keychain, settings, export, store boot, journal,
 │                                 # recovery, reliability events, resource scheduler
@@ -649,6 +655,7 @@ Kurn/
 Packages/
 ├── KurnCore/                    # Pure-Foundation logic (AppError, ReliabilityEvent,
 │                                 # filesystem/clock seams); `swift test` on Linux
+├── AgentHarness/                # Foundation-only agent runtime; `swift test` on Linux
 └── WhisperCpp/                  # Binary target wrapping whisper.cpp's XCFramework
 
 KurnWatch/

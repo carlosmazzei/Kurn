@@ -31,8 +31,7 @@ Each locale has its own `Localizable.strings` file with the same keys as the
 English (base) file — `en.lproj/Localizable.strings` is the reference every
 other locale must stay in sync with. The Watch app (`KurnWatch/`) and the
 Live Activity widget (`KurnLiveActivityExtension/`) each ship their own,
-smaller `Localizable.strings` pair and currently only support English and
-Brazilian Portuguese.
+smaller `Localizable.strings` files in all seven languages.
 
 ## Transcription languages
 
