@@ -40,6 +40,11 @@ extension AppSettings {
         ledger.revoke(destination, for: .automatic)
         saveCloudConsents(ledger)
         removeCloudTranscriptionConsent(destination)
+        // Fall back to on-device transcription rather than leave an engine
+        // selected that can no longer upload.
+        if transcriptionEngine == .whisperAPI, cloudConsentDestination(for: transcriptionProvider) == destination {
+            transcriptionEngine = .appleSpeech
+        }
         if cloudConsentDestination(for: aiProvider) == destination {
             wikiEnabled = false
             correctionEnabled = false
