@@ -11,9 +11,15 @@ enum ChatKnowledgeToolText {
 
     static func output(header: String, lines: [Rendered], offset: Int, limit: Int,
                        read: KnowledgeBrowserRead) -> AgentToolOutput {
+        output(header: header, lines: lines, offset: offset, limit: limit, revision: read.revision, meetings: read.meetingIDs.count)
+    }
+
+    // swiftlint:disable:next function_parameter_count
+    static func output(header: String, lines: [Rendered], offset: Int, limit: Int,
+                       revision: Int, meetings: Int) -> AgentToolOutput {
         let page = Array(lines.dropFirst(offset).prefix(limit))
         var count = page.count
-        let footer = "revision: \(read.revision); meetings: \(read.meetingIDs.count)"
+        let footer = "revision: \(revision); meetings: \(meetings)"
         func content() -> String {
             let pageLine = ChatSourceToolText.pageLine(offset: offset, count: count, total: lines.count)
             return ([header] + page.prefix(count).map(\.text) + [pageLine, footer]).joined(separator: "\n")

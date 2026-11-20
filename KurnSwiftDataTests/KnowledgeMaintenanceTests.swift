@@ -141,6 +141,26 @@ struct KnowledgeMaintenanceTests {
         #expect(try job(.extraction, in: ModelContext(f.container)).coverageData == row.coverageData)
     }
 
+    @Test func coverageReadGroupsTheReportsCoverageByMeetingWithoutOtherReads() async throws {
+        let f = try fixture(count: 2)
+        try await compile(f)
+        let auth = f.auth
+        let read = try await f.store.coverageRead(meetingIDs: f.ids, scope: "workspace", authorization: { auth })
+        #expect(read.meetingIDs == f.ids && read.isComplete && read.sourceClassifications == [.internal, .internal])
+        let compiled = try #require(read.meetings.first { $0.meetingID == f.meetings[0].id })
+        #expect(compiled.recordings.map(\.state) == [.current] && compiled.recordings.first?.examinedSegments == 1)
+        let pending = try #require(read.meetings.first { $0.meetingID == f.meetings[1].id })
+        #expect(pending.recordings.map(\.state) == [.missingCompilation] && pending.recordings.first?.totalSegments == 1)
+        let full = try await report(f)
+        #expect(Set(read.meetings.flatMap(\.recordings).map(\.recordingID)) == Set(full.report.coverage.map(\.recordingID)))
+        var denied = f.auth
+        denied.meetingIDs = [f.meetings[0].id]
+        let narrowed = denied
+        await #expect(throws: KnowledgeWikiStoreError.scopeDenied) {
+            try await f.store.coverageRead(meetingIDs: f.ids, scope: "workspace", authorization: { narrowed })
+        }
+    }
+
     @Test func sourceAndPolicyChangesHideOldDetailsAndReportTheCoverageReason() async throws {
         var f = try fixture()
         try await compile(f)

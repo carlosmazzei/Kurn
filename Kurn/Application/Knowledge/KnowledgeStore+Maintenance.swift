@@ -9,7 +9,46 @@ struct KnowledgeScopedMaintenanceReport: Codable, Equatable, Sendable {
     let report: KnowledgeMaintenanceReport
 }
 
+/// Per meeting, the segments the latest compilation examined in each recording (`get_coverage`):
+/// counts and states only, the same measure as the maintenance report's coverage.
+struct KnowledgeCoverageRead: Equatable, Sendable {
+    struct Meeting: Equatable, Sendable {
+        let meetingID: UUID
+        let recordings: [KnowledgeMaintenanceCoverage]
+        let classification: KnowledgeClassification
+    }
+
+    let revision: Int
+    /// False when a compilation's coverage could not be read, so its counts are not complete.
+    let isComplete: Bool
+    let meetings: [Meeting]
+    var meetingIDs: Set<UUID> { Set(meetings.map(\.meetingID)) }
+    var sourceClassifications: [KnowledgeClassification] { meetings.map(\.classification) }
+}
+
 extension KnowledgeStore {
+    /// The coverage part of `maintenanceReport` alone, grouped by meeting: no wiki, catalog or
+    /// review reads, under the same `.semanticLint` source authorization.
+    func coverageRead(meetingIDs: Set<UUID>, scope: String,
+                      authorization: @Sendable () async -> KnowledgeSourceAuthorization) async throws -> KnowledgeCoverageRead {
+        let auth = await authorization()
+        try Task.checkCancellation()
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+        let sources = try KnowledgeWikiSourceRows.sources(meetingIDs: meetingIDs, scope: scope, auth: auth, operation: .semanticLint, in: context)
+        let revision = try KnowledgeStoreRows.latestRevision(in: context)
+        var isComplete = true
+        var meetings: [KnowledgeCoverageRead.Meeting] = []
+        for source in sources {
+            var input = KnowledgeMaintenanceInput(revision: revision)
+            _ = try KnowledgeMaintenanceRows.compilation(source: source, input: &input, in: context)
+            isComplete = isComplete && input.isComplete
+            meetings.append(.init(meetingID: source.meetingID, recordings: input.coverage, classification: source.contextClassification))
+        }
+        try Task.checkCancellation()
+        return KnowledgeCoverageRead(revision: revision, isComplete: isComplete, meetings: meetings)
+    }
+
     /// Local deterministic lint only. It neither calls a provider nor changes
     /// canonical data, pages, review state, jobs or outbox acknowledgements.
     func maintenanceReport(meetingIDs: Set<UUID>, scope: String,

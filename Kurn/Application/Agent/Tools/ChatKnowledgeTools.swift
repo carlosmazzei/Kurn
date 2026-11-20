@@ -13,20 +13,27 @@ struct ChatKnowledgeSource: Sendable {
     /// Whether the person agreed to send knowledge to this remote provider to answer: its
     /// on-request grant in the cloud-consent ledger. A policy alone never stands in for consent.
     let remoteConsent: @MainActor @Sendable (AIProvider) -> Bool
+    /// A fresh, content-free coverage read of exactly these meetings (`get_coverage`).
+    let coverage: @Sendable (Set<UUID>) async throws -> KnowledgeCoverageRead
 
     @MainActor
     init(coordinator: KnowledgeCompilationCoordinator) {
         read = { meetings, selection in try await coordinator.readKnowledgeBrowser(meetingIDs: meetings, selection: selection) }
         authorization = { coordinator.browserReadAuthorization(meetingIDs: $0) }
         remoteConsent = { coordinator.allowsRemoteAnswers(with: $0) }
+        coverage = { try await coordinator.readKnowledgeCoverage(meetingIDs: $0) }
     }
 
     init(read: @escaping @Sendable (Set<UUID>, KnowledgeEvidenceSelection?) async throws -> KnowledgeBrowserRead,
          authorization: @escaping @MainActor @Sendable (Set<UUID>) -> KnowledgeSourceAuthorization,
-         remoteConsent: @escaping @MainActor @Sendable (AIProvider) -> Bool) {
+         remoteConsent: @escaping @MainActor @Sendable (AIProvider) -> Bool,
+         coverage: @escaping @Sendable (Set<UUID>) async throws -> KnowledgeCoverageRead = { _ in
+             throw KnowledgeWikiStoreError.scopeDenied
+         }) {
         self.read = read
         self.authorization = authorization
         self.remoteConsent = remoteConsent
+        self.coverage = coverage
     }
 }
 
@@ -62,13 +69,14 @@ enum ChatKnowledgeGate {
 }
 
 /// Read-only knowledge tools (K5.1): search, an entity's page, a timeline, one cited passage and
-/// the structure tools of `ChatKnowledgeTools+Structure`.
+/// the structure tools of `ChatKnowledgeTools+Structure`, plus `get_coverage`
+/// (`ChatKnowledgeTools+Coverage`).
 /// Each call re-authorizes, reads afresh and re-checks the policy against the read's own source
 /// classifications before anything reaches the model. Results are compact text
 /// (`ChatKnowledgeToolText`) ending with a `page:` line and a `revision:` line.
 enum ChatKnowledgeTools {
     static let names = ["search_knowledge", "get_entity", "get_timeline", "get_evidence", "resolve_entity", "get_graph",
-                        "compare_state", "list_open_actions", "list_contexts", "get_context"]
+                        "compare_state", "list_open_actions", "list_contexts", "get_context", "get_coverage"]
     /// The ranked window search pages, the index's own maximum.
     static let searchWindow = 100
 
@@ -79,6 +87,9 @@ enum ChatKnowledgeTools {
             AgentTool(spec: spec(name), scheduling: .parallelRead) { arguments in
                 do {
                     let params = try Parameters(arguments, name: name)
+                    if name == "get_coverage" {
+                        return try await coverage(params, source: source, meetings: meetings, provider: provider)
+                    }
                     let read = try await authorizedRead(source: source, meetings: meetings, provider: provider,
                                                         selection: params.selection)
                     return try execute(name, params: params, read: read, now: now())
@@ -96,18 +107,21 @@ enum ChatKnowledgeTools {
 
     /// Authorization before the read and again with the read's own classifications after it, so a
     /// context reclassified since the run started is never sent.
+    static func authorize(_ meetings: Set<UUID>, source: ChatKnowledgeSource, provider: AIProvider,
+                          classifications: [KnowledgeClassification] = []) async throws {
+        guard await ChatKnowledgeGate.meetings(meetings, source: source, provider: provider,
+                                               classifications: classifications) == meetings else {
+            throw Invalid("Knowledge is not authorized for these sources.")
+        }
+    }
+
     private static func authorizedRead(source: ChatKnowledgeSource, meetings: Set<UUID>, provider: AIProvider,
                                        selection: KnowledgeEvidenceSelection?) async throws -> KnowledgeBrowserRead {
-        guard await ChatKnowledgeGate.meetings(meetings, source: source, provider: provider) == meetings else {
-            throw Invalid("Knowledge is not authorized for these sources.")
-        }
+        try await authorize(meetings, source: source, provider: provider)
         let read = try await source.read(meetings, selection)
         try Task.checkCancellation()
-        guard read.meetingIDs == meetings,
-              await ChatKnowledgeGate.meetings(meetings, source: source, provider: provider,
-                                               classifications: read.sourceClassifications) == meetings else {
-            throw Invalid("Knowledge is not authorized for these sources.")
-        }
+        guard read.meetingIDs == meetings else { throw Invalid("Knowledge is not authorized for these sources.") }
+        try await authorize(meetings, source: source, provider: provider, classifications: read.sourceClassifications)
         return read
     }
 
@@ -177,6 +191,11 @@ enum ChatKnowledgeTools {
             properties = ["assertionID": uuid, "evidenceID": uuid]
             required = [.string("assertionID"), .string("evidenceID")]
             description = "Read the transcript passage one claim cites: meeting, speaker, time and verbatim quote."
+        case "get_coverage":
+            properties["meetingID"] = uuid
+            description = "Read how much of each selected recording the latest knowledge compilation examined, "
+                + "optionally for one meeting: segment counts and a state, never content. Use it before saying "
+                + "something was not discussed: an uncompiled or partly examined recording may still hold it."
         default:
             let schema = structureSchema(name)
             properties.merge(schema.properties) { _, new in new }
@@ -209,6 +228,7 @@ enum ChatKnowledgeTools {
             case "search_knowledge": ["query", "offset", "limit"]
             case "get_entity", "get_timeline": ["entityID", "offset", "limit"]
             case "get_evidence": ["assertionID", "evidenceID"]
+            case "get_coverage": ["meetingID", "offset", "limit"]
             default: ChatKnowledgeTools.structureArguments[name] ?? []
             }
             guard Set(values.keys).isSubset(of: permitted) else { throw Invalid("Unknown argument.") }
