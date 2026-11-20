@@ -115,4 +115,16 @@ struct AppSettingsCloudConsentTests {
         #expect(!settings.allowsCloud(.openAI, for: .onRequest))
         #expect(settings.cloudConsents.destinations.isEmpty)
     }
+
+    @Test func aFallbackNeverReselectsAWithdrawnProvider() throws {
+        let (defaults, suite) = try defaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(cloudStore: InMemoryCloudKeyValueStore(), defaults: defaults,
+                                   credentials: CredentialStore(keychain: InMemoryKeychain()))
+        settings.credentials.saveKey("sk-test", for: .openAI)
+        settings.aiProviderID = AIProvider.openAI.id
+        settings.revokeAllCloudConsent(settings.cloudConsentDestination(for: .openAI))
+        settings.ensureProviderSelectionsAreUsable()
+        #expect(settings.aiProviderID != AIProvider.openAI.id)
+    }
 }

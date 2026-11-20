@@ -39,14 +39,13 @@ extension AppSettings {
     }
 
     /// Repoints a selection whose provider is no longer usable. The summary
-    /// selection moves to the first usable summary provider the person allowed
-    /// (an on-request grant, CLAUDE.md "Cloud consent"; on-device needs none),
-    /// so a fallback never picks a provider whose permission was removed, and
-    /// stays put when there is none, so the picker can say so. Cloud transcription
+    /// selection moves to the first usable summary provider whose permissions
+    /// were not all removed in Privacy & Cloud (CLAUDE.md, "Cloud consent"),
+    /// and stays put when there is none, so the picker can say so. Cloud transcription
     /// moves to the first usable transcription provider, or falls back to the
     /// on-device engine when none has a key.
     func ensureProviderSelectionsAreUsable() {
-        let summaryProviders = configuredSummaryProviders.filter { allowsCloud($0, for: .onRequest) }
+        let summaryProviders = configuredSummaryProviders.filter { !cloudConsents.isWithdrawn(cloudConsentDestination(for: $0)) }
         if !summaryProviders.isEmpty, !summaryProviders.contains(where: { $0.id == aiProviderID }) {
             aiProviderID = summaryProviders[0].id
         }
