@@ -21,7 +21,7 @@ extension ChatKnowledgeTools {
         let header = ChatKnowledgeToolText.coverageHeader(recordings.map(\.1), meetings: shown.count, isComplete: read.isComplete)
         return ChatKnowledgeToolText.output(header: header, lines: recordings.map { ChatKnowledgeToolText.coverage($0.1, meeting: $0.0) },
                                             offset: params.offset, limit: params.limit,
-                                            revision: read.revision, meetings: read.meetings.count)
+                                            scope: (read.revision, read.meetings.count))
     }
 }
 

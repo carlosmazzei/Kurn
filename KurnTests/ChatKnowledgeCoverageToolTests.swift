@@ -57,7 +57,7 @@ struct ChatKnowledgeCoverageToolTests {
         let one = try await run(["meetingID": .string(Self.planning.uuidString)])
         #expect(one.content.hasPrefix("coverage: 0 of 12 segments examined in 1 meetings; 0 of 1 recordings current"))
         #expect(!one.content.contains(Self.first.uuidString))
-        let paged = try await run(["limit": .number(1), "offset": .number(1)])
+        let paged = try await run(["meetingID": .string(Self.review.uuidString), "limit": .number(1), "offset": .number(1)])
         #expect(paged.content.contains(Self.second.uuidString) && !paged.content.contains("| recording \(Self.first.uuidString)"))
         #expect(try await run(["meetingID": .string(UUID().uuidString)]).isError)
         #expect(try await run(["meetingID": .string("nope")]).isError)
