@@ -5,7 +5,7 @@ final class KnowledgeSettingsUITests: XCTestCase {
     private func launch() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["UI-Testing-Screenshots", "UI-Testing-DisableAnimations", "UI-Testing-KnowledgeFixture",
-            "UI-Testing-KnowledgeNavigationPrototype", "-settings.knowledgeEnabled", "YES", "-settings.semanticSearchEnabled", "NO",
+            "-settings.knowledgeEnabled", "YES", "-settings.semanticSearchEnabled", "NO",
             "-settings.meetingsSortOrder", "dateNewest", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
         return app
@@ -14,7 +14,6 @@ final class KnowledgeSettingsUITests: XCTestCase {
     func testKnowledgeSettingsPreviewHasExplicitLocalCostAndNoImplicitBackfill() throws {
         continueAfterFailure = false
         let app = launch()
-        app.buttons["root.destination.meetings"].tap()
         let settings = app.buttons["nav.settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 10)); settings.tap()
         let knowledge = app.buttons["settings.link.knowledge"]
@@ -45,7 +44,6 @@ final class KnowledgeSettingsUITests: XCTestCase {
     func testKnowledgeSettingsExclusionsRemoveSourcesFromTheKnowledgePicker() throws {
         continueAfterFailure = false
         let app = launch()
-        app.buttons["root.destination.meetings"].tap()
         XCTAssertTrue(app.buttons["nav.settings"].waitForExistence(timeout: 10)); app.buttons["nav.settings"].tap()
         let knowledge = app.buttons["settings.link.knowledge"]
         XCTAssertTrue(knowledge.waitForExistence(timeout: 10)); knowledge.tap()

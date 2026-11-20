@@ -1537,9 +1537,7 @@
 "knowledge.browser.meetings" = "Reuniões";
 "knowledge.browser.ask" = "Perguntar";
 
-// Four root destinations and source selection
-"meetings.options" = "Opções da lista";
-"meetings.selection.actions" = "Ações da seleção";
+// Knowledge source selection
 "knowledge.browser.choose_sources" = "Escolher reuniões";
 "knowledge.browser.choose_sources_detail" = "Escolha até 16 reuniões para consultar o conhecimento delas.";
 

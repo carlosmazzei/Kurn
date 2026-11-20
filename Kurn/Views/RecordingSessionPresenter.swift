@@ -37,11 +37,6 @@ extension View {
     func hostsRecordingMiniBar() -> some View {
         modifier(HostedRecordingMiniBar())
     }
-
-    @ViewBuilder
-    func hostsRecordingMiniBar(when enabled: Bool) -> some View {
-        if enabled { hostsRecordingMiniBar() } else { self }
-    }
 }
 
 /// How many on-screen views currently host the mini bar themselves; the root

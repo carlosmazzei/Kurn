@@ -1537,9 +1537,7 @@
 "knowledge.browser.meetings" = "会议";
 "knowledge.browser.ask" = "提问";
 
-// Four root destinations and source selection
-"meetings.options" = "列表选项";
-"meetings.selection.actions" = "选择操作";
+// Knowledge source selection
 "knowledge.browser.choose_sources" = "选择会议";
 "knowledge.browser.choose_sources_detail" = "最多选择 16 场会议以浏览其知识。";
 

@@ -4,7 +4,7 @@ import KurnCore
 import SwiftUI
 
 /// An explicitly scoped reader/search stack, shared by meeting entry and the
-/// reviewed Knowledge root. Navigation carries IDs, never cached search text.
+/// library's Knowledge sheet. Navigation carries IDs, never cached search text.
 struct KnowledgeBrowserView: View {
     let meetingIDs: Set<UUID>
     let showsDone: Bool
@@ -55,15 +55,7 @@ struct KnowledgeBrowserView: View {
                         prompt: Text(KnowledgeBrowserCopy.text("search_prompt")))
                     .searchFocused($searchFocused)
                     .onSubmit(of: .search) { searchFocused = false }
-                    .navigationDestination(for: KnowledgeBrowserRoute.self) {
-                        destination($0).toolbar(.hidden, for: .tabBar)
-                    }
-                    // The root destinations draw their own bar; the stack's
-                    // own pages keep the native tab bar hidden as well, since
-                    // a hosting tab's modifier does not always reach inside
-                    // a stack whose root changes as content loads. In a sheet
-                    // there is no tab bar, so this changes nothing there.
-                    .toolbar(.hidden, for: .tabBar)
+                    .navigationDestination(for: KnowledgeBrowserRoute.self) { destination($0) }
                     .toolbar {
                         if let onChooseSources {
                             ToolbarItem(placement: .topBarLeading) {
