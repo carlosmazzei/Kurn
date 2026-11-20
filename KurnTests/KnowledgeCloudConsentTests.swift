@@ -19,21 +19,15 @@ struct KnowledgeCloudConsentTests {
         #expect(policy.allowedRemoteProviderIDs.isEmpty)
     }
 
-    @Test func aGrantNamesTheProviderForInternalSourcesAndChangesTheRevision() {
+    @Test func aGrantNamesTheProviderWithoutChangingTheRevision() {
         let settings = MeetingFixtures.isolatedSettings()
+        let before = KnowledgeProcessingPolicy.revisionKey([KnowledgeCompilationCoordinator.localPolicy(settings)])
         settings.grantCloudConsent(.openAI, for: .onRequest)
         let policy = KnowledgeCompilationCoordinator.localPolicy(settings)
         #expect(policy.allowedRemoteProviderIDs == [AIProvider.openAI.id])
         #expect(policy.maxRemoteClassification == .internal)
-        #expect(policy.revision != KnowledgeProcessingPolicy.defaultDeny().revision)
-        #expect(KnowledgeCompilationCoordinator.localPolicy(settings).revision == policy.revision)
-    }
-
-    @Test func policyRevisionDependsOnlyOnTheProviderSet() {
-        let revision = KnowledgeCompilationCoordinator.policyRevision(["a", "b"])
-        #expect(revision == KnowledgeCompilationCoordinator.policyRevision(["b", "a"]))
-        #expect(revision != KnowledgeCompilationCoordinator.policyRevision(["a"]))
-        #expect(revision > 1)
+        // Existing Knowledge stays readable: its policy revision key is unchanged.
+        #expect(KnowledgeProcessingPolicy.revisionKey([policy]) == before)
     }
 
     @Test func extractionConsentNeedsTheAutomaticGrant() {

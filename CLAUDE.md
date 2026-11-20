@@ -2927,8 +2927,9 @@ hold for every phase; code comments cite this section.
   injected policy permits more; on-device needs no grant. A cloud run uses the
   `.conservative` context budget, on-device keeps `.onDevice`. No model download
   is triggered. The stable host-owned workspace policy (`localPolicy`) names every
-  provider with a grant for `.internal` sources, with a revision derived from that
-  set, and is default-deny without one; named context
+  provider with a grant for `.internal` sources and keeps the default's revision
+  (a new grant must not hide Knowledge compiled before it; egress is re-checked
+  live against the ledger), and is default-deny without one; named context
   policies must be supplied explicitly, never silently replaced by that default.
   Local scope/control preferences and backfill UI are described in K2.7 below;
   corporate-policy editing remains gated.

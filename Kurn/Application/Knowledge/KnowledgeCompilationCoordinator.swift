@@ -41,26 +41,19 @@ final class KnowledgeCompilationCoordinator {
 
     /// The local policy follows the shared cloud-consent ledger (CLAUDE.md,
     /// "Cloud consent"): it names every remote provider the person allowed,
-    /// for `.internal` sources, and its revision changes with that set so work
-    /// queued under an earlier set is refused as obsolete. Consent is still
-    /// checked per operation: extraction needs the automatic grant, Ask the
-    /// on-request one.
+    /// for `.internal` sources. Its revision stays the default's: the provider
+    /// set changes no derived content, so a new grant must not hide Knowledge
+    /// compiled under the previous set, and every egress is re-checked live
+    /// against the ledger (extraction needs the automatic grant at submission,
+    /// before each request and in queue eligibility; Ask the on-request one).
     static func localPolicy(_ settings: AppSettings) -> KnowledgeProcessingPolicy {
         let remote = settings.providers
             .filter { $0.kind != .appleOnDevice && settings.allowsCloud($0, for: .onRequest) }
             .map(\.id)
         guard !remote.isEmpty else { return .defaultDeny(id: localPolicyID) }
-        return KnowledgeProcessingPolicy(id: localPolicyID, revision: policyRevision(remote), allowedRemoteProviderIDs: Set(remote),
-            allowedOperations: KnowledgeProcessingPolicy.onDeviceOperations, maxRemoteClassification: .internal)
-    }
-
-    /// A launch-stable revision (FNV-1a) for a set of provider IDs; 1 is the default-deny revision.
-    static func policyRevision(_ providerIDs: [String]) -> Int {
-        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
-        for byte in providerIDs.sorted().joined(separator: "\n").utf8 {
-            hash = (hash ^ UInt64(byte)) &* 0x0000_0100_0000_01B3
-        }
-        return 2 + Int(hash % UInt64(Int32.max))
+        return KnowledgeProcessingPolicy(id: localPolicyID, revision: KnowledgeProcessingPolicy.defaultDeny().revision,
+            allowedRemoteProviderIDs: Set(remote), allowedOperations: KnowledgeProcessingPolicy.onDeviceOperations,
+            maxRemoteClassification: .internal)
     }
 
     /// Whether Ask may send knowledge to this provider: the on-request grant.
