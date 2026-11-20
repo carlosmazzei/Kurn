@@ -21,7 +21,7 @@ struct RecognitionPipelineTests {
 
         #expect(config.parallelChunkConcurrency == 4)
         #expect(config.streamingEnabled)
-        #expect(config.melChunkContext == false)
+        #expect(config.melChunkContextOverride == false)
         #expect(config.dualDecodeArbitration)
     }
     #endif

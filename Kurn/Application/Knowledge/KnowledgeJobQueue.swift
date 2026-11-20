@@ -43,12 +43,18 @@ final class KnowledgeJobQueue {
     @ObservationIgnored private var cancellationTask: Task<Void, Never>?
 
     init(container: ModelContainer, foreground: Bool = true, scheduler: ResourceScheduler = .shared,
-         eraseJobs: @escaping Erase = { try await $0.eraseJobs(kind: $1, createdBefore: $2) }) {
+         eraseJobs: @escaping Erase = KnowledgeJobQueue.eraseStoredJobs) {
         storeHost = KnowledgeStoreHost(container: container)
         self.foreground = foreground
         self.scheduler = scheduler
         self.eraseJobs = eraseJobs
         automaticBudget = foreground ? 5 : 0
+    }
+
+    /// The production erase, named for the same reason as
+    /// `KnowledgeDeletionCoordinator.purgeNext`.
+    static func eraseStoredJobs(_ store: KnowledgeStore, kind: KnowledgeJobKind, createdBefore: Date) async throws {
+        try await store.eraseJobs(kind: kind, createdBefore: createdBefore)
     }
 
     func register(kind: KnowledgeJobKind, recovery: @escaping Recovery = { _ in false },

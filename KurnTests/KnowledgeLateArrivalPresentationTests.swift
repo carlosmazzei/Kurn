@@ -14,11 +14,14 @@ struct KnowledgeLateArrivalPresentationTests {
     private static func page(_ statuses: [(String, String, String)]) throws -> KnowledgeWikiPage {
         let entity = UUID()
         let facts = try statuses.map { value, stated, recorded in
-            KnowledgeWikiSnapshot.Fact(
+            // Bound first: inside an argument of optional type, #require would
+            // check the promoted optional and never fail.
+            let validFrom = try #require(KnowledgeTemporalValue(text: stated, precision: .day))
+            return KnowledgeWikiSnapshot.Fact(
                 id: UUID(), subjectID: entity, predicate: .hasStatus, value: .enumeration(value),
                 qualifiers: .init(modality: .reported, polarity: .positive, claimKind: .internalStatusReport, authority: .attributed,
                                   confidence: .medium, review: .machineExtracted,
-                                  validFrom: try #require(KnowledgeTemporalValue(text: stated, precision: .day))),
+                                  validFrom: validFrom),
                 source: .init(meetingID: UUID(), recordedAt: try date(recorded), evidence: [
                     .init(id: UUID(), recordingID: UUID(), segmentIDs: ["s1"], quote: "quoted", startMs: 0, endMs: 500,
                           attributedSpeaker: "Speaker 1"),

@@ -172,7 +172,7 @@ struct ProviderFactoryTests {
     /// `OpenAIProvider` and send the audio to a Whisper-shaped endpoint the
     /// vendor does not have; it now refuses instead.
     @Test func whisperProviderRefusesAProviderWithoutATranscriptionRoute() throws {
-        try withKey(.anthropic, value: "anthropic-key") {
+        withKey(.anthropic, value: "anthropic-key") {
             #expect(throws: AppError.self) {
                 _ = try ProviderFactory.whisperProvider(for: .anthropic, model: "")
             }
@@ -180,7 +180,7 @@ struct ProviderFactoryTests {
     }
 
     @Test func summaryProviderThrowsSummarizationUnsupportedForElevenLabs() throws {
-        try withKey(.elevenLabs, value: "eleven-key") {
+        withKey(.elevenLabs, value: "eleven-key") {
             #expect(throws: AppError.self) {
                 _ = try ProviderFactory.summaryProvider(for: .elevenLabs, model: "")
             }
