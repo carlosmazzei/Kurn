@@ -45,7 +45,11 @@ extension AppSettings {
     /// moves to the first usable transcription provider, or falls back to the
     /// on-device engine when none has a key.
     func ensureProviderSelectionsAreUsable() {
-        let summaryProviders = configuredSummaryProviders.filter { !cloudConsents.isWithdrawn(cloudConsentDestination(for: $0)) }
+        let allowed = configuredSummaryProviders.filter { !cloudConsents.isWithdrawn(cloudConsentDestination(for: $0)) }
+        // Prefer a provider already allowed to receive per-recording sends, so a
+        // fallback keeps automation running instead of turning it off.
+        let summaryProviders = allowed.filter { allowsCloud($0, for: .automatic) }
+            + allowed.filter { !allowsCloud($0, for: .automatic) }
         if !summaryProviders.isEmpty, !summaryProviders.contains(where: { $0.id == aiProviderID }) {
             isRepointingSelection = true
             aiProviderID = summaryProviders[0].id
