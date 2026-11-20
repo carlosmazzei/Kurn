@@ -3741,9 +3741,10 @@ On a day (evolution), Compare and Contexts (lanes).
 
 ### Knowledge tools for Ask (K5.1)
 
-Ask can read canonical knowledge through four read-only tools (`Application/Agent/Tools/ChatKnowledgeTools`):
-`search_knowledge`, `get_entity` (an entity's page), `get_timeline` (claims by stated time, undated last) and
-`get_evidence` (one cited passage). They read through `ChatKnowledgeSource`, the same authorized,
+Ask can read canonical knowledge through ten read-only tools (`Application/Agent/Tools/ChatKnowledgeTools`):
+`search_knowledge`, `get_entity` (an entity's page), `get_timeline` (claims by stated time, undated last),
+`get_evidence` (one cited passage) and the structure tools of `ChatKnowledgeTools+Structure`: `resolve_entity`,
+`get_graph`, `compare_state`, `list_open_actions`, `list_contexts` and `get_context`. They read through `ChatKnowledgeSource`, the same authorized,
 evidence-checked read the Knowledge reader shows (`KnowledgeCompilationCoordinator.readKnowledgeBrowser`),
 never a second store, and answer in `ChatSourceToolText`'s compact form (`ChatKnowledgeToolText`): one line per
 item with the IDs the model passes back, vocabulary raw values (modality, polarity as a leading `NOT`, review
@@ -3759,9 +3760,21 @@ state, stated validity), each name and quote clipped to one line, a `page:` line
   classifications (`KnowledgeBrowserRead.sourceClassifications`, from each meeting's context), so a context
   reclassified or consent withdrawn since the run started sends nothing. A refused or failed read is a
   recoverable tool error with a fixed message, never source text.
-- Not yet: the other K5.1 tools (`resolve_entity`, `get_graph`, `compare_state`, `get_coverage`,
-  `list_open_actions`, `list_contexts`, `get_context`, `trace_influence`), the consent screen, K5.2's
-  wiki-first query policy and K5.3's knowledge parts in `ChatSourceScope`.
+- **The structure tools are projections of that same read** (KurnCore, no new store query).
+  `resolve_entity` folds case and accents (`KnowledgeEntityResolver.normalizedName`) and ranks exact name,
+  alias, prefix, then every query word in the name, optionally of one kind. `get_graph` is a
+  `KnowledgeGraphIndex` query (depth 0–2, default 1, the K4.3 node/edge bounds; inferred relations hidden unless
+  asked for, as in the Graph Explorer): nodes, then one edge per claim in its stated direction with its
+  evidence ID, the truncation, frontier and `supersedes` cycles in the header. `compare_state` is
+  `KnowledgeStateComparison` at the end of two `yyyy-MM-dd` days, as known now or, with `asKnownThen`, as known
+  on each day; certainty shifts and conflicts are listed, never resolved. `list_open_actions` projects each
+  action item's lifecycle (`KnowledgeLifecycle.action`) at the tool clock (`make(now:)`) and leaves out only a
+  definite `completed` or `cancelled`, with assignees (`assignedTo`, or `owns` pointing at it), due dates and
+  lifecycle anomalies; an entity filter keeps actions with a claim naming it. `list_contexts`/`get_context`
+  group the selected meetings by `KnowledgeBrowserContext` in the Graph Explorer's lane order, meetings with
+  none under context `unknown`.
+- Not yet: `get_coverage` and `trace_influence` (they need store semantics not defined yet), the consent
+  screen, K5.2's wiki-first query policy and K5.3's knowledge parts in `ChatSourceScope`.
 
 ### Attached documents (PDFs)
 
