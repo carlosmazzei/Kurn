@@ -258,7 +258,7 @@ struct HarnessChatService {
         list_open_actions or get_graph for its facts. Each fact keeps its modality, negation and time:
         report proposed, disputed or negated claims as such, never as agreed. Cite a fact through its
         meeting and the [m:ss] its evidence gives (get_evidence).
-        Knowledge holds only what was compiled. Call get_coverage for the knowledge meetings you answer from: for
+        Knowledge holds only what was compiled. Call get_coverage (without a meetingID it lists every meeting knowledge may cover, compiled or not) before answering: for
         any meeting not compiled, stale or not fully examined, and for meetings without knowledge, use
         the other source tools you have (search, read_transcript, read_summary) for that meeting, or say
         that its knowledge is incomplete when they are not offered. Even with full coverage, a missing
