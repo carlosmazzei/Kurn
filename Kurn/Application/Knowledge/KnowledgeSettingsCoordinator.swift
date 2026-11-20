@@ -23,8 +23,8 @@ final class KnowledgeSettingsCoordinator {
     }
 
     func preview(meetingIDs: Set<UUID>, rebuild: Bool) async throws -> KnowledgeBackfillPlan {
-        guard settings.knowledgeEnabled, let controls = settings.knowledgeControls,
-              settings.knowledgeProvider?.kind == .appleOnDevice else { throw KnowledgeSettingsError.unavailable }
+        guard settings.knowledgeEnabled, let controls = settings.knowledgeControls, let provider = settings.knowledgeProvider,
+              settings.allowsCloud(provider, for: .automatic) else { throw KnowledgeSettingsError.unavailable }
         let read = try await read(meetingIDs: meetingIDs)
         guard settings.knowledgeControls == controls, settings.knowledgeEnabled else { throw KnowledgeSettingsError.stalePreview }
         return KnowledgeBackfillPlan(id: UUID(), controls: controls, read: read, rebuild: rebuild)
