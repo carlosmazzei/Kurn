@@ -431,17 +431,29 @@ Each item is a product decision first; the control/content layering and the
 existing identifiers (`nav.settings`, `meetingCard`, `settings.link.*`) must
 survive. Items that revisit a `CLAUDE.md` decision are marked **review**.
 
-1. **Meetings list toolbar (review).** Today with Knowledge on: Library, Filter,
-   Sort, Select, Settings on top; four places and Record at the bottom. Keep
-   Select as its own button (a long press is not discoverable and is harder
-   with VoiceOver and Voice Control). Fold Sort into the Filter sheet, leaving
-   Library, Filter, Select and Settings on top: one control fewer, with no
-   hidden gesture. This still reverses part of the "each control open in the
-   bar" choice from the K0.5 review, so it needs that review and a usability
-   check (task: "sort by duration"). The icons themselves are system-sized
-   (no custom frames or fonts in `MeetingsListToolbar`); the heaviness comes
-   from the count of glass buttons, not from their size. Check it on a device
-   before changing anything else.
+1. **Meetings list toolbar: one layout with Knowledge on or off (review).**
+   Today `browsingToolbar` switches between two layouts (top: Select, Sort,
+   Settings or Library, Filter, Sort, Select, Settings; bottom: Library,
+   Filter, Ask, Documents or the four places). Replace both with one:
+   - **Top:** Library, Filter (Sort moves into its sheet), Select, then a fixed
+     spacer and Settings. Select stays a button; a long press is not
+     discoverable and is harder with VoiceOver and Voice Control.
+   - **Bottom:** Ask, Documents, and Knowledge only while it is on, then the
+     flexible spacer and Record. The "Meetings" place exists only to mark the
+     current screen among four, so it appears with Knowledge, never alone.
+   The top bar is then identical in both states and has four controls instead
+   of five, so the Knowledge-on bar is no longer the crowded one. This reverses
+   part of the K0.5 "each control open in the bar" choice, so it needs that
+   review and a usability check (task: "sort by duration"). Identifiers
+   (`meetings.library`, `meetings.filters`, `nav.settings`,
+   `root.destination.*`) stay, so flows change their path, not their handles.
+   **Icon size and spacing.** `MeetingsListToolbar` sets no frame or font on
+   the icons: size and the gap between buttons in a glass group are the
+   system's. To get smaller icons, try `.imageScale(.small)` or a smaller
+   `.font` on the toolbar labels; the gap cannot be set, only reduced by
+   having fewer items. Not verified on a device: check it there first, keep the
+   hit area at 44 × 44 pt and make sure the glyphs still grow with Dynamic Type
+   (do not cap them with `dynamicTypeSize`).
 2. **Meeting detail overflow menu.** Group the up to 10 rows into three
    `Section`s: *Create* (title, wiki, tags), *Manage* (edit, add PDF, share) and
    *Reprocess* (re-transcribe); replace the `ellipsis` "generating" glyph with a
