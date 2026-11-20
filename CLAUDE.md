@@ -1555,7 +1555,7 @@ transcript.
   confidence and ≤ 160 characters of the neighbouring segments' text
   (`before`/`after`, read-only), so a word is judged in the conversation it was
   said in.
-- **Batching** reuses the shape of `SummaryService.packWholeItems`: greedy packs
+- **Batching** greedy-packs segments
   bounded by both `maxBatchChars` (6,000) and `maxSegmentsPerBatch` (40), never
   splitting a segment.
 - **Vocabulary.** `MeetingVocabularyExtractor` (`Pipeline/`) collects the
