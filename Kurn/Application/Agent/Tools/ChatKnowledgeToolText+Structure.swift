@@ -26,7 +26,7 @@ extension ChatKnowledgeToolText {
             header += "\nsupersedes cycles (not ordered): "
                 + graph.supersessionCycles.map { "[" + $0.map(\.uuidString).joined(separator: ", ") + "]" }.joined(separator: "; ")
         }
-        return header + "\nnodes (node | name | kind | depth), then edges (edge assertion | claim | modality | evidence):"
+        return header + "\nnodes (node | name | kind | depth), then edges (edge assertion | claim | modality | from node to node | evidence):"
     }
 
     static func node(_ node: KnowledgeGraph.Node) -> Rendered {
@@ -40,6 +40,7 @@ extension ChatKnowledgeToolText {
         let text = ChatSourceToolText.renderedField(edge.polarity == .negative ? "NOT " + claim : claim, limit: 400)
         var line = "- edge \(edge.factID.uuidString) | \(text.text) | modality: \(edge.modality.rawValue)"
         if edge.isTentative { line += " | tentative" }
+        line += " | from \(edge.sourceID.uuidString) to \(edge.targetID.uuidString)"
         if let evidence = edge.evidenceID { line += " | evidence \(evidence.uuidString)" }
         return Rendered(text: line, omittedScalars: text.omittedScalars)
     }

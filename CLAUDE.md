@@ -3765,12 +3765,12 @@ state, stated validity), each name and quote clipped to one line, a `page:` line
   alias, prefix, then every query word in the name, optionally of one kind. `get_graph` is a
   `KnowledgeGraphIndex` query (depth 0–2, default 1, the K4.3 node/edge bounds; inferred relations hidden unless
   asked for, as in the Graph Explorer): nodes, then one edge per claim in its stated direction with its
-  evidence ID, the truncation, frontier and `supersedes` cycles in the header. `compare_state` is
+  endpoint node IDs and evidence ID, the truncation, frontier and `supersedes` cycles in the header. `compare_state` is
   `KnowledgeStateComparison` at the end of two `yyyy-MM-dd` days, as known now or, with `asKnownThen`, as known
   on each day; certainty shifts and conflicts are listed, never resolved. `list_open_actions` projects each
   action item's lifecycle (`KnowledgeLifecycle.action`) at the tool clock (`make(now:)`) and leaves out only a
-  definite `completed` or `cancelled`, with assignees (`assignedTo`, or `owns` pointing at it), due dates and
-  lifecycle anomalies; an entity filter keeps actions with a claim naming it. `list_contexts`/`get_context`
+  definite `completed` or `cancelled`, with the assignees (`assignedTo`, or `owns` pointing at it) and due dates
+  that hold at that moment (`KnowledgeTemporalReducer`, proposals marked tentative) and lifecycle anomalies; an entity filter keeps actions with a claim naming it. `list_contexts`/`get_context`
   group the selected meetings by `KnowledgeBrowserContext` in the Graph Explorer's lane order, meetings with
   none under context `unknown`.
 - Not yet: `get_coverage` and `trace_influence` (they need store semantics not defined yet), the consent

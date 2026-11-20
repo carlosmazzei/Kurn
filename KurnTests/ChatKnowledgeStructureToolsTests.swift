@@ -95,6 +95,8 @@ struct ChatKnowledgeStructureToolsTests {
         let graph = try await run("get_graph", ["entityID": .string(Self.team.uuidString)])
         #expect(graph.content.hasPrefix("graph around entity \(Self.team.uuidString) | Platform team | depth: 1 | nodes: 2 | edges: 1"))
         #expect(graph.content.contains("- edge ") && graph.content.contains("| Platform team blocks Example portal | modality: reported"))
+        // Endpoint node IDs tell same-named entities apart.
+        #expect(graph.content.contains("| from \(Self.team.uuidString) to \(Self.project.uuidString)"))
         #expect(!graph.content.contains("Avery Example"))
         let inferred = try await run("get_graph", ["entityID": .string(Self.team.uuidString), "includeInferred": .bool(true)])
         #expect(inferred.content.contains("Platform team relatesTo Avery Example | modality: inferred"))
