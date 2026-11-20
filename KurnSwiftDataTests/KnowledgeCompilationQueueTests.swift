@@ -17,17 +17,17 @@ struct KnowledgeCompilationQueueTests {
 
     private actor Gate {
         var started = false
-        private var continuation: CheckedContinuation<Void, Never>?
+        private var continuations: [CheckedContinuation<Void, Never>] = []
         private var released = false
         func wait() async {
             started = true
             guard !released else { return }
-            await withCheckedContinuation { continuation = $0 }
+            await withCheckedContinuation { continuations.append($0) }
         }
         func release() {
             released = true
-            continuation?.resume()
-            continuation = nil
+            continuations.forEach { $0.resume() }
+            continuations = []
         }
     }
 
