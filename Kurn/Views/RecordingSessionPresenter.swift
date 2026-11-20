@@ -35,7 +35,15 @@ extension View {
     /// Shows the mini bar inside this screen's safe area instead of at the
     /// root, for a screen whose bottom toolbar the root bar would cover.
     func hostsRecordingMiniBar() -> some View {
-        modifier(HostedRecordingMiniBar())
+        modifier(HostedRecordingMiniBar(closesSheetToExpand: false))
+    }
+
+    /// The mini bar inside a sheet the meetings list presents (Knowledge,
+    /// Ask), which covers the list's own. The recorder is presented from the
+    /// root, which cannot present over this sheet, so expanding closes the
+    /// sheet first.
+    func hostsRecordingMiniBarInSheet() -> some View {
+        modifier(HostedRecordingMiniBar(closesSheetToExpand: true))
     }
 }
 
@@ -52,10 +60,14 @@ final class RecordingMiniBarPlacement {
 private struct MiniBarSlot: View {
     @Environment(RecordingSessionController.self) private var session
     @Environment(RecordingMiniBarPlacement.self) private var placement
+    var beforeExpand: (() -> Void)?
 
     var body: some View {
         if let vm = session.viewModel, !session.isExpanded, !placement.isKeyboardVisible {
-            RecordingMiniBar(vm: vm, onExpand: { session.expand() })
+            RecordingMiniBar(vm: vm, onExpand: {
+                beforeExpand?()
+                session.expand()
+            })
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -64,13 +76,15 @@ private struct MiniBarSlot: View {
 }
 
 private struct HostedRecordingMiniBar: ViewModifier {
+    let closesSheetToExpand: Bool
     @Environment(RecordingMiniBarPlacement.self) private var placement
+    @Environment(\.dismiss) private var dismiss
     @State private var isHosting = false
 
     func body(content: Content) -> some View {
         content
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if isHosting { MiniBarSlot() }
+                if isHosting { MiniBarSlot(beforeExpand: closesSheetToExpand ? { dismiss() } : nil) }
             }
             .onAppear {
                 guard !isHosting else { return }

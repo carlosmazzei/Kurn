@@ -388,8 +388,11 @@ struct MeetingsListView: View {
                     }
                 }
             }
+            .hostsRecordingMiniBarInSheet()
         }
-        .sheet(isPresented: $showingKnowledge) { KnowledgeLibraryDestination(meetingIDs: $knowledgeSourceIDs) }
+        .sheet(isPresented: $showingKnowledge) {
+            KnowledgeLibraryDestination(meetingIDs: $knowledgeSourceIDs).hostsRecordingMiniBarInSheet()
+        }
         .task(id: initialKnowledgeSourceIDs) {
             guard !initialKnowledgeSourceIDs.isEmpty else { return }
             knowledgeSourceIDs = initialKnowledgeSourceIDs
