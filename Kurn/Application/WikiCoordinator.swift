@@ -115,7 +115,7 @@ final class WikiCoordinator {
         let meetingID = meeting.id
         if trigger == .explicit { lastError = nil }
         guard !generatingMeetingIDs.contains(meetingID), let settings = appSettings,
-              settings.wikiEnabled || trigger == .explicit else { return .skipped }
+              settings.wikiAutomaticAllowed || trigger == .explicit else { return .skipped }
         let provider = settings.aiProvider
         guard !localOnly || provider.kind == .appleOnDevice else { return .skipped }
         let model = settings.summaryModel(for: provider)
@@ -145,7 +145,7 @@ final class WikiCoordinator {
 
     private func performQueued(_ handle: KnowledgeJobHandle) async throws {
         let work = handle.work
-        guard let settings = appSettings, settings.wikiEnabled || work.explicitlyRequested else {
+        guard let settings = appSettings, settings.wikiAutomaticAllowed || work.explicitlyRequested else {
             throw KnowledgeJobDeferred(reason: .featureDisabled)
         }
         guard settings.aiProvider == work.provider, settings.summaryModel(for: work.provider) == work.model else {
@@ -190,7 +190,7 @@ final class WikiCoordinator {
             guard settings.aiProvider == work.provider, settings.summaryModel(for: work.provider) == work.model else {
                 throw KnowledgeWorkObsolete.providerChanged
             }
-            guard settings.wikiEnabled || work.explicitlyRequested else { throw KnowledgeJobDeferred(reason: .featureDisabled) }
+            guard settings.wikiAutomaticAllowed || work.explicitlyRequested else { throw KnowledgeJobDeferred(reason: .featureDisabled) }
             let currentMeeting = try modelContext.fetch(FetchDescriptor<Meeting>(predicate: #Predicate { $0.id == requestedMeetingID })).first
             guard let currentMeeting, Self.contentHash(currentMeeting.assembledContextText()) == work.sourceFingerprint else {
                 throw KnowledgeWorkObsolete.sourceChanged
@@ -248,7 +248,7 @@ final class WikiCoordinator {
     /// article, at most `backfillBatchLimit` per call to bound cost. Skipped when
     /// the feature is off or no API key is available. Low priority, cancellable.
     func backfill() async {
-        guard appSettings?.wikiEnabled ?? false, !isBackfilling,
+        guard appSettings?.wikiAutomaticAllowed ?? false, !isBackfilling,
               let settings = appSettings, hasProviderKey else { return }
         isBackfilling = true
         defer { isBackfilling = false }

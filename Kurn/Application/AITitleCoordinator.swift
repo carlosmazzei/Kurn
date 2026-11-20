@@ -58,7 +58,7 @@ final class AITitleCoordinator {
         guard Self.allowsGeneration(
             trigger: trigger,
             provider: provider,
-            cloudEnabled: settings.aiTitleCloudEnabled
+            cloudEnabled: settings.aiTitleCloudEnabled && settings.allowsCloud(provider, for: .automatic)
         ) else {
             AppLog.transcription.atInfo.info("AI title: automatic cloud title not enabled")
             return nil

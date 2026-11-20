@@ -3872,7 +3872,10 @@ extraction). An automatic grant also covers on-request use. A changed endpoint i
 a new destination, and the on-device provider never needs a grant. Feature
 toggles still choose which features run. Turning on `wikiEnabled`,
 `correctionEnabled` or `aiTitleCloudEnabled` records the automatic grant for the
-summary provider, and confirming the cloud-upload dialog records it for the
+summary provider, and those features run per recording only while the current
+summary provider holds that grant (`wikiAutomaticAllowed`, `AITitleCoordinator`,
+`correctionConsented`), so switching summary providers does not carry it over;
+explicit requests still run. Confirming the cloud-upload dialog records it for the
 transcription provider. Audio keeps its own per-destination upload consent
 (`hasCloudTranscriptionConsent`): a text grant never authorizes an audio upload.
 `revokeAutomaticCloudConsent` withdraws the grant, clears the legacy transcription

@@ -31,7 +31,7 @@ extension AppSettings {
             correction: correctionEnabled ? .llm : .none,
             correctionProvider: aiProvider,
             correctionModel: correctionEnabled ? summaryModel(for: aiProvider) : "",
-            correctionConsented: correctionEnabled && aiProvider.isUsable
+            correctionConsented: correctionEnabled && aiProvider.isUsable && allowsCloud(aiProvider, for: .automatic)
         )
     }
 

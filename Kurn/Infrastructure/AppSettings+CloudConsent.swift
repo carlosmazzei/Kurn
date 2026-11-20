@@ -22,6 +22,10 @@ extension AppSettings {
         provider.kind == .appleOnDevice || cloudConsents.allows(cloudConsentDestination(for: provider), for: purpose)
     }
 
+    /// The meeting wiki runs per recording only under the summary provider's
+    /// automatic grant; switching providers does not carry the grant over.
+    var wikiAutomaticAllowed: Bool { wikiEnabled && allowsCloud(aiProvider, for: .automatic) }
+
     func grantCloudConsent(_ provider: AIProvider, for purpose: CloudConsentPurpose, at date: Date = Date()) {
         guard provider.kind != .appleOnDevice else { return }
         var ledger = cloudConsents
