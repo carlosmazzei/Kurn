@@ -46,7 +46,6 @@ public enum AppErrorRecoveryAction: String, Sendable {
     case openSettings
     case freeSpace
     case changeProviderOrModel
-    case recoverQuarantinedAudio
     case exportDiagnostics
 }
 
