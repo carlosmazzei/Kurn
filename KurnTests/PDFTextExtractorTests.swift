@@ -13,6 +13,9 @@ import KurnCore
 import Testing
 @testable import Kurn
 
+// A Vision or pasteboard service that stops answering fails here in minutes,
+// naming the test, instead of stalling the job until its 40-minute watchdog.
+@Suite(.timeLimit(.minutes(3)))
 struct PDFTextExtractorTests {
 
     @Test func readsTheTextOfEveryPageInOrder() throws {
