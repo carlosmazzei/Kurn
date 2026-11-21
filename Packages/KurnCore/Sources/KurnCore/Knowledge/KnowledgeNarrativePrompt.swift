@@ -5,7 +5,7 @@ import Foundation
 /// only paragraphs that cite at least one of those references, resolves them to assertion IDs and
 /// respects the projector's limits, so its output always validates against the page.
 public enum KnowledgeNarrativePrompt {
-    /// Claims shown to the model, newest-first pages are trimmed beyond this.
+    /// Claims shown to the model; a larger page keeps its most recently recorded ones.
     public static let claimLimit = 40
     static let paragraphLimit = 32
     static let byteLimit = 16_384
@@ -28,7 +28,11 @@ public enum KnowledgeNarrativePrompt {
     }
 
     public static func request(_ page: KnowledgeWikiPage) -> Request? {
-        let entries = Array(page.sections.flatMap(\.entries).prefix(claimLimit))
+        let all = page.sections.flatMap(\.entries)
+        let kept = Set(all.enumerated().sorted {
+            ($0.element.fact.source.recordedAt, $0.offset) > ($1.element.fact.source.recordedAt, $1.offset)
+        }.prefix(claimLimit).map(\.offset))
+        let entries = all.enumerated().filter { kept.contains($0.offset) }.map(\.element)
         guard !entries.isEmpty else { return nil }
         var references: [String: UUID] = [:]
         var lines = ["Entity: \(page.entity.name) (\(page.entity.kind.rawValue))", "Claims:"]
