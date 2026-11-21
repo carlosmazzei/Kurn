@@ -126,6 +126,18 @@ struct KnowledgeSettingsIntegrationTests {
         #expect(coverage.report.coverage.first?.examinedSegments == 1)
     }
 
+    @Test func aCloudKnowledgeProviderWithoutItsAutomaticGrantWritesNoNarrative() async throws {
+        let f = try fixture()
+        #expect(await f.compiler.compile(meetingID: f.meeting.id, trigger: .explicit) == .completed)
+        var controls = try #require(f.settings.knowledgeControls)
+        controls.providerID = AIProvider.openAI.id
+        try f.settings.saveKnowledgeControls(controls)
+        #expect(f.settings.knowledgeProvider == .openAI && !f.settings.allowsCloud(.openAI, for: .automatic))
+        try await f.management.rebuildPages(meetingIDs: f.ids)
+        let narrativeCalls = await f.provider.narrativeCalls
+        #expect(narrativeCalls == 0)
+    }
+
     @Test func exclusionsInvalidatePreviewAndEveryReaderBeforeReturningContent() async throws {
         let f = try fixture()
         let plan = try await f.management.preview(meetingIDs: f.ids, rebuild: false)
