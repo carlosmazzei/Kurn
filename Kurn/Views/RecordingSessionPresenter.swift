@@ -288,6 +288,11 @@ private struct RecordingMiniBarSurfaceModifier: ViewModifier {
         } else {
             content
                 .glassEffect(.regular.interactive(), in: .capsule)
+                .overlay {
+                    if contrast == .increased {
+                        Capsule().strokeBorder(Theme.separator, lineWidth: 1.5)
+                    }
+                }
         }
     }
 }

@@ -98,10 +98,10 @@ struct StatusBadge: View {
             }
             .padding(.horizontal, 9)
             .padding(.vertical, 3)
-            .background(color.opacity(0.16), in: Capsule())
+            .background(color.opacity(contrast == .increased ? 0.10 : 0.12), in: Capsule())
             .overlay {
                 if contrast == .increased {
-                    Capsule().strokeBorder(color.opacity(0.6), lineWidth: 1)
+                    Capsule().strokeBorder(color.opacity(0.75), lineWidth: 1)
                 }
             }
             .foregroundStyle(color)
@@ -327,17 +327,15 @@ struct KurnDialogModifier: ViewModifier {
         action: @escaping () -> Void
     ) -> some View {
         let background = isPrimary
-            ? (role == .destructive ? Theme.accent : Theme.info)
+            ? (role == .destructive ? Theme.accentFill : Theme.infoFill)
             : Theme.fill
         let foreground = isPrimary ? Color.white : Theme.textPrimary
 
         return Button(action: action) {
             Text(title)
-                // White text on `Theme.accent`/`Theme.info` measures ~3.55:1 /
-                // ~3.65:1 contrast — below the 4.5:1 WCAG AA floor for normal
-                // text, but above the 3:1 floor for "large text" (>=14pt
-                // bold). Bold `.subheadline` (15pt) clears that bar without
-                // touching the brand colors used identically elsewhere.
+                // White text on `Theme.accentFill` (#C91F16) / `Theme.infoFill`
+                // (#0055B3) measures 5.85:1 / 7.30:1 contrast in both light and
+                // dark mode, clearing the 4.5:1 WCAG AA floor at every size.
                 .font(isPrimary ? .system(.subheadline, design: .default, weight: .bold) : Theme.footnoteEmphasized)
                 .lineLimit(singleLine ? 1 : 2)
                 .fixedSize(horizontal: singleLine, vertical: true)
