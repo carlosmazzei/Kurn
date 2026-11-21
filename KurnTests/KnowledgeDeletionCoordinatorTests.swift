@@ -58,9 +58,11 @@ struct KnowledgeDeletionCoordinatorTests {
         let script = Script([])
         let coordinator = KnowledgeDeletionCoordinator(queue: queue(), purge: { _ in try script.next() })
         coordinator.observeStoreSaves()
-        let posted = DispatchSemaphore(value: 0)
+        let container = TestModelContainer.make(), posted = DispatchSemaphore(value: 0)
+        // A real save inside a transaction, as the store's publish makes.
         DispatchQueue.global().async {
-            NotificationCenter.default.post(name: .NSManagedObjectContextDidSave, object: nil)
+            let context = ModelContext(container)
+            try? context.transaction { context.insert(Meeting(title: "Synthetic save")) }
             posted.signal()
         }
         #expect(blockMain(until: posted) == .success)
