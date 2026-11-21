@@ -49,6 +49,33 @@ struct KnowledgeDeletionCoordinatorTests {
         #expect(rearm.calls == 2)
     }
 
+    /// A container whose main context is never created, as the Knowledge
+    /// store's container is only written from its own actor.
+    private static func backgroundContainer() -> ModelContainer {
+        let schema = Schema(KurnModelGraph.currentModels)
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        do { return try ModelContainer(for: schema, configurations: [configuration]) } catch {
+            fatalError("Failed to create in-memory ModelContainer: \(error)")
+        }
+    }
+
+    // DIAGNOSTIC (temporary): which part of a background save waits for main.
+    @Test func diagnosticSaveWhileMainBlocked() {
+        for touchMain in [false, true] {
+            let container = Self.backgroundContainer()
+            if touchMain { container.mainContext.autosaveEnabled = false }
+            let posted = DispatchSemaphore(value: 0)
+            DispatchQueue.global().async {
+                let context = ModelContext(container)
+                try? context.transaction { context.insert(Meeting(title: "Synthetic save")) }
+                posted.signal()
+            }
+            let result = posted.wait(timeout: .now() + 3)
+            print("DIAG-SAVE touchMain=\(touchMain) finished=\(result == .success)")
+            _ = posted.wait(timeout: .now() + 10)
+        }
+    }
+
     /// Blocks the main thread, as a store transaction running on it does.
     private func blockMain(until posted: DispatchSemaphore) -> DispatchTimeoutResult {
         posted.wait(timeout: .now() + 5)
@@ -58,7 +85,7 @@ struct KnowledgeDeletionCoordinatorTests {
         let script = Script([])
         let coordinator = KnowledgeDeletionCoordinator(queue: queue(), purge: { _ in try script.next() })
         coordinator.observeStoreSaves()
-        let container = TestModelContainer.make(), posted = DispatchSemaphore(value: 0)
+        let container = Self.backgroundContainer(), posted = DispatchSemaphore(value: 0)
         // A real save inside a transaction, as the store's publish makes.
         DispatchQueue.global().async {
             let context = ModelContext(container)
