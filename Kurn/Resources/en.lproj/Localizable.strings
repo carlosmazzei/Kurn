@@ -1433,6 +1433,8 @@
 "knowledge.browser.refresh" = "Refresh";
 "knowledge.browser.export" = "Export Knowledge";
 "knowledge.browser.export_failed" = "Knowledge could not be exported";
+"knowledge.browser.narrative" = "Notes";
+"knowledge.browser.narrative_note" = "Generated from the claims below; check them before relying on it.";
 "knowledge.browser.ask_entity" = "Ask about this";
 "knowledge.browser.ask_draft" = "What do we know about %@?";
 "knowledge.browser.page" = "Page section";

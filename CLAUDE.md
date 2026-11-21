@@ -3082,10 +3082,17 @@ with assertion IDs. Each paragraph needs unique citations belonging to that
 page; the host renders their evidence links. Missing/foreign/future/oversized
 output is refused for the whole publication. This checks citation integrity,
 not semantic entailment. Narratives stay visibly separate from attributed
-claims and never become canonical evidence. This backend performs no model
-calls or egress, enables no cloud processing, and changes neither schema nor
-navigation. Provider execution, automatic projection admission and the reading
-UI will be composed by the later K2 host/UI work; these APIs are not model tools.
+claims and never become canonical evidence. "Rebuild pages" generates them
+(`KnowledgeSettingsCoordinator.pageNarratives`): KurnCore's
+`KnowledgeNarrativePrompt` shows the model a page's claims (up to 40) as `[c1]`
+references and keeps only paragraphs citing them, within the projector limits.
+Narratives go to the 24 pages with the most claims, from the Knowledge provider
+under the extraction host checks (`narrativeModel`: a cloud provider only with its
+automatic grant, `.pageNarrative` evaluated over the meetings' classifications,
+checked once at the start). Generation is best effort: a failed or uncited page
+keeps its claims alone. The browser read loads the published narratives and drops
+any that no longer validate; the entity page shows them under "Notes", labelled
+as generated, above the claims, and Ask reads them with `get_wiki_page`.
 
 ### Knowledge maintenance lint (K2.2)
 

@@ -133,6 +133,21 @@ final class KnowledgeCompilationCoordinator {
             meetingIDs: Set(meetingIDs.filter { controls?.allows($0) == true }), policies: auth.policies, sourceClassifications: auth.sourceClassifications)
     }
 
+    /// The model that writes page narratives: the Knowledge provider under the same host checks as
+    /// extraction (a cloud provider only under its automatic grant), evaluated for `.pageNarrative`
+    /// over the pages' classifications. Checked once when generation starts.
+    func narrativeModel(classifications: [KnowledgeClassification]) -> LLMProvider? {
+        guard let provider = settings.knowledgeProvider, isProviderUsable(provider) else { return nil }
+        let model = settings.summaryModel(for: provider)
+        guard let auth = try? hostAuthorization(provider: provider, model: model) else { return nil }
+        let destination: KnowledgeDestination = provider.kind == .appleOnDevice ? .onDevice : .remote(providerID: provider.id)
+        let request = KnowledgeProcessingRequest(operation: .pageNarrative, destination: destination,
+            sourceClassifications: auth.sourceClassifications + classifications, userConsentedToRemote: auth.userConsentedToRemote)
+        guard KnowledgePolicyEvaluator.evaluate(request, under: auth.policies, featureEnabled: auth.featureEnabled).isAllowed,
+              let llm = try? resolveProvider(provider, model), llm.provider == provider else { return nil }
+        return llm
+    }
+
     private func hostAuthorization(provider: AIProvider, model: String) throws -> KnowledgeExtractionAuthorization {
         guard settings.knowledgeEnabled else { throw KnowledgeJobDeferred(reason: .featureDisabled) }
         guard let controls = settings.knowledgeControls else { throw KnowledgeJobDeferred(reason: .policyDenied) }
