@@ -46,7 +46,8 @@ struct KnowledgeBrowserView: View {
     private func exportKnowledge() {
         Task {
             do {
-                exportDocument = KnowledgeExportDocument(data: try await coordinator.exportKnowledge(meetingIDs: meetingIDs))
+                let data = try await coordinator.exportKnowledge(meetingIDs: meetingIDs)
+                if settings.knowledgeExportEnabled { exportDocument = KnowledgeExportDocument(data: data) }
             } catch {
                 exportFailed = true
             }
@@ -111,6 +112,8 @@ struct KnowledgeBrowserView: View {
             if case .failure = result { exportFailed = true }
         }
         .alert(KnowledgeBrowserCopy.text("export_failed"), isPresented: $exportFailed) {}
+        // Turning export off withdraws a bundle still waiting for its save location.
+        .onChange(of: settings.knowledgeExportEnabled) { _, enabled in if !enabled { exportDocument = nil } }
         .sheet(item: $entityAsk) { request in
             NavigationStack {
                 MeetingChatView(meeting: nil, conversation: request.conversation, initialScope: request.scope,
