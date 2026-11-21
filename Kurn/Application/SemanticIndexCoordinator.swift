@@ -101,15 +101,31 @@ final class SemanticIndexCoordinator {
         persist()
     }
 
-    /// Wipe and re-index every meeting from scratch (Settings → Rebuild index).
-    /// After clearing, every transcribed meeting looks stale, so the backfill
-    /// re-embeds all of them. Ignores the enabled toggle so the user can rebuild
-    /// even while deciding whether to keep the feature on.
+    /// Re-index every meeting from scratch (Settings → Rebuild index),
+    /// replacing each meeting's passages only after its new embeddings succeed,
+    /// so an interrupted rebuild preserves the existing index. Passages whose
+    /// source recording no longer exists (or no longer has a transcript) are
+    /// pruned up front, so deleted text can never survive a failed rebuild.
+    /// Ignores the enabled toggle so the user can rebuild even while deciding
+    /// whether to keep the feature on.
     func rebuild() async {
-        clearIndex()
-        let meetings = (try? modelContext.fetch(FetchDescriptor<Meeting>()))?
-            .filter(\.hasAnyTranscript) ?? []
-        for meeting in meetings {
+        let allMeetings = (try? modelContext.fetch(FetchDescriptor<Meeting>())) ?? []
+        let transcribedRecordingIDs = Set(allMeetings.flatMap { meeting in
+            meeting.recordings
+                .filter { recording in
+                    guard let transcript = recording.transcript else { return false }
+                    return !transcript.segments.isEmpty || transcript.isSegmentsDataCorrupted
+                }
+                .map(\.id)
+        })
+        let stale = ((try? modelContext.fetch(FetchDescriptor<SemanticChunk>())) ?? []).filter { chunk in
+            chunk.meeting == nil || !transcribedRecordingIDs.contains(chunk.recordingID)
+        }
+        if !stale.isEmpty {
+            for chunk in stale { modelContext.delete(chunk) }
+            persist()
+        }
+        for meeting in allMeetings where meeting.hasAnyTranscript {
             if Task.isCancelled { return }
             await index(meeting)
         }

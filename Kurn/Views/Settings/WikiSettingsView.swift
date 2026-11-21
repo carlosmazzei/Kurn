@@ -19,6 +19,8 @@ struct WikiSettingsView: View {
 
     /// Count of stored articles, refreshed on appear and after a bulk run/clear.
     @State private var wikiArticleCount = 0
+    /// Drives the confirmation dialog before erasing all generated wiki articles (G1).
+    @State private var showingClearConfirm = false
 
     /// The reason the toggle is disabled, when it is. Names the specific
     /// on-device unavailability reason rather than always suggesting an API
@@ -95,8 +97,7 @@ struct WikiSettingsView: View {
                 .disabled(isBusy || !settings.wikiEnabled || !hasKey)
 
                 Button(role: .destructive) {
-                    wiki.clearWiki()
-                    wikiArticleCount = wiki.articleCount()
+                    showingClearConfirm = true
                 } label: {
                     Label(
                         NSLocalizedString("settings.wiki_clear", comment: "Clear wiki"),
@@ -104,6 +105,7 @@ struct WikiSettingsView: View {
                     )
                 }
                 .disabled(isBusy || wikiArticleCount == 0)
+                .accessibilityIdentifier("settings.wiki.clear")
             } header: {
                 Text(NSLocalizedString("settings.wiki_title", comment: "Meeting wiki section title"))
             } footer: {
@@ -112,6 +114,20 @@ struct WikiSettingsView: View {
         }
         .navigationTitle(NSLocalizedString("settings.wiki_title", comment: "Meeting wiki"))
         .task { wikiArticleCount = wiki.articleCount() }
+        .kurnDialog(
+            isPresented: $showingClearConfirm,
+            iconSystemName: "trash.circle.fill",
+            iconTint: Theme.warning,
+            title: NSLocalizedString("settings.wiki_clear_confirm.title", comment: "Clear wiki confirmation"),
+            message: NSLocalizedString("settings.wiki_clear_confirm.message", comment: "Clear wiki message"),
+            primaryTitle: NSLocalizedString("settings.wiki_clear", comment: "Clear wiki"),
+            primaryRole: .destructive,
+            primaryAction: {
+                wiki.clearWiki()
+                wikiArticleCount = wiki.articleCount()
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
     }
 
     /// Determinate progress for the bulk run in flight, so a large library
