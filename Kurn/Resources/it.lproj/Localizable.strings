@@ -1435,6 +1435,7 @@
 "knowledge.browser.export_failed" = "Impossibile esportare Knowledge";
 "knowledge.browser.narrative" = "Note";
 "knowledge.browser.narrative_note" = "Generato dalle affermazioni qui sotto; verificale prima di farvi affidamento.";
+"knowledge.browser.narrative_sources" = "Basato su %d affermazioni";
 "knowledge.browser.ask_entity" = "Chiedi su questo";
 "knowledge.browser.ask_draft" = "Cosa sappiamo di %@?";
 "knowledge.browser.page" = "Sezione della pagina";
