@@ -384,7 +384,11 @@ Connect or a decision the repository cannot make:
 
 Goal: fewer decisions per screen, with no regression in the HIG, WCAG 2.2 AA or
 the Accessibility Nutrition Labels. The baseline below was measured on the
-tip of `claude/sweet-hamilton-g6ae6c` (merge of PR #444, 2026-11-20; iOS 26 deployment target). The external
+tip of `claude/sweet-hamilton-g6ae6c` (merge of PR #444, 2026-11-20; iOS 26 deployment target)
+and rechecked on `feature/knowledge-compiler` (PR #452, 2026-11-21: K5.1 `get_wiki_page` and
+`trace_influence`, K6.1 egress audit, K6.2 export, page narratives). That branch added
+no fixed fonts, `lineLimit(1)`, fixed heights or unwrapped animations, so every count
+below is the same on both; what it added is listed under "New surface". The external
 specification this track follows targets iOS 27 / Xcode 27 and cites WWDC26
 material; those APIs and the session-220 patterns are **not verified here**.
 Each U-phase that depends on one starts by checking Apple's documentation, and
@@ -407,6 +411,16 @@ there is nothing to remove for the iOS 27 SDK.
 | Automated audits | `performAccessibilityAudit(for: [.sufficientElementDescription, .trait])` only; `continueAfterFailure = false` | `.contrast`, `.dynamicType`, `.hitRegion`, `.textClipped` never run; the first failure hides the rest |
 | Complexity | Meetings list: 10 controls with Knowledge on; detail overflow menu: up to 10 conditional rows; detail modes: 5; Settings hub: 15 rows; `TranscriptionSettingsView`: 13 controls | The simplification targets |
 
+**New surface from `feature/knowledge-compiler`** (all in the Knowledge reader and Settings):
+
+| Surface | What it is | What the track must cover |
+| --- | --- | --- |
+| Entity page "Notes" | Generated narrative paragraphs under a `KnowledgeSectionLabel` (already a header), one `DisclosureGroup` per paragraph ("Based on N claims"), a footnote saying the text is generated | Audit at AX5; the disclosure label must read the paragraph it belongs to (U4.1); keep the generated-text note in `textSecondary`, never `textTertiary` (U2.1) |
+| Reader toolbar | Up to four `.primaryAction` icons (Review, Export when allowed, Refresh) beside the source picker | The same crowding as the meetings list: icon-only share glyph, `accessibilityInputLabels`, hit region; decide which stay in the bar (U1.7) |
+| Export (JSON) | `fileExporter` save sheet, a failure alert, an opt-in toggle in Settings → Knowledge that re-authenticates | Add to the common-task list; the alert and the save sheet are system components (Inherit); Settings → Knowledge now has 6 toggles/pickers, which U1.4's merge must not grow |
+| Ask | 12 knowledge tools (`get_wiki_page`, `trace_influence` new); `ChatStepPresentation` has no entries for any of them | Check what the step timeline says for a knowledge tool call (generic wording, localized, no raw tool name) and add the words in all seven locales (U1.6) |
+| Strings | 6 new keys in all 7 locales | Already enforced by CI; no action |
+
 ### U0 · Measure before changing (1 sprint)
 
 1. Widen the audit to `[.contrast, .dynamicType, .hitRegion, .sufficientElementDescription, .textClipped, .trait]`
@@ -417,9 +431,12 @@ there is nothing to remove for the iOS 27 SDK.
 2. Add a launch argument (DEBUG, `UITestLaunchOptions`) that sets a content size
    category, so one seeded run audits at default and at `accessibilityExtraExtraExtraLarge`
    (AX5). This closes the "no automated check at large text" gap.
-3. Bring `RecorderView` and `FolderFormView` into the audit (existing gap).
+3. Bring `RecorderView` and `FolderFormView` into the audit (existing gap), and
+   the entity page with a seeded narrative and the reader toolbar with export on
+   (`MeetingKnowledgeUITests` already seeds a synthetic canonical store).
 4. Write the **common-task list** (record and stop; find a meeting; read a
-   summary; ask a question; export; change provider; delete) as
+   summary; ask a question; export a meeting; export Knowledge; read a generated
+   note and open its claims; change provider; delete) as
    `docs/release-physical-checklist.md` rows. Nutrition Labels may only be
    declared for features completed end to end on a device with VoiceOver and
    Screen Curtain, then Voice Control alone.
@@ -472,8 +489,18 @@ survive. Items that revisit a `CLAUDE.md` decision are marked **review**.
    properties; no new persisted engine IDs.
 6. **One words-pass.** Short sentences, error messages that say how to fix the
    problem (`AppError` descriptions first), one name per concept (wiki /
-   Knowledge / documents). Use the `design:ux-copy` skill; all seven locales,
+   Knowledge / documents), and the Ask step timeline's wording for the knowledge tools. Use the `design:ux-copy` skill; all seven locales,
    enforced by the existing localization check.
+7. **Knowledge reader toolbar.** Source picker, Review, Export (when allowed)
+   and Refresh sit in one `.primaryAction` group. Keep Review and the source
+   picker visible; move Refresh and Export into one titled menu ("Knowledge
+   actions", never "More") or give each a distinct `accessibilityInputLabels`
+   set. Export keeps `fileExporter` and its re-authentication; no generic share
+   sheet (the private-corporate boundary in `CLAUDE.md`).
+8. **Knowledge settings.** After the K-track merge (Wiki into Knowledge) the
+   screen must not exceed one screen of controls at default size: group
+   extraction, controls and export under collapsed sections, and keep the
+   safe-reset and consent copy visible.
 Exit: the common-task list needs equal or fewer taps than before, measured by
 the UI flows; nothing removed that the flows or the roadmap rely on.
 
@@ -524,7 +551,10 @@ Exit: `.dynamicType`, `.textClipped` and `.hitRegion` audits clean at AX5.
 
 ### U4 · VoiceOver, Voice Control and motion (2 sprints)
 
-1. **Structure.** `isHeader` on every section title (`KnowledgeSectionLabel`,
+1. **Structure.** Generated notes: the disclosure for each paragraph reads
+   "Based on N claims" for that paragraph, so give it the paragraph's first words
+   as context (`accessibilityLabel` plus `accessibilityHint`), and announce that the
+   text is generated before it is read. `isHeader` on every section title (`KnowledgeSectionLabel`,
    settings headers, summary section titles); `.accessibilityElement(children: .combine)`
    on meeting rows and knowledge cards; `accessibilityCustomContent` for list
    metadata (duration, language, status) so the label stays short; rotors for
