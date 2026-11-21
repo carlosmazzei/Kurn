@@ -77,21 +77,44 @@ struct FlowLayout: Layout {
     }
 }
 
-/// Small colored pill showing a transcription status (dot + label).
+/// Small colored pill showing a transcription status (dot/symbol + label).
 struct StatusBadge: View {
     let status: TranscriptionStatus
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         if let label {
             HStack(spacing: 4) {
-                Circle().fill(color).frame(width: 5, height: 5)
+                if differentiateWithoutColor {
+                    Image(systemName: symbolName)
+                        .font(.caption2.weight(.semibold))
+                        .accessibilityHidden(true)
+                } else {
+                    Circle().fill(color).frame(width: 5, height: 5)
+                }
                 Text(label)
                     .font(.caption2.weight(.semibold))
             }
             .padding(.horizontal, 9)
             .padding(.vertical, 3)
             .background(color.opacity(0.16), in: Capsule())
+            .overlay {
+                if contrast == .increased {
+                    Capsule().strokeBorder(color.opacity(0.6), lineWidth: 1)
+                }
+            }
             .foregroundStyle(color)
+        }
+    }
+
+    private var symbolName: String {
+        switch status {
+        case .none: return "circle.dashed"
+        case .inProgress: return "waveform"
+        case .pending: return "clock.fill"
+        case .done: return "checkmark.circle.fill"
+        case .failed: return "exclamationmark.triangle.fill"
         }
     }
 
@@ -122,6 +145,8 @@ struct FilterChip: View {
     /// Optional accent (e.g. a speaker color). Defaults to the primary label.
     var tint: Color = .primary
     let action: () -> Void
+    @Environment(\.accessibilityShowButtonShapes) private var showButtonShapes
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         Button(action: action) {
@@ -135,6 +160,12 @@ struct FilterChip: View {
                     isSelected ? AnyShapeStyle(selectedBackground) : AnyShapeStyle(Theme.fill),
                     in: Capsule()
                 )
+                .overlay {
+                    if showButtonShapes || contrast == .increased {
+                        Capsule()
+                            .strokeBorder(isSelected ? selectedForeground.opacity(0.4) : Theme.separator, lineWidth: 1)
+                    }
+                }
         }
         .buttonStyle(.plain)
     }
@@ -321,13 +352,52 @@ struct KurnDialogModifier: ViewModifier {
     }
 }
 
-extension View {
-    /// The standard rounded card surface (#1C1C1E in dark) used across screens.
-    func kurnCard(padding: CGFloat = 16, cornerRadius: CGFloat = 18) -> some View {
-        self
+private struct KurnCardModifier: ViewModifier {
+    let padding: CGFloat
+    let cornerRadius: CGFloat
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay {
+                if contrast == .increased {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(Theme.separator, lineWidth: 1)
+                }
+            }
+    }
+}
+
+private struct KurnComposerSurfaceModifier: ViewModifier {
+    let cornerRadius: CGFloat
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                reduceTransparency ? AnyShapeStyle(Theme.surface) : AnyShapeStyle(.ultraThinMaterial),
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Theme.separator, lineWidth: contrast == .increased ? 1.5 : 1)
+            )
+    }
+}
+
+extension View {
+    /// The standard rounded card surface (#1C1C1E in dark) used across screens.
+    func kurnCard(padding: CGFloat = 16, cornerRadius: CGFloat = 18) -> some View {
+        modifier(KurnCardModifier(padding: padding, cornerRadius: cornerRadius))
+    }
+
+    /// Floating composer surface that honors Reduce Transparency and Increase Contrast.
+    func kurnComposerSurface(cornerRadius: CGFloat = 26) -> some View {
+        modifier(KurnComposerSurfaceModifier(cornerRadius: cornerRadius))
     }
 
     /// Strip the default `List` row chrome (separator + background) so cards sit

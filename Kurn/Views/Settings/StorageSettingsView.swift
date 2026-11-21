@@ -275,7 +275,7 @@ struct StorageSettingsView: View {
                                 if case .verified = model.verificationState {
                                     Image(systemName: "checkmark.seal.fill")
                                         .font(.caption)
-                                        .foregroundStyle(.green)
+                                        .foregroundStyle(Theme.success)
                                         .accessibilityHidden(true)
                                 }
                             }
@@ -287,7 +287,7 @@ struct StorageSettingsView: View {
                                         .accessibilityHidden(true)
                                 }
                                 .font(.caption)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(Theme.accent)
                             }
                         }
                         Spacer()
@@ -299,7 +299,7 @@ struct StorageSettingsView: View {
                             Image(systemName: "trash")
                         }
                         .buttonStyle(.borderless)
-                        .tint(.red)
+                        .tint(Theme.accent)
                         .disabled(downloads.isDownloading)
                         .accessibilityLabel(
                             "\(model.displayName): \(NSLocalizedString("settings.models.delete", comment: "Delete model"))"

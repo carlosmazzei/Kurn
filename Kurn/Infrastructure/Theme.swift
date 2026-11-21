@@ -19,33 +19,54 @@ enum Theme {
     static let surface = adaptive(dark: 0x1C1C1E, light: nil, lightSystem: .secondarySystemGroupedBackground)
     /// Subtle fill (chips, icon wells) — translucent white in dark.
     static let fill = Color(uiColor: UIColor { t in
-        t.userInterfaceStyle == .dark
-            ? UIColor.white.withAlphaComponent(0.08)
-            : UIColor.systemGray5
+        if t.userInterfaceStyle == .dark {
+            return UIColor.white.withAlphaComponent(t.accessibilityContrast == .high ? 0.14 : 0.08)
+        }
+        return t.accessibilityContrast == .high ? UIColor.systemGray4 : UIColor.systemGray5
     })
 
-    /// Brand / record accent.
-    static let accent = Color(hex: "#FF3B30")
-    static let success = Color(hex: "#32D74B")
-    static let info = Color(hex: "#0A84FF")
-    static let warning = Color(hex: "#FF9F0A")
+    /// Brand / record / destructive accent. Light mode uses a deeper red
+    /// (#C91F16, 5.85:1 on white) so both red text/glyphs on light cards and
+    /// white text on filled accent buttons meet WCAG AA 4.5:1 contrast.
+    static let accent = adaptive(dark: 0xFF453A, light: 0xC91F16, lightSystem: .systemRed)
+    /// Status green: #32D74B in dark (8.9:1 on #1C1C1E), #1B7F37 in light (5.15:1 on white).
+    static let success = adaptive(dark: 0x32D74B, light: 0x1B7F37, lightSystem: .systemGreen)
+    /// Interactive / informational blue: #409CFF in dark (6.1:1 on #1C1C1E), #0055B3 in light (7.3:1 on white).
+    static let info = adaptive(dark: 0x409CFF, light: 0x0055B3, lightSystem: .systemBlue)
+    /// Status amber: #FF9F0A in dark (8.3:1 on #1C1C1E), #9E5800 in light (5.92:1 on white).
+    static let warning = adaptive(dark: 0xFF9F0A, light: 0x9E5800, lightSystem: .systemOrange)
+    /// Camera viewfinder focus/zoom accent over dark live preview.
+    static let cameraAccent = Color(hex: "#FFD60A")
 
-    /// Hairline separator matching the mock (rgba(84,84,88,.4) in dark).
+    /// Hairline separator matching the mock (rgba(84,84,88,.4) in dark; boosted under Increase Contrast).
     static let separator = Color(uiColor: UIColor { t in
-        t.userInterfaceStyle == .dark
-            ? UIColor(red: 84/255, green: 84/255, blue: 88/255, alpha: 0.4)
-            : UIColor.separator
+        if t.userInterfaceStyle == .dark {
+            let alpha: CGFloat = t.accessibilityContrast == .high ? 0.75 : 0.4
+            return UIColor(red: 84/255, green: 84/255, blue: 88/255, alpha: alpha)
+        }
+        return t.accessibilityContrast == .high ? UIColor.opaqueSeparator : UIColor.separator
     })
 
     // MARK: - Text
 
     static let textPrimary = Color.primary
     static let textSecondary = Color(uiColor: UIColor { t in
-        t.userInterfaceStyle == .dark
-            ? UIColor.white.withAlphaComponent(0.5)
-            : UIColor.secondaryLabel
+        if t.userInterfaceStyle == .dark {
+            return UIColor.white.withAlphaComponent(t.accessibilityContrast == .high ? 0.88 : 0.74)
+        }
+        return t.accessibilityContrast == .high ? UIColor(rgb: 0x3A3A3E) : UIColor.secondaryLabel
     })
+    /// Secondary/metadata text token guaranteed to meet >= 4.5:1 contrast on
+    /// both `background` and `surface` in dark and light appearances.
     static let textTertiary = Color(uiColor: UIColor { t in
+        if t.userInterfaceStyle == .dark {
+            return UIColor.white.withAlphaComponent(t.accessibilityContrast == .high ? 0.82 : 0.68)
+        }
+        return t.accessibilityContrast == .high ? UIColor(rgb: 0x3A3A3E) : UIColor(rgb: 0x56565C)
+    })
+    /// Decorative-only tertiary token for non-text borders and inactive rules
+    /// that do not carry readable information.
+    static let decorationTertiary = Color(uiColor: UIColor { t in
         t.userInterfaceStyle == .dark
             ? UIColor.white.withAlphaComponent(0.3)
             : UIColor.tertiaryLabel

@@ -427,8 +427,7 @@ struct MeetingChatConversationView: View {
         .padding(.horizontal, 16)
         .padding(.top, 14)
         .padding(.bottom, 10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).stroke(Theme.separator, lineWidth: 1))
+        .kurnComposerSurface(cornerRadius: 26)
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
     }

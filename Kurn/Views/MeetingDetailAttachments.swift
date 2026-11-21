@@ -69,7 +69,7 @@ extension MeetingDetailView {
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
-                    .foregroundStyle(Theme.textTertiary.opacity(0.4))
+                    .foregroundStyle(Theme.decorationTertiary.opacity(0.6))
             )
         }
         .buttonStyle(.plain)
