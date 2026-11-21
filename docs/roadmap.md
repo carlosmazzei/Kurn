@@ -430,8 +430,11 @@ there is nothing to remove for the iOS 27 SDK.
    audit and flow suites are in the required `ui-accessibility-tests` shards,
    so widening them would turn the first measurement into a blocked PR. Put
    the widened audit in its own test class (`AccessibilityBaselineUITests`),
-   skip it in `swift.yml` with a `-skip-testing` line and run it from
-   `reliability-hardening.yml` (on demand and weekly, like `ui-flake-rate`).
+   skip it in `swift.yml` with a `-skip-testing` line and run it from its own
+   job in `reliability-hardening.yml` (on demand and weekly). Add the same
+   `-skip-testing:KurnUITests/AccessibilityBaselineUITests` line to the
+   `ui-flake-rate` job, which runs all of `KurnUITests` except the screenshot
+   suite: known accessibility failures must not count as flakes.
    It joins the required shards in U5, once its findings are fixed. The
    `.xcresult` is already archived on failure by `collect-failure-diagnostics`
    (14 days); nothing to add. First run is a measurement: record the findings
@@ -736,9 +739,13 @@ screenshot review in step 6.
 3. **Collapse the surfaces** to background, card and inset with one card
    modifier shared by `kurnCard` and `knowledgeCard`.
 4. **First-run empty state.** On the empty meetings list: what the app does in
-   one sentence ("Record a meeting. Transcript and summary stay on this
-   device."), one prominent Record button, and a one-line note on what happens
-   next. Ask for the microphone only when Record is tapped, with a sentence
+   one sentence that is true under the default settings and does not hide the
+   cloud options ("Record a meeting. By default everything stays on this
+   device; if you choose a cloud provider, only what that feature needs is sent
+   to it."; summaries use the configured provider, so the copy cannot promise
+   on-device processing unconditionally), one prominent Record button, and a
+   one-line note on what happens next. The wording is checked against
+   `PrivacyCloudSettingsView` so the two never disagree. Ask for the microphone only when Record is tapped, with a sentence
    before the system prompt saying why. Offer the diarization model download
    once, after the first recording, in the banner that already exists, with its
    size. No tour, no tooltips, no sign-in.
@@ -829,7 +836,11 @@ Exit: all common tasks complete with VoiceOver and Screen Curtain on a device.
    with VoiceOver + Screen Curtain, Voice Control only, AX5, Dark, Reduce
    Transparency, Increase Contrast, Reduce Motion, and Liquid Glass at both ends
    of its slider if the OS has one; on the Apple Watch the recorder remote with
-   VoiceOver and the largest text size (`KurnWatchUITests` does not run in CI).
+   VoiceOver, the largest text size, Reduce Motion (the recording indicator and
+   any transition stay still) and Differentiate Without Color (Recording and
+   Paused are read as words, not colour), because the manifest also declares those
+   two for the Watch; any label the Watch pass cannot evidence is set to `false`
+   (`KurnWatchUITests` does not run in CI).
    One matrix row per family × label: build, device, result, evidence link.
 3. Move the widened audit (`AccessibilityBaselineUITests`) into the required
    `ui-accessibility-tests` shards once its findings are fixed. The failure
@@ -839,7 +850,10 @@ Exit: all common tasks complete with VoiceOver and Screen Curtain on a device.
    an HTTPS URL. `Tools/validate_store_metadata.py` does not read evidence
    either. Add `Tools/check_accessibility_evidence.py` to `static-policy`:
    every `true` in `accessibility.json` needs a matching family × label row
-   with build, date and link in `docs/release-physical-checklist.md`. Before
+   in `docs/release-physical-checklist.md` with a **passing** result, a date
+   and a link, recorded against the build being published (the tagged
+   `MARKETING_VERSION` and build number); a failed, blocked or older-build row
+   fails the check. Before
    the protected, manual `accessibility-labels.yml` publishes, the release owner
    signs the matrix; the script makes that sign-off checkable, it does not
    replace it.
