@@ -689,26 +689,10 @@ survive. Items that revisit a `CLAUDE.md` decision are marked **review**.
    whether Knowledge (off by default) stays a fifth segment or moves into the
    Summary tab's footer. Measure with the segmented control at AX3, where five
    segments cannot fit one row.
-4. **Settings hub 15 → 9 rows, and editable Privacy & Cloud.**
-   - **Privacy & Cloud first** (it is the consent and privacy surface, paired
-     with AI Providers at the top of Settings). Make `PrivacyCloudSettingsView`
-     directly editable instead of a read-only `LabeledContent` ledger: list
-     every configured cloud provider (as well as any historical destination with
-     an active grant) with direct toggles for *On request*, *Automatic* (gated
-     by the consent dialog and `SensitiveActionAuthorizer` re-authentication)
-     and *Audio upload* (for transcription-capable providers), plus the list of
-     features using it and the revoke actions; replace the read-only *Other
-     sharing* rows with live toggles for *Sync Templates via iCloud* and
-     *Diagnostic Reports* (with its consent dialog); and surface the device
-     privacy toggles (*Require authentication for recordings* and *Hide meeting
-     title on Lock Screen*) so all privacy and permission controls live in one
-     place.
-   - **Consolidate the remaining groups:** merge Wiki into Knowledge (already
-     planned: "Settings → Wiki becomes Settings → Knowledge"), Search into
-     Library, and Usage, Health and Diagnostics into one *Health & diagnostics*
-     screen. Add one-line current-setup summaries on the hub rows (rule 7). Keep
-     the old `settings.link.*` identifiers on the destinations so the flow UI
-     tests only change their path, not their handles.
+4. **Settings hub reorganization and editable Privacy & Cloud (`U1.4`, done; consolidation 15 → 9 rows remaining).**
+   - `Privacy & Cloud` (`settings.link.privacyCloud`) and `AI Providers` (`settings.link.providers`) sit at the top of `SettingsView`, followed by `Capture` (`Recording`, `Transcription`), `Intelligence` (`Summary`, `Knowledge`, `Meeting Wiki`, `Read Aloud`), `Library` (`Tags`, `Semantic Search`) and `System` (`Storage`, `Health & Recovery`, `Diagnostics`, `Usage Insights`, `About`).
+   - `PrivacyCloudSettingsView` renders interactive `Toggle`s instead of read-only `LabeledContent` for every configured cloud provider (`On request`, `Automatic`, `Audio upload`), device privacy (`Require Authentication`, `Hide Meeting Title on Lock Screen`, moved from `RecordingSettingsView`), and non-provider sharing (`Sync Templates via iCloud`, `Diagnostic Reports`), gated by `SensitiveActionAuthorizer` and confirmation dialogs (`kurnDialog`).
+   - **Remaining consolidation (15 → 9 rows):** merge Wiki into Knowledge (already planned: "Settings → Wiki becomes Settings → Knowledge"), Search into Library, and Usage, Health and Diagnostics into one *Health & diagnostics* screen, plus one-line current-setup summaries on the hub rows (rule 7). Keep the old `settings.link.*` identifiers on the destinations so the flow UI tests only change their path, not their handles.
 5. **Transcription settings: presets plus Advanced.** Offer *Recommended*,
    *Most accurate* and *Fully offline* above the 13 controls, which move under a
    collapsed Advanced `DisclosureGroup`. A preset writes the same `AppSettings`

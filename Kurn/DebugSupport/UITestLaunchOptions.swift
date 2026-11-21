@@ -16,6 +16,11 @@ enum UITestLaunchOptions {
     /// failing later on an unrelated "element missing"; without them each
     /// transition also stops costing its animation time.
     static let disableAnimations = "UI-Testing-DisableAnimations"
+    /// Switches `AppSettings` onto a dedicated UI-testing `UserDefaults` suite
+    /// and clears only that suite before launch, so flow tests start from a
+    /// fresh install without wiping a developer installation's standard defaults.
+    static let resetDefaults = "UI-Testing-ResetDefaults"
+    static let isolatedDefaultsSuiteName = "com.kurn.ui-testing-defaults"
     /// Pins the app to `accessibilityExtraExtraExtraLarge` (AX5) via UIKit's
     /// preferred content size category launch argument (U0.2).
     static let accessibilityContentSize = "UI-Testing-AX5"
@@ -31,11 +36,23 @@ enum UITestLaunchOptions {
         if arguments.contains(disableAnimations) {
             UIView.setAnimationsEnabled(false)
         }
+        if arguments.contains(resetDefaults) {
+            UserDefaults().removePersistentDomain(forName: isolatedDefaultsSuiteName)
+        }
         if arguments.contains(accessibilityContentSize), !arguments.contains(contentSizeKey) {
             UserDefaults.standard.set(ax5Value, forKey: "UIPreferredContentSizeCategoryName")
         } else if arguments.contains(defaultContentSize), !arguments.contains(contentSizeKey) {
             UserDefaults.standard.set(defaultValue, forKey: "UIPreferredContentSizeCategoryName")
         }
+    }
+
+    static func settingsDefaults(arguments: [String] = ProcessInfo.processInfo.arguments) -> UserDefaults {
+        guard arguments.contains(resetDefaults),
+              let suite = UserDefaults(suiteName: isolatedDefaultsSuiteName) else {
+            return .standard
+        }
+        suite.addSuite(named: UserDefaults.argumentDomain)
+        return suite
     }
 }
 #endif

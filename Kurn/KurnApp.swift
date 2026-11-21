@@ -125,7 +125,11 @@ struct KurnApp: App {
         // both `_boot` and `_recoveryViewModel` are explicitly assigned.
         let bootCoordinator = KurnApp.makeBootCoordinator()
         _boot = State(initialValue: bootCoordinator)
+        #if DEBUG
+        let settings = AppSettings(defaults: UITestLaunchOptions.settingsDefaults())
+        #else
         let settings = AppSettings()
+        #endif
         let composition = AppComposition(settings: settings)
         _settings = State(initialValue: settings)
         _composition = State(initialValue: composition)
@@ -380,7 +384,7 @@ struct KurnApp: App {
             )
             ScreenshotSeedData.seed(into: container.mainContext)
             if ProcessInfo.processInfo.arguments.contains("UI-Testing-KnowledgeFixture") {
-                try AppSettings().resetKnowledgeControls()
+                try AppSettings(defaults: UITestLaunchOptions.settingsDefaults()).resetKnowledgeControls()
                 try KnowledgeMeetingSeed.seed(container: container)
             }
             return container

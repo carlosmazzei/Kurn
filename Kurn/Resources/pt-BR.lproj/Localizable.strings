@@ -1650,8 +1650,10 @@
 "privacy.cloud.not_allowed" = "Não permitido";
 "privacy.cloud.removed_provider" = "Provedor removido";
 "privacy.cloud.revoke_title" = "Parar o envio automático?";
+"privacy.cloud.revoke_text_title" = "Parar o envio automático de texto?";
 "privacy.cloud.revoke_automatic" = "Parar envio automático";
 "privacy.cloud.revoke_detail" = "Transcrição em nuvem, títulos automáticos, wiki, correção e Knowledge param de enviar a este provedor e são desligados para ele. Pedir um resumo ou uma resposta no chat continua funcionando.";
+"privacy.cloud.revoke_text_detail" = "Títulos automáticos, wiki e correção são desligados para este provedor, e o Knowledge para de enviar a ele. O envio de áudio para transcrição em nuvem não muda; desligue-o separadamente. Pedir um resumo ou uma resposta no chat continua funcionando.";
 "privacy.cloud.feature.transcription" = "Transcrição em nuvem";
 "privacy.cloud.feature.title" = "Títulos automáticos";
 "privacy.cloud.feature.wiki" = "Wiki da reunião";
