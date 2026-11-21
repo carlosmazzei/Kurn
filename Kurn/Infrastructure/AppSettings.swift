@@ -463,7 +463,7 @@ final class AppSettings {
     /// Shared default `UserDefaults` backing `AppSettings` and services that
     /// read settings directly. Resolves to `.standard` outside UI-test runs
     /// and to the isolated UI-test suite when `UI-Testing-ResetDefaults` is set.
-    static var defaultDefaults: UserDefaults {
+    nonisolated static var defaultDefaults: UserDefaults {
         #if DEBUG
         UITestLaunchOptions.settingsDefaults()
         #else
