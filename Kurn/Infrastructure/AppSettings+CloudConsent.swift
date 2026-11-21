@@ -29,18 +29,24 @@ extension AppSettings {
         saveCloudConsents(ledger)
     }
 
-    /// Withdrawing automatic sending also turns off the per-recording features
-    /// that were using this destination, so no toggle is left on without a grant.
-    func revokeAutomaticCloudConsent(_ destination: String) {
-        var ledger = cloudConsents
-        ledger.revoke(destination, for: .automatic)
-        saveCloudConsents(ledger)
+    /// Withdrawing audio upload permission clears the destination's upload key
+    /// and falls back to on-device transcription if Whisper API was using it.
+    func revokeCloudTranscriptionConsent(_ destination: String) {
         removeCloudTranscriptionConsent(destination)
         // Fall back to on-device transcription rather than leave an engine
         // selected that can no longer upload.
         if transcriptionEngine == .whisperAPI, cloudConsentDestination(for: transcriptionProvider) == destination {
             transcriptionEngine = .appleSpeech
         }
+    }
+
+    /// Withdrawing automatic sending also turns off the per-recording features
+    /// that were using this destination, so no toggle is left on without a grant.
+    func revokeAutomaticCloudConsent(_ destination: String) {
+        var ledger = cloudConsents
+        ledger.revoke(destination, for: .automatic)
+        saveCloudConsents(ledger)
+        revokeCloudTranscriptionConsent(destination)
         if cloudConsentDestination(for: aiProvider) == destination {
             wikiEnabled = false
             correctionEnabled = false
@@ -73,6 +79,16 @@ extension AppSettings {
     /// Every destination with a text grant or an audio upload consent, for Privacy & Cloud.
     var cloudConsentDestinationsForDisplay: [String] {
         Array(Set(cloudConsents.destinations).union(cloudTranscriptionConsentKeys)).sorted()
+    }
+
+    /// Every destination that can be managed in Privacy & Cloud: any configured
+    /// cloud provider with a saved API key (or currently selected), plus any
+    /// destination that already holds a text or audio upload consent.
+    var editableCloudConsentDestinations: [String] {
+        let configured = providers
+            .filter { $0.kind != .appleOnDevice && (credentials.hasKey(for: $0) || $0.id == aiProviderID) }
+            .map(cloudConsentDestination(for:))
+        return Array(Set(configured).union(cloudConsentDestinationsForDisplay)).sorted()
     }
 
     /// The provider configured for a destination, if it still exists.

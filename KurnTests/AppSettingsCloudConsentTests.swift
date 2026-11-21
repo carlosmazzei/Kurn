@@ -116,6 +116,35 @@ struct AppSettingsCloudConsentTests {
         #expect(!settings.allowsCloud(.openAI, for: .automatic))
     }
 
+    @Test func revokingAudioUploadAloneKeepsAutomaticTextGrantsAndFallsBackToOnDeviceTranscription() {
+        let settings = cloudSettings()
+        settings.wikiEnabled = true
+        settings.recordCloudTranscriptionConsent(for: .openAI)
+        settings.transcriptionProviderID = AIProvider.openAI.id
+        settings.transcriptionEngine = .whisperAPI
+        let destination = settings.cloudConsentDestination(for: .openAI)
+
+        settings.revokeCloudTranscriptionConsent(destination)
+
+        #expect(!settings.hasCloudTranscriptionConsent(for: .openAI))
+        #expect(settings.transcriptionEngine == .appleSpeech)
+        #expect(settings.wikiEnabled)
+        #expect(settings.allowsCloud(.openAI, for: .automatic))
+    }
+
+    @Test func editableCloudConsentDestinationsIncludesConfiguredProvidersEvenAfterRevokeAll() throws {
+        let (defaults, suite) = try defaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(cloudStore: InMemoryCloudKeyValueStore(), defaults: defaults,
+                                   credentials: CredentialStore(keychain: ConsentTestKeychain()))
+        settings.credentials.saveKey("sk-openai", for: .openAI)
+        let destination = settings.cloudConsentDestination(for: .openAI)
+        settings.revokeAllCloudConsent(destination)
+
+        #expect(settings.cloudConsentDestinationsForDisplay.isEmpty)
+        #expect(settings.editableCloudConsentDestinations.contains(destination))
+    }
+
     @Test func removingAllPermissionsMovesTheSummaryProviderOnDevice() {
         let settings = cloudSettings()
         settings.readAloud.providerID = AIProvider.openAI.id

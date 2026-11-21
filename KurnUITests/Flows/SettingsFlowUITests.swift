@@ -18,6 +18,18 @@ import XCTest
 
 final class SettingsFlowUITests: FlowUITestCase {
 
+    // MARK: - Privacy & Cloud
+
+    func testPrivacyCloudRendersEditableToggles() {
+        openSettingsScreen("settings.link.privacyCloud")
+
+        XCTAssertTrue(anyElement("settings.privacy_cloud.form").waitForExistence(timeout: 10))
+        XCTAssertTrue(app.switches["privacy.cloud.requireAuth"].exists)
+        XCTAssertTrue(app.switches["privacy.cloud.hideLiveActivityTitle"].exists)
+        XCTAssertTrue(scrollUntilExists(app.switches["privacy.cloud.templatesSync"]))
+        XCTAssertTrue(scrollUntilExists(app.switches["privacy.cloud.diagnosticReports"]))
+    }
+
     // MARK: - Providers
 
     func testProvidersListsBuiltInProvidersAndAddAction() {
