@@ -214,6 +214,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         app.launchArguments += [
             "UI-Testing-Screenshots",
             "UI-Testing-DisableAnimations",
+            "UI-Testing-ResetDefaults",
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US"
         ]
@@ -234,18 +235,6 @@ final class MeetingKnowledgeUITests: XCTestCase {
         XCTAssertTrue(done.waitForExistence(timeout: 5))
         done.tap()
         XCTAssertTrue(app.buttons["knowledge.chooseSources"].waitForExistence(timeout: 10))
-        // Leave Knowledge off again so later tests in the same simulator shard
-        // still start from the default opt-in state.
-        closeSheet(app)
-        let settingsButton = app.buttons["nav.settings"]
-        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5))
-        settingsButton.tap()
-        let knowledgeRow = app.buttons["settings.link.knowledge"]
-        for _ in 0..<4 where !knowledgeRow.exists { app.swipeUp() }
-        XCTAssertTrue(knowledgeRow.waitForExistence(timeout: 5))
-        knowledgeRow.tap()
-        XCTAssertTrue(toggle.waitForExistence(timeout: 10))
-        toggle.switches.firstMatch.tap()
     }
 
     func testKnowledgeHomeUsesExplicitSourceSelection() throws {
