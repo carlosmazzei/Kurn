@@ -1431,6 +1431,11 @@
 // Scoped knowledge reader
 "knowledge.browser.title" = "知识";
 "knowledge.browser.refresh" = "刷新";
+"knowledge.browser.export" = "导出 Knowledge";
+"knowledge.browser.export_failed" = "无法导出 Knowledge";
+"knowledge.browser.narrative" = "笔记";
+"knowledge.browser.narrative_note" = "根据下方的陈述生成；依赖前请先核对。";
+"knowledge.browser.narrative_sources" = "依据 %d 条陈述";
 "knowledge.browser.ask_entity" = "就此提问";
 "knowledge.browser.ask_draft" = "关于%@我们知道什么？";
 "knowledge.browser.page" = "页面部分";
@@ -1597,6 +1602,7 @@
 "knowledge.settings.enable" = "启用 Knowledge";
 "knowledge.settings.automatic" = "自动编译未来的转录";
 "knowledge.settings.pause" = "暂停 Knowledge 编译";
+"knowledge.settings.export" = "允许将 Knowledge 导出为 JSON";
 "knowledge.settings.provider" = "处理提供商";
 "knowledge.settings.unavailable" = "设备端处理不可用";
 "knowledge.settings.use_local" = "使用设备端处理";

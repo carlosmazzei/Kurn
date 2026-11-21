@@ -49,6 +49,43 @@ struct KnowledgeDeletionCoordinatorTests {
         #expect(rearm.calls == 2)
     }
 
+    /// A container whose main context is never created, as the Knowledge
+    /// store's container is only written from its own actor.
+    private static func backgroundContainer() -> ModelContainer {
+        let schema = Schema(KurnModelGraph.currentModels)
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        do { return try ModelContainer(for: schema, configurations: [configuration]) } catch {
+            fatalError("Failed to create in-memory ModelContainer: \(error)")
+        }
+    }
+
+    /// Blocks the main thread, as a store transaction running on it does.
+    /// Generous, because a loaded test host can be slow to start the saver.
+    private func blockMain(until saved: DispatchSemaphore) -> DispatchTimeoutResult {
+        saved.wait(timeout: .now() + 30)
+    }
+
+    @Test func aStoreSaveNeverWaitsForTheMainThreadAndStillDrains() async {
+        let script = Script([])
+        let coordinator = KnowledgeDeletionCoordinator(queue: queue(), purge: { _ in try script.next() })
+        coordinator.observeStoreSaves()
+        let container = Self.backgroundContainer(), saved = DispatchSemaphore(value: 0)
+        // A real transaction, as the store's publish makes, on its own thread
+        // so a busy dispatch pool cannot delay it. Its save posts the
+        // did-save notification synchronously; an observer queue would make
+        // that post wait for the blocked main thread.
+        Thread {
+            let context = ModelContext(container)
+            try? context.transaction { context.insert(Meeting(title: "Synthetic save")) }
+            saved.signal()
+        }.start()
+        #expect(blockMain(until: saved) == .success)
+        let deadline = ContinuousClock.now.advanced(by: .seconds(60))
+        while script.calls == 0, ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(10)) }
+        await coordinator.waitUntilIdle()
+        #expect(script.calls >= 1)
+    }
+
     @Test func aFailureStopsTheDrainKeepsItsCodeAndAClearRunResetsIt() async {
         let script = Script([.failure(KnowledgeStoreError.invalidJob), .success(nil)])
         let coordinator = KnowledgeDeletionCoordinator(queue: queue(), purge: { _ in try script.next() })

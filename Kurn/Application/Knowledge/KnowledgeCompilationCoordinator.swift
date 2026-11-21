@@ -41,7 +41,8 @@ final class KnowledgeCompilationCoordinator {
 
     /// The local policy follows the shared cloud-consent ledger (CLAUDE.md,
     /// "Cloud consent"): it names every remote provider the person allowed,
-    /// for `.internal` sources. Its revision stays the default's: the provider
+    /// for `.internal` sources, and allows `.export` only while Knowledge export
+    /// is turned on (K6.2). Its revision stays the default's: the provider
     /// set changes no derived content, so a new grant must not hide Knowledge
     /// compiled under the previous set, and every egress is re-checked live
     /// against the ledger (extraction needs the automatic grant at submission,
@@ -50,10 +51,12 @@ final class KnowledgeCompilationCoordinator {
         let remote = settings.providers
             .filter { $0.kind != .appleOnDevice && settings.allowsCloud($0, for: .onRequest) }
             .map(\.id)
-        guard !remote.isEmpty else { return .defaultDeny(id: localPolicyID) }
+        let export = settings.knowledgeExportEnabled
+        guard !remote.isEmpty || export else { return .defaultDeny(id: localPolicyID) }
         return KnowledgeProcessingPolicy(id: localPolicyID, revision: KnowledgeProcessingPolicy.defaultDeny().revision,
-            allowedRemoteProviderIDs: Set(remote), allowedOperations: KnowledgeProcessingPolicy.onDeviceOperations,
-            maxRemoteClassification: .internal)
+            allowedRemoteProviderIDs: Set(remote),
+            allowedOperations: KnowledgeProcessingPolicy.onDeviceOperations.union(export ? [.export] : []),
+            maxRemoteClassification: remote.isEmpty ? nil : .internal, exportAllowed: export)
     }
 
     /// Whether Ask may send knowledge to this provider: the on-request grant.
@@ -128,6 +131,21 @@ final class KnowledgeCompilationCoordinator {
         let controls = settings.knowledgeControls
         return KnowledgeSourceAuthorization(featureEnabled: auth.featureEnabled && settings.knowledgeEnabled && controls != nil,
             meetingIDs: Set(meetingIDs.filter { controls?.allows($0) == true }), policies: auth.policies, sourceClassifications: auth.sourceClassifications)
+    }
+
+    /// The model that writes page narratives: the Knowledge provider under the same host checks as
+    /// extraction (a cloud provider only under its automatic grant), evaluated for `.pageNarrative`
+    /// over the pages' classifications. Checked once when generation starts.
+    func narrativeModel(classifications: [KnowledgeClassification]) -> LLMProvider? {
+        guard let provider = settings.knowledgeProvider, isProviderUsable(provider) else { return nil }
+        let model = settings.summaryModel(for: provider)
+        guard let auth = try? hostAuthorization(provider: provider, model: model) else { return nil }
+        let destination: KnowledgeDestination = provider.kind == .appleOnDevice ? .onDevice : .remote(providerID: provider.id)
+        let request = KnowledgeProcessingRequest(operation: .pageNarrative, destination: destination,
+            sourceClassifications: auth.sourceClassifications + classifications, userConsentedToRemote: auth.userConsentedToRemote)
+        guard KnowledgePolicyEvaluator.evaluate(request, under: auth.policies, featureEnabled: auth.featureEnabled).isAllowed,
+              let llm = try? resolveProvider(provider, model), llm.provider == provider else { return nil }
+        return llm
     }
 
     private func hostAuthorization(provider: AIProvider, model: String) throws -> KnowledgeExtractionAuthorization {

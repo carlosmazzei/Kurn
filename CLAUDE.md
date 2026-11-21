@@ -3036,7 +3036,7 @@ Where the checkout makes the specification bend:
 | Graph as SwiftData relations | `Meeting` cascades its derived artifacts; there is no shared-entity model yet | Entities, assertions and evidence relate by persisted UUIDs, never by `@Relationship` to `Meeting` (no blind cascade across shared entities, spec §13). Deletion is explicit: `MeetingLibrary` commits a tombstone with each meeting or transcribed-recording deletion, `KnowledgeDeletionCoordinator` purges it, and `LibraryEraser` removes every knowledge row ("Knowledge deletion (K2.8)") |
 | Typed `AppRoute` and `kurn://entity/…` deep links | The app deliberately declares no URL scheme (any app could open one, see "Cross-device control") | Typed in-process routes only; Markdown links in generated pages resolve through a router that accepts `entity:`/`evidence:` IDs and nothing else, consistent with `MarkdownPresentation` disabling links. No registered URL scheme |
 | Embeddings and hybrid retrieval | `SemanticSearchService.hybridSearch` (on-device `NLContextualEmbedding` + BM25 + RRF) over `SemanticChunk` | Extend the same index with typed documents (page, assertion, event, alias) carrying `modelIdentifier`; no cloud embeddings, so no extra consent for indexing |
-| Export bundle (JSONL, Markdown, GraphML) | Meeting export via share sheet (`MeetingExport`, `DocumentExport`) | Knowledge export is disabled by default, has no generic share sheet in the corporate mode, and lands last (K6) after the egress audit |
+| Export bundle (JSONL, Markdown, GraphML) | Meeting export via share sheet (`MeetingExport`, `DocumentExport`) | Knowledge export (K6.2) is off by default (`AppSettings.knowledgeExportEnabled`, which sets the local policy's `exportAllowed` and `.export`); the browser saves a `kurn.knowledge-export` JSON bundle through `fileExporter`, with no generic share sheet |
 | Settings → Knowledge with provider, scope, backfill | Settings → Wiki (`WikiSettingsView`) with `wikiEnabled` and bulk missing/rebuild | Settings → Wiki becomes Settings → Knowledge: the meeting wiki keeps its own toggle and consent, Knowledge adds its own; neither implies the other |
 | `ProcessingPolicy`, `KnowledgeWorkspace`, `KnowledgeContext` (§20.1) | Provider consent is per feature (`wikiEnabled`, `correctionEnabled`, …); the provider circuit breaker gates automatic calls | One workspace in `mode=privateCorporate`; `KnowledgeProcessingPolicy` (KurnCore, pure) evaluates destination × operation × classification and is checked before retrieval, prompt assembly, egress and export. Folders are not ACLs |
 
@@ -3082,10 +3082,17 @@ with assertion IDs. Each paragraph needs unique citations belonging to that
 page; the host renders their evidence links. Missing/foreign/future/oversized
 output is refused for the whole publication. This checks citation integrity,
 not semantic entailment. Narratives stay visibly separate from attributed
-claims and never become canonical evidence. This backend performs no model
-calls or egress, enables no cloud processing, and changes neither schema nor
-navigation. Provider execution, automatic projection admission and the reading
-UI will be composed by the later K2 host/UI work; these APIs are not model tools.
+claims and never become canonical evidence. "Rebuild pages" generates them
+(`KnowledgeSettingsCoordinator.pageNarratives`): KurnCore's
+`KnowledgeNarrativePrompt` shows the model a page's claims (up to 40) as `[c1]`
+references and keeps only paragraphs citing them, within the projector limits.
+Narratives go to the 24 pages with the most claims, from the Knowledge provider
+under the extraction host checks (`narrativeModel`: a cloud provider only with its
+automatic grant, `.pageNarrative` evaluated over the meetings' classifications,
+checked once at the start). Generation is best effort: a failed or uncited page
+keeps its claims alone. The browser read loads the published narratives and drops
+any that no longer validate; the entity page shows them under "Notes", labelled
+as generated, above the claims, and Ask reads them with `get_wiki_page`.
 
 ### Knowledge maintenance lint (K2.2)
 
@@ -3437,6 +3444,15 @@ save (fault seam `beforeSave`) or a process death leaves all of it for the next
 drain. Failures record a content-free `knowledge_deletion` reliability event once
 per code per process; an unknown scope or pipeline is refused, never dropped.
 
+- **Ask question set and scorer (K0.4/K5.4).** `Fixtures/knowledge-questions/questions.json`
+  (format `kurn.knowledge-questions` v1, synthetic, Portuguese and English) asks questions over
+  the golden fixtures. For each one it lists the assertion refs a correct answer states, the
+  `mustNotAssert` entries it must not state, whether it must decline, and the `source/segment` IDs
+  it may cite. KurnCore's `KnowledgeAnswerScorer` scores an answer for precision, recall, tempting
+  claims stated, refusal honoured and resolvable citations, and summarizes a run so Ask variants
+  can be compared. `KnowledgeQuestionFixtureTests` checks every reference against its fixture, that
+  an oracle answer scores perfectly and that declining everything does not. Running variants A–F
+  on a device to produce observations is still to do.
 - **Meeting/source:** every assertion, event and evidence row of that meeting,
   their relations and all its extraction jobs (provenance included). Entities
   named by its provenance, assertions or events are removed unless another
@@ -3800,14 +3816,24 @@ state, stated validity), each name and quote clipped to one line, a `page:` line
   `knowledgeSelectable` marker (before K5.3) gains it wherever parts were selected, so old chats keep offering
   knowledge; an empty selection stays empty. An entity page's Ask button opens a separate library conversation
   scoped to the meetings its facts come from, with a drafted question.
-- Not yet: `get_wiki_page` (pages carry no narrative until K2's narrative generation is wired, so it would
-  repeat `get_entity`) and `trace_influence` (no influence semantics are defined).
+- `get_wiki_page` returns a page's generated narrative (`KnowledgeWikiNarrative` paragraphs with the assertion IDs
+  each summarizes), labelled as not evidence, or says the page has none. `trace_influence` (KurnCore `KnowledgeInfluenceTrace`) lists, in stated order, every claim about
+  or naming an entity, the earlier claims on the same subject and predicate each replaces, its meeting, speakers and
+  evidence IDs.
 - **Knowledge-first query policy (K5.2)**: when a run offers the knowledge tools, `HarnessChatService.system(knowledge:)`
   adds a `knowledge_policy` section last, where a patch adding or removing it replays it
   (`HarnessChatService.knowledgePolicy`): query knowledge first, keep modality/negation, cite through evidence, call
   `get_coverage` for the meetings it answers from and use the offered source tools for meetings not compiled, stale,
   not fully examined or without knowledge; a missing fact is reported as absent from the compiled knowledge, never as
-  never said; the transcript wins a disagreement. Runs without knowledge tools keep the old prompt.
+  never said; the transcript wins a disagreement.
+- **Knowledge egress (K6.1)**: the `knowledge-network` rule in `Tools/check_static_policy.py` rejects `URLSession`,
+  `URLRequest`, `LLMHTTP`, `ProviderHTTPTransport`, `NWConnection` and CloudKit/iCloud key-value stores in Knowledge
+  code (`Application/Knowledge/`, `ChatKnowledgeTools*`, `Views/Knowledge*`, `Views/MeetingKnowledge*`, KurnCore
+  `Knowledge/`); its only egress is the provider call admitted by the policy and the consent ledger.
+- **Knowledge export (K6.2)**: `KnowledgeCompilationCoordinator.exportKnowledge` authorizes `.export` before the
+  browser read and again with the read's classifications, then encodes KurnCore `KnowledgeExportBundle` (format
+  `kurn.knowledge-export`, schema 1: meetings, entities, claims with qualifiers and evidence, sorted by ID). The browser
+  writes it with `fileExporter` (a save to a chosen location), never the generic share sheet. Runs without knowledge tools keep the old prompt.
 
 ### Attached documents (PDFs)
 

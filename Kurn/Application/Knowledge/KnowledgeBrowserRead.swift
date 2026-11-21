@@ -73,12 +73,13 @@ struct KnowledgeBrowserRead: Equatable, Sendable {
     }
 
     init(meetingIDs: Set<UUID>, wiki: KnowledgeWikiSnapshot, meetingTitles: [UUID: String],
-         selectedEvidence: KnowledgeEvidenceRead? = nil, policyRevisionKey: String = "", allowsEmbedding: Bool = false,
+         narratives: [KnowledgeWikiNarrative] = [], selectedEvidence: KnowledgeEvidenceRead? = nil, policyRevisionKey: String = "", allowsEmbedding: Bool = false,
          meetingContexts: [UUID: KnowledgeBrowserContext] = [:]) throws {
         guard !meetingIDs.isEmpty, meetingIDs.count <= 16, Set(meetingTitles.keys) == meetingIDs,
               Set(meetingContexts.keys).isSubset(of: meetingIDs),
               wiki.facts.allSatisfy({ meetingIDs.contains($0.source.meetingID) }) else { throw KnowledgeWikiStoreError.scopeDenied }
-        let pages = try KnowledgeWikiProjector.project(wiki)
+        // A published narrative that no longer validates against the current claims is dropped, never shown.
+        let pages = try (try? KnowledgeWikiProjector.project(wiki, narratives: narratives)) ?? KnowledgeWikiProjector.project(wiki)
         if let selectedEvidence {
             guard pages.contains(where: { $0.sections.contains(where: { $0.entries.contains(selectedEvidence.entry) }) }),
                   selectedEvidence.entry.fact.source.evidence.contains(selectedEvidence.evidence) else {

@@ -121,6 +121,16 @@ TYPE_DECLARATION_RE = re.compile(
 STRING_LITERAL_RE = re.compile(r'"(?:[^"\\]|\\.)*"')
 
 
+# Knowledge code (K6.1 egress audit): the store, compiler, projections, readers and Ask tools.
+KNOWLEDGE_DIRS = (
+    "Kurn/Application/Knowledge/",
+    "Kurn/Application/Agent/Tools/ChatKnowledge",
+    "Kurn/Views/Knowledge",
+    "Kurn/Views/MeetingKnowledge",
+    "Packages/KurnCore/Sources/KurnCore/Knowledge/",
+)
+
+
 RULES = [
     Rule(
         name="domain-agent-dependency",
@@ -133,6 +143,18 @@ RULES = [
         pattern=re.compile(r"\bimport\s+(?:(?:struct|class|enum|protocol|func|var|let|typealias)\s+)?(?:KurnCore|Kurn|SwiftData|SwiftUI)\b"),
         description="AgentHarness must remain independent of Kurn domain and platform adapters.",
         scope=("Packages/AgentHarness/Sources/",),
+    ),
+    Rule(
+        name="knowledge-network",
+        pattern=re.compile(
+            r"\b(?:URLSession|URLRequest|NWConnection|LLMHTTP|ProviderHTTPTransport|CKContainer|CKDatabase"
+            r"|NSUbiquitousKeyValueStore)\b"
+        ),
+        description=(
+            "Knowledge code must not reach the network or a sync store directly (K6.1): its only egress is "
+            "the provider call the knowledge policy and consent ledger admit, through the app's providers."
+        ),
+        scope=KNOWLEDGE_DIRS,
     ),
     Rule(
         name="fatal-error",

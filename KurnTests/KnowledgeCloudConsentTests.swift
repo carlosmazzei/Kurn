@@ -30,6 +30,23 @@ struct KnowledgeCloudConsentTests {
         #expect(KnowledgePolicyEvaluator.revisionKey([policy]) == before)
     }
 
+    @Test func exportIsAllowedOnlyWhileTurnedOnAndKeepsTheRevision() {
+        let settings = MeetingFixtures.isolatedSettings()
+        let export = KnowledgeProcessingRequest(operation: .export, destination: .onDevice,
+                                                sourceClassifications: [.internal], userConsentedToRemote: false)
+        let before = KnowledgeCompilationCoordinator.localPolicy(settings)
+        #expect(!KnowledgePolicyEvaluator.evaluate(export, under: [before], featureEnabled: true).isAllowed)
+        settings.knowledgeExportEnabled = true
+        let policy = KnowledgeCompilationCoordinator.localPolicy(settings)
+        #expect(policy.exportAllowed && policy.allowedOperations.contains(.export))
+        #expect(policy.allowedRemoteProviderIDs.isEmpty && policy.maxRemoteClassification == nil)
+        #expect(KnowledgePolicyEvaluator.evaluate(export, under: [policy], featureEnabled: true).isAllowed)
+        #expect(!KnowledgePolicyEvaluator.evaluate(export, under: [policy], featureEnabled: false).isAllowed)
+        #expect(KnowledgePolicyEvaluator.revisionKey([policy]) == KnowledgePolicyEvaluator.revisionKey([before]))
+        try? settings.resetKnowledgeControls()
+        #expect(!settings.knowledgeExportEnabled)
+    }
+
     @Test func extractionConsentNeedsTheAutomaticGrant() {
         let settings = MeetingFixtures.isolatedSettings()
         settings.grantCloudConsent(.openAI, for: .onRequest)

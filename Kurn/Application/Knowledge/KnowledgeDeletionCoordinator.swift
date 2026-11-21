@@ -40,13 +40,16 @@ final class KnowledgeDeletionCoordinator {
 
     /// Every store save may have committed a tombstone (a meeting or recording
     /// deleted anywhere in the app). Saves are signals only; nothing is read
-    /// from the notification.
+    /// from the notification. The observer runs on the posting thread and only
+    /// schedules the drain: an observer queue would make every save wait for the
+    /// main thread, which deadlocks a save posted on the main thread from inside
+    /// another queue's transaction.
     func observeStoreSaves() {
         guard saveObserver == nil else { return }
         saveObserver = NotificationCenter.default.addObserver(
-            forName: .NSManagedObjectContextDidSave, object: nil, queue: .main
+            forName: .NSManagedObjectContextDidSave, object: nil, queue: nil
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.drain() }
+            Task { @MainActor in self?.drain() }
         }
     }
 

@@ -1431,6 +1431,11 @@
 // Scoped knowledge reader
 "knowledge.browser.title" = "Connaissances";
 "knowledge.browser.refresh" = "Actualiser";
+"knowledge.browser.export" = "Exporter Knowledge";
+"knowledge.browser.export_failed" = "Impossible d’exporter Knowledge";
+"knowledge.browser.narrative" = "Notes";
+"knowledge.browser.narrative_note" = "Généré à partir des affirmations ci-dessous ; vérifiez-les avant de vous y fier.";
+"knowledge.browser.narrative_sources" = "Fondé sur %d affirmations";
 "knowledge.browser.ask_entity" = "Poser une question";
 "knowledge.browser.ask_draft" = "Que savons-nous de %@ ?";
 "knowledge.browser.page" = "Section de la page";
@@ -1597,6 +1602,7 @@
 "knowledge.settings.enable" = "Activer Knowledge";
 "knowledge.settings.automatic" = "Compiler automatiquement les futures transcriptions";
 "knowledge.settings.pause" = "Suspendre la compilation Knowledge";
+"knowledge.settings.export" = "Autoriser l’export de Knowledge en JSON";
 "knowledge.settings.provider" = "Fournisseur de traitement";
 "knowledge.settings.unavailable" = "Le traitement local est indisponible";
 "knowledge.settings.use_local" = "Utiliser le traitement local";

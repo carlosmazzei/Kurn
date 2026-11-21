@@ -76,7 +76,8 @@ enum ChatKnowledgeGate {
 /// (`ChatKnowledgeToolText`) ending with a `page:` line and a `revision:` line.
 enum ChatKnowledgeTools {
     static let names = ["search_knowledge", "get_entity", "get_timeline", "get_evidence", "resolve_entity", "get_graph",
-                        "compare_state", "list_open_actions", "list_contexts", "get_context", "get_coverage"]
+                        "compare_state", "list_open_actions", "list_contexts", "get_context", "get_coverage",
+                        "trace_influence", "get_wiki_page"]
     /// The ranked window search pages, the index's own maximum.
     static let searchWindow = 100
 
@@ -147,6 +148,16 @@ enum ChatKnowledgeTools {
             return ChatKnowledgeToolText.output(header: ChatKnowledgeToolText.entityHeader(page),
                                                 lines: entries.map { ChatKnowledgeToolText.claim($0) },
                                                 offset: params.offset, limit: params.limit, read: read)
+        case "get_wiki_page":
+            let id = try params.uuid("entityID")
+            guard let page = read.pages.first(where: { $0.entity.id == id }) else { throw Invalid("Unknown entityID.") }
+            let paragraphs = page.narrative?.paragraphs ?? []
+            let note = paragraphs.isEmpty
+                ? "no generated narrative for this page; read its claims with get_entity"
+                : "generated narrative (paragraph | text | cited assertions); it is not evidence: cite the claims it names"
+            return ChatKnowledgeToolText.output(header: ChatKnowledgeToolText.entityHeader(page) + "\n" + note,
+                                                lines: paragraphs.enumerated().map { ChatKnowledgeToolText.paragraph($1, index: $0 + 1) },
+                                                offset: params.offset, limit: params.limit, read: read)
         case "get_timeline":
             let entity = try params.optionalUUID("entityID")
             if let entity, !read.pages.contains(where: { $0.entity.id == entity }) { throw Invalid("Unknown entityID.") }
@@ -184,6 +195,11 @@ enum ChatKnowledgeTools {
             properties["entityID"] = uuid
             required = [.string("entityID")]
             description = "Read one entity's page: its attributed claims with modality, polarity, stated dates and evidence IDs."
+        case "get_wiki_page":
+            properties["entityID"] = uuid
+            required = [.string("entityID")]
+            description = "Read one entity's generated narrative, when its page has one: plain-text paragraphs, each with the "
+                + "assertion IDs it summarizes. The narrative is not evidence; check and cite those claims (get_entity, get_evidence)."
         case "get_timeline":
             properties["entityID"] = uuid
             description = "Read claims ordered by their stated (valid) time, optionally only those about one entity."
@@ -226,7 +242,7 @@ enum ChatKnowledgeTools {
             guard case .object(let values) = arguments else { throw Invalid("Expected an object.") }
             let permitted: Set<String> = switch name {
             case "search_knowledge": ["query", "offset", "limit"]
-            case "get_entity", "get_timeline": ["entityID", "offset", "limit"]
+            case "get_entity", "get_timeline", "get_wiki_page": ["entityID", "offset", "limit"]
             case "get_evidence": ["assertionID", "evidenceID"]
             case "get_coverage": ["meetingID", "offset", "limit"]
             default: ChatKnowledgeTools.structureArguments[name] ?? []
