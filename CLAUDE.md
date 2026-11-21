@@ -3800,8 +3800,8 @@ state, stated validity), each name and quote clipped to one line, a `page:` line
   `knowledgeSelectable` marker (before K5.3) gains it wherever parts were selected, so old chats keep offering
   knowledge; an empty selection stays empty. An entity page's Ask button opens a separate library conversation
   scoped to the meetings its facts come from, with a drafted question.
-- Not yet: `get_wiki_page` (pages carry no narrative until K2's narrative generation is wired, so it would
-  repeat `get_entity`). `trace_influence` (KurnCore `KnowledgeInfluenceTrace`) lists, in stated order, every claim about
+- `get_wiki_page` returns a page's generated narrative (`KnowledgeWikiNarrative` paragraphs with the assertion IDs
+  each summarizes), labelled as not evidence, or says the page has none. `trace_influence` (KurnCore `KnowledgeInfluenceTrace`) lists, in stated order, every claim about
   or naming an entity, the earlier claims on the same subject and predicate each replaces, its meeting, speakers and
   evidence IDs.
 - **Knowledge-first query policy (K5.2)**: when a run offers the knowledge tools, `HarnessChatService.system(knowledge:)`
