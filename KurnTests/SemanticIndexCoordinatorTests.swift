@@ -205,8 +205,10 @@ struct SemanticIndexCoordinatorTests {
         let harness = Harness(enabled: false)
         let first = MeetingFixtures.transcribed("First", in: harness.context)
         let second = MeetingFixtures.transcribed("Second", in: harness.context)
+        let noTranscript = Meeting(title: "No transcript")
+        harness.context.insert(noTranscript)
         harness.staleChunk(for: first, model: "stub-v1")
-        harness.context.insert(Meeting(title: "No transcript"))
+        harness.staleChunk(for: noTranscript, model: "stub-v1")
 
         await harness.coordinator.rebuild()
 
@@ -214,5 +216,19 @@ struct SemanticIndexCoordinatorTests {
         #expect(first.semanticChunks.count == 1)
         #expect(first.semanticChunks.first?.text != "stale passage")
         #expect(second.semanticChunks.count == 1)
+        #expect(noTranscript.semanticChunks.isEmpty)
+    }
+
+    @Test func rebuildPreservesExistingPassagesWhenEmbedderFails() async {
+        let harness = Harness()
+        let meeting = MeetingFixtures.transcribed("Planning", in: harness.context)
+        await harness.coordinator.index(meeting)
+        #expect(meeting.semanticChunks.count == 1)
+
+        harness.embedder.fail(with: EmbedderDown())
+        await harness.coordinator.rebuild()
+
+        #expect(meeting.semanticChunks.count == 1)
+        #expect(harness.coordinator.indexedChunkCount() == 1)
     }
 }

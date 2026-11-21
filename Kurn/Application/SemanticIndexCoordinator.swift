@@ -101,15 +101,23 @@ final class SemanticIndexCoordinator {
         persist()
     }
 
-    /// Wipe and re-index every meeting from scratch (Settings → Rebuild index).
-    /// After clearing, every transcribed meeting looks stale, so the backfill
-    /// re-embeds all of them. Ignores the enabled toggle so the user can rebuild
-    /// even while deciding whether to keep the feature on.
+    /// Re-index every meeting from scratch (Settings → Rebuild index),
+    /// replacing each meeting's passages only after its new embeddings succeed
+    /// and pruning orphaned passages so an interrupted rebuild preserves the
+    /// existing index. Ignores the enabled toggle so the user can rebuild even
+    /// while deciding whether to keep the feature on.
     func rebuild() async {
-        clearIndex()
-        let meetings = (try? modelContext.fetch(FetchDescriptor<Meeting>()))?
-            .filter(\.hasAnyTranscript) ?? []
-        for meeting in meetings {
+        let allMeetings = (try? modelContext.fetch(FetchDescriptor<Meeting>())) ?? []
+        let activeMeetingIDs = Set(allMeetings.filter(\.hasAnyTranscript).map(\.id))
+        let staleOrOrphaned = ((try? modelContext.fetch(FetchDescriptor<SemanticChunk>())) ?? []).filter { chunk in
+            guard let meetingID = chunk.meeting?.id else { return true }
+            return !activeMeetingIDs.contains(meetingID)
+        }
+        if !staleOrOrphaned.isEmpty {
+            for chunk in staleOrOrphaned { modelContext.delete(chunk) }
+            persist()
+        }
+        for meeting in allMeetings where meeting.hasAnyTranscript {
             if Task.isCancelled { return }
             await index(meeting)
         }

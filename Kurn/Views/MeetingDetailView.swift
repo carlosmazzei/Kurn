@@ -263,6 +263,7 @@ struct MeetingDetailView: View {
             },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
         )
+        .attachmentDeleteDialog(attachments: attachments, modelContext: modelContext)
         .kurnDialog(
             isPresented: $pendingRetranscribeAll,
             iconSystemName: "arrow.triangle.2.circlepath.circle.fill",

@@ -12,6 +12,7 @@
 //
 
 import KurnCore
+import SwiftData
 import SwiftUI
 
 extension MeetingDetailView {
@@ -76,7 +77,19 @@ extension MeetingDetailView {
         .buttonStyle(.plain)
         .disabled(attachments.isImporting)
         .accessibilityIdentifier("detail.attachments.add")
-        .kurnDialog(
+    }
+}
+
+extension View {
+    /// Confirmation dialog before deleting a swiped PDF attachment (G1),
+    /// attached at the root of `MeetingDetailView` so the overlay is always
+    /// centered on screen even when the Documents section is scrolled partially
+    /// out of view.
+    func attachmentDeleteDialog(
+        attachments: MeetingAttachmentsViewModel,
+        modelContext: ModelContext
+    ) -> some View {
+        kurnDialog(
             isPresented: Binding(
                 get: { attachments.pendingDelete != nil },
                 set: { if !$0 { attachments.cancelDelete() } }
