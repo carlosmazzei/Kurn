@@ -59,20 +59,27 @@ struct KnowledgeDeletionCoordinatorTests {
         }
     }
 
-    // DIAGNOSTIC (temporary): which part of a background save waits for main.
-    @Test func diagnosticSaveWhileMainBlocked() {
-        for touchMain in [false, true] {
-            let container = Self.backgroundContainer()
-            if touchMain { container.mainContext.autosaveEnabled = false }
-            let posted = DispatchSemaphore(value: 0)
-            DispatchQueue.global().async {
-                let context = ModelContext(container)
-                try? context.transaction { context.insert(Meeting(title: "Synthetic save")) }
-                posted.signal()
-            }
-            let result = posted.wait(timeout: .now() + 3)
-            print("DIAG-SAVE touchMain=\(touchMain) finished=\(result == .success)")
-            _ = posted.wait(timeout: .now() + 10)
+    // DIAGNOSTIC (temporary): does a background save wait for the main thread?
+    @Test func diagnosticSaveWhileMainBlocked() async {
+        let control = Self.backgroundContainer()
+        let start = ContinuousClock.now
+        await Task.detached {
+            let context = ModelContext(control)
+            try? context.transaction { context.insert(Meeting(title: "Synthetic save")) }
+        }.value
+        print("DIAG-SAVE control elapsed=\(ContinuousClock.now - start)")
+        let container = Self.backgroundContainer(), posted = DispatchSemaphore(value: 0)
+        let blocked = ContinuousClock.now
+        DispatchQueue.global().async {
+            let context = ModelContext(container)
+            try? context.transaction { context.insert(Meeting(title: "Synthetic save")) }
+            posted.signal()
+        }
+        let result = posted.wait(timeout: .now() + 30)
+        print("DIAG-SAVE blocked finished=\(result == .success) elapsed=\(ContinuousClock.now - blocked)")
+        if result == .timedOut {
+            while posted.wait(timeout: .now()) == .timedOut { try? await Task.sleep(for: .milliseconds(10)) }
+            print("DIAG-SAVE blocked completed after unblocking elapsed=\(ContinuousClock.now - blocked)")
         }
     }
 
@@ -85,11 +92,11 @@ struct KnowledgeDeletionCoordinatorTests {
         let script = Script([])
         let coordinator = KnowledgeDeletionCoordinator(queue: queue(), purge: { _ in try script.next() })
         coordinator.observeStoreSaves()
-        let container = Self.backgroundContainer(), posted = DispatchSemaphore(value: 0)
-        // A real save inside a transaction, as the store's publish makes.
+        let posted = DispatchSemaphore(value: 0)
+        // Core Data posts this synchronously from inside the saving context's
+        // transaction; an observer queue would make the post wait for main.
         DispatchQueue.global().async {
-            let context = ModelContext(container)
-            try? context.transaction { context.insert(Meeting(title: "Synthetic save")) }
+            NotificationCenter.default.post(name: .NSManagedObjectContextDidSave, object: nil)
             posted.signal()
         }
         #expect(blockMain(until: posted) == .success)
