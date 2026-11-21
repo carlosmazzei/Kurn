@@ -426,8 +426,16 @@ there is nothing to remove for the iOS 27 SDK.
 1. Widen the audit to `[.contrast, .dynamicType, .hitRegion, .sufficientElementDescription, .textClipped, .trait]`
    on the screens `AccessibilityAuditUITests` and `MeetingKnowledgeUITests`
    already seed, with `continueAfterFailure = true` in the audit tests only
-   (flows keep `false`). Upload the `.xcresult` when the job fails. First run
-   is a measurement: record the findings here, do not fix inside this step.
+   (flows keep `false`). **Run it outside the required check.** The existing
+   audit and flow suites are in the required `ui-accessibility-tests` shards,
+   so widening them would turn the first measurement into a blocked PR. Put
+   the widened audit in its own test class (`AccessibilityBaselineUITests`),
+   skip it in `swift.yml` with a `-skip-testing` line and run it from
+   `reliability-hardening.yml` (on demand and weekly, like `ui-flake-rate`).
+   It joins the required shards in U5, once its findings are fixed. The
+   `.xcresult` is already archived on failure by `collect-failure-diagnostics`
+   (14 days); nothing to add. First run is a measurement: record the findings
+   here, do not fix inside this step.
 2. Add a launch argument (DEBUG, `UITestLaunchOptions`) that sets a content size
    category, so one seeded run audits at default and at `accessibilityExtraExtraExtraLarge`
    (AX5). This closes the "no automated check at large text" gap.
@@ -474,7 +482,7 @@ VoiceOver order.
 
 | # | Result | Where | Fix (phase) |
 | --- | --- | --- | --- |
-| G1 | **Destructive action with no confirmation, three places.** Swipe-delete of an attached PDF; "Clear wiki" (costs paid LLM calls to regenerate); "Clear index" (local, rebuildable). The summary delete does confirm (`pendingDeleteSummary`) | `MeetingDetailAttachments.swift:38`, `WikiSettingsView.swift:97`, `SemanticSearchSettingsView.swift:61` | `kurnDialog` naming what is lost and what regenerating costs, or undo from the trash for the PDF (U1, rule 6) |
+| G1 | **Destructive action with no confirmation, three places.** Swipe-delete of an attached PDF; "Clear wiki" (costs paid LLM calls to regenerate); "Clear index" (local, rebuildable). The summary delete does confirm (`pendingDeleteSummary`) | `MeetingDetailAttachments.swift:38`, `WikiSettingsView.swift:97`, `SemanticSearchSettingsView.swift:61` | `kurnDialog` naming what is lost and what regenerating costs, or, only after the retention design in rule 6, undo (U1) |
 | G2 | **Tap targets under 44 pt with no `contentShape`:** pause, stop and the other transcription controls in recording rows (30 pt, 5 places) and the 34 pt play button; photo-capture controls (36–40 pt); a 36 pt control in `DesignComponents`; 32–40 pt swatches in the folder form and template editor | `RecordingSegmentRow.swift:42,105–167`, `PhotoCaptureView.swift:153,215,290`, `DesignComponents.swift:212`, `FolderFormView.swift:53,101`, `TemplateEditorView.swift:22` | Keep the glyph, extend the hit area to 44 × 44 with `contentShape` and padding; the audit's `.hitRegion` should then pass (U3.4) |
 | G3 | **System colours instead of tokens for status:** `.green`, `.red`, `.orange`, `.yellow` in Storage, Health, the language picker and photo capture, although `Theme.success` and `Theme.warning` exist. Those two tokens are only 1.9:1 and 2.1:1 on white (8.9:1 and 8.3:1 on `#1C1C1E`), so as light-mode icons they fall under the 3:1 non-text minimum; the status glyphs also carry a symbol, so colour is not the only cue | `StorageSettingsView.swift:278,290,302`, `HealthRecoveryView+Sections.swift:154,184`, `StorageSettingsSections.swift:101`, `LanguagePickerRow.swift:24`, `PhotoCaptureView.swift:289` | Route through `Theme` and give success/warning light-mode variants that reach 3:1 for glyphs and 4.5:1 for text (U2) |
 | G4 | **Sheet size:** about 59 presentations, and only 12 files set `presentationDetents`. Short forms with none: filter bar, tag editor, tag merge, folder form, folder picker, knowledge meeting selection, chat source sheet. Settings or call sites may set them elsewhere, so confirm each on a device | `FilterBarView`, `TagEditorView`, `TagMergeView`, `FolderFormView`, `FolderPickerView`, `KnowledgeMeetingSelectionView`, `ChatSourceSheet` | `.medium`/`[.medium, .large]` per "Modal weight" (U1, rule 8) |
@@ -575,12 +583,20 @@ Each rule names the Kurn evidence it answers.
    words and a symbol, and tells what the person can do next. Progress and
    failure copy follow "what happened, what it means, what to do"; errors that
    have a fix already offer it (`ErrorRecovery`). *Builds on U1.6.*
-6. **Undo beats confirm for the reversible, confirm beats nothing for the
-   rest.** Deleting a meeting or recording already moves files to a trash
-   before the model changes; surface that as a visible "Recently deleted" with
-   a restore, and keep `kurnDialog` for what truly cannot come back (Delete all
-   data, Delete Knowledge). Check first what the trash retains and for how long.
-   *Answers F8.*
+6. **Confirm what is lost now; undo only once something is retained.** Today's
+   trash is not a "Recently deleted" folder: `RecordingOperationJournal` moves
+   files aside only so a failed save can restore them, and purges them as soon
+   as the save commits. So there is nothing to restore later. Until that
+   changes, every destructive action names what is lost (and what regenerating
+   costs) in a `kurnDialog` (G1). A visible "Recently deleted" is a separate
+   design, not a UI tweak: a retention window for the audio, photos and
+   attachments, a snapshot of the rows needed to restore a meeting (recordings,
+   transcript, summaries, speakers, tags), restore in the library, space shown
+   in Storage, purge on expiry, and an exception path for "Delete all data",
+   `LibraryEraser` and the Knowledge deletion tombstone, which must still erase
+   everything. It also keeps meeting content on the device longer, which the
+   privacy model must accept first. Track it as its own roadmap item before
+   promising it. *Answers F8.*
 7. **Defaults that work, advanced behind a door.** Presets for Transcription
    (U1.5) and, in the same spirit, one-line summaries under each Settings row
    ("Apple Speech, on this device") so the hub reads as the current setup, not
@@ -622,7 +638,7 @@ survive. Items that revisit a `CLAUDE.md` decision are marked **review**.
    The top bar is then identical in both states and has four controls instead
    of five, so the Knowledge-on bar is no longer the crowded one. This reverses
    part of the K0.5 "each control open in the bar" choice, so it needs that
-   review and a usability check (task: "sort by duration"). Identifiers
+   review and the U0b walkthrough (task: "sort by duration"). Identifiers
    (`meetings.library`, `meetings.filters`, `nav.settings`,
    `root.destination.*`) stay, so flows change their path, not their handles.
    **Icon size and spacing stay the system's.** No frame, font or
@@ -744,23 +760,43 @@ Exit: all common tasks complete with VoiceOver and Screen Curtain on a device.
 
 ### U5 · Device certification and governance (1 sprint)
 
-1. Run the common-task list on a physical iPhone: VoiceOver + Screen Curtain,
-   Voice Control only, AX5, Dark, Reduce Transparency, Increase Contrast,
-   Reduce Motion, and Liquid Glass at both ends of its slider if the OS has one.
-   One matrix row per feature: build, device, result, evidence link.
-2. Make the widened audit a required PR check (it is today a required job, but
-   only for two audit types) and archive the `.xcresult` on failure.
-3. Fill `fastlane/accessibility.json` only for rows with evidence;
-   `Tools/validate_store_metadata.py` stays the gate; publish the accessibility
-   page and add EAA-relevant limits to it.
-4. Every release re-evaluates the labels when navigation, authentication,
+1. **Decide the scope first.** `fastlane/accessibility.json` declares per device
+   family (IPHONE, IPAD, APPLE_WATCH; Voice Control does not exist for the
+   Watch) and today declares VoiceOver, Larger Text, Reduced Motion and
+   Differentiate Without Color as supported on all three, and Dark Interface,
+   Sufficient Contrast, Voice Control, Captions and Audio Descriptions as not.
+   U5 lists which labels it re-evaluates (at least every one declared `true`,
+   because the baseline above does not yet support them, plus Sufficient Contrast
+   and Dark Interface after U2, and Voice Control after U4) and for which
+   families. A label stays declared for a family only with evidence for that
+   family.
+2. Run the common-task list per family in scope: on a physical iPhone and iPad
+   with VoiceOver + Screen Curtain, Voice Control only, AX5, Dark, Reduce
+   Transparency, Increase Contrast, Reduce Motion, and Liquid Glass at both ends
+   of its slider if the OS has one; on the Apple Watch the recorder remote with
+   VoiceOver and the largest text size (`KurnWatchUITests` does not run in CI).
+   One matrix row per family × label: build, device, result, evidence link.
+3. Move the widened audit (`AccessibilityBaselineUITests`) into the required
+   `ui-accessibility-tests` shards once its findings are fixed. The failure
+   artifact is already uploaded.
+4. **Who checks the evidence, and where.** CI's `AccessibilityLabels.load`
+   (run in `lint-and-validate`) is structural only: keys per family, booleans,
+   an HTTPS URL. `Tools/validate_store_metadata.py` does not read evidence
+   either. Add `Tools/check_accessibility_evidence.py` to `static-policy`:
+   every `true` in `accessibility.json` needs a matching family × label row
+   with build, date and link in `docs/release-physical-checklist.md`. Before
+   the protected, manual `accessibility-labels.yml` publishes, the release owner
+   signs the matrix; the script makes that sign-off checkable, it does not
+   replace it.
+5. Publish the accessibility page and add EAA-relevant limits to it.
+6. Every release re-evaluates the labels when navigation, authentication,
    playback or the design tokens change.
 
 ### Order and risks
 
 U0 → U0b → U2 and U1 in parallel (U1 touches structure, U2 tokens) → U3 → U4 → U5.
 Risks: U1.1 and U1.4 change what users have learned, so they ship behind the
-usability check, not with the accessibility fixes; U2.1 changes 71 call sites,
+U0b walkthrough, not with the accessibility fixes; U2.1 changes 71 call sites,
 so migrate by screen with the screenshot matrix; the simulator cannot run
 VoiceOver, so no U-phase is "done" on audits alone.
 
