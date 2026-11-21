@@ -31,7 +31,7 @@ enum DiagnosticPayloadIntake {
 
     /// Consent is read at delivery time, straight from `UserDefaults`, so a
     /// delivery that races `AppSettings`' construction still honours it.
-    static func isConsented(in defaults: UserDefaults = .standard) -> Bool {
+    static func isConsented(in defaults: UserDefaults = AppSettings.defaultDefaults) -> Bool {
         defaults.bool(forKey: AppSettingsKeys.diagnosticReportsConsented)
     }
 

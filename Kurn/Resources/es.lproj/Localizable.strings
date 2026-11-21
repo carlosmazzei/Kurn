@@ -1653,7 +1653,7 @@
 "privacy.cloud.revoke_text_title" = "¿Detener el envío automático de texto?";
 "privacy.cloud.revoke_automatic" = "Detener envío automático";
 "privacy.cloud.revoke_detail" = "La transcripción en la nube, los títulos automáticos, la wiki, la corrección y Knowledge dejan de enviar a este proveedor y se desactivan para él. Pedir un resumen o una respuesta en el chat sigue funcionando.";
-"privacy.cloud.revoke_text_detail" = "Los títulos automáticos, la wiki, la corrección y Knowledge dejan de enviar a este proveedor y se desactivan para él. El envío de audio para la transcripción en la nube no cambia; desactívalo por separado. Pedir un resumen o una respuesta en el chat sigue funcionando.";
+"privacy.cloud.revoke_text_detail" = "Los títulos automáticos, la wiki y la corrección se desactivan para este proveedor, y Knowledge deja de enviarle contenido. El envío de audio para la transcripción en la nube no cambia; desactívalo por separado. Pedir un resumen o una respuesta en el chat sigue funcionando.";
 "privacy.cloud.feature.transcription" = "Transcripción en la nube";
 "privacy.cloud.feature.title" = "Títulos automáticos";
 "privacy.cloud.feature.wiki" = "Wiki de reuniones";
