@@ -49,8 +49,8 @@ struct PrivacyCloudSettingsView: View {
             isPresented: Binding(get: { pendingRevocation != nil }, set: { if !$0 { pendingRevocation = nil } }),
             iconSystemName: "icloud.slash",
             iconTint: Theme.warning,
-            title: PrivacyCloudCopy.text(pendingRevocation?.everything == true ? "revoke_all_title" : "revoke_title"),
-            message: PrivacyCloudCopy.text(pendingRevocation?.everything == true ? "revoke_all_detail" : "revoke_detail"),
+            title: PrivacyCloudCopy.text(revocationTitleKey),
+            message: PrivacyCloudCopy.text(revocationMessageKey),
             primaryTitle: PrivacyCloudCopy.text(pendingRevocation?.everything == true ? "revoke_all" : "revoke_automatic"),
             primaryRole: .destructive,
             primaryAction: {
@@ -77,6 +77,21 @@ struct PrivacyCloudSettingsView: View {
             primaryAction: { settings.diagnosticReportsConsented = true },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
         )
+    }
+
+    /// The bulk "Stop automatic sending" button also withdraws audio upload;
+    /// the Automatic toggle leaves it alone, so both the title and message
+    /// distinguish text-only revocation from bulk revocation.
+    private var revocationTitleKey: String {
+        guard let pendingRevocation else { return "revoke_title" }
+        if pendingRevocation.everything { return "revoke_all_title" }
+        return pendingRevocation.includeAudio ? "revoke_title" : "revoke_text_title"
+    }
+
+    private var revocationMessageKey: String {
+        guard let pendingRevocation else { return "revoke_detail" }
+        if pendingRevocation.everything { return "revoke_all_detail" }
+        return pendingRevocation.includeAudio ? "revoke_detail" : "revoke_text_detail"
     }
 
     private func providerSection(_ destination: String) -> some View {

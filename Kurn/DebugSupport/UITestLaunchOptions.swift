@@ -16,11 +16,18 @@ enum UITestLaunchOptions {
     /// failing later on an unrelated "element missing"; without them each
     /// transition also stops costing its animation time.
     static let disableAnimations = "UI-Testing-DisableAnimations"
+    /// Wipes the app's persistent `UserDefaults` domain before `AppSettings`
+    /// loads, so a flow that adds providers or grants consent starts from a
+    /// fresh install every run instead of accumulating earlier runs' state.
+    static let resetDefaults = "UI-Testing-ResetDefaults"
 
     @MainActor
     static func apply(arguments: [String] = ProcessInfo.processInfo.arguments) {
         if arguments.contains(disableAnimations) {
             UIView.setAnimationsEnabled(false)
+        }
+        if arguments.contains(resetDefaults), let domain = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: domain)
         }
     }
 }

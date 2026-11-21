@@ -26,11 +26,13 @@ final class SettingsFlowUITests: FlowUITestCase {
         XCTAssertTrue(addButton.waitForExistence(timeout: 10))
         addButton.tap()
 
-        let nameField = app.textFields["Provider Name"]
+        let nameField = app.textFields["settings.providers.add.name"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 5))
         nameField.tap()
         nameField.typeText("Test Cloud")
-        app.buttons["Save"].tap()
+        let saveButton = app.buttons["settings.providers.add.save"]
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
+        saveButton.tap()
         XCTAssertTrue(anyElement("settings.providers.form").waitForExistence(timeout: 5))
         goBack(to: "Settings")
 
@@ -42,25 +44,59 @@ final class SettingsFlowUITests: FlowUITestCase {
         XCTAssertTrue(anyElement("settings.privacy_cloud.form").waitForExistence(timeout: 10))
         let onRequest = app.switches["privacy.cloud.onRequest"]
         let automatic = app.switches["privacy.cloud.automatic"]
+        let audio = app.switches["privacy.cloud.audio"]
         XCTAssertTrue(onRequest.waitForExistence(timeout: 5))
+        XCTAssertTrue(audio.waitForExistence(timeout: 5))
         XCTAssertEqual(onRequest.value as? String, "1")
         XCTAssertEqual(automatic.value as? String, "0")
+        XCTAssertEqual(audio.value as? String, "0")
 
+        // Grant both automatic text and audio upload permissions.
         automatic.switches.firstMatch.tap()
         XCTAssertTrue(waitUntil(automatic, "value == '1'"))
+        audio.switches.firstMatch.tap()
+        XCTAssertTrue(waitUntil(audio, "value == '1'"))
 
+        // Turning off the Automatic toggle alone explains audio is unchanged;
+        // cancelling keeps both on, confirming turns off only automatic text.
         automatic.switches.firstMatch.tap()
         let dialogTitle = app.staticTexts["dialog.title"]
         XCTAssertTrue(dialogTitle.waitForExistence(timeout: 5))
+        XCTAssertEqual(dialogTitle.label, "Stop automatic text sending?")
+        let textOnlyMessage = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Audio upload for cloud transcription is not changed")
+        ).firstMatch
+        XCTAssertTrue(textOnlyMessage.waitForExistence(timeout: 5))
         app.buttons["dialog.secondary"].tap()
         XCTAssertTrue(dialogTitle.waitForNonExistence(timeout: 5))
         XCTAssertEqual(automatic.value as? String, "1")
+        XCTAssertEqual(audio.value as? String, "1")
 
         automatic.switches.firstMatch.tap()
         XCTAssertTrue(dialogTitle.waitForExistence(timeout: 5))
         app.buttons["dialog.primary"].tap()
         XCTAssertTrue(dialogTitle.waitForNonExistence(timeout: 5))
         XCTAssertEqual(automatic.value as? String, "0")
+        XCTAssertEqual(audio.value as? String, "1")
+        XCTAssertEqual(onRequest.value as? String, "1")
+
+        // Re-enable automatic text and confirm the bulk "Stop automatic sending"
+        // action revokes both automatic text and audio upload.
+        automatic.switches.firstMatch.tap()
+        XCTAssertTrue(waitUntil(automatic, "value == '1'"))
+        let bulkRevoke = app.buttons["privacy.cloud.revoke"]
+        XCTAssertTrue(bulkRevoke.waitForExistence(timeout: 5))
+        bulkRevoke.tap()
+        XCTAssertTrue(dialogTitle.waitForExistence(timeout: 5))
+        XCTAssertEqual(dialogTitle.label, "Stop automatic sending?")
+        let bulkMessage = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Cloud transcription")
+        ).firstMatch
+        XCTAssertTrue(bulkMessage.waitForExistence(timeout: 5))
+        app.buttons["dialog.primary"].tap()
+        XCTAssertTrue(dialogTitle.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(automatic.value as? String, "0")
+        XCTAssertEqual(audio.value as? String, "0")
         XCTAssertEqual(onRequest.value as? String, "1")
 
         XCTAssertTrue(scrollUntilExists(app.switches["privacy.cloud.requireAuth"]))
