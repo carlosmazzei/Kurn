@@ -163,7 +163,7 @@ struct PhotoCaptureView: View {
                         .font(isActive ? Theme.subheadlineEmphasized : Theme.footnoteEmphasized)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
-                        .foregroundStyle(isActive ? Color.yellow : .white)
+                        .foregroundStyle(isActive ? Theme.cameraAccent : .white)
                         .padding(.horizontal, 8)
                         .frame(minWidth: 44, minHeight: 44)
                         .background(.black.opacity(0.4), in: Capsule())
@@ -213,6 +213,7 @@ struct PhotoCaptureView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(.white.opacity(0.6), lineWidth: 1))
                 .rotationEffect(.degrees(iconRotation))
+                .accessibilityIgnoresInvertColors(true)
                 .accessibilityLabel(NSLocalizedString("recorder.photo_last", comment: "Last photo taken"))
         } else {
             Color.clear.frame(width: 52, height: 52)
@@ -295,13 +296,13 @@ private struct FocusControl: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: 4)
-            .stroke(.yellow, lineWidth: 1.5)
+            .stroke(Theme.cameraAccent, lineWidth: 1.5)
             .frame(width: 70, height: 70)
             .allowsHitTesting(false)
             .overlay(alignment: sunOnLeading ? .leading : .trailing) {
                 Image(systemName: "sun.max.fill")
                     .font(Theme.title3)
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(Theme.cameraAccent)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
                     .offset(x: sunOnLeading ? -44 : 44, y: CGFloat(-exposure) * PhotoExposure.trackHeight / 2)

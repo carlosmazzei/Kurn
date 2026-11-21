@@ -116,6 +116,79 @@ struct AppSettingsCloudConsentTests {
         #expect(!settings.allowsCloud(.openAI, for: .automatic))
     }
 
+    @Test func revokingAudioUploadAloneKeepsAutomaticTextGrantsAndFallsBackToOnDeviceTranscription() {
+        let settings = cloudSettings()
+        settings.wikiEnabled = true
+        settings.recordCloudTranscriptionConsent(for: .openAI)
+        settings.transcriptionProviderID = AIProvider.openAI.id
+        settings.transcriptionEngine = .whisperAPI
+        let destination = settings.cloudConsentDestination(for: .openAI)
+
+        settings.revokeCloudTranscriptionConsent(destination)
+
+        #expect(!settings.hasCloudTranscriptionConsent(for: .openAI))
+        #expect(settings.transcriptionEngine == .appleSpeech)
+        #expect(settings.wikiEnabled)
+        #expect(settings.allowsCloud(.openAI, for: .automatic))
+    }
+
+    @Test func revokingAutomaticAlonePreservesOnRequestFromKnowledgeAndKeepsAudioUploadWhenExcluded() {
+        let settings = MeetingFixtures.isolatedSettings()
+        let destination = settings.cloudConsentDestination(for: .anthropic)
+        // Knowledge records only `.automatic`, which also satisfies `.onRequest`.
+        settings.grantCloudConsent(.anthropic, for: .automatic)
+        settings.recordCloudTranscriptionConsent(for: .anthropic)
+
+        settings.revokeAutomaticCloudConsent(destination, includeAudio: false)
+
+        #expect(!settings.allowsCloud(.anthropic, for: .automatic))
+        #expect(settings.allowsCloud(.anthropic, for: .onRequest))
+        #expect(settings.hasCloudTranscriptionConsent(for: .anthropic))
+    }
+
+    @Test func revokingAfterDisablingSoleAudioPermissionStillClearsReadAloudProvider() {
+        let settings = MeetingFixtures.isolatedSettings()
+        let destination = settings.cloudConsentDestination(for: .elevenLabs)
+        settings.recordCloudTranscriptionConsent(for: .elevenLabs)
+        settings.readAloud.providerID = AIProvider.elevenLabs.id
+
+        settings.revokeCloudTranscriptionConsent(destination)
+        #expect(!settings.hasCloudTranscriptionConsent(for: .elevenLabs))
+        #expect(settings.editableCloudConsentDestinations.contains(destination))
+
+        settings.revokeAllCloudConsent(destination)
+        #expect(settings.readAloud.providerID == AIProvider.appleOnDevice.id)
+    }
+
+    @Test func uiTestResetDefaultsUsesIsolatedSuiteAndPreservesStandardDefaults() {
+        let sentinelKey = "test.preserve.standard.\(UUID().uuidString)"
+        UserDefaults.standard.set("keep-my-template", forKey: sentinelKey)
+        defer { UserDefaults.standard.removeObject(forKey: sentinelKey) }
+
+        let args = [UITestLaunchOptions.resetDefaults]
+        let suiteBefore = UITestLaunchOptions.settingsDefaults(arguments: args)
+        suiteBefore.set("stale-provider", forKey: "test.isolated.key")
+
+        UITestLaunchOptions.apply(arguments: args)
+
+        let suiteAfter = UITestLaunchOptions.settingsDefaults(arguments: args)
+        #expect(suiteAfter.string(forKey: "test.isolated.key") == nil)
+        #expect(UserDefaults.standard.string(forKey: sentinelKey) == "keep-my-template")
+    }
+
+    @Test func editableCloudConsentDestinationsIncludesConfiguredProvidersEvenAfterRevokeAll() throws {
+        let (defaults, suite) = try defaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(cloudStore: InMemoryCloudKeyValueStore(), defaults: defaults,
+                                   credentials: CredentialStore(keychain: ConsentTestKeychain()))
+        settings.credentials.saveKey("sk-openai", for: .openAI)
+        let destination = settings.cloudConsentDestination(for: .openAI)
+        settings.revokeAllCloudConsent(destination)
+
+        #expect(settings.cloudConsentDestinationsForDisplay.isEmpty)
+        #expect(settings.editableCloudConsentDestinations.contains(destination))
+    }
+
     @Test func removingAllPermissionsMovesTheSummaryProviderOnDevice() {
         let settings = cloudSettings()
         settings.readAloud.providerID = AIProvider.openAI.id

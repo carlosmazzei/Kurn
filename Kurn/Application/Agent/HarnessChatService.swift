@@ -6,8 +6,8 @@ import SwiftData
 @MainActor
 struct HarnessChatService {
     typealias ModelFactory = @Sendable (AIProvider, String) throws -> (any AgentModel)?
-    var isWikiEnabled: @MainActor () -> Bool = { UserDefaults.standard.bool(forKey: AppSettings.Keys.wikiEnabled) }
-    var isKnowledgeEnabled: @MainActor () -> Bool = { UserDefaults.standard.bool(forKey: AppSettings.Keys.knowledgeEnabled) }
+    var isWikiEnabled: @MainActor () -> Bool = { AppSettings.defaultDefaults.bool(forKey: AppSettings.Keys.wikiEnabled) }
+    var isKnowledgeEnabled: @MainActor () -> Bool = { AppSettings.defaultDefaults.bool(forKey: AppSettings.Keys.knowledgeEnabled) }
     /// nil plans from the authorized workload; explicit limits retain fixed-budget behavior.
     var limits: AgentLimits?
     var conversationID: UUID?

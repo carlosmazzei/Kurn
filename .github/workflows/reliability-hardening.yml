@@ -217,6 +217,7 @@ jobs:
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
             -only-testing:KurnUITests \
             -skip-testing:KurnUITests/ScreenshotUITests \
+            -skip-testing:KurnUITests/AccessibilityBaselineUITests \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 240 \
             -maximum-test-execution-time-allowance 600 \
@@ -242,9 +243,78 @@ jobs:
           path: ${{ runner.temp }}/result/ui-flake-attempt-${{ matrix.attempt }}.txt
           retention-days: 14
 
+  # U0.1: Widened accessibility audit across all six XCTest audit categories
+  # at default and AX5 text sizes. Kept outside the required PR shards and
+  # ui-flake-rate (and non-blocking via continue-on-error) until its findings
+  # are resolved in U2–U4 and U5 promotes it to a zero-finding gate.
+  accessibility-baseline:
+    runs-on: macos-26
+    timeout-minutes: 60
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - uses: ./.github/actions/prepare-simulator
+
+      - uses: ./.github/actions/cache-spm-packages
+
+      - name: Run widened accessibility audit
+        id: audit
+        run: |
+          xcodebuild \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "$IOS_DESTINATION" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
+            -only-testing:KurnUITests/AccessibilityBaselineUITests \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 240 \
+            -maximum-test-execution-time-allowance 600 \
+            clean test
+
+      - name: Collect failure diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-failure-diagnostics
+        with:
+          artifact-name: accessibility-baseline-failure-diagnostics
+
+      # continue-on-error hides the difference between "audit ran all screens
+      # and found issues", "audit threw/failed partway through", and "audit
+      # never ran" (e.g. simulator setup failed). Inspect the .xcresult bundle
+      # with xcresulttool so only complete measurements report `measured-*`.
+      - name: Record audit outcome
+        if: always()
+        env:
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/result"
+          status="$(python3 Tools/classify_accessibility_baseline.py \
+            --xcresult "$RUNNER_TEMP/TestResults.xcresult" \
+            --audit-outcome "$AUDIT_OUTCOME")"
+          echo "$status" > "$RUNNER_TEMP/result/accessibility-baseline-attempt-1.txt"
+          echo "Accessibility baseline: $status" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload audit outcome
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: accessibility-baseline-result-1
+          path: ${{ runner.temp }}/result/accessibility-baseline-attempt-1.txt
+          retention-days: 14
+
   # Counts and reports without retrying; preserves failures from every job.
+  # accessibility-baseline is listed only so its outcome is reported; it is
+  # never required to pass until U5 promotes it.
   hardening-summary:
-    needs: [thread-sanitizer, release-configuration-tests, ui-flake-rate]
+    needs: [thread-sanitizer, release-configuration-tests, ui-flake-rate, accessibility-baseline]
     if: always()
     runs-on: ubuntu-latest
 
@@ -283,6 +353,9 @@ jobs:
             echo "| thread-sanitizer (2 independent attempts) | $(count_status thread-sanitizer-attempt) passed |"
             echo "| release-configuration-tests | ${{ needs.release-configuration-tests.result }} |"
             echo "| ui-flake-rate (5 attempts) | $(count_status ui-flake-attempt) passed |"
+            a11y_file="$RUNNER_TEMP/results/accessibility-baseline-attempt-1.txt"
+            if [ -e "$a11y_file" ]; then a11y="$(cat "$a11y_file")"; else a11y="not-measured (no outcome recorded)"; fi
+            echo "| accessibility-baseline (non-blocking until U5) | $a11y |"
             echo
             echo "A less-than-full pass rate on \`thread-sanitizer\` or \`ui-flake-rate\` is a real signal to"
             echo "investigate, not noise to retry away. No numeric SLO is enforced here — record a rate"

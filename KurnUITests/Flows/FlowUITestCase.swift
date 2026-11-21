@@ -32,6 +32,7 @@ class FlowUITestCase: XCTestCase {
         app.launchArguments += [
             "UI-Testing-Screenshots",
             "UI-Testing-DisableAnimations",
+            "UI-Testing-ResetDefaults",
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US"
         ]
@@ -133,7 +134,10 @@ class FlowUITestCase: XCTestCase {
     /// navigation-bar button is not reliably the visible back button; the
     /// back button's label is the previous screen's title.
     func goBack(to title: String) {
-        let back = app.navigationBars.buttons[title]
+        let predicate = NSPredicate(format: "label == %@ AND identifier != %@", title, "nav.settings")
+        let topBar = app.navigationBars.allElementsBoundByIndex.last
+        let scoped = topBar?.buttons.matching(predicate).firstMatch
+        let back = (scoped?.exists == true) ? scoped! : app.navigationBars.buttons.matching(predicate).firstMatch
         XCTAssertTrue(back.waitForExistence(timeout: 5), "Back button to \(title) missing")
         back.tap()
     }

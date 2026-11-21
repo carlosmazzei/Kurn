@@ -61,6 +61,7 @@ struct TranscriptView: View {
                             .foregroundStyle(color)
                     }
                     .accessibilityHidden(true)
+                    .accessibilityIgnoresInvertColors(true)
                     Text(name)
                         .font(Theme.footnoteEmphasized)
                         .foregroundStyle(color)

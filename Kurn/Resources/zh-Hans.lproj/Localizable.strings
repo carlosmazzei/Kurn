@@ -1650,8 +1650,10 @@
 "privacy.cloud.not_allowed" = "未允许";
 "privacy.cloud.removed_provider" = "已移除的提供商";
 "privacy.cloud.revoke_title" = "停止自动发送？";
+"privacy.cloud.revoke_text_title" = "停止自动发送文本？";
 "privacy.cloud.revoke_automatic" = "停止自动发送";
 "privacy.cloud.revoke_detail" = "云端转写、自动标题、Wiki、校正和 Knowledge 将停止向此提供商发送并对其关闭。按需请求摘要或聊天回答仍可使用。";
+"privacy.cloud.revoke_text_detail" = "自动标题、Wiki 和校正将对此提供商关闭，Knowledge 也将停止向其发送内容。云端转写的音频上传不受影响，请单独关闭。按需请求摘要或聊天回答仍可使用。";
 "privacy.cloud.feature.transcription" = "云端转写";
 "privacy.cloud.feature.title" = "自动标题";
 "privacy.cloud.feature.wiki" = "会议 Wiki";
@@ -1662,6 +1664,13 @@
 "privacy.cloud.revoke_all_detail" = "将不再向此提供商发送任何内容，无论按需还是自动。使用它的摘要和 Knowledge 将改为在设备端处理。";
 "privacy.cloud.audio" = "音频上传";
 
+/* G1 destructive action confirmations */
+"detail.attachments.delete_confirm.title" = "删除文档？";
+"detail.attachments.delete_confirm.message" = "“%@”将从此会议中永久移除。";
+"settings.wiki_clear_confirm.title" = "清除所有 Wiki 文章？";
+"settings.wiki_clear_confirm.message" = "所有已生成的会议 Wiki 文章都将从此设备中移除。重新生成将调用已配置的 AI 提供商，并可能产生费用。";
+"settings.semantic_clear_confirm.title" = "清除语义搜索索引？";
+"settings.semantic_clear_confirm.message" = "本地语义搜索索引将被移除。你可以随时在此设备上重建索引，不会删除你的会议。";
 /* Folder icon accessibility labels */
 "folder.icon.folder" = "文件夹";
 "folder.icon.briefcase" = "工作";

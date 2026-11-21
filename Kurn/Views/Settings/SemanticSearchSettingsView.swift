@@ -18,6 +18,8 @@ struct SemanticSearchSettingsView: View {
     /// True while a rebuild is running, so the buttons show progress and can't
     /// be re-triggered.
     @State private var isRebuildingIndex = false
+    /// Drives the confirmation dialog before clearing the local semantic index (G1).
+    @State private var showingClearConfirm = false
 
     var body: some View {
         Form {
@@ -59,8 +61,7 @@ struct SemanticSearchSettingsView: View {
                 }
                 .disabled(isRebuildingIndex)
                 Button(role: .destructive) {
-                    semanticIndex.clearIndex()
-                    semanticChunkCount = semanticIndex.indexedChunkCount()
+                    showingClearConfirm = true
                 } label: {
                     Label(
                         NSLocalizedString("settings.semantic_clear", comment: "Clear index"),
@@ -68,11 +69,26 @@ struct SemanticSearchSettingsView: View {
                     )
                 }
                 .disabled(isRebuildingIndex || semanticChunkCount == 0)
+                .accessibilityIdentifier("settings.semantic.clear")
             } header: {
                 Text(NSLocalizedString("settings.semantic_search_title", comment: "Semantic search section title"))
             }
         }
         .navigationTitle(NSLocalizedString("settings.semantic_search_title", comment: "Semantic search"))
         .task { semanticChunkCount = semanticIndex.indexedChunkCount() }
+        .kurnDialog(
+            isPresented: $showingClearConfirm,
+            iconSystemName: "trash.circle.fill",
+            iconTint: Theme.warning,
+            title: NSLocalizedString("settings.semantic_clear_confirm.title", comment: "Clear semantic index confirmation"),
+            message: NSLocalizedString("settings.semantic_clear_confirm.message", comment: "Clear semantic index message"),
+            primaryTitle: NSLocalizedString("settings.semantic_clear", comment: "Clear index"),
+            primaryRole: .destructive,
+            primaryAction: {
+                semanticIndex.clearIndex()
+                semanticChunkCount = semanticIndex.indexedChunkCount()
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
     }
 }

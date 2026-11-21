@@ -168,6 +168,8 @@ private struct RecordingSessionPresenter: ViewModifier {
 struct RecordingMiniBar: View {
     let vm: RecorderViewModel
     let onExpand: () -> Void
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
 
     /// The round controls are fixed geometry, so they scale from their own
     /// base and the subtree caps Dynamic Type, like `RecorderView`.
@@ -262,7 +264,7 @@ struct RecordingMiniBar: View {
         .padding(.trailing, 8)
         .padding(.vertical, 8)
         .frame(maxWidth: 560)
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .modifier(RecordingMiniBarSurfaceModifier(reduceTransparency: reduceTransparency, contrast: contrast))
         .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         .sensoryFeedback(.selection, trigger: vm.state)
     }
@@ -286,5 +288,27 @@ struct RecordingMiniBar: View {
         isPaused
             ? NSLocalizedString("recorder.mini.paused", comment: "Mini recorder bar: paused")
             : NSLocalizedString("recorder.mini.recording", comment: "Mini recorder bar: recording")
+    }
+}
+
+private struct RecordingMiniBarSurfaceModifier: ViewModifier {
+    let reduceTransparency: Bool
+    let contrast: ColorSchemeContrast
+
+    func body(content: Content) -> some View {
+        let borderColor = contrast == .increased ? Theme.textTertiary : Theme.separator
+        if reduceTransparency {
+            content
+                .background(Theme.surface, in: Capsule())
+                .overlay(Capsule().strokeBorder(borderColor, lineWidth: contrast == .increased ? 1.5 : 1))
+        } else {
+            content
+                .glassEffect(.regular.interactive(), in: .capsule)
+                .overlay {
+                    if contrast == .increased {
+                        Capsule().strokeBorder(borderColor, lineWidth: 1.5)
+                    }
+                }
+        }
     }
 }

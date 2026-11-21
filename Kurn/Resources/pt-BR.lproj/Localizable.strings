@@ -1650,8 +1650,10 @@
 "privacy.cloud.not_allowed" = "Não permitido";
 "privacy.cloud.removed_provider" = "Provedor removido";
 "privacy.cloud.revoke_title" = "Parar o envio automático?";
+"privacy.cloud.revoke_text_title" = "Parar o envio automático de texto?";
 "privacy.cloud.revoke_automatic" = "Parar envio automático";
 "privacy.cloud.revoke_detail" = "Transcrição em nuvem, títulos automáticos, wiki, correção e Knowledge param de enviar a este provedor e são desligados para ele. Pedir um resumo ou uma resposta no chat continua funcionando.";
+"privacy.cloud.revoke_text_detail" = "Títulos automáticos, wiki e correção são desligados para este provedor, e o Knowledge para de enviar a ele. O envio de áudio para transcrição em nuvem não muda; desligue-o separadamente. Pedir um resumo ou uma resposta no chat continua funcionando.";
 "privacy.cloud.feature.transcription" = "Transcrição em nuvem";
 "privacy.cloud.feature.title" = "Títulos automáticos";
 "privacy.cloud.feature.wiki" = "Wiki da reunião";
@@ -1662,6 +1664,13 @@
 "privacy.cloud.revoke_all_detail" = "Nada mais é enviado a este provedor, nem quando você pede nem automaticamente. Resumos e Knowledge que o usavam passam para o processamento no aparelho.";
 "privacy.cloud.audio" = "Envio de áudio";
 
+/* G1 destructive action confirmations */
+"detail.attachments.delete_confirm.title" = "Excluir documento?";
+"detail.attachments.delete_confirm.message" = "“%@” será removido permanentemente desta reunião.";
+"settings.wiki_clear_confirm.title" = "Limpar todos os artigos da wiki?";
+"settings.wiki_clear_confirm.message" = "Todos os artigos da wiki das reuniões gerados serão removidos deste dispositivo. Gerá-los novamente chama o provedor de IA configurado e pode gerar custos.";
+"settings.semantic_clear_confirm.title" = "Limpar índice da busca semântica?";
+"settings.semantic_clear_confirm.message" = "O índice local de busca semântica será removido. Você pode reconstruí-lo neste dispositivo a qualquer momento sem excluir suas reuniões.";
 /* Folder icon accessibility labels */
 "folder.icon.folder" = "Pasta";
 "folder.icon.briefcase" = "Trabalho";

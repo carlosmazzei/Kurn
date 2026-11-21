@@ -43,6 +43,8 @@ struct KnowledgeIconWell: View {
 struct KnowledgeChipLabel: View {
     let title: String
     let systemImage: String
+    @Environment(\.accessibilityShowButtonShapes) private var showButtonShapes
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         HStack(spacing: 6) {
@@ -54,6 +56,11 @@ struct KnowledgeChipLabel: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
         .background(Theme.fill, in: Capsule())
+        .overlay {
+            if showButtonShapes || contrast == .increased {
+                Capsule().strokeBorder(Theme.separator, lineWidth: 1)
+            }
+        }
         .frame(minHeight: 44)
         .contentShape(Rectangle())
     }
@@ -75,7 +82,7 @@ struct KnowledgeChevron: View {
     var body: some View {
         Image(systemName: "chevron.right")
             .font(Theme.footnoteEmphasized)
-            .foregroundStyle(Theme.textTertiary)
+            .foregroundStyle(Theme.decorationTertiary)
             .accessibilityHidden(true)
     }
 }

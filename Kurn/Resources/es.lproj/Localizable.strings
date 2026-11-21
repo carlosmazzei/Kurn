@@ -1650,8 +1650,10 @@
 "privacy.cloud.not_allowed" = "No permitido";
 "privacy.cloud.removed_provider" = "Proveedor eliminado";
 "privacy.cloud.revoke_title" = "¿Detener el envío automático?";
+"privacy.cloud.revoke_text_title" = "¿Detener el envío automático de texto?";
 "privacy.cloud.revoke_automatic" = "Detener envío automático";
 "privacy.cloud.revoke_detail" = "La transcripción en la nube, los títulos automáticos, la wiki, la corrección y Knowledge dejan de enviar a este proveedor y se desactivan para él. Pedir un resumen o una respuesta en el chat sigue funcionando.";
+"privacy.cloud.revoke_text_detail" = "Los títulos automáticos, la wiki y la corrección se desactivan para este proveedor, y Knowledge deja de enviarle contenido. El envío de audio para la transcripción en la nube no cambia; desactívalo por separado. Pedir un resumen o una respuesta en el chat sigue funcionando.";
 "privacy.cloud.feature.transcription" = "Transcripción en la nube";
 "privacy.cloud.feature.title" = "Títulos automáticos";
 "privacy.cloud.feature.wiki" = "Wiki de reuniones";
@@ -1662,6 +1664,13 @@
 "privacy.cloud.revoke_all_detail" = "Ya no se envía nada a este proveedor, ni a petición ni automáticamente. Los resúmenes y Knowledge que lo usaban pasan al procesamiento en el dispositivo.";
 "privacy.cloud.audio" = "Envío de audio";
 
+/* G1 destructive action confirmations */
+"detail.attachments.delete_confirm.title" = "¿Eliminar documento?";
+"detail.attachments.delete_confirm.message" = "«%@» se eliminará permanentemente de esta reunión.";
+"settings.wiki_clear_confirm.title" = "¿Borrar todos los artículos de la wiki?";
+"settings.wiki_clear_confirm.message" = "Todos los artículos de la wiki de reuniones generados se eliminarán de este dispositivo. Regenerarlos llama a tu proveedor de IA configurado y puede generar cargos.";
+"settings.semantic_clear_confirm.title" = "¿Borrar el índice de búsqueda semántica?";
+"settings.semantic_clear_confirm.message" = "El índice local de búsqueda semántica se eliminará. Puedes reconstruirlo en este dispositivo en cualquier momento sin eliminar tus reuniones.";
 /* Folder icon accessibility labels */
 "folder.icon.folder" = "Carpeta";
 "folder.icon.briefcase" = "Trabajo";

@@ -1650,8 +1650,10 @@
 "privacy.cloud.not_allowed" = "Non autorisé";
 "privacy.cloud.removed_provider" = "Fournisseur supprimé";
 "privacy.cloud.revoke_title" = "Arrêter l’envoi automatique ?";
+"privacy.cloud.revoke_text_title" = "Arrêter l’envoi automatique de texte ?";
 "privacy.cloud.revoke_automatic" = "Arrêter l’envoi automatique";
 "privacy.cloud.revoke_detail" = "La transcription cloud, les titres automatiques, le wiki, la correction et Knowledge cessent d’envoyer à ce fournisseur et sont désactivés pour lui. Demander un résumé ou une réponse dans le chat fonctionne toujours.";
+"privacy.cloud.revoke_text_detail" = "Les titres automatiques, le wiki et la correction sont désactivés pour ce fournisseur, et Knowledge cesse de lui envoyer du contenu. L’envoi audio pour la transcription cloud ne change pas ; désactivez-le séparément. Demander un résumé ou une réponse dans le chat fonctionne toujours.";
 "privacy.cloud.feature.transcription" = "Transcription cloud";
 "privacy.cloud.feature.title" = "Titres automatiques";
 "privacy.cloud.feature.wiki" = "Wiki des réunions";
@@ -1662,6 +1664,13 @@
 "privacy.cloud.revoke_all_detail" = "Plus rien n’est envoyé à ce fournisseur, ni sur demande ni automatiquement. Les résumés et Knowledge qui l’utilisaient passent au traitement sur l’appareil.";
 "privacy.cloud.audio" = "Envoi audio";
 
+/* G1 destructive action confirmations */
+"detail.attachments.delete_confirm.title" = "Supprimer le document ?";
+"detail.attachments.delete_confirm.message" = "« %@ » sera définitivement supprimé de cette réunion.";
+"settings.wiki_clear_confirm.title" = "Effacer tous les articles du wiki ?";
+"settings.wiki_clear_confirm.message" = "Tous les articles wiki des réunions générés seront supprimés de cet appareil. Les régénérer appelle votre fournisseur d’IA configuré et peut entraîner des frais.";
+"settings.semantic_clear_confirm.title" = "Effacer l’index de recherche sémantique ?";
+"settings.semantic_clear_confirm.message" = "L’index local de recherche sémantique sera supprimé. Vous pouvez le reconstruire sur cet appareil à tout moment sans supprimer vos réunions.";
 /* Folder icon accessibility labels */
 "folder.icon.folder" = "Dossier";
 "folder.icon.briefcase" = "Travail";

@@ -1650,8 +1650,10 @@
 "privacy.cloud.not_allowed" = "Nicht erlaubt";
 "privacy.cloud.removed_provider" = "Entfernter Anbieter";
 "privacy.cloud.revoke_title" = "Automatisches Senden beenden?";
+"privacy.cloud.revoke_text_title" = "Automatisches Senden von Text stoppen?";
 "privacy.cloud.revoke_automatic" = "Automatisches Senden beenden";
 "privacy.cloud.revoke_detail" = "Cloud-Transkription, automatische Titel, Wiki, Korrektur und Knowledge senden nicht mehr an diesen Anbieter und werden für ihn ausgeschaltet. Zusammenfassungen und Chat-Antworten auf Anfrage funktionieren weiter.";
+"privacy.cloud.revoke_text_detail" = "Automatische Titel, Wiki und Korrektur werden für diesen Anbieter ausgeschaltet, und Knowledge sendet nicht mehr an ihn. Der Audio-Upload für die Cloud-Transkription bleibt unverändert; schalte ihn separat aus. Zusammenfassungen und Chat-Antworten auf Anfrage funktionieren weiter.";
 "privacy.cloud.feature.transcription" = "Cloud-Transkription";
 "privacy.cloud.feature.title" = "Automatische Titel";
 "privacy.cloud.feature.wiki" = "Meeting-Wiki";
@@ -1662,6 +1664,13 @@
 "privacy.cloud.revoke_all_detail" = "An diesen Anbieter wird nichts mehr gesendet, weder auf Anfrage noch automatisch. Zusammenfassungen und Knowledge, die ihn nutzten, wechseln zur Verarbeitung auf dem Gerät.";
 "privacy.cloud.audio" = "Audio-Upload";
 
+/* G1 destructive action confirmations */
+"detail.attachments.delete_confirm.title" = "Dokument löschen?";
+"detail.attachments.delete_confirm.message" = "„%@“ wird dauerhaft aus dieser Besprechung entfernt.";
+"settings.wiki_clear_confirm.title" = "Alle Wiki-Artikel löschen?";
+"settings.wiki_clear_confirm.message" = "Alle erzeugten Meeting-Wiki-Artikel werden von diesem Gerät entfernt. Das erneute Erzeugen ruft deinen konfigurierten KI-Anbieter auf und kann Anbietergebühren verursachen.";
+"settings.semantic_clear_confirm.title" = "Semantischen Suchindex löschen?";
+"settings.semantic_clear_confirm.message" = "Der lokale semantische Suchindex wird entfernt. Du kannst ihn jederzeit auf diesem Gerät neu aufbauen, ohne deine Besprechungen zu löschen.";
 /* Folder icon accessibility labels */
 "folder.icon.folder" = "Ordner";
 "folder.icon.briefcase" = "Arbeit";

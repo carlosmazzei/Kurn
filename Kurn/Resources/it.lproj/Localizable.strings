@@ -1650,8 +1650,10 @@
 "privacy.cloud.not_allowed" = "Non consentito";
 "privacy.cloud.removed_provider" = "Fornitore rimosso";
 "privacy.cloud.revoke_title" = "Interrompere l’invio automatico?";
+"privacy.cloud.revoke_text_title" = "Interrompere l’invio automatico di testo?";
 "privacy.cloud.revoke_automatic" = "Interrompi invio automatico";
 "privacy.cloud.revoke_detail" = "Trascrizione cloud, titoli automatici, wiki, correzione e Knowledge smettono di inviare a questo fornitore e vengono disattivati per esso. Chiedere un riepilogo o una risposta in chat continua a funzionare.";
+"privacy.cloud.revoke_text_detail" = "Titoli automatici, wiki e correzione vengono disattivati per questo fornitore e Knowledge smette di inviargli contenuti. L’invio dell’audio per la trascrizione cloud non cambia; disattivalo separatamente. Chiedere un riepilogo o una risposta in chat continua a funzionare.";
 "privacy.cloud.feature.transcription" = "Trascrizione cloud";
 "privacy.cloud.feature.title" = "Titoli automatici";
 "privacy.cloud.feature.wiki" = "Wiki delle riunioni";
@@ -1662,6 +1664,13 @@
 "privacy.cloud.revoke_all_detail" = "Non viene più inviato nulla a questo fornitore, né su richiesta né automaticamente. Riepiloghi e Knowledge che lo usavano passano all’elaborazione sul dispositivo.";
 "privacy.cloud.audio" = "Invio audio";
 
+/* G1 destructive action confirmations */
+"detail.attachments.delete_confirm.title" = "Eliminare il documento?";
+"detail.attachments.delete_confirm.message" = "“%@” verrà rimosso definitivamente da questa riunione.";
+"settings.wiki_clear_confirm.title" = "Cancellare tutti gli articoli wiki?";
+"settings.wiki_clear_confirm.message" = "Tutti gli articoli wiki delle riunioni generati verranno rimossi da questo dispositivo. Rigenerarli chiama il fornitore IA configurato e può comportare costi.";
+"settings.semantic_clear_confirm.title" = "Cancellare l’indice di ricerca semantica?";
+"settings.semantic_clear_confirm.message" = "L’indice locale di ricerca semantica verrà rimosso. Puoi ricostruirlo su questo dispositivo in qualsiasi momento senza eliminare le riunioni.";
 /* Folder icon accessibility labels */
 "folder.icon.folder" = "Cartella";
 "folder.icon.briefcase" = "Lavoro";

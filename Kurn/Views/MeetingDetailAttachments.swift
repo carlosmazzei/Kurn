@@ -12,6 +12,7 @@
 //
 
 import KurnCore
+import SwiftData
 import SwiftUI
 
 extension MeetingDetailView {
@@ -33,11 +34,13 @@ extension MeetingDetailView {
             }
             .buttonStyle(.plain)
             .accessibilityHint(NSLocalizedString("detail.attachments.open_hint", comment: "Opens the document"))
+            .accessibilityIdentifier("detail.attachments.row")
             .clearListRow(insets: EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
             .swipeActions(edge: .trailing) {
-                Button(role: .destructive) { attachments.delete(attachment, context: modelContext) } label: {
+                Button(role: .destructive) { attachments.requestDelete(attachment) } label: {
                     Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
                 }
+                .accessibilityIdentifier("detail.attachments.delete")
             }
         }
         addAttachmentButton
@@ -69,12 +72,41 @@ extension MeetingDetailView {
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
-                    .foregroundStyle(Theme.textTertiary.opacity(0.4))
+                    .foregroundStyle(Theme.decorationTertiary.opacity(0.6))
             )
         }
         .buttonStyle(.plain)
         .disabled(attachments.isImporting)
         .accessibilityIdentifier("detail.attachments.add")
+    }
+}
+
+extension View {
+    /// Confirmation dialog before deleting a swiped PDF attachment (G1),
+    /// attached at the root of `MeetingDetailView` so the overlay is always
+    /// centered on screen even when the Documents section is scrolled partially
+    /// out of view.
+    func attachmentDeleteDialog(
+        attachments: MeetingAttachmentsViewModel,
+        modelContext: ModelContext
+    ) -> some View {
+        kurnDialog(
+            isPresented: Binding(
+                get: { attachments.pendingDelete != nil },
+                set: { if !$0 { attachments.cancelDelete() } }
+            ),
+            iconSystemName: "trash.circle.fill",
+            iconTint: Theme.warning,
+            title: NSLocalizedString("detail.attachments.delete_confirm.title", comment: "Delete attachment confirmation"),
+            message: String(
+                format: NSLocalizedString("detail.attachments.delete_confirm.message", comment: "Delete attachment message"),
+                attachments.pendingDelete?.displayName ?? ""
+            ),
+            primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
+            primaryRole: .destructive,
+            primaryAction: { attachments.confirmDelete(context: modelContext) },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
     }
 }
 

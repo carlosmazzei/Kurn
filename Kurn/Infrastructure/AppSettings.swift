@@ -460,9 +460,20 @@ final class AppSettings {
         didSet { defaults.set(lastSummaryTemplateID, forKey: Keys.lastSummaryTemplate) }
     }
 
+    /// Shared default `UserDefaults` backing `AppSettings` and services that
+    /// read settings directly. Resolves to `.standard` outside UI-test runs
+    /// and to the isolated UI-test suite when `UI-Testing-ResetDefaults` is set.
+    nonisolated static var defaultDefaults: UserDefaults {
+        #if DEBUG
+        UITestLaunchOptions.settingsDefaults()
+        #else
+        .standard
+        #endif
+    }
+
     init(
         cloudStore: CloudKeyValueStore = CloudSettingsSync.shared,
-        defaults: UserDefaults = .standard,
+        defaults: UserDefaults = AppSettings.defaultDefaults,
         credentials: CredentialStore = CredentialStore()
     ) {
         self.cloudStore = cloudStore
