@@ -483,14 +483,82 @@ hypothesis to confirm on a device before it becomes a change.
    sort choice as the first row of that sheet); ask a question 1 tap to open;
    read a meeting's wiki 2 taps with Knowledge off and 1 with it on (F4);
    export a meeting at least 4.
-4. **Usability test.** Five participants, seven tasks from the common-task list,
-   think-aloud, one participant using VoiceOver. Record completion without help,
-   time, wrong taps and the words people use for Wiki / Knowledge / Ask (this
-   settles F1 and F2). Bar: at least four of five complete each task unaided; a
-   task below that goes to the top of U1. Needs real users; Claude can write the
-   script and tabulate results but cannot run the sessions.
+4. **Expert review instead of user sessions.** There are no participants, so the
+   evidence is a structured review: a cognitive walkthrough of each common task
+   (at each step: will the person know what to do, see the control, link it to
+   their goal, and see progress), scored against Nielsen's ten heuristics and the
+   HIG principles with a 0–4 severity scale, by two reviewers (the maintainer and
+   Claude, independently, then reconciled). Then a one-week dogfood: the
+   maintainer does the seven tasks daily on a device, with screen recording
+   for the first run, and logs hesitations. The app has no analytics by design
+   (local-first), so nothing is measured remotely; TestFlight feedback is the only
+   outside signal. A review finds likely problems, it does not prove the
+   fixes help: treat every U1 change as a hypothesis and keep it small enough to
+   revert.
 Exit: findings table confirmed or dropped on a device, a signed-off glossary and
-icon catalog, a task baseline, and U1's order set by the test results.
+icon catalog, a task baseline, and U1's order set by the review's severity scores.
+
+### Design proposal (best practices, no user data)
+
+Built from widely documented patterns in apps known for being simple (Apple
+Voice Memos, Notes and Files; Things; Bear; and meeting tools such as Otter and
+Granola, which lead with the outcome rather than the recording). This is
+reasoning from how those apps are generally understood, not a measurement of
+them or of Kurn's users; none of it is verified against their current versions.
+Each rule names the Kurn evidence it answers.
+
+1. **One obvious thing per screen.** The meetings list is for finding and
+   starting; the one prominent control is Record (already true). The detail
+   screen exists to read the outcome. *Answers F4, F5.*
+2. **Outcome first.** Meeting detail always opens on Recordings
+   (`@State tab = .recordings`). Open on Summary when one exists, else on
+   Transcript, else on Recordings with its progress. People return to a meeting
+   to read what was decided, not to replay audio. Keep the last chosen tab per
+   meeting. *Answers the mode-count problem without removing a mode.*
+3. **A small app until the person opts in.** With Knowledge off (the default)
+   the app is Meetings, Ask and Documents: three places and Record. Knowledge
+   appears as a fourth place only when switched on, and never changes where
+   anything else lives (U1.1). Settings shows Knowledge as one row with its
+   toggle, not its controls, until it is on. *Answers F4.*
+4. **Plain words, one per idea.** Proposed vocabulary, to be confirmed in the
+   expert review and in all seven languages: **Ask** for every conversation
+   (the Chat tab becomes Ask); **Notes** for the meeting's condensed article
+   (the word "wiki" leaves the UI); **Knowledge** only for the cross-meeting
+   facts, with the entity page's generated paragraphs called **Overview**.
+   Avoid internal terms (compile, canonical, projection, harness) in any visible
+   string. *Answers F1, F2.*
+5. **Show state, do not ask about it.** Each list row says what is happening to
+   the meeting (recording, transcribing, summarizing, done, needs attention) in
+   words and a symbol, and tells what the person can do next. Progress and
+   failure copy follow "what happened, what it means, what to do"; errors that
+   have a fix already offer it (`ErrorRecovery`). *Builds on U1.6.*
+6. **Undo beats confirm for the reversible, confirm beats nothing for the
+   rest.** Deleting a meeting or recording already moves files to a trash
+   before the model changes; surface that as a visible "Recently deleted" with
+   a restore, and keep `kurnDialog` for what truly cannot come back (Delete all
+   data, Delete Knowledge). Check first what the trash retains and for how long.
+   *Answers F8.*
+7. **Defaults that work, advanced behind a door.** Presets for Transcription
+   (U1.5) and, in the same spirit, one-line summaries under each Settings row
+   ("Apple Speech, on this device") so the hub reads as the current setup, not
+   as a list of topics. *Answers the Settings count.*
+8. **Predictable modality.** Sheets for short tasks that return to where the
+   person was (pick, edit, confirm), pushes for going deeper (a meeting, a
+   document, an entity), a full-height sheet only for a long task (Ask). Every
+   sheet has an explicit Cancel/Done and the right detent. Knowledge reader and
+   Documents are "deeper" and should push; Ask is a task and stays a sheet.
+   *Answers F5, F6.*
+9. **Consistent glyph, label and place for an action everywhere** (the catalog in
+   U0b.2): Share is always `square.and.arrow.up`, an overflow menu is always
+   named for its content, destructive actions are always red and last.
+10. **Respect the system.** No custom chrome, native `Form`, `ContentUnavailableView`,
+   toolbars and sheets, so Dynamic Type, Voice Control and the Liquid Glass
+   settings keep working with no extra code (the Inherit tier).
+
+What this deliberately does not propose: onboarding tours, tooltips, gamification
+or in-app analytics. The first run should need none of them if rules 3 and 5
+hold; if the review disagrees, add one empty-state call to action rather than a
+tour.
 
 ### U1 · Simplify the structure (2 sprints)
 
