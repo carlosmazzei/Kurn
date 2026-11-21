@@ -40,6 +40,9 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
+                link(PrivacyCloudCopy.text("title"), systemImage: "lock.shield", identifier: "settings.link.privacyCloud") {
+                    PrivacyCloudSettingsView()
+                }
                 link(
                     NSLocalizedString("settings.providers", comment: "AI Providers"),
                     systemImage: "brain",
@@ -47,42 +50,8 @@ struct SettingsView: View {
                 ) {
                     ProvidersSettingsView()
                 }
-                link(
-                    NSLocalizedString("settings.summary", comment: "Summary"),
-                    systemImage: "sparkles",
-                    identifier: "settings.link.summary"
-                ) {
-                    SummarySettingsView()
-                }
-                link(
-                    NSLocalizedString("settings.semantic_search_title", comment: "Search and chat"),
-                    systemImage: "magnifyingglass",
-                    identifier: "settings.link.search"
-                ) {
-                    SemanticSearchSettingsView()
-                }
-                link(
-                    NSLocalizedString("settings.wiki_title", comment: "Meeting wiki"),
-                    systemImage: "book",
-                    identifier: "settings.link.wiki"
-                ) {
-                    WikiSettingsView()
-                }
-                link(KnowledgeSettingsCopy.text("title"), systemImage: "book.pages", identifier: "settings.link.knowledge") {
-                    KnowledgeSettingsView()
-                }
-                link(PrivacyCloudCopy.text("title"), systemImage: "lock.shield", identifier: "settings.link.privacyCloud") {
-                    PrivacyCloudSettingsView()
-                }
-                link(
-                    NSLocalizedString("settings.read_aloud.title", comment: "Read Aloud"),
-                    systemImage: "speaker.wave.2",
-                    identifier: "settings.link.readAloud"
-                ) {
-                    ReadAloudSettingsView()
-                }
             } header: {
-                Text(NSLocalizedString("settings.group.intelligence", comment: "Intelligence group"))
+                Text(PrivacyCloudCopy.text("title"))
             }
 
             Section {
@@ -106,6 +75,35 @@ struct SettingsView: View {
 
             Section {
                 link(
+                    NSLocalizedString("settings.summary", comment: "Summary"),
+                    systemImage: "sparkles",
+                    identifier: "settings.link.summary"
+                ) {
+                    SummarySettingsView()
+                }
+                link(KnowledgeSettingsCopy.text("title"), systemImage: "book.pages", identifier: "settings.link.knowledge") {
+                    KnowledgeSettingsView()
+                }
+                link(
+                    NSLocalizedString("settings.wiki_title", comment: "Meeting wiki"),
+                    systemImage: "book",
+                    identifier: "settings.link.wiki"
+                ) {
+                    WikiSettingsView()
+                }
+                link(
+                    NSLocalizedString("settings.read_aloud.title", comment: "Read Aloud"),
+                    systemImage: "speaker.wave.2",
+                    identifier: "settings.link.readAloud"
+                ) {
+                    ReadAloudSettingsView()
+                }
+            } header: {
+                Text(NSLocalizedString("settings.group.intelligence", comment: "Intelligence group"))
+            }
+
+            Section {
+                link(
                     NSLocalizedString("tag.title", comment: "Tags"),
                     systemImage: "tag",
                     identifier: "settings.link.tags"
@@ -113,16 +111,14 @@ struct SettingsView: View {
                     TagsSettingsView()
                 }
                 link(
-                    NSLocalizedString("usage_insights.title", comment: "Usage Insights"),
-                    systemImage: "chart.bar",
-                    identifier: "settings.link.usage"
+                    NSLocalizedString("settings.semantic_search_title", comment: "Search and chat"),
+                    systemImage: "magnifyingglass",
+                    identifier: "settings.link.search"
                 ) {
-                    UsageInsightsView()
+                    SemanticSearchSettingsView()
                 }
             } header: {
                 Text(NSLocalizedString("settings.group.library", comment: "Library group"))
-            } footer: {
-                Text(NSLocalizedString("usage_insights.footer", comment: "Explains local-only usage data"))
             }
 
             Section {
@@ -148,6 +144,13 @@ struct SettingsView: View {
                     DiagnosticsSettingsView()
                 }
                 link(
+                    NSLocalizedString("usage_insights.title", comment: "Usage Insights"),
+                    systemImage: "chart.bar",
+                    identifier: "settings.link.usage"
+                ) {
+                    UsageInsightsView()
+                }
+                link(
                     NSLocalizedString("settings.about", comment: "About"),
                     systemImage: "info.circle",
                     identifier: "settings.link.about"
@@ -156,6 +159,8 @@ struct SettingsView: View {
                 }
             } header: {
                 Text(NSLocalizedString("settings.group.system", comment: "System group"))
+            } footer: {
+                Text(NSLocalizedString("usage_insights.footer", comment: "Explains local-only usage data"))
             }
 
             Section {

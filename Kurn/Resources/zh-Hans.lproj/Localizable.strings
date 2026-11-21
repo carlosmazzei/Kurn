@@ -1653,8 +1653,10 @@
 "privacy.cloud.not_allowed" = "未允许";
 "privacy.cloud.removed_provider" = "已移除的提供商";
 "privacy.cloud.revoke_title" = "停止自动发送？";
+"privacy.cloud.revoke_text_title" = "停止自动发送文本？";
 "privacy.cloud.revoke_automatic" = "停止自动发送";
 "privacy.cloud.revoke_detail" = "云端转写、自动标题、Wiki、校正和 Knowledge 将停止向此提供商发送并对其关闭。按需请求摘要或聊天回答仍可使用。";
+"privacy.cloud.revoke_text_detail" = "自动标题、Wiki 和校正将对此提供商关闭，Knowledge 也将停止向其发送内容。云端转写的音频上传不受影响，请单独关闭。按需请求摘要或聊天回答仍可使用。";
 "privacy.cloud.feature.transcription" = "云端转写";
 "privacy.cloud.feature.title" = "自动标题";
 "privacy.cloud.feature.wiki" = "会议 Wiki";
