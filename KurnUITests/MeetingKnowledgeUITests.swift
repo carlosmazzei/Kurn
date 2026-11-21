@@ -149,6 +149,21 @@ final class MeetingKnowledgeUITests: XCTestCase {
         }
         XCTAssertFalse(app.navigationBars.buttons["meetings.record"].exists)
         capture(app, named: "knowledge-navigation-list-controls")
+        let firstCardBeforeSort = app.buttons["meetingCard"].firstMatch.label
+        actions.tap()
+        let sort = app.buttons["Sort"]
+        XCTAssertTrue(sort.waitForExistence(timeout: 5))
+        sort.tap()
+        let oldest = app.buttons["Oldest first"]
+        XCTAssertTrue(oldest.waitForExistence(timeout: 5))
+        oldest.tap()
+        XCTAssertNotEqual(app.buttons["meetingCard"].firstMatch.label, firstCardBeforeSort)
+        actions.tap()
+        XCTAssertTrue(sort.waitForExistence(timeout: 5))
+        sort.tap()
+        let newest = app.buttons["Newest first"]
+        XCTAssertTrue(newest.waitForExistence(timeout: 5))
+        newest.tap()
         library.tap()
         let favorites = app.buttons["library.bucket.favorites"]
         XCTAssertTrue(favorites.waitForExistence(timeout: 10))
@@ -199,7 +214,6 @@ final class MeetingKnowledgeUITests: XCTestCase {
         app.launchArguments += [
             "UI-Testing-Screenshots",
             "UI-Testing-DisableAnimations",
-            "-settings.knowledgeEnabled", "NO",
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US"
         ]
@@ -212,7 +226,26 @@ final class MeetingKnowledgeUITests: XCTestCase {
         let openSettings = app.buttons["knowledge.openSettings"]
         XCTAssertTrue(openSettings.waitForExistence(timeout: 5))
         openSettings.tap()
-        XCTAssertTrue(app.switches["knowledge.settings.enabled"].waitForExistence(timeout: 10))
+        let toggle = app.switches["knowledge.settings.enabled"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+        toggle.switches.firstMatch.tap()
+        let done = app.navigationBars.allElementsBoundByIndex.last?.buttons["Done"].firstMatch
+            ?? app.navigationBars.buttons["Done"].firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        done.tap()
+        XCTAssertTrue(app.buttons["knowledge.chooseSources"].waitForExistence(timeout: 10))
+        // Leave Knowledge off again so later tests in the same simulator shard
+        // still start from the default opt-in state.
+        closeSheet(app)
+        let settingsButton = app.buttons["nav.settings"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5))
+        settingsButton.tap()
+        let knowledgeRow = app.buttons["settings.link.knowledge"]
+        for _ in 0..<4 where !knowledgeRow.exists { app.swipeUp() }
+        XCTAssertTrue(knowledgeRow.waitForExistence(timeout: 5))
+        knowledgeRow.tap()
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+        toggle.switches.firstMatch.tap()
     }
 
     func testKnowledgeHomeUsesExplicitSourceSelection() throws {
