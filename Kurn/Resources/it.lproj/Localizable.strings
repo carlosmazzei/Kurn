@@ -1661,3 +1661,23 @@
 "privacy.cloud.revoke_all_title" = "Rimuovere tutte le autorizzazioni per questo fornitore?";
 "privacy.cloud.revoke_all_detail" = "Non viene più inviato nulla a questo fornitore, né su richiesta né automaticamente. Riepiloghi e Knowledge che lo usavano passano all’elaborazione sul dispositivo.";
 "privacy.cloud.audio" = "Invio audio";
+
+/* Folder icon accessibility labels */
+"folder.icon.folder" = "Cartella";
+"folder.icon.briefcase" = "Lavoro";
+"folder.icon.house" = "Casa";
+"folder.icon.people" = "Persone";
+"folder.icon.graduationcap" = "Istruzione";
+"folder.icon.heart" = "Salute";
+"folder.icon.star" = "Stella";
+"folder.icon.book" = "Libro";
+"folder.icon.document" = "Documento";
+"folder.icon.bookmark" = "Segnalibro";
+"folder.icon.bag" = "Acquisti";
+"folder.icon.airplane" = "Viaggio";
+"folder.icon.car" = "Trasporto";
+"folder.icon.gift" = "Regalo";
+"folder.icon.camera" = "Fotocamera";
+"folder.icon.pin" = "Puntina";
+"folder.icon.flag" = "Bandiera";
+"folder.icon.tag" = "Tag";

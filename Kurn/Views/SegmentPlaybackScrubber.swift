@@ -58,25 +58,32 @@ struct SegmentPlaybackScrubber: View {
                 Image(systemName: isPlaying ? "waveform" : "timer")
                     .font(Theme.caption2Emphasized)
                     .foregroundStyle(Theme.textTertiary)
+                    .accessibilityHidden(true)
                 Text("0:00")
                 Spacer(minLength: 8)
                 Button { onSkip(-AudioPlayerService.skipInterval) } label: {
                     Image(systemName: "gobackward.15")
+                        .accessibilityHidden(true)
                         .font(Theme.captionEmphasized)
                         .foregroundStyle(Theme.accent)
                         .frame(minWidth: 34)
                         .padding(.vertical, 3)
                         .background(Theme.fill, in: Capsule())
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(NSLocalizedString("detail.skip_backward", comment: "Skip back 15 seconds"))
                 Button { onSkip(AudioPlayerService.skipInterval) } label: {
                     Image(systemName: "goforward.15")
+                        .accessibilityHidden(true)
                         .font(Theme.captionEmphasized)
                         .foregroundStyle(Theme.accent)
                         .frame(minWidth: 34)
                         .padding(.vertical, 3)
                         .background(Theme.fill, in: Capsule())
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(NSLocalizedString("detail.skip_forward", comment: "Skip forward 15 seconds"))
@@ -88,6 +95,7 @@ struct SegmentPlaybackScrubber: View {
                                 .scaleEffect(0.5)
                         } else {
                             Image(systemName: "sparkles")
+                                .accessibilityHidden(true)
                                 .font(Theme.caption2Emphasized)
                                 .foregroundStyle(isEnhanced ? Theme.accent : Theme.textTertiary)
                         }
@@ -95,6 +103,8 @@ struct SegmentPlaybackScrubber: View {
                     .frame(minWidth: 34)
                     .padding(.vertical, 3)
                     .background(Theme.fill, in: Capsule())
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(isEnhancing)
@@ -113,6 +123,8 @@ struct SegmentPlaybackScrubber: View {
                         .frame(minWidth: 34)
                         .padding(.vertical, 3)
                         .background(Theme.fill, in: Capsule())
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(NSLocalizedString("detail.playback_speed", comment: "Playback speed"))

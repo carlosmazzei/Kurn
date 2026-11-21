@@ -1661,3 +1661,23 @@
 "privacy.cloud.revoke_all_title" = "移除此提供商的所有权限？";
 "privacy.cloud.revoke_all_detail" = "将不再向此提供商发送任何内容，无论按需还是自动。使用它的摘要和 Knowledge 将改为在设备端处理。";
 "privacy.cloud.audio" = "音频上传";
+
+/* Folder icon accessibility labels */
+"folder.icon.folder" = "文件夹";
+"folder.icon.briefcase" = "工作";
+"folder.icon.house" = "家庭";
+"folder.icon.people" = "人员";
+"folder.icon.graduationcap" = "教育";
+"folder.icon.heart" = "健康";
+"folder.icon.star" = "星标";
+"folder.icon.book" = "书籍";
+"folder.icon.document" = "文档";
+"folder.icon.bookmark" = "书签";
+"folder.icon.bag" = "购物";
+"folder.icon.airplane" = "旅行";
+"folder.icon.car" = "交通";
+"folder.icon.gift" = "礼物";
+"folder.icon.camera" = "相机";
+"folder.icon.pin" = "图钉";
+"folder.icon.flag" = "旗帜";
+"folder.icon.tag" = "标签";

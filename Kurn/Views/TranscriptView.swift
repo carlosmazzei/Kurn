@@ -30,14 +30,12 @@ struct TranscriptView: View {
     /// photo marker entirely, so call sites that don't pass `photos` don't
     /// need to pass this either.
     var onShowPhoto: ((MeetingPhoto) -> Void)?
+    @ScaledMetric(relativeTo: .caption2) private var avatarSize: CGFloat = 26
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(segments) { segment in
                 segmentRow(segment)
-                    .contentShape(Rectangle())
-                    .onTapGesture { onSeek(segment.startTime) }
-                    .accessibilityAddTraits(.isButton)
             }
         }
     }
@@ -53,19 +51,31 @@ struct TranscriptView: View {
 
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                ZStack {
-                    Circle().fill(color.opacity(0.2)).frame(width: 26, height: 26)
-                    // Fixed size to fit the fixed 26x26 avatar circle.
-                    Text(String(name.prefix(1)).uppercased())
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(color)
+                Button {
+                    onSeek(segment.startTime)
+                } label: {
+                    HStack(spacing: 8) {
+                        ZStack {
+                            Circle().fill(color.opacity(0.2)).frame(width: avatarSize, height: avatarSize)
+                            Text(String(name.prefix(1)).uppercased())
+                                .font(Theme.caption2Emphasized)
+                                .foregroundStyle(color)
+                        }
+                        .accessibilityHidden(true)
+                        Text(name)
+                            .font(Theme.footnoteEmphasized)
+                            .foregroundStyle(color)
+                        Text((segment.startTime + offset).clockDisplay)
+                            .font(Theme.caption2)
+                            .foregroundStyle(Theme.textTertiary)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                 }
-                Text(name)
-                    .font(Theme.footnoteEmphasized)
-                    .foregroundStyle(color)
-                Text((segment.startTime + offset).clockDisplay)
-                    .font(Theme.caption2)
-                    .foregroundStyle(Theme.textTertiary)
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .combine)
+
                 ForEach(matchingHighlights) { highlight in
                     Button {
                         onSeek(highlight.timestamp)
@@ -73,6 +83,8 @@ struct TranscriptView: View {
                         Image(systemName: "bookmark.fill")
                             .font(.caption2)
                             .foregroundStyle(Theme.warning)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(NSLocalizedString("transcript.jump_to_highlight", comment: "Jump to highlight"))
@@ -84,17 +96,25 @@ struct TranscriptView: View {
                         Image(systemName: "camera.fill")
                             .font(.caption2)
                             .foregroundStyle(Theme.accent)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(NSLocalizedString("transcript.view_photo", comment: "View photo"))
                 }
-                Spacer()
             }
-            Text(segment.text)
-                .font(Theme.subheadline)
-                .foregroundStyle(Theme.textPrimary.opacity(0.85))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 34)
+            Button {
+                onSeek(segment.startTime)
+            } label: {
+                Text(segment.text)
+                    .font(Theme.subheadline)
+                    .foregroundStyle(Theme.textPrimary.opacity(0.85))
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .padding(.leading, 34)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
         .padding(10)
         .background(

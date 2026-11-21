@@ -127,7 +127,8 @@ struct FilterChip: View {
         Button(action: action) {
             Text(title)
                 .font(.system(.footnote, design: .default, weight: isSelected ? .semibold : .regular))
-                .lineLimit(1)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 6)
                 .foregroundStyle(isSelected ? selectedForeground : Theme.textSecondary)
@@ -135,6 +136,8 @@ struct FilterChip: View {
                     isSelected ? AnyShapeStyle(selectedBackground) : AnyShapeStyle(Theme.fill),
                     in: Capsule()
                 )
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -210,9 +213,8 @@ struct KurnDialogModifier: ViewModifier {
                     Circle()
                         .fill(iconTint.opacity(0.14))
                         .frame(width: 36, height: 36)
-                    // Fixed size to fit the fixed 36x36 icon well.
                     Image(systemName: iconSystemName)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(Theme.calloutEmphasized)
                         .foregroundStyle(iconTint)
                 }
 
