@@ -463,6 +463,42 @@ hypothesis to confirm on a device before it becomes a change.
 | F8 | Delete is spread over 14 trash glyphs, 21 destructive roles and 8 swipe actions | `grep` | Check each goes through `kurnDialog` and says what is deleted; add undo where the data model allows it (the cognitive-accessibility rule) |
 | F9 | 11 `ContentUnavailableView` empty states in 9 files, consistent with the convention | `grep` | Confirm each offers the next action, not only a description |
 
+**Conformity check of every button, menu and screen (static, 2026-11-21)**
+
+Scripted greps and reads over `Kurn/Views` and `Kurn/ViewModels` against
+`Theme.swift`'s "Button language" and "Modal weight", the HIG tap-target and
+layering rules and the accessibility rules in `CLAUDE.md`. It finds what the
+source shows; it does not replace the device pass (U5), and it does not check
+contrast of composited surfaces, the single-primary-action rule per screen, or
+VoiceOver order.
+
+| # | Result | Where | Fix (phase) |
+| --- | --- | --- | --- |
+| G1 | **Destructive action with no confirmation, three places.** Swipe-delete of an attached PDF; "Clear wiki" (costs paid LLM calls to regenerate); "Clear index" (local, rebuildable). The summary delete does confirm (`pendingDeleteSummary`) | `MeetingDetailAttachments.swift:38`, `WikiSettingsView.swift:97`, `SemanticSearchSettingsView.swift:61` | `kurnDialog` naming what is lost and what regenerating costs, or undo from the trash for the PDF (U1, rule 6) |
+| G2 | **Tap targets under 44 pt with no `contentShape`:** pause, stop and the other transcription controls in recording rows (30 pt, 5 places) and the 34 pt play button; photo-capture controls (36–40 pt); a 36 pt control in `DesignComponents`; 32–40 pt swatches in the folder form and template editor | `RecordingSegmentRow.swift:42,105–167`, `PhotoCaptureView.swift:153,215,290`, `DesignComponents.swift:212`, `FolderFormView.swift:53,101`, `TemplateEditorView.swift:22` | Keep the glyph, extend the hit area to 44 × 44 with `contentShape` and padding; the audit's `.hitRegion` should then pass (U3.4) |
+| G3 | **System colours instead of tokens for status:** `.green`, `.red`, `.orange`, `.yellow` in Storage, Health, the language picker and photo capture, although `Theme.success` and `Theme.warning` exist. Those two tokens are only 1.9:1 and 2.1:1 on white (8.9:1 and 8.3:1 on `#1C1C1E`), so as light-mode icons they fall under the 3:1 non-text minimum; the status glyphs also carry a symbol, so colour is not the only cue | `StorageSettingsView.swift:278,290,302`, `HealthRecoveryView+Sections.swift:154,184`, `StorageSettingsSections.swift:101`, `LanguagePickerRow.swift:24`, `PhotoCaptureView.swift:289` | Route through `Theme` and give success/warning light-mode variants that reach 3:1 for glyphs and 4.5:1 for text (U2) |
+| G4 | **Sheet size:** about 59 presentations, and only 12 files set `presentationDetents`. Short forms with none: filter bar, tag editor, tag merge, folder form, folder picker, knowledge meeting selection, chat source sheet. Settings or call sites may set them elsewhere, so confirm each on a device | `FilterBarView`, `TagEditorView`, `TagMergeView`, `FolderFormView`, `FolderPickerView`, `KnowledgeMeetingSelectionView`, `ChatSourceSheet` | `.medium`/`[.medium, .large]` per "Modal weight" (U1, rule 8) |
+| G5 | **Sheet chrome to confirm:** `TranscriptionSettingsView`, `MeetingChatView` and `MeetingWikiView` are presented as sheets but their own files hold no `NavigationStack`; the host may supply it | those files | Confirm each has a title and an explicit Cancel/Done on a device (U0b.1) |
+| G6 | **Button styles in use:** `.plain` 85, `.borderless` 16, `.glassProminent` 12, `.bordered` 9, `.glass` 4. `.borderless` is outside the table; whether each screen has exactly one prominent action was not checked | `grep` | Add `.borderless` to the table with its reason; check one prominent action per screen in the pattern table (U0b.1) |
+| G7 | **Menus:** 29. Only the meetings list toolbar was read for labels. The detail overflow menu is "More options" (ambiguous for Voice Control) and uses the `ellipsis` glyph as a loading label three times | `MeetingDetailToolbar.swift` | Name by content, `ProgressView` for loading, `accessibilityInputLabels` (U1.2, U4.4) |
+| G8 | **Passes:** no unlocalized literal titles in `Label`, `Button`, `Toggle`, `Section`, `NavigationLink` or `navigationTitle` (the 14 bare `Text("\(n)")` are numbers); Liquid Glass appears only on the recording mini bar (a control); 11 empty states use `ContentUnavailableView`; section labels carry `isHeader`; the lint rules for labels and traits are errors in CI | `grep` | Keep; the static policy should stop a regression |
+
+**Recommendation register** (what to do, in order; each maps to a phase above)
+1. U0 and U0b: widen the audit, audit at AX5, add the missing screens, and run the
+   walkthrough with the table above as the starting list.
+2. G1 first: it is the only finding that can lose user data or money.
+3. U2: fix `textTertiary` (2.45:1), route status colours through `Theme` with
+   light-mode variants (G3), add the display-setting tokens.
+4. U3: hit areas (G2), then the fixed fonts, `lineLimit(1)`, fixed heights.
+5. U1: one list toolbar (Select stays a button, Sort into Filter), menu and
+   Settings reductions, sheet detents (G4), the vocabulary (Wiki, Knowledge, Ask;
+   no "Notes") and one icon per concept.
+6. U4: structure, announcements, Voice Control labels, motion.
+7. U5: device certification before any Nutrition Label is declared.
+8. Static policy: reject a duplicate catalog glyph, a bare `withAnimation` in
+   `Views/`, a destructive role with no confirmation, and a raw system status
+   colour in `Views/` (each as its own rule, with a baseline that only shrinks).
+
 **Work**
 1. **Pattern table per screen** (meetings list, meeting detail and its five modes,
    recorder, Ask, Documents, Knowledge reader, Settings screens): primary
