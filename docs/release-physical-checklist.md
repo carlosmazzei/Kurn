@@ -84,6 +84,30 @@ the release the same as a failed CI job would.
       cancelling doesn't leave the app in a stuck "downloading forever" or
       falsely-installed state.
 
+## Common-task accessibility certification (U0.4 / U5)
+
+Nutrition Labels (`fastlane/accessibility.json`) may only be declared for
+features where every task below is completed end to end on a physical device
+with VoiceOver + Screen Curtain, and then with Voice Control alone:
+
+- [ ] Record and stop: start a recording from the meetings list, pause/resume,
+      and stop and save.
+- [ ] Find a meeting: filter or search for a meeting and open its detail screen.
+- [ ] Read a summary: navigate to the Summary tab and read its sections.
+- [ ] Ask a question: open Ask, submit a question against authorized sources,
+      and read the cited answer.
+- [ ] Export a meeting: export/share a meeting transcript or summary.
+- [ ] Export Knowledge: enable Knowledge export in Settings → Knowledge (with
+      re-authentication) and export a `kurn.knowledge-export` JSON file from
+      the Knowledge browser via `fileExporter`.
+- [ ] Read a generated note and open its claims: open a Knowledge entity page,
+      read the generated narrative ("Notes"), expand its "Based on N claims"
+      disclosure, and inspect the underlying claims/evidence.
+- [ ] Change provider: open Settings → AI Providers and switch or configure
+      the active provider.
+- [ ] Delete: delete a meeting or clear Knowledge data and confirm the
+      confirmation dialog and deletion outcome.
+
 ## Recording this checklist's own result
 
 This file has no CI job of its own — a maintainer runs it by hand and

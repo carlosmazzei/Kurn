@@ -217,6 +217,7 @@ jobs:
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
             -only-testing:KurnUITests \
             -skip-testing:KurnUITests/ScreenshotUITests \
+            -skip-testing:KurnUITests/AccessibilityBaselineUITests \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 240 \
             -maximum-test-execution-time-allowance 600 \
@@ -241,6 +242,46 @@ jobs:
           name: ui-flake-result-${{ matrix.attempt }}
           path: ${{ runner.temp }}/result/ui-flake-attempt-${{ matrix.attempt }}.txt
           retention-days: 14
+
+  # U0.1: Widened accessibility audit across all six XCTest audit categories
+  # at default and AX5 text sizes. Kept outside the required PR shards and
+  # ui-flake-rate until its findings are resolved in U2–U4 and U5 promotes it.
+  accessibility-baseline:
+    runs-on: macos-26
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - uses: ./.github/actions/prepare-simulator
+
+      - uses: ./.github/actions/cache-spm-packages
+
+      - name: Run widened accessibility audit
+        run: |
+          xcodebuild \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "$IOS_DESTINATION" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
+            -only-testing:KurnUITests/AccessibilityBaselineUITests \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 240 \
+            -maximum-test-execution-time-allowance 600 \
+            clean test
+
+      - name: Collect failure diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-failure-diagnostics
+        with:
+          artifact-name: accessibility-baseline-failure-diagnostics
 
   # Counts and reports without retrying; preserves failures from every job.
   hardening-summary:
