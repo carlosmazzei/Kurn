@@ -102,19 +102,24 @@ final class SemanticIndexCoordinator {
     }
 
     /// Re-index every meeting from scratch (Settings → Rebuild index),
-    /// replacing each meeting's passages only after its new embeddings succeed
-    /// and pruning orphaned passages so an interrupted rebuild preserves the
-    /// existing index. Ignores the enabled toggle so the user can rebuild even
-    /// while deciding whether to keep the feature on.
+    /// replacing each meeting's passages only after its new embeddings succeed,
+    /// so an interrupted rebuild preserves the existing index. Passages whose
+    /// source recording no longer exists (or no longer has a transcript) are
+    /// pruned up front, so deleted text can never survive a failed rebuild.
+    /// Ignores the enabled toggle so the user can rebuild even while deciding
+    /// whether to keep the feature on.
     func rebuild() async {
         let allMeetings = (try? modelContext.fetch(FetchDescriptor<Meeting>())) ?? []
-        let activeMeetingIDs = Set(allMeetings.filter(\.hasAnyTranscript).map(\.id))
-        let staleOrOrphaned = ((try? modelContext.fetch(FetchDescriptor<SemanticChunk>())) ?? []).filter { chunk in
-            guard let meetingID = chunk.meeting?.id else { return true }
-            return !activeMeetingIDs.contains(meetingID)
+        let transcribedRecordingIDs = Set(allMeetings.flatMap { meeting in
+            meeting.recordings
+                .filter { !($0.transcript?.segments.isEmpty ?? true) }
+                .map(\.id)
+        })
+        let stale = ((try? modelContext.fetch(FetchDescriptor<SemanticChunk>())) ?? []).filter { chunk in
+            chunk.meeting == nil || !transcribedRecordingIDs.contains(chunk.recordingID)
         }
-        if !staleOrOrphaned.isEmpty {
-            for chunk in staleOrOrphaned { modelContext.delete(chunk) }
+        if !stale.isEmpty {
+            for chunk in stale { modelContext.delete(chunk) }
             persist()
         }
         for meeting in allMeetings where meeting.hasAnyTranscript {

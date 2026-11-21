@@ -231,4 +231,31 @@ struct SemanticIndexCoordinatorTests {
         #expect(meeting.semanticChunks.count == 1)
         #expect(harness.coordinator.indexedChunkCount() == 1)
     }
+
+    @Test func rebuildDropsPassagesOfADeletedRecordingEvenWhenEmbedderFails() async throws {
+        let harness = Harness()
+        let meeting = MeetingFixtures.transcribed("Planning", in: harness.context)
+        let kept = try #require(meeting.recordings.first)
+        let removed = Recording(meeting: meeting, fileName: "\(UUID().uuidString).m4a", duration: 60, transcriptionStatus: .done)
+        harness.context.insert(removed)
+        let transcript = Transcript(
+            recording: removed,
+            segments: [TranscriptSegment(speakerLabel: "Speaker 2", startTime: 0, endTime: 4, text: "secret morning plan")],
+            language: "en"
+        )
+        harness.context.insert(transcript)
+        removed.transcript = transcript
+        try harness.context.save()
+        await harness.coordinator.index(meeting)
+        #expect(Set(meeting.semanticChunks.map(\.recordingID)) == [kept.id, removed.id])
+
+        harness.context.delete(removed)
+        try harness.context.save()
+        harness.embedder.fail(with: EmbedderDown())
+        await harness.coordinator.rebuild()
+
+        #expect(!meeting.semanticChunks.isEmpty)
+        #expect(meeting.semanticChunks.allSatisfy { $0.recordingID == kept.id })
+        #expect(!meeting.semanticChunks.contains { $0.text.contains("secret morning plan") })
+    }
 }

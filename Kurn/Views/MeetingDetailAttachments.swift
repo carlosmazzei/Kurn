@@ -34,6 +34,7 @@ extension MeetingDetailView {
             }
             .buttonStyle(.plain)
             .accessibilityHint(NSLocalizedString("detail.attachments.open_hint", comment: "Opens the document"))
+            .accessibilityIdentifier("detail.attachments.row")
             .clearListRow(insets: EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
             .swipeActions(edge: .trailing) {
                 Button(role: .destructive) { attachments.requestDelete(attachment) } label: {
