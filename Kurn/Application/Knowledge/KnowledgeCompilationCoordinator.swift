@@ -41,7 +41,8 @@ final class KnowledgeCompilationCoordinator {
 
     /// The local policy follows the shared cloud-consent ledger (CLAUDE.md,
     /// "Cloud consent"): it names every remote provider the person allowed,
-    /// for `.internal` sources. Its revision stays the default's: the provider
+    /// for `.internal` sources, and allows `.export` only while Knowledge export
+    /// is turned on (K6.2). Its revision stays the default's: the provider
     /// set changes no derived content, so a new grant must not hide Knowledge
     /// compiled under the previous set, and every egress is re-checked live
     /// against the ledger (extraction needs the automatic grant at submission,
@@ -50,10 +51,12 @@ final class KnowledgeCompilationCoordinator {
         let remote = settings.providers
             .filter { $0.kind != .appleOnDevice && settings.allowsCloud($0, for: .onRequest) }
             .map(\.id)
-        guard !remote.isEmpty else { return .defaultDeny(id: localPolicyID) }
+        let export = settings.knowledgeExportEnabled
+        guard !remote.isEmpty || export else { return .defaultDeny(id: localPolicyID) }
         return KnowledgeProcessingPolicy(id: localPolicyID, revision: KnowledgeProcessingPolicy.defaultDeny().revision,
-            allowedRemoteProviderIDs: Set(remote), allowedOperations: KnowledgeProcessingPolicy.onDeviceOperations,
-            maxRemoteClassification: .internal)
+            allowedRemoteProviderIDs: Set(remote),
+            allowedOperations: KnowledgeProcessingPolicy.onDeviceOperations.union(export ? [.export] : []),
+            maxRemoteClassification: remote.isEmpty ? nil : .internal, exportAllowed: export)
     }
 
     /// Whether Ask may send knowledge to this provider: the on-request grant.

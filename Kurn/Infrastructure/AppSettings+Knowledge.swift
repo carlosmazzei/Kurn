@@ -22,6 +22,21 @@ extension AppSettings {
         }
     }
 
+    /// Whether the Knowledge browser may write an export bundle (K6.2). Off by default; it
+    /// becomes the local policy's `exportAllowed`, so `KnowledgePolicyEvaluator` refuses
+    /// `.export` while it is off.
+    var knowledgeExportEnabled: Bool {
+        get {
+            access(keyPath: \.knowledgeExportEnabled)
+            return defaults.bool(forKey: Keys.knowledgeExportEnabled)
+        }
+        set {
+            withMutation(keyPath: \.knowledgeExportEnabled) {
+                defaults.set(newValue, forKey: Keys.knowledgeExportEnabled)
+            }
+        }
+    }
+
     /// Missing preferences use safe defaults. Corrupt/future preferences stay
     /// unreadable so an upgrade never silently widens the selected source ACL.
     var knowledgeControls: KnowledgeControls? {
@@ -42,6 +57,7 @@ extension AppSettings {
 
     func resetKnowledgeControls() throws {
         knowledgeEnabled = false
+        knowledgeExportEnabled = false
         var controls = KnowledgeControls()
         controls.generation = UUID().uuidString
         let data = try controls.encoded()

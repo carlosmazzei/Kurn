@@ -2,6 +2,7 @@ import Combine
 import CoreData
 import KurnCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// An explicitly scoped reader/search stack, shared by meeting entry and the
 /// library's Knowledge sheet. Navigation carries IDs, never cached search text.
@@ -24,6 +25,8 @@ struct KnowledgeBrowserView: View {
     @State private var showingReview = false
     @State private var graphService = KnowledgeGraphQueryService()
     @State private var entityAsk: KnowledgeEntityAskRequest?
+    @State private var exportDocument: KnowledgeExportDocument?
+    @State private var exportFailed = false
     @Environment(ChatConversationHost.self) private var conversations: ChatConversationHost?
 
     init(meetingIDs: Set<UUID>, initialEntityID: UUID? = nil, initialEvidenceSelection: KnowledgeEvidenceSelection? = nil,
@@ -40,6 +43,16 @@ struct KnowledgeBrowserView: View {
         meetingIDs.map(\.uuidString).sorted().joined(separator: ",") + ":\(path):\(refresh)"
     }
     private var searchKey: String { "\(requestKey):\(settings.semanticSearchEnabled):\(searchRevision)" }
+    private func exportKnowledge() {
+        Task {
+            do {
+                exportDocument = KnowledgeExportDocument(data: try await coordinator.exportKnowledge(meetingIDs: meetingIDs))
+            } catch {
+                exportFailed = true
+            }
+        }
+    }
+
     private var state: KnowledgeBrowserLoadState {
         settings.knowledgeEnabled ? model.presentation(meetingIDs: meetingIDs, selection: selection) : .unavailable
     }
@@ -71,6 +84,14 @@ struct KnowledgeBrowserView: View {
                             Button { showingReview = true } label: { Label(KnowledgeReviewCopy.text("title"), systemImage: "tray.full") }
                                 .accessibilityIdentifier("knowledge.review.open")
                         }
+                        if settings.knowledgeExportEnabled {
+                            ToolbarItem(placement: .primaryAction) {
+                                Button { exportKnowledge() } label: {
+                                    Label(KnowledgeBrowserCopy.text("export"), systemImage: "square.and.arrow.up")
+                                }
+                                .accessibilityIdentifier("knowledge.browser.export")
+                            }
+                        }
                         ToolbarItem(placement: .primaryAction) {
                             Button { invalidateAndRefresh() } label: { Label(KnowledgeBrowserCopy.text("refresh"), systemImage: "arrow.clockwise") }
                                 .accessibilityIdentifier("knowledge.browser.refresh")
@@ -84,6 +105,12 @@ struct KnowledgeBrowserView: View {
             }
         }
         .sheet(isPresented: $showingReview) { KnowledgeReviewInboxView(meetingIDs: meetingIDs) }
+        // A save to a chosen location, never the generic share sheet (private-corporate boundary).
+        .fileExporter(isPresented: Binding(get: { exportDocument != nil }, set: { if !$0 { exportDocument = nil } }),
+                      document: exportDocument, contentType: .json, defaultFilename: "Knowledge") { result in
+            if case .failure = result { exportFailed = true }
+        }
+        .alert(KnowledgeBrowserCopy.text("export_failed"), isPresented: $exportFailed) {}
         .sheet(item: $entityAsk) { request in
             NavigationStack {
                 MeetingChatView(meeting: nil, conversation: request.conversation, initialScope: request.scope,
@@ -275,4 +302,19 @@ struct KnowledgeHomeView: View {
             .accessibilityIdentifier("knowledge.browser.home")
         }
     }
+}
+
+/// The K6.2 export bundle as a JSON document for `fileExporter`.
+struct KnowledgeExportDocument: FileDocument {
+    static let readableContentTypes: [UTType] = [.json]
+    let data: Data
+
+    init(data: Data) { self.data = data }
+
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents else { throw CocoaError(.fileReadCorruptFile) }
+        self.data = data
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) }
 }

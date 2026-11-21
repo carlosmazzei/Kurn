@@ -120,6 +120,9 @@ struct KnowledgeSettingsView: View {
                     .disabled(!settings.knowledgeEnabled).accessibilityIdentifier("knowledge.settings.automatic")
                 Toggle(KnowledgeSettingsCopy.text("pause"), isOn: binding(controls, \.isPaused))
                     .disabled(!settings.knowledgeEnabled).accessibilityIdentifier("knowledge.settings.paused")
+                Toggle(KnowledgeSettingsCopy.text("export"), isOn: Binding(get: { settings.knowledgeExportEnabled },
+                                                                           set: { settings.knowledgeExportEnabled = $0 }))
+                    .disabled(!settings.knowledgeEnabled).accessibilityIdentifier("knowledge.settings.export")
                 Picker(KnowledgeSettingsCopy.text("provider"), selection: Binding(
                     get: { controls.providerID },
                     set: { id in choose(id, controls: controls) }
