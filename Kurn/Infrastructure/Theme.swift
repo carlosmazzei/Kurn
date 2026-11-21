@@ -60,7 +60,7 @@ enum Theme {
         if t.userInterfaceStyle == .dark {
             return UIColor.white.withAlphaComponent(t.accessibilityContrast == .high ? 0.88 : 0.74)
         }
-        return t.accessibilityContrast == .high ? UIColor(rgb: 0x3A3A3E) : UIColor.secondaryLabel
+        return t.accessibilityContrast == .high ? UIColor(rgb: 0x3A3A3E) : UIColor(rgb: 0x48484D)
     })
     /// Secondary/metadata text token guaranteed to meet >= 4.5:1 contrast on
     /// both `background` and `surface` in dark and light appearances.
