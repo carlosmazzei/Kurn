@@ -61,10 +61,10 @@ public enum KnowledgeNarrativePrompt {
             let text = pattern.stringByReplacingMatches(in: block, range: range, withTemplate: "")
                 .split(whereSeparator: \.isWhitespace).joined(separator: " ")
                 .replacingOccurrences(of: " .", with: ".").replacingOccurrences(of: " ,", with: ",")
-            guard !cited.isEmpty, !text.isEmpty, text.utf8.count <= paragraphByteLimit,
+            guard !cited.isEmpty, cited.count <= citationLimit, !text.isEmpty, text.utf8.count <= paragraphByteLimit,
                   bytes + text.utf8.count <= byteLimit else { continue }
             bytes += text.utf8.count
-            paragraphs.append(.init(text: text, assertionIDs: Array(cited.prefix(citationLimit))))
+            paragraphs.append(.init(text: text, assertionIDs: cited))
         }
         return paragraphs.isEmpty ? nil : KnowledgeWikiNarrative(entityID: entityID, paragraphs: paragraphs)
     }

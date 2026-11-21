@@ -40,6 +40,12 @@ struct KnowledgeNarrativePromptTests {
         #expect(try KnowledgeWikiProjector.project(snapshot, narratives: [narrative]).first?.narrative == narrative)
     }
 
+    @Test func aParagraphCitingMoreThanTheLimitIsDroppedNotTruncated() {
+        let references = Dictionary(uniqueKeysWithValues: (1...17).map { ("c\($0)", UUID()) })
+        let output = "Too many " + (1...17).map { "[c\($0)]" }.joined() + "."
+        #expect(KnowledgeNarrativePrompt.parse(output, entityID: project, references: references) == nil)
+    }
+
     @Test func outputWithoutCitationsGivesNoNarrative() throws {
         #expect(KnowledgeNarrativePrompt.parse("Nothing cited here.", entityID: project, references: ["c1": UUID()]) == nil)
         #expect(KnowledgeNarrativePrompt.request(KnowledgeWikiPage(entity: .init(id: project, kind: .project, name: "Empty"),
