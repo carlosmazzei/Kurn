@@ -16,7 +16,7 @@ struct KnowledgeNarrativePromptTests {
                         attributedSpeaker: "Speaker 1")]))
         }
         let pages = try KnowledgeWikiProjector.project(.init(revision: 1, entities: [entity], facts: claims == 2 ? [fact("open"), fact("blocked")]
-            : (0..<claims).map { fact("state\($0)", at: 1_000 + TimeInterval($0)) }))
+            : (0..<claims).map { fact($0.isMultiple(of: 2) ? "open" : "blocked", at: 1_000 + TimeInterval($0)) }))
         return try #require(pages.first)
     }
 
