@@ -75,12 +75,16 @@ struct KnowledgeDeletionCoordinatorTests {
             try? context.transaction { context.insert(Meeting(title: "Synthetic save")) }
             posted.signal()
         }
-        let result = posted.wait(timeout: .now() + 30)
+        let result = Self.wait(posted, seconds: 30)
         print("DIAG-SAVE blocked finished=\(result == .success) elapsed=\(ContinuousClock.now - blocked)")
         if result == .timedOut {
-            while posted.wait(timeout: .now()) == .timedOut { try? await Task.sleep(for: .milliseconds(10)) }
+            while Self.wait(posted, seconds: 0) == .timedOut { try? await Task.sleep(for: .milliseconds(10)) }
             print("DIAG-SAVE blocked completed after unblocking elapsed=\(ContinuousClock.now - blocked)")
         }
+    }
+
+    private static func wait(_ semaphore: DispatchSemaphore, seconds: Double) -> DispatchTimeoutResult {
+        semaphore.wait(timeout: .now() + seconds)
     }
 
     /// Blocks the main thread, as a store transaction running on it does.
