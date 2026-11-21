@@ -199,7 +199,7 @@ final class AccessibilityBaselineUITests: XCTestCase {
         let done = app.navigationBars.buttons["Done"].firstMatch
         XCTAssertTrue(done.waitForExistence(timeout: 10), "Missing Knowledge reader Done button")
         done.tap()
-        XCTAssertTrue(app.buttons["root.destination.meetings"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["root.destination.knowledge"].waitForExistence(timeout: 10))
         audit(app, screen: "MeetingsList+KnowledgeOn", sizeLabel: sizeLabel)
 
         openFirstMeeting(app)

@@ -290,6 +290,7 @@
 "meetings.delete.confirm" = "删除此会议及其录音？";
 "meetings.rename" = "重命名";
 "meetings.sort" = "排序";
+"meetings.list_actions" = "列表选项";
 "meetings.sort.date_newest" = "最新优先";
 "meetings.sort.date_oldest" = "最早优先";
 "meetings.sort.title_az" = "标题 A–Z";
@@ -1552,6 +1553,8 @@
 // Knowledge source selection
 "knowledge.browser.choose_sources" = "选择会议";
 "knowledge.browser.choose_sources_detail" = "最多选择 16 场会议以浏览其知识。";
+"knowledge.browser.disabled_title" = "Knowledge 已关闭";
+"knowledge.browser.disabled_detail" = "请在设置 → Knowledge 中开启 Knowledge，以跨会议整理实体、决策和依据。";
 
 /* Local, source-authorized Knowledge search. */
 "knowledge.browser.search_prompt" = "搜索名称、别名和论断";

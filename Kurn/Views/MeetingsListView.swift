@@ -399,7 +399,7 @@ struct MeetingsListView: View {
             showingKnowledge = true
         }
         .onChange(of: settings.knowledgeEnabled) { _, enabled in
-            if !enabled { showingKnowledge = false; knowledgeSourceIDs = [] }
+            if !enabled { knowledgeSourceIDs = [] }
         }
         .task(id: searchText) { await runSemanticSearch() }
         .kurnDialog(

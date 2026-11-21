@@ -18,10 +18,16 @@ final class BulkSelectionFlowUITests: FlowUITestCase {
 
     private var cards: XCUIElementQuery { app.buttons.matching(identifier: "meetingCard") }
 
-    /// Enters selection mode from the toolbar and waits for its chrome.
+    /// Enters selection mode from the list-options menu and waits for its chrome.
     private func beginSelecting() {
-        let select = app.buttons["meetings.select"]
-        XCTAssertTrue(select.waitForExistence(timeout: 10))
+        let actions = app.buttons["meetings.actions"]
+        // SwiftUI Menu items do not always surface accessibility identifiers;
+        // accept either the identifier or the pinned English label.
+        let select = app.buttons.matching(
+            NSPredicate(format: "identifier == %@ OR label == %@", "meetings.select", "Select")
+        ).firstMatch
+        XCTAssertTrue(actions.waitForExistence(timeout: 10))
+        XCTAssertTrue(tap(actions, until: select), "List options menu did not open")
         XCTAssertTrue(tap(select, until: app.buttons["meetings.selection.done"]), "Selection mode did not start")
     }
 
@@ -82,7 +88,7 @@ final class BulkSelectionFlowUITests: FlowUITestCase {
 
         // Cancelling the export keeps the selection; Done leaves selection mode.
         XCTAssertTrue(selectedTitle(2).exists)
-        XCTAssertTrue(tap(app.buttons["meetings.selection.done"], until: app.buttons["meetings.select"]))
+        XCTAssertTrue(tap(app.buttons["meetings.selection.done"], until: app.buttons["meetings.actions"]))
     }
 
     func testBulkDeleteAsksFirstAndRemovesOnlyThePickedMeetings() {
@@ -103,7 +109,7 @@ final class BulkSelectionFlowUITests: FlowUITestCase {
         app.buttons["dialog.primary"].tap()
 
         // A confirmed delete leaves selection mode and the picked cards.
-        XCTAssertTrue(app.buttons["meetings.select"].waitForExistence(timeout: 10), "Selection mode did not end")
+        XCTAssertTrue(app.buttons["meetings.actions"].waitForExistence(timeout: 10), "Selection mode did not end")
         for label in picked {
             let card = cards.matching(NSPredicate(format: "label == %@", label)).firstMatch
             XCTAssertTrue(card.waitForNonExistence(timeout: 5), "Deleted meeting is still listed")

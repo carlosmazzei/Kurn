@@ -5,13 +5,22 @@ import SwiftUI
 /// source selection belongs to the list (`meetingIDs`), so closing and
 /// reopening the sheet keeps the meetings it was reading.
 struct KnowledgeLibraryDestination: View {
+    private enum ActiveSheet: Identifiable {
+        case sources
+        case settings
+        var id: Self { self }
+    }
+
     @Binding var meetingIDs: Set<UUID>
+    @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
-    @State private var showingSources = false
+    @State private var activeSheet: ActiveSheet?
 
     var body: some View {
         ZStack {
-            if meetingIDs.isEmpty {
+            if !settings.knowledgeEnabled {
+                disabledState
+            } else if meetingIDs.isEmpty {
                 NavigationStack {
                     ContentUnavailableView {
                         Label(KnowledgeBrowserCopy.text("title"), systemImage: "book.pages")
@@ -28,19 +37,62 @@ struct KnowledgeLibraryDestination: View {
                     }
                 }
             } else {
-                KnowledgeBrowserView(meetingIDs: meetingIDs, showsDone: true, onChooseSources: { showingSources = true })
+                KnowledgeBrowserView(meetingIDs: meetingIDs, showsDone: true, onChooseSources: { activeSheet = .sources })
                     .id(meetingIDs)
             }
         }
-        .sheet(isPresented: $showingSources) {
-            KnowledgeMeetingSelectionView(selectedIDs: meetingIDs) { meetingIDs = $0; showingSources = false }
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .sources:
+                KnowledgeMeetingSelectionView(selectedIDs: meetingIDs) { meetingIDs = $0; activeSheet = nil }
+            case .settings:
+                NavigationStack {
+                    KnowledgeSettingsView()
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button(NSLocalizedString("common.done", comment: "Done")) { activeSheet = nil }
+                            }
+                        }
+                }
+            }
+        }
+    }
+
+    private var disabledState: some View {
+        NavigationStack {
+            ContentUnavailableView {
+                Label(KnowledgeBrowserCopy.text("disabled_title"), systemImage: "book.pages")
+            } description: {
+                Text(KnowledgeBrowserCopy.text("disabled_detail"))
+            } actions: {
+                Button {
+                    activeSheet = .settings
+                } label: {
+                    Label(
+                        NSLocalizedString("recordings.open_settings", comment: "Open Settings"),
+                        systemImage: "gearshape"
+                    )
+                    .font(Theme.calloutEmphasized)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(Theme.accent)
+                .accessibilityIdentifier("knowledge.openSettings")
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .knowledgeReadingSurface()
+            .navigationTitle(KnowledgeBrowserCopy.text("title"))
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
+                }
+            }
         }
     }
 
     /// Choosing sources is the one thing this empty screen is for: the
     /// primary action style (Theme "Button language").
     private var chooseSourcesButton: some View {
-        Button { showingSources = true } label: {
+        Button { activeSheet = .sources } label: {
             Label(KnowledgeBrowserCopy.text("choose_sources"), systemImage: "checklist")
                 .font(Theme.calloutEmphasized)
         }

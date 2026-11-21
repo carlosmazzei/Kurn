@@ -205,7 +205,12 @@ extension ChatKnowledgeTools {
     static func structureSchema(_ name: String) -> (properties: [String: JSONValue], required: [String], description: String) {
         let uuid: JSONValue = .object(["type": .string("string"), "format": .string("uuid")])
         let flag: JSONValue = .object(["type": .string("boolean")])
-        let day: JSONValue = .object(["type": .string("string"), "pattern": .string("^[0-9]{4}-[0-9]{2}-[0-9]{2}$")])
+        let day: JSONValue = .object([
+            "type": .string("string"),
+            "minLength": .number(10),
+            "maxLength": .number(10),
+            "description": .string("Calendar day formatted as yyyy-MM-dd.")
+        ])
         switch name {
         case "resolve_entity":
             return (["name": .object(["type": .string("string"), "minLength": .number(1), "maxLength": .number(200)]),

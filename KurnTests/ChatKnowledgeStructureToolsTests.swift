@@ -161,12 +161,21 @@ struct ChatKnowledgeStructureToolsTests {
         #expect(try await run("list_contexts", ["extra": .number(1)]).isError)
     }
 
-    @Test func everyToolHasAClosedSchema() {
+    @Test func everyToolHasAClosedValidSchemaAcceptedByAgentToolRegistry() throws {
         let tools = ChatKnowledgeTools.make(source: Self.source(), meetings: [Self.review], provider: .openAI)
         #expect(tools.map(\.spec.name) == ChatKnowledgeTools.names)
+        let registry = try AgentToolRegistry(tools)
         for tool in tools {
             guard case .object(let schema) = tool.spec.inputSchema else { Issue.record("schema"); continue }
             #expect(schema["additionalProperties"] == .bool(false))
         }
+        try registry.validate(
+            .object([
+                "entityID": .string(Self.project.uuidString),
+                "from": .string("2026-10-10"),
+                "to": .string("2026-11-15")
+            ]),
+            for: "compare_state"
+        )
     }
 }

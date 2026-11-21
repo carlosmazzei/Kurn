@@ -290,6 +290,7 @@
 "meetings.delete.confirm" = "Dieses Meeting und seine Aufnahmen löschen?";
 "meetings.rename" = "Umbenennen";
 "meetings.sort" = "Sortieren";
+"meetings.list_actions" = "Listenoptionen";
 "meetings.sort.date_newest" = "Neueste zuerst";
 "meetings.sort.date_oldest" = "Älteste zuerst";
 "meetings.sort.title_az" = "Titel A–Z";
@@ -1552,6 +1553,8 @@
 // Knowledge source selection
 "knowledge.browser.choose_sources" = "Besprechungen auswählen";
 "knowledge.browser.choose_sources_detail" = "Wähle bis zu 16 Besprechungen aus, um deren Wissen zu lesen.";
+"knowledge.browser.disabled_title" = "Knowledge ist ausgeschaltet";
+"knowledge.browser.disabled_detail" = "Aktiviere Knowledge unter Einstellungen → Knowledge, um Entitäten, Entscheidungen und Belege aus deinen Meetings zu sammeln.";
 
 /* Local, source-authorized Knowledge search. */
 "knowledge.browser.search_prompt" = "Namen, Aliasse und Aussagen suchen";
