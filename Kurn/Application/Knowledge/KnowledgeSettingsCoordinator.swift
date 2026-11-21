@@ -107,8 +107,10 @@ final class KnowledgeSettingsCoordinator {
         for page in ranked.prefix(Self.narrativePageLimit) {
             guard !Task.isCancelled else { break }
             guard let request = KnowledgeNarrativePrompt.request(page),
-                  let text = try? await llm.chat(systemPrompt: KnowledgeNarrativePrompt.systemPrompt,
-                                                 messages: [ChatMessage(role: .user, content: request.userPrompt)]),
+                  let text = try? await withResourceReservation(.knowledgeGeneration(onDevice: llm.provider.kind == .appleOnDevice), {
+                      try await llm.chat(systemPrompt: KnowledgeNarrativePrompt.systemPrompt,
+                                         messages: [ChatMessage(role: .user, content: request.userPrompt)])
+                  }),
                   let narrative = KnowledgeNarrativePrompt.parse(text, entityID: page.entity.id, references: request.references) else { continue }
             narratives.append(narrative)
         }
