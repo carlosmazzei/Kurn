@@ -519,7 +519,7 @@ VoiceOver order.
 | --- | --- | --- | --- |
 | G1 | **Destructive action with no confirmation, three places** (done). Swipe-delete of an attached PDF (`MeetingAttachmentsViewModel.pendingDelete` + `kurnDialog`); "Clear wiki" (`WikiSettingsView` `kurnDialog` naming regeneration cost); "Clear index" (`SemanticSearchSettingsView` `kurnDialog` naming local rebuild) | `MeetingDetailAttachments.swift`, `MeetingDetailView.swift`, `WikiSettingsView.swift`, `SemanticSearchSettingsView.swift` | Done (`kurnDialog` naming what is lost and what regenerating costs) |
 | G2 | **Tap targets under 44 pt with no `contentShape`:** pause, stop and the other transcription controls in recording rows (30 pt, 5 places) and the 34 pt play button; photo-capture controls (36–40 pt); a 36 pt control in `DesignComponents`; 32–40 pt swatches in the folder form and template editor | `RecordingSegmentRow.swift:42,105–167`, `PhotoCaptureView.swift:153,215,290`, `DesignComponents.swift:212`, `FolderFormView.swift:53,101`, `TemplateEditorView.swift:22` | Keep the glyph, extend the hit area to 44 × 44 with `contentShape` and padding; the audit's `.hitRegion` should then pass (U3.4) |
-| G3 | **System colours instead of tokens for status:** `.green`, `.red`, `.orange`, `.yellow` in Storage, Health, the language picker and photo capture, although `Theme.success` and `Theme.warning` exist. Those two tokens are only 1.9:1 and 2.1:1 on white (8.9:1 and 8.3:1 on `#1C1C1E`), so as light-mode icons they fall under the 3:1 non-text minimum; the status glyphs also carry a symbol, so colour is not the only cue | `StorageSettingsView.swift:278,290,302`, `HealthRecoveryView+Sections.swift:154,184`, `StorageSettingsSections.swift:101`, `LanguagePickerRow.swift:24`, `PhotoCaptureView.swift:289` | Route through `Theme` and give success/warning light-mode variants that reach 3:1 for glyphs and 4.5:1 for text (U2) |
+| G3 | **System colours instead of tokens for status** (done). Routed `.green`, `.red`, `.orange`, `.yellow` through `Theme.success`, `Theme.accent`, `Theme.warning` and `Theme.cameraAccent`, with adaptive light-mode variants (`#1B7F37`, `#C91F16`, `#9E5800`, `#0055B3`) that exceed 4.5:1 text and 3:1 glyph contrast | `StorageSettingsView.swift`, `HealthRecoveryView+Sections.swift`, `StorageSettingsSections.swift`, `LanguagePickerRow.swift`, `PhotoCaptureView.swift`, `Theme.swift` | Done (U2) |
 | G4 | **Sheet size:** about 59 presentations, and only 12 files set `presentationDetents`. Short forms with none: filter bar, tag editor, tag merge, folder form, folder picker, knowledge meeting selection, chat source sheet. Settings or call sites may set them elsewhere, so confirm each on a device | `FilterBarView`, `TagEditorView`, `TagMergeView`, `FolderFormView`, `FolderPickerView`, `KnowledgeMeetingSelectionView`, `ChatSourceSheet` | `.medium`/`[.medium, .large]` per "Modal weight" (U1, rule 8) |
 | G5 | **Sheet chrome to confirm:** `TranscriptionSettingsView`, `MeetingChatView` and `MeetingWikiView` are presented as sheets but their own files hold no `NavigationStack`; the host may supply it | those files | Confirm each has a title and an explicit Cancel/Done on a device (U0b.1) |
 | G6 | **Button styles in use:** `.plain` 85, `.borderless` 16, `.glassProminent` 12, `.bordered` 9, `.glass` 4. `.borderless` is outside the table; whether each screen has exactly one prominent action was not checked | `grep` | Add `.borderless` to the table with its reason; check one prominent action per screen in the pattern table (U0b.1) |
@@ -716,22 +716,23 @@ the UI flows; nothing removed that the flows or the roadmap rely on.
 
 ### U2 · Contrast and display settings (1 sprint)
 
-1. **Fix `Theme.textTertiary`** for text: dark ≥ 4.5:1 on both backgrounds
-   (about white at 62%), light stays `tertiaryLabel` only for non-text
-   decoration. Split a `Theme.decorationTertiary` for the places where 2.5:1 is
-   acceptable (disabled chevrons, dividers), and migrate the 71 uses by hand:
-   anything a user must read moves to `textSecondary`.
-2. **Central environment tokens.** Add `Theme` modifiers reading
-   `accessibilityReduceTransparency` (opaque `Theme.surface`),
-   `colorSchemeContrast == .increased` (stronger stroke, `textPrimary`),
-   `accessibilityDifferentiateWithoutColor` (symbol or text beside any
-   colour-only state: tag and folder colours already carry names via
-   `ColorAccessibility`; check status dots and the graph's states) and
-   `accessibilityShowButtonShapes` (outline for `.plain` chips such as
-   `KnowledgeChipButton`). `KnowledgeCard`, `kurnCard`, `RecordingMiniBar` and the
-   chat composer card are the only custom surfaces that need them.
-3. **`.accessibilityIgnoresInvertColors(true)`** on meeting photos, the photo
-   viewer and any avatar.
+1. **Fix `Theme.textTertiary` and status tokens** (done). Raised `Theme.textTertiary`
+   to ≥ 4.5:1 in both dark (`white @ 0.68`, `0.82` in high contrast) and light
+   (`#56565C`, `#3A3A3E` in high contrast) appearances; split
+   `Theme.decorationTertiary` for non-text decoration (disabled chevrons, dashed
+   borders); gave `Theme.accent`, `Theme.success`, `Theme.info` and
+   `Theme.warning` adaptive light-mode variants that reach ≥ 4.5:1 contrast.
+2. **Central environment tokens** (done). Added `Theme` / `DesignComponents`
+   modifiers reading `accessibilityReduceTransparency` (opaque `Theme.surface` on
+   `RecordingMiniBar` and `.kurnComposerSurface`), `colorSchemeContrast == .increased`
+   (stronger strokes on `kurnCard`, `StatusBadge`, `FilterChip`, `KnowledgeChipLabel`,
+   `RecordingMiniBar` and `.kurnComposerSurface`, plus high-contrast `Theme.fill`,
+   `Theme.separator`, `Theme.textSecondary` and `Theme.textTertiary`),
+   `accessibilityDifferentiateWithoutColor` (status SF Symbols in `StatusBadge`
+   instead of a colour-only dot) and `accessibilityShowButtonShapes` (capsule
+   outlines on `FilterChip` and `KnowledgeChipLabel`).
+3. **`.accessibilityIgnoresInvertColors(true)`** (done) on meeting photos, the
+   photo viewer, camera thumbnail and speaker avatars.
 4. A screenshot matrix test for the six system states × the screens that scroll
    under a toolbar (list, transcript, chat), kept as `ui-review-previews`.
    The 30-frame matrix of the specification is the manual release version of it.

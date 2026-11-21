@@ -27,6 +27,7 @@ struct PhotoViewerView: View {
                             .resizable()
                             .scaledToFit()
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .accessibilityIgnoresInvertColors(true)
                             .accessibilityLabel(NSLocalizedString(
                                 "photo.captured_image",
                                 comment: "Accessibility label for a photo captured during recording"
@@ -102,6 +103,7 @@ struct PhotoThumbnail: View {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()
+                    .accessibilityIgnoresInvertColors(true)
             } else {
                 Rectangle()
                     .fill(Theme.textTertiary.opacity(0.15))
