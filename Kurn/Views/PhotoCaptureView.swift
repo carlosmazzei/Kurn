@@ -165,11 +165,10 @@ struct PhotoCaptureView: View {
                         .fixedSize(horizontal: true, vertical: false)
                         .foregroundStyle(isActive ? Color.yellow : .white)
                         .padding(.horizontal, 8)
-                        .frame(minWidth: 40, minHeight: 40)
-                        .background(.black.opacity(0.4), in: Capsule())
-                        .rotationEffect(.degrees(iconRotation))
                         .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
+                        .background(.black.opacity(0.4), in: Capsule())
+                        .contentShape(Capsule())
+                        .rotationEffect(.degrees(iconRotation))
                 }
                 .accessibilityLabel(String(
                     format: NSLocalizedString("recorder.photo_zoom_format", comment: "Zoom level, e.g. Zoom 2×"),
