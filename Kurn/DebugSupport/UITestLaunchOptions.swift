@@ -16,19 +16,29 @@ enum UITestLaunchOptions {
     /// failing later on an unrelated "element missing"; without them each
     /// transition also stops costing its animation time.
     static let disableAnimations = "UI-Testing-DisableAnimations"
-    /// Wipes the app's persistent `UserDefaults` domain before `AppSettings`
-    /// loads, so a flow that adds providers or grants consent starts from a
-    /// fresh install every run instead of accumulating earlier runs' state.
+    /// Switches `AppSettings` onto a dedicated UI-testing `UserDefaults` suite
+    /// and clears only that suite before launch, so flow tests start from a
+    /// fresh install without wiping a developer installation's standard defaults.
     static let resetDefaults = "UI-Testing-ResetDefaults"
+    static let isolatedDefaultsSuiteName = "com.kurn.ui-testing-defaults"
 
     @MainActor
     static func apply(arguments: [String] = ProcessInfo.processInfo.arguments) {
         if arguments.contains(disableAnimations) {
             UIView.setAnimationsEnabled(false)
         }
-        if arguments.contains(resetDefaults), let domain = Bundle.main.bundleIdentifier {
-            UserDefaults.standard.removePersistentDomain(forName: domain)
+        if arguments.contains(resetDefaults) {
+            UserDefaults().removePersistentDomain(forName: isolatedDefaultsSuiteName)
         }
+    }
+
+    static func settingsDefaults(arguments: [String] = ProcessInfo.processInfo.arguments) -> UserDefaults {
+        guard arguments.contains(resetDefaults),
+              let suite = UserDefaults(suiteName: isolatedDefaultsSuiteName) else {
+            return .standard
+        }
+        suite.addSuite(named: UserDefaults.argumentDomain)
+        return suite
     }
 }
 #endif

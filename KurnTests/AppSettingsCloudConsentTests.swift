@@ -160,6 +160,22 @@ struct AppSettingsCloudConsentTests {
         #expect(settings.readAloud.providerID == AIProvider.appleOnDevice.id)
     }
 
+    @Test func uiTestResetDefaultsUsesIsolatedSuiteAndPreservesStandardDefaults() {
+        let sentinelKey = "test.preserve.standard.\(UUID().uuidString)"
+        UserDefaults.standard.set("keep-my-template", forKey: sentinelKey)
+        defer { UserDefaults.standard.removeObject(forKey: sentinelKey) }
+
+        let args = [UITestLaunchOptions.resetDefaults]
+        let suiteBefore = UITestLaunchOptions.settingsDefaults(arguments: args)
+        suiteBefore.set("stale-provider", forKey: "test.isolated.key")
+
+        UITestLaunchOptions.apply(arguments: args)
+
+        let suiteAfter = UITestLaunchOptions.settingsDefaults(arguments: args)
+        #expect(suiteAfter.string(forKey: "test.isolated.key") == nil)
+        #expect(UserDefaults.standard.string(forKey: sentinelKey) == "keep-my-template")
+    }
+
     @Test func editableCloudConsentDestinationsIncludesConfiguredProvidersEvenAfterRevokeAll() throws {
         let (defaults, suite) = try defaults()
         defer { defaults.removePersistentDomain(forName: suite) }
