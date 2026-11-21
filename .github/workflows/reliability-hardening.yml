@@ -245,10 +245,12 @@ jobs:
 
   # U0.1: Widened accessibility audit across all six XCTest audit categories
   # at default and AX5 text sizes. Kept outside the required PR shards and
-  # ui-flake-rate until its findings are resolved in U2–U4 and U5 promotes it.
+  # ui-flake-rate (and non-blocking via continue-on-error) until its findings
+  # are resolved in U2–U4 and U5 promotes it to a zero-finding gate.
   accessibility-baseline:
     runs-on: macos-26
     timeout-minutes: 60
+    continue-on-error: true
 
     steps:
       - name: Checkout

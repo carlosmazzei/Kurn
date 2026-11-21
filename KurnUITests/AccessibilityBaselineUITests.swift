@@ -54,6 +54,12 @@ final class AccessibilityBaselineUITests: XCTestCase {
                 "-UIPreferredContentSizeCategoryName",
                 "UICTContentSizeCategoryAccessibilityXXXL"
             ]
+        } else {
+            app.launchArguments += [
+                "UI-Testing-DefaultDynamicType",
+                "-UIPreferredContentSizeCategoryName",
+                "UICTContentSizeCategoryL"
+            ]
         }
         if knowledge {
             app.launchArguments += [
@@ -107,61 +113,56 @@ final class AccessibilityBaselineUITests: XCTestCase {
 
         // 2. FolderFormView (via Library -> New Folder)
         let library = app.buttons["meetings.library"]
-        if library.waitForExistence(timeout: 5) {
-            library.tap()
-            let newFolder = app.buttons["folders.new"]
-            for _ in 0..<4 where !newFolder.exists || !newFolder.isHittable {
-                app.swipeUp()
-            }
-            if newFolder.waitForExistence(timeout: 10) {
-                newFolder.tap()
-                XCTAssertTrue(app.textFields["folder.name"].waitForExistence(timeout: 10))
-                audit(app, screen: "FolderFormView", sizeLabel: sizeLabel)
-                if app.buttons["folder.cancel"].exists {
-                    app.buttons["folder.cancel"].tap()
-                }
-            }
-            let done = app.navigationBars.buttons["Done"].firstMatch
-            if done.waitForExistence(timeout: 5) {
-                done.tap()
-            }
+        XCTAssertTrue(library.waitForExistence(timeout: 5), "Missing meetings.library button")
+        library.tap()
+        let newFolder = app.buttons["folders.new"]
+        for _ in 0..<4 where !newFolder.exists || !newFolder.isHittable {
+            app.swipeUp()
         }
+        XCTAssertTrue(newFolder.waitForExistence(timeout: 10), "Missing folders.new button")
+        newFolder.tap()
+        XCTAssertTrue(app.textFields["folder.name"].waitForExistence(timeout: 10), "Missing folder.name field")
+        audit(app, screen: "FolderFormView", sizeLabel: sizeLabel)
+        let cancelFolder = app.buttons["folder.cancel"]
+        XCTAssertTrue(cancelFolder.waitForExistence(timeout: 5), "Missing folder.cancel button")
+        cancelFolder.tap()
+        let libraryDone = app.navigationBars.buttons["Done"].firstMatch
+        XCTAssertTrue(libraryDone.waitForExistence(timeout: 5), "Missing Library Done button")
+        libraryDone.tap()
 
         // 3. Settings Hub
         let settings = app.buttons["nav.settings"]
-        if settings.waitForExistence(timeout: 10) {
-            settings.tap()
-            XCTAssertTrue(app.buttons["settings.link.providers"].waitForExistence(timeout: 10))
-            audit(app, screen: "SettingsView", sizeLabel: sizeLabel)
-            let done = app.navigationBars.buttons["Done"].firstMatch
-            if done.waitForExistence(timeout: 5) {
-                done.tap()
-            }
-        }
+        XCTAssertTrue(settings.waitForExistence(timeout: 10), "Missing nav.settings button")
+        settings.tap()
+        XCTAssertTrue(app.buttons["settings.link.providers"].waitForExistence(timeout: 10))
+        audit(app, screen: "SettingsView", sizeLabel: sizeLabel)
+        let settingsDone = app.navigationBars.buttons["Done"].firstMatch
+        XCTAssertTrue(settingsDone.waitForExistence(timeout: 5), "Missing Settings Done button")
+        settingsDone.tap()
 
         // 4. Meeting Detail Tabs (Recordings, Transcript, Summary, Chat)
         openFirstMeeting(app)
         for tab in ["recordings", "transcript", "summary", "chat"] {
             let button = app.buttons["tab.\(tab)"]
-            if button.waitForExistence(timeout: 10) {
-                button.tap()
-                audit(app, screen: "MeetingDetail.\(tab)", sizeLabel: sizeLabel)
-            }
+            XCTAssertTrue(button.waitForExistence(timeout: 10), "Missing tab.\(tab)")
+            button.tap()
+            audit(app, screen: "MeetingDetail.\(tab)", sizeLabel: sizeLabel)
         }
 
         // 5. RecorderView (audited last so no active recording session or mini
         // bar pollutes Settings or MeetingDetail, and returning to the list is
         // not required after the audit).
         let back = app.navigationBars.buttons.element(boundBy: 0)
-        if back.exists { back.tap() }
+        XCTAssertTrue(back.waitForExistence(timeout: 5), "Missing back button from MeetingDetail")
+        back.tap()
         let record = app.buttons["meetings.record"]
-        if record.waitForExistence(timeout: 10) {
-            record.tap()
-            let minimize = app.buttons["recorder.minimize"]
-            if minimize.waitForExistence(timeout: 10) {
-                audit(app, screen: "RecorderView", sizeLabel: sizeLabel)
-            }
-        }
+        XCTAssertTrue(record.waitForExistence(timeout: 10), "Missing meetings.record button")
+        record.tap()
+        dismissSystemPermissionAlertIfPresent()
+        let minimize = app.buttons["recorder.minimize"]
+        XCTAssertTrue(minimize.waitForExistence(timeout: 10), "Missing recorder.minimize button")
+        XCTAssertTrue(waitUntilEnabled(minimize, timeout: 10), "Recorder did not finish starting active capture")
+        audit(app, screen: "RecorderView", sizeLabel: sizeLabel)
     }
 
     // MARK: - Knowledge Screens (Default & AX5)
@@ -192,24 +193,37 @@ final class AccessibilityBaselineUITests: XCTestCase {
 
         // Pop back to Knowledge Home so its Done button is visible, then close the sheet
         let back = readerBackButton(app)
-        if back.waitForExistence(timeout: 5) {
-            back.tap()
-        }
+        XCTAssertTrue(back.waitForExistence(timeout: 5), "Missing Knowledge reader back button")
+        back.tap()
         let done = app.navigationBars.buttons["Done"].firstMatch
-        if done.waitForExistence(timeout: 10) {
-            done.tap()
-        }
+        XCTAssertTrue(done.waitForExistence(timeout: 10), "Missing Knowledge reader Done button")
+        done.tap()
         XCTAssertTrue(app.buttons["root.destination.meetings"].waitForExistence(timeout: 10))
         audit(app, screen: "MeetingsList+KnowledgeOn", sizeLabel: sizeLabel)
 
         openFirstMeeting(app)
         let knowledgeTab = app.buttons["tab.knowledge"]
-        if knowledgeTab.waitForExistence(timeout: 10) {
-            knowledgeTab.tap()
-            let quote = app.staticTexts["knowledge.quote"].firstMatch
-            _ = quote.waitForExistence(timeout: 10)
-            audit(app, screen: "MeetingDetail.knowledge", sizeLabel: sizeLabel)
+        XCTAssertTrue(knowledgeTab.waitForExistence(timeout: 10), "Missing tab.knowledge")
+        knowledgeTab.tap()
+        let quote = app.staticTexts["knowledge.quote"].firstMatch
+        XCTAssertTrue(quote.waitForExistence(timeout: 10), "Missing seeded knowledge.quote")
+        audit(app, screen: "MeetingDetail.knowledge", sizeLabel: sizeLabel)
+    }
+
+    private func dismissSystemPermissionAlertIfPresent() {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let allow = springboard.alerts.buttons.matching(
+            NSPredicate(format: "label IN %@", ["Allow", "OK", "Permitir"])
+        ).firstMatch
+        if allow.waitForExistence(timeout: 2) {
+            allow.tap()
         }
+    }
+
+    private func waitUntilEnabled(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let predicate = NSPredicate(format: "isEnabled == true")
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
 
     private func readerBackButton(_ app: XCUIApplication) -> XCUIElement {

@@ -88,7 +88,11 @@ the release the same as a failed CI job would.
 
 Nutrition Labels (`fastlane/accessibility.json`) may only be declared for
 features where every task below is completed end to end on a physical device
-with VoiceOver + Screen Curtain, and then with Voice Control alone:
+with VoiceOver + Screen Curtain, and then with Voice Control alone. Record
+the completed certification in the release PR or `vX.Y.Z` tag notes (see
+"Recording this checklist's own result" below); the release approver must
+verify that record in the tag/PR notes before approving the `release`
+environment deployment in `.github/workflows/accessibility-labels.yml`:
 
 - [ ] Record and stop: start a recording from the meetings list, pause/resume,
       and stop and save.

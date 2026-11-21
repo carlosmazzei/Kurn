@@ -44,6 +44,10 @@ jobs:
           ruby-version: '3.3'
           bundler-cache: true
 
+      - name: Verify physical certification record notice
+        run: |
+          echo "::notice::Before approving or publishing App Store Accessibility Nutrition Labels for ${GITHUB_REF_NAME}, verify that the physical-device VoiceOver (Screen Curtain) and Voice Control certification in docs/release-physical-checklist.md ('Common-task accessibility certification') is recorded in the release PR / tag notes for ${GITHUB_REF_NAME}."
+
       - name: Sync Accessibility Nutrition Labels
         run: bundle exec fastlane accessibility_labels publish:"$PUBLISH"
         env:

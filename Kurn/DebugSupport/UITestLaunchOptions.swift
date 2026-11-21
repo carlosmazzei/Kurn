@@ -19,8 +19,12 @@ enum UITestLaunchOptions {
     /// Pins the app to `accessibilityExtraExtraExtraLarge` (AX5) via UIKit's
     /// preferred content size category launch argument (U0.2).
     static let accessibilityContentSize = "UI-Testing-AX5"
+    /// Pins the app to the standard `large` Dynamic Type category so default-size
+    /// baseline runs never inherit a simulator's leftover text size (U0.1).
+    static let defaultContentSize = "UI-Testing-DefaultDynamicType"
     private static let contentSizeKey = "-UIPreferredContentSizeCategoryName"
     private static let ax5Value = UIContentSizeCategory.accessibilityExtraExtraExtraLarge.rawValue
+    private static let defaultValue = UIContentSizeCategory.large.rawValue
 
     @MainActor
     static func apply(arguments: [String] = ProcessInfo.processInfo.arguments) {
@@ -29,6 +33,8 @@ enum UITestLaunchOptions {
         }
         if arguments.contains(accessibilityContentSize), !arguments.contains(contentSizeKey) {
             UserDefaults.standard.set(ax5Value, forKey: "UIPreferredContentSizeCategoryName")
+        } else if arguments.contains(defaultContentSize), !arguments.contains(contentSizeKey) {
+            UserDefaults.standard.set(defaultValue, forKey: "UIPreferredContentSizeCategoryName")
         }
     }
 }
