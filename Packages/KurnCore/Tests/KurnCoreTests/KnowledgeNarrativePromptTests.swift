@@ -55,6 +55,13 @@ struct KnowledgeNarrativePromptTests {
         #expect(KnowledgeNarrativePrompt.parse(output, entityID: project, references: references) == nil)
     }
 
+    @Test func aParagraphResolvesItsCitedClaimsInCitationOrder() throws {
+        let page = try page()
+        let ids = page.sections.flatMap(\.entries).map(\.fact.id)
+        let paragraph = KnowledgeWikiNarrative.Paragraph(text: "Text.", assertionIDs: [ids[1], UUID(), ids[0]])
+        #expect(page.entries(citedBy: paragraph).map(\.fact.id) == [ids[1], ids[0]])
+    }
+
     @Test func outputWithoutCitationsGivesNoNarrative() throws {
         #expect(KnowledgeNarrativePrompt.parse("Nothing cited here.", entityID: project, references: ["c1": UUID()]) == nil)
         #expect(KnowledgeNarrativePrompt.request(KnowledgeWikiPage(entity: .init(id: project, kind: .project, name: "Empty"),

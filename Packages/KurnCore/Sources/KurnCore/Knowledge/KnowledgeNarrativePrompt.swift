@@ -73,3 +73,11 @@ public enum KnowledgeNarrativePrompt {
         return paragraphs.isEmpty ? nil : KnowledgeWikiNarrative(entityID: entityID, paragraphs: paragraphs)
     }
 }
+
+public extension KnowledgeWikiPage {
+    /// The page's claims a narrative paragraph cites, in citation order; IDs not on the page are skipped.
+    func entries(citedBy paragraph: KnowledgeWikiNarrative.Paragraph) -> [Entry] {
+        let entries = sections.flatMap(\.entries)
+        return paragraph.assertionIDs.compactMap { id in entries.first { $0.fact.id == id } }
+    }
+}

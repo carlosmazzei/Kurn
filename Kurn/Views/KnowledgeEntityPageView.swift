@@ -60,7 +60,7 @@ struct KnowledgeEntityPageView: View {
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(narrative.paragraphs.enumerated()), id: \.offset) { _, paragraph in
                     Text(verbatim: paragraph.text).font(Theme.body)
-                    let cited = paragraph.assertionIDs.compactMap { id in page.sections.lazy.flatMap(\.entries).first { $0.fact.id == id } }
+                    let cited = page.entries(citedBy: paragraph)
                     DisclosureGroup(String(format: KnowledgeBrowserCopy.text("narrative_sources"), cited.count)) {
                         VStack(alignment: .leading, spacing: 10) {
                             ForEach(cited, id: \.fact.id) { KnowledgeClaimReadView(entry: $0) }
