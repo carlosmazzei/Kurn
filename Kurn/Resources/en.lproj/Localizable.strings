@@ -1663,3 +1663,11 @@
 "privacy.cloud.revoke_all_title" = "Remove all permissions for this provider?";
 "privacy.cloud.revoke_all_detail" = "Nothing is sent to this provider anymore, on request or automatically. Summaries and Knowledge that used it switch to on-device processing.";
 "privacy.cloud.audio" = "Audio upload";
+
+/* G1 destructive action confirmations */
+"detail.attachments.delete_confirm.title" = "Delete Document?";
+"detail.attachments.delete_confirm.message" = "“%@” will be permanently removed from this meeting.";
+"settings.wiki_clear_confirm.title" = "Clear All Wiki Articles?";
+"settings.wiki_clear_confirm.message" = "All generated meeting wiki articles will be removed from this device. Regenerating them calls your configured AI provider and may incur provider fees.";
+"settings.semantic_clear_confirm.title" = "Clear Semantic Search Index?";
+"settings.semantic_clear_confirm.message" = "The local semantic search index will be removed. You can rebuild it on this device at any time without deleting your meetings.";

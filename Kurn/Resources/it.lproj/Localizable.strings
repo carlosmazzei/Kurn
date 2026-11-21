@@ -1663,3 +1663,11 @@
 "privacy.cloud.revoke_all_title" = "Rimuovere tutte le autorizzazioni per questo fornitore?";
 "privacy.cloud.revoke_all_detail" = "Non viene più inviato nulla a questo fornitore, né su richiesta né automaticamente. Riepiloghi e Knowledge che lo usavano passano all’elaborazione sul dispositivo.";
 "privacy.cloud.audio" = "Invio audio";
+
+/* G1 destructive action confirmations */
+"detail.attachments.delete_confirm.title" = "Eliminare il documento?";
+"detail.attachments.delete_confirm.message" = "“%@” verrà rimosso definitivamente da questa riunione.";
+"settings.wiki_clear_confirm.title" = "Cancellare tutti gli articoli wiki?";
+"settings.wiki_clear_confirm.message" = "Tutti gli articoli wiki delle riunioni generati verranno rimossi da questo dispositivo. Rigenerarli chiama il fornitore IA configurato e può comportare costi.";
+"settings.semantic_clear_confirm.title" = "Cancellare l’indice di ricerca semantica?";
+"settings.semantic_clear_confirm.message" = "L’indice locale di ricerca semantica verrà rimosso. Puoi ricostruirlo su questo dispositivo in qualsiasi momento senza eliminare le riunioni.";

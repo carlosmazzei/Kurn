@@ -93,6 +93,29 @@ struct AttachmentViewModelTests {
         #expect(viewModel.error == nil)
     }
 
+    @Test func deleteConfirmationStagesAndCancelsOrDeletes() async throws {
+        let (meeting, context) = try makeMeeting()
+        defer { removeStoredFiles(of: meeting) }
+        let source = try PDFFixtures.makePDF(pages: ["Agenda"])
+        defer { PDFFixtures.remove(source) }
+        let attachment = try await MeetingAttachmentImporter(context: context).importPDF(from: source, into: meeting)
+        let viewModel = MeetingAttachmentsViewModel()
+
+        viewModel.requestDelete(attachment)
+        #expect(viewModel.pendingDelete?.id == attachment.id)
+        #expect(meeting.attachments.count == 1)
+
+        viewModel.cancelDelete()
+        #expect(viewModel.pendingDelete == nil)
+        #expect(meeting.attachments.count == 1)
+
+        viewModel.requestDelete(attachment)
+        viewModel.confirmDelete(context: context)
+        #expect(viewModel.pendingDelete == nil)
+        #expect(meeting.attachments.isEmpty)
+        #expect(viewModel.error == nil)
+    }
+
     @Test func aFailedDeleteIsSurfaced() async throws {
         let (meeting, context) = try makeMeeting()
         defer { removeStoredFiles(of: meeting) }

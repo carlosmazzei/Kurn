@@ -1663,3 +1663,11 @@
 "privacy.cloud.revoke_all_title" = "移除此提供商的所有权限？";
 "privacy.cloud.revoke_all_detail" = "将不再向此提供商发送任何内容，无论按需还是自动。使用它的摘要和 Knowledge 将改为在设备端处理。";
 "privacy.cloud.audio" = "音频上传";
+
+/* G1 destructive action confirmations */
+"detail.attachments.delete_confirm.title" = "删除文档？";
+"detail.attachments.delete_confirm.message" = "“%@”将从此会议中永久移除。";
+"settings.wiki_clear_confirm.title" = "清除所有 Wiki 文章？";
+"settings.wiki_clear_confirm.message" = "所有已生成的会议 Wiki 文章都将从此设备中移除。重新生成将调用已配置的 AI 提供商，并可能产生费用。";
+"settings.semantic_clear_confirm.title" = "清除语义搜索索引？";
+"settings.semantic_clear_confirm.message" = "本地语义搜索索引将被移除。你可以随时在此设备上重建索引，不会删除你的会议。";

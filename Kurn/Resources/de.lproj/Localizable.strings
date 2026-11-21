@@ -1663,3 +1663,11 @@
 "privacy.cloud.revoke_all_title" = "Alle Berechtigungen für diesen Anbieter entfernen?";
 "privacy.cloud.revoke_all_detail" = "An diesen Anbieter wird nichts mehr gesendet, weder auf Anfrage noch automatisch. Zusammenfassungen und Knowledge, die ihn nutzten, wechseln zur Verarbeitung auf dem Gerät.";
 "privacy.cloud.audio" = "Audio-Upload";
+
+/* G1 destructive action confirmations */
+"detail.attachments.delete_confirm.title" = "Dokument löschen?";
+"detail.attachments.delete_confirm.message" = "„%@“ wird dauerhaft aus dieser Besprechung entfernt.";
+"settings.wiki_clear_confirm.title" = "Alle Wiki-Artikel löschen?";
+"settings.wiki_clear_confirm.message" = "Alle erzeugten Meeting-Wiki-Artikel werden von diesem Gerät entfernt. Das erneute Erzeugen ruft deinen konfigurierten KI-Anbieter auf und kann Anbietergebühren verursachen.";
+"settings.semantic_clear_confirm.title" = "Semantischen Suchindex löschen?";
+"settings.semantic_clear_confirm.message" = "Der lokale semantische Suchindex wird entfernt. Du kannst ihn jederzeit auf diesem Gerät neu aufbauen, ohne deine Besprechungen zu löschen.";
