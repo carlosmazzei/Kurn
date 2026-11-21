@@ -76,7 +76,7 @@ struct FlowLayout: Layout {
         return (contentWidth, subviews.isEmpty ? 0 : y + rowHeight)
     }
 
-    private func measuredSize(of subview: Subview, maxWidth: CGFloat) -> CGSize {
+    private func measuredSize(of subview: LayoutSubview, maxWidth: CGFloat) -> CGSize {
         let natural = subview.sizeThatFits(.unspecified)
         guard maxWidth.isFinite, maxWidth > 0, natural.width > maxWidth else {
             return natural
