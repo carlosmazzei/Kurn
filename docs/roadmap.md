@@ -442,6 +442,56 @@ there is nothing to remove for the iOS 27 SDK.
    Screen Curtain, then Voice Control alone.
 Exit: a dated findings table per screen; no code behaviour changes.
 
+### U0b · Consistency and usability audit (1 sprint, before U1)
+
+U1 reduces controls; this step decides whether the screens are also coherent and
+learnable. The findings below come from reading the code and counting patterns
+on `feature/knowledge-compiler`, **not from using the app**: each one is a
+hypothesis to confirm on a device before it becomes a change.
+
+**Findings so far**
+
+| # | Finding | Evidence | Direction |
+| --- | --- | --- | --- |
+| F1 | One idea, three names: the meeting's condensed article is "Wiki" (menu "View wiki", sheet "Meeting Wiki", Settings → Wiki), the cross-meeting facts are "Knowledge" (tab, Settings, reader), and the generated paragraphs on an entity page are "Notes" | `detail.wiki.*`, `tab.knowledge`, `knowledge.browser.narrative` | Pick one vocabulary (glossary below) and apply it to strings, identifiers in prose, and Settings |
+| F2 | Ask and Chat are the same conversation under two names: root place "Ask", meeting tab "Chat", entity button "Ask about this"; two glyphs for it (`bubble.left.and.bubble.right` in `AppRootDestination` and `DocumentDetailView`, `bubble.left.and.text.bubble.right` in the list toolbar and `MeetingDetailMode`) | `AppRootDestination.swift`, `MeetingDetailMode.swift`, `MeetingsListToolbar.swift` | One name ("Ask") and one glyph, defined once |
+| F3 | `book.pages` means Knowledge (place, tab, Settings, reader rows) and also "Generate wiki" in the detail menu | `MeetingDetailToolbar.swift`, `AppRootDestination.swift` | One glyph per concept; give the wiki action its own or drop it with the F1 rename |
+| F4 | The place a thing lives depends on a setting: with Knowledge loaded the wiki moves from the overflow menu to the Knowledge tab; the list toolbar has two layouts | `CLAUDE.md` "Meeting detail Knowledge mode"; `browsingToolbar` | One home per action regardless of flags (U1.1 for the list; same rule for the detail menu) |
+| F5 | Three presentation models in one bottom bar: Knowledge and Ask open as sheets, Documents is pushed, Library is a sheet or a sidebar | `MeetingsListView`, `KnowledgeLibraryDestination`, `DocumentsListView` | Decide one model per destination type; the mini-bar plumbing (`hostsRecordingMiniBarInSheet`) is a cost of mixing them |
+| F6 | 58 `.sheet` in 32 files but only 12 `presentationDetents`; `Theme` says utility pickers open at `.medium` | `grep` over `Views/` | List every sheet with its detents and its Cancel/Done; fix the full-height ones that hold a short choice |
+| F7 | `.buttonStyle(.borderless)` is used 16 times (13 in Settings Health/Storage) and is not in `Theme`'s "Button language" table | `grep` | Probably legitimate (several buttons inside one Form row); add it to the table with that reason instead of migrating |
+| F8 | Delete is spread over 14 trash glyphs, 21 destructive roles and 8 swipe actions | `grep` | Check each goes through `kurnDialog` and says what is deleted; add undo where the data model allows it (the cognitive-accessibility rule) |
+| F9 | 11 `ContentUnavailableView` empty states in 9 files, consistent with the convention | `grep` | Confirm each offers the next action, not only a description |
+
+**Work**
+1. **Pattern table per screen** (meetings list, meeting detail and its five modes,
+   recorder, Ask, Documents, Knowledge reader, Settings screens): primary
+   action, secondary action, destructive action, presentation (push / sheet /
+   dialog), dismissal, empty state, error state, Inherit / Adapt / Own. Any cell
+   that differs from `Theme.swift`'s "Button language" and "Modal weight" is a
+   finding.
+2. **Glossary and icon catalog.** One table of user-facing terms (Meeting,
+   Recording, Transcript, Summary, Wiki/Notes, Knowledge, Ask, Document,
+   Library) with the chosen word in seven languages, and one place that defines
+   each concept's glyph (extend `AppRootDestination`'s pattern) so the tab,
+   toolbar and destination cannot drift. A static-policy check rejects the same
+   `systemImage` literal for two catalog concepts.
+3. **Task baseline.** For each common task, count taps and screens as built, then
+   set a target. Estimates from the code, to be measured: start recording 1 tap
+   from the list; sort by duration 2 taps today and 3 after U1.1 folds Sort into
+   the Filter sheet (a cost U1.1 must accept or avoid, for example by keeping the
+   sort choice as the first row of that sheet); ask a question 1 tap to open;
+   read a meeting's wiki 2 taps with Knowledge off and 1 with it on (F4);
+   export a meeting at least 4.
+4. **Usability test.** Five participants, seven tasks from the common-task list,
+   think-aloud, one participant using VoiceOver. Record completion without help,
+   time, wrong taps and the words people use for Wiki / Knowledge / Ask (this
+   settles F1 and F2). Bar: at least four of five complete each task unaided; a
+   task below that goes to the top of U1. Needs real users; Claude can write the
+   script and tabulate results but cannot run the sessions.
+Exit: findings table confirmed or dropped on a device, a signed-off glossary and
+icon catalog, a task baseline, and U1's order set by the test results.
+
 ### U1 · Simplify the structure (2 sprints)
 
 Each item is a product decision first; the control/content layering and the
@@ -597,7 +647,7 @@ Exit: all common tasks complete with VoiceOver and Screen Curtain on a device.
 
 ### Order and risks
 
-U0 → U2 and U1 in parallel (U1 touches structure, U2 tokens) → U3 → U4 → U5.
+U0 → U0b → U2 and U1 in parallel (U1 touches structure, U2 tokens) → U3 → U4 → U5.
 Risks: U1.1 and U1.4 change what users have learned, so they ship behind the
 usability check, not with the accessibility fixes; U2.1 changes 71 call sites,
 so migrate by screen with the screenshot matrix; the simulator cannot run
