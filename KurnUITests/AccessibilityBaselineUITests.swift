@@ -84,11 +84,12 @@ final class AccessibilityBaselineUITests: XCTestCase {
         XCTContext.runActivity(named: "Audit \(screen) (\(sizeLabel))") { _ in
             do {
                 try app.performAccessibilityAudit(for: Self.auditTypes) { issue in
-                    XCTFail("[\(screen) | \(sizeLabel)] [\(issue.auditType)] \(issue.compactDescription) — \(issue.detailedDescription) | element=\(String(describing: issue.element?.debugDescription.prefix(240)))")
+                    XCTFail("[A11Y_FINDING] [\(screen) | \(sizeLabel)] [\(issue.auditType)] \(issue.compactDescription) — \(issue.detailedDescription) | element=\(String(describing: issue.element?.debugDescription.prefix(240)))")
                     return true
                 }
+                XCTContext.runActivity(named: "A11Y_MEASURED \(screen) (\(sizeLabel))") { _ in }
             } catch {
-                XCTFail("[\(screen) | \(sizeLabel)] Audit threw error: \(error)")
+                XCTFail("[A11Y_AUDIT_ERROR] [\(screen) | \(sizeLabel)] Audit threw error: \(error)")
             }
         }
     }

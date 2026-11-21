@@ -286,20 +286,19 @@ jobs:
         with:
           artifact-name: accessibility-baseline-failure-diagnostics
 
-      # continue-on-error hides the difference between "audit ran and found
-      # issues" and "audit never ran" (e.g. simulator setup failed), so record
-      # which one happened for hardening-summary.
+      # continue-on-error hides the difference between "audit ran all screens
+      # and found issues", "audit threw/failed partway through", and "audit
+      # never ran" (e.g. simulator setup failed). Inspect the .xcresult bundle
+      # with xcresulttool so only complete measurements report `measured-*`.
       - name: Record audit outcome
         if: always()
         env:
           AUDIT_OUTCOME: ${{ steps.audit.outcome }}
         run: |
           mkdir -p "$RUNNER_TEMP/result"
-          if [ -d "$RUNNER_TEMP/TestResults.xcresult" ] && { [ "$AUDIT_OUTCOME" = "success" ] || [ "$AUDIT_OUTCOME" = "failure" ]; }; then
-            if [ "$AUDIT_OUTCOME" = "success" ]; then status="measured-no-findings"; else status="measured-with-findings"; fi
-          else
-            status="not-measured (audit step: ${AUDIT_OUTCOME:-skipped})"
-          fi
+          status="$(python3 Tools/classify_accessibility_baseline.py \
+            --xcresult "$RUNNER_TEMP/TestResults.xcresult" \
+            --audit-outcome "$AUDIT_OUTCOME")"
           echo "$status" > "$RUNNER_TEMP/result/accessibility-baseline-attempt-1.txt"
           echo "Accessibility baseline: $status" >> "$GITHUB_STEP_SUMMARY"
 
