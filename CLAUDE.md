@@ -3444,6 +3444,15 @@ save (fault seam `beforeSave`) or a process death leaves all of it for the next
 drain. Failures record a content-free `knowledge_deletion` reliability event once
 per code per process; an unknown scope or pipeline is refused, never dropped.
 
+- **Ask question set and scorer (K0.4/K5.4).** `Fixtures/knowledge-questions/questions.json`
+  (format `kurn.knowledge-questions` v1, synthetic, Portuguese and English) asks questions over
+  the golden fixtures. For each one it lists the assertion refs a correct answer states, the
+  `mustNotAssert` entries it must not state, whether it must decline, and the `source/segment` IDs
+  it may cite. KurnCore's `KnowledgeAnswerScorer` scores an answer for precision, recall, tempting
+  claims stated, refusal honoured and resolvable citations, and summarizes a run so Ask variants
+  can be compared. `KnowledgeQuestionFixtureTests` checks every reference against its fixture, that
+  an oracle answer scores perfectly and that declining everything does not. Running variants A–F
+  on a device to produce observations is still to do.
 - **Meeting/source:** every assertion, event and evidence row of that meeting,
   their relations and all its extraction jobs (provenance included). Entities
   named by its provenance, assertions or events are removed unless another
