@@ -704,6 +704,61 @@ the UI flows; nothing removed that the flows or the roadmap rely on.
    The 30-frame matrix of the specification is the manual release version of it.
 Exit: `.contrast` audit clean on every audited screen in both appearances.
 
+### U2b · Visual system and first impression (2 sprints)
+
+Goal: an app that reads as one product, explains itself in the first minute and
+looks professional without custom chrome. **Evidence limits:** the findings are
+token-level and come from the source; no app screenshot is checked in, so
+hierarchy, alignment and density have not been judged visually. The CI artifact
+`ui-review-previews` (seeded screens, retained 14 days) is the input for the
+screenshot review in step 6.
+
+| # | Finding | Evidence | Direction |
+| --- | --- | --- | --- |
+| V1 | **One red does four jobs:** brand, record, destructive action and "selected/active" (current place in the bottom bar, active filter, many tints). Red reads as danger, so a calm selection looks like a warning | `Theme.accent` (#FF3B30, system red) in 128 places across 58 files; `destinationButton` tints the current place with it | Separate roles: red only for record, destructive and errors; a distinct interactive tint for selection and links |
+| V2 | **Three competing accents:** the asset catalog's `AccentColor` is an indigo (about #4C6EF5), `Theme.info` is #0A84FF and `Theme.accent` is red; the global tint and the hand-applied tints disagree | `AccentColor.colorset`, `Theme.swift` | One interactive accent defined once (asset and token the same), `info` removed or aliased |
+| V3 | **No spacing, radius or motion tokens:** stack spacings of 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20 pt; corner radii of 4, 8, 10, 12, 14, 16, 18, 24, 26 pt (`kurnCard` defaults to 18, `knowledgeCard` to 16); animation durations from 0.06 s to 1.25 s | `grep` over `Views/` | `Theme.Spacing` (4, 8, 12, 16, 20, 24), `Theme.Radius` (small, card, sheet), `Theme.Motion` (quick, standard); migrate by screen |
+| V4 | **Several surface treatments:** cards on `Theme.surface` (9), chips and wells on `Theme.fill` (25), `kurnCard` (9) and `knowledgeCard` | `grep` | Three levels only (background, card, inset) and one card modifier |
+| V5 | **A custom dark palette beside system materials:** `#0A0A0F` background and white-alpha text tokens in dark, system grouped backgrounds in light; the recorder forces `.dark` | `Theme.swift`, `RecorderView.swift:121` | Decide whether the blue-tinted near-black is a brand choice; if not, move dark mode to the system backgrounds so Liquid Glass and Increase Contrast behave as designed |
+| V6 | **No first-run experience:** no onboarding or first-use code; the first value (a recording turning into a summary) sits behind a microphone prompt, a model-download consent and a provider choice | `grep` for onboarding/first-run finds only screenshot seeds and the review prompt | One guided empty state, no tour (step 4) |
+| V7 | **Little tactile feedback:** three feedback sites (recorder highlight, mini-bar state, photo shutter) | `grep` | Feedback on record start/stop, copy, delete confirmed, success (step 5) |
+
+**Work**
+1. **Decide the colour roles first** (V1, V2, V5): a one-page palette with
+   interactive accent, brand mark, record/destructive red, status green and amber
+   (with the light-mode contrast fixes from G3), neutral surfaces. Prototype the
+   bottom bar and the filter button with the calm accent and compare screenshots
+   before migrating the 128 call sites.
+2. **Add `Theme.Spacing`, `Theme.Radius`, `Theme.Motion`** and migrate by screen
+   as U3 touches each one (no big-bang rewrite); a static-policy rule rejects a
+   new literal corner radius or spacing outside the token file once a screen is
+   migrated (baseline that only shrinks).
+3. **Collapse the surfaces** to background, card and inset with one card
+   modifier shared by `kurnCard` and `knowledgeCard`.
+4. **First-run empty state.** On the empty meetings list: what the app does in
+   one sentence ("Record a meeting. Transcript and summary stay on this
+   device."), one prominent Record button, and a one-line note on what happens
+   next. Ask for the microphone only when Record is tapped, with a sentence
+   before the system prompt saying why. Offer the diarization model download
+   once, after the first recording, in the banner that already exists, with its
+   size. No tour, no tooltips, no sign-in.
+5. **Feedback and loading.** Use `sensoryFeedback` for record start and stop,
+   copy and a confirmed delete; keep the 47 progress indicators but make long
+   waits say what is happening and what the person can do meanwhile (the
+   pipeline phases already exist).
+6. **Screenshot review** with the CI `ui-review-previews` (or fresh device
+   captures) of: empty list, list with meetings, recorder, mini bar, meeting
+   detail (each tab), Ask, Knowledge, Settings, at default and AX3, dark and
+   light. Per screen: one clear focal point; at most two type weights in a
+   row; aligned left edges; consistent margins (20 pt); no control that looks
+   tappable but is not or the opposite; no text under 11 pt equivalent; status
+   shown with words, not only colour. Score with the U0b severity scale.
+7. **Brand consistency.** Icon, accent, launch screen, store screenshots and
+   in-app colours from the same palette (step 1); the `scripts/screenshots`
+   frames already render per-language captions, so update their palette last.
+Exit: a palette and token file, the first-run empty state, and a reviewed set of
+screenshots with no severity-3 or -4 visual finding.
+
 ### U3 · Elastic layout to AX5 (2 sprints)
 
 Work through the baseline counts, not the whole list of anti-patterns:
@@ -794,7 +849,7 @@ Exit: all common tasks complete with VoiceOver and Screen Curtain on a device.
 
 ### Order and risks
 
-U0 → U0b → U2 and U1 in parallel (U1 touches structure, U2 tokens) → U3 → U4 → U5.
+U0 → U0b → U2 and U1 in parallel (U1 touches structure, U2 tokens) → U2b (visual system and first run; decide colours before U3 migrates screens) → U3 → U4 → U5.
 Risks: U1.1 and U1.4 change what users have learned, so they ship behind the
 U0b walkthrough, not with the accessibility fixes; U2.1 changes 71 call sites,
 so migrate by screen with the screenshot matrix; the simulator cannot run
