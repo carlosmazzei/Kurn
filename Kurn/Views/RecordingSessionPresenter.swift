@@ -281,16 +281,17 @@ private struct RecordingMiniBarSurfaceModifier: ViewModifier {
     let contrast: ColorSchemeContrast
 
     func body(content: Content) -> some View {
+        let borderColor = contrast == .increased ? Theme.textTertiary : Theme.separator
         if reduceTransparency {
             content
                 .background(Theme.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(Theme.separator, lineWidth: contrast == .increased ? 1.5 : 1))
+                .overlay(Capsule().strokeBorder(borderColor, lineWidth: contrast == .increased ? 1.5 : 1))
         } else {
             content
                 .glassEffect(.regular.interactive(), in: .capsule)
                 .overlay {
                     if contrast == .increased {
-                        Capsule().strokeBorder(Theme.separator, lineWidth: 1.5)
+                        Capsule().strokeBorder(borderColor, lineWidth: 1.5)
                     }
                 }
         }

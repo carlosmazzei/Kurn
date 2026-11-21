@@ -67,10 +67,12 @@ struct ThemeContrastTests {
         for style in [UIUserInterfaceStyle.light, .dark] {
             for contrast in [UIAccessibilityContrast.normal, .high] {
                 let collection = traits(style: style, contrast: contrast)
-                let secondaryRatio = contrastRatio(foreground: Theme.textSecondary, background: Theme.surface, traits: collection)
-                let tertiaryRatio = contrastRatio(foreground: Theme.textTertiary, background: Theme.surface, traits: collection)
-                #expect(secondaryRatio >= 4.5, "textSecondary contrast \(secondaryRatio) < 4.5 for \(style)/\(contrast)")
-                #expect(tertiaryRatio >= 4.5, "textTertiary contrast \(tertiaryRatio) < 4.5 for \(style)/\(contrast)")
+                for background in [Theme.surface, Theme.background] {
+                    let secondaryRatio = contrastRatio(foreground: Theme.textSecondary, background: background, traits: collection)
+                    let tertiaryRatio = contrastRatio(foreground: Theme.textTertiary, background: background, traits: collection)
+                    #expect(secondaryRatio >= 4.5, "textSecondary contrast \(secondaryRatio) < 4.5 for \(style)/\(contrast)")
+                    #expect(tertiaryRatio >= 4.5, "textTertiary contrast \(tertiaryRatio) < 4.5 for \(style)/\(contrast)")
+                }
             }
         }
     }
@@ -82,8 +84,10 @@ struct ThemeContrastTests {
                 let ratio = contrastRatio(foreground: token, background: Theme.surface, traits: collection)
                 #expect(ratio >= 4.5, "status token contrast \(ratio) < 4.5 for \(style)")
             }
-            #expect(contrastRatio(foreground: .white, background: Theme.accentFill, traits: collection) >= 4.5)
-            #expect(contrastRatio(foreground: .white, background: Theme.infoFill, traits: collection) >= 4.5)
+            for fill in [Theme.accentFill, Theme.infoFill] {
+                #expect(contrastRatio(foreground: .white, background: fill, traits: collection) >= 4.5)
+                #expect(contrastRatio(foreground: fill, background: Theme.surface, traits: collection) >= 3.0)
+            }
         }
     }
 
@@ -96,16 +100,17 @@ struct ThemeContrastTests {
             let fillHigh = rgba(Theme.fill, traits: high)
             let sepNormal = rgba(Theme.separator, traits: normal)
             let sepHigh = rgba(Theme.separator, traits: high)
+            let sepContrastNormal = contrastRatio(foreground: Theme.separator, background: Theme.surface, traits: normal)
+            let sepContrastHigh = contrastRatio(foreground: Theme.separator, background: Theme.surface, traits: high)
             let decoNormal = rgba(Theme.decorationTertiary, traits: normal)
 
+            #expect(fillHigh != fillNormal)
+            #expect(sepHigh != sepNormal)
+            #expect(sepContrastHigh > sepContrastNormal)
+            #expect(decoNormal.alpha > 0)
             if style == .dark {
                 #expect(fillHigh.alpha > fillNormal.alpha)
                 #expect(sepHigh.alpha > sepNormal.alpha)
-                #expect(decoNormal.alpha > 0)
-            } else {
-                #expect(fillHigh != fillNormal)
-                #expect(sepHigh.alpha >= sepNormal.alpha)
-                #expect(decoNormal.alpha > 0)
             }
         }
     }

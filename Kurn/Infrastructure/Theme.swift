@@ -30,15 +30,15 @@ enum Theme {
     /// on light cards and status badges meet WCAG AA 4.5:1 contrast.
     static let accent = adaptive(dark: 0xFF453A, light: 0xB31912, lightSystem: .systemRed)
     /// Filled button background for destructive primary actions with white text
-    /// (#C91F16 in both appearances: 5.85:1 contrast with white text).
-    static let accentFill = Color(hex: "#C91F16")
+    /// (#D92B21 in both appearances: 4.86:1 with white text and 3.50:1 against #1C1C1E).
+    static let accentFill = Color(hex: "#D92B21")
     /// Status green: #32D74B in dark (8.9:1 on #1C1C1E), #116629 in light (7.07:1 on white, >6.0:1 on tinted pill).
     static let success = adaptive(dark: 0x32D74B, light: 0x116629, lightSystem: .systemGreen)
     /// Interactive / informational blue: #409CFF in dark (6.1:1 on #1C1C1E), #004A9F in light (8.4:1 on white).
     static let info = adaptive(dark: 0x409CFF, light: 0x004A9F, lightSystem: .systemBlue)
     /// Filled button background for non-destructive primary dialog actions with
-    /// white text (#0055B3 in both appearances: 7.3:1 contrast with white text).
-    static let infoFill = Color(hex: "#0055B3")
+    /// white text (#0B66D6 in both appearances: 5.40:1 with white text and 3.15:1 against #1C1C1E).
+    static let infoFill = Color(hex: "#0B66D6")
     /// Status amber: #FF9F0A in dark (8.3:1 on #1C1C1E), #854600 in light (7.16:1 on white, >6.0:1 on tinted pill).
     static let warning = adaptive(dark: 0xFF9F0A, light: 0x854600, lightSystem: .systemOrange)
     /// Camera viewfinder focus/zoom accent over dark live preview.
