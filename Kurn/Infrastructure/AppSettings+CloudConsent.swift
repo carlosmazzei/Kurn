@@ -42,11 +42,21 @@ extension AppSettings {
 
     /// Withdrawing automatic sending also turns off the per-recording features
     /// that were using this destination, so no toggle is left on without a grant.
-    func revokeAutomaticCloudConsent(_ destination: String) {
+    /// Since an automatic grant also implies on-request permission, preserving
+    /// an explicit on-request grant ensures on-request features keep working
+    /// when only automatic sending is withdrawn.
+    func revokeAutomaticCloudConsent(_ destination: String, includeAudio: Bool = true) {
         var ledger = cloudConsents
+        let allowedOnRequest = ledger.allows(destination, for: .onRequest)
+        let automaticGrantedAt = ledger.grant(for: destination, purpose: .automatic)?.grantedAt ?? Date()
         ledger.revoke(destination, for: .automatic)
+        if allowedOnRequest, !ledger.allows(destination, for: .onRequest) {
+            ledger.grant(destination, for: .onRequest, at: automaticGrantedAt)
+        }
         saveCloudConsents(ledger)
-        revokeCloudTranscriptionConsent(destination)
+        if includeAudio {
+            revokeCloudTranscriptionConsent(destination)
+        }
         if cloudConsentDestination(for: aiProvider) == destination {
             wikiEnabled = false
             correctionEnabled = false
@@ -86,7 +96,13 @@ extension AppSettings {
     /// destination that already holds a text or audio upload consent.
     var editableCloudConsentDestinations: [String] {
         let configured = providers
-            .filter { $0.kind != .appleOnDevice && (credentials.hasKey(for: $0) || $0.id == aiProviderID) }
+            .filter {
+                $0.kind != .appleOnDevice && (
+                    credentials.hasKey(for: $0) ||
+                    $0.id == aiProviderID ||
+                    $0.id == readAloud.providerID
+                )
+            }
             .map(cloudConsentDestination(for:))
         return Array(Set(configured).union(cloudConsentDestinationsForDisplay)).sorted()
     }

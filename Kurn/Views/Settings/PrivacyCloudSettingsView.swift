@@ -22,6 +22,7 @@ struct PrivacyCloudSettingsView: View {
     private struct Revocation: Equatable {
         let destination: String
         let everything: Bool
+        var includeAudio = true
     }
 
     var body: some View {
@@ -57,7 +58,10 @@ struct PrivacyCloudSettingsView: View {
                 if pendingRevocation.everything {
                     settings.revokeAllCloudConsent(pendingRevocation.destination)
                 } else {
-                    settings.revokeAutomaticCloudConsent(pendingRevocation.destination)
+                    settings.revokeAutomaticCloudConsent(
+                        pendingRevocation.destination,
+                        includeAudio: pendingRevocation.includeAudio
+                    )
                 }
                 self.pendingRevocation = nil
             },
@@ -127,7 +131,7 @@ struct PrivacyCloudSettingsView: View {
                 }
                 .accessibilityIdentifier("privacy.cloud.revoke")
             }
-            if onRequest || automatic || audio {
+            if onRequest || automatic || audio || provider?.id == settings.readAloud.providerID {
                 Button(PrivacyCloudCopy.text("revoke_all"), role: .destructive) {
                     pendingRevocation = Revocation(destination: destination, everything: true)
                 }
@@ -179,7 +183,7 @@ struct PrivacyCloudSettingsView: View {
             Toggle(
                 isOn: Binding(
                     get: { settings.templatesSyncEnabled },
-                    set: { settings.templatesSyncEnabled = $0 }
+                    set: { setTemplatesSync($0) }
                 )
             ) {
                 SettingsRowLabel(
@@ -233,7 +237,17 @@ struct PrivacyCloudSettingsView: View {
                 settings.grantCloudConsent(provider, for: .automatic)
             }
         } else {
-            pendingRevocation = Revocation(destination: destination, everything: false)
+            pendingRevocation = Revocation(destination: destination, everything: false, includeAudio: false)
+        }
+    }
+
+    private func setTemplatesSync(_ enabled: Bool) {
+        if enabled {
+            authorizeCloudChange {
+                settings.templatesSyncEnabled = true
+            }
+        } else {
+            settings.templatesSyncEnabled = false
         }
     }
 

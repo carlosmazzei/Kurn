@@ -132,6 +132,34 @@ struct AppSettingsCloudConsentTests {
         #expect(settings.allowsCloud(.openAI, for: .automatic))
     }
 
+    @Test func revokingAutomaticAlonePreservesOnRequestFromKnowledgeAndKeepsAudioUploadWhenExcluded() {
+        let settings = MeetingFixtures.isolatedSettings()
+        let destination = settings.cloudConsentDestination(for: .anthropic)
+        // Knowledge records only `.automatic`, which also satisfies `.onRequest`.
+        settings.grantCloudConsent(.anthropic, for: .automatic)
+        settings.recordCloudTranscriptionConsent(for: .anthropic)
+
+        settings.revokeAutomaticCloudConsent(destination, includeAudio: false)
+
+        #expect(!settings.allowsCloud(.anthropic, for: .automatic))
+        #expect(settings.allowsCloud(.anthropic, for: .onRequest))
+        #expect(settings.hasCloudTranscriptionConsent(for: .anthropic))
+    }
+
+    @Test func revokingAfterDisablingSoleAudioPermissionStillClearsReadAloudProvider() {
+        let settings = MeetingFixtures.isolatedSettings()
+        let destination = settings.cloudConsentDestination(for: .elevenLabs)
+        settings.recordCloudTranscriptionConsent(for: .elevenLabs)
+        settings.readAloud.providerID = AIProvider.elevenLabs.id
+
+        settings.revokeCloudTranscriptionConsent(destination)
+        #expect(!settings.hasCloudTranscriptionConsent(for: .elevenLabs))
+        #expect(settings.editableCloudConsentDestinations.contains(destination))
+
+        settings.revokeAllCloudConsent(destination)
+        #expect(settings.readAloud.providerID == AIProvider.appleOnDevice.id)
+    }
+
     @Test func editableCloudConsentDestinationsIncludesConfiguredProvidersEvenAfterRevokeAll() throws {
         let (defaults, suite) = try defaults()
         defer { defaults.removePersistentDomain(forName: suite) }

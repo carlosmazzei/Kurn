@@ -21,11 +21,50 @@ final class SettingsFlowUITests: FlowUITestCase {
     // MARK: - Privacy & Cloud
 
     func testPrivacyCloudRendersEditableToggles() {
-        openSettingsScreen("settings.link.privacyCloud")
+        openSettingsScreen("settings.link.providers")
+        let addButton = app.buttons["settings.providers.add"]
+        XCTAssertTrue(addButton.waitForExistence(timeout: 10))
+        addButton.tap()
+
+        let nameField = app.textFields["Provider Name"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        nameField.tap()
+        nameField.typeText("Test Cloud")
+        app.buttons["Save"].tap()
+        XCTAssertTrue(anyElement("settings.providers.form").waitForExistence(timeout: 5))
+        goBack(to: "Settings")
+
+        let privacyRow = app.buttons["settings.link.privacyCloud"]
+        XCTAssertTrue(scrollUntilExists(privacyRow))
+        scrollIntoSafeArea(privacyRow)
+        XCTAssertTrue(tapUntilCovered(privacyRow))
 
         XCTAssertTrue(anyElement("settings.privacy_cloud.form").waitForExistence(timeout: 10))
-        XCTAssertTrue(app.switches["privacy.cloud.requireAuth"].exists)
-        XCTAssertTrue(app.switches["privacy.cloud.hideLiveActivityTitle"].exists)
+        let onRequest = app.switches["privacy.cloud.onRequest"]
+        let automatic = app.switches["privacy.cloud.automatic"]
+        XCTAssertTrue(onRequest.waitForExistence(timeout: 5))
+        XCTAssertEqual(onRequest.value as? String, "1")
+        XCTAssertEqual(automatic.value as? String, "0")
+
+        automatic.switches.firstMatch.tap()
+        XCTAssertTrue(waitUntil(automatic, "value == '1'"))
+
+        automatic.switches.firstMatch.tap()
+        let dialogTitle = app.staticTexts["dialog.title"]
+        XCTAssertTrue(dialogTitle.waitForExistence(timeout: 5))
+        app.buttons["dialog.secondary"].tap()
+        XCTAssertTrue(dialogTitle.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(automatic.value as? String, "1")
+
+        automatic.switches.firstMatch.tap()
+        XCTAssertTrue(dialogTitle.waitForExistence(timeout: 5))
+        app.buttons["dialog.primary"].tap()
+        XCTAssertTrue(dialogTitle.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(automatic.value as? String, "0")
+        XCTAssertEqual(onRequest.value as? String, "1")
+
+        XCTAssertTrue(scrollUntilExists(app.switches["privacy.cloud.requireAuth"]))
+        XCTAssertTrue(scrollUntilExists(app.switches["privacy.cloud.hideLiveActivityTitle"]))
         XCTAssertTrue(scrollUntilExists(app.switches["privacy.cloud.templatesSync"]))
         XCTAssertTrue(scrollUntilExists(app.switches["privacy.cloud.diagnosticReports"]))
     }
