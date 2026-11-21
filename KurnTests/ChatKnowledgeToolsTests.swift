@@ -122,6 +122,9 @@ struct ChatKnowledgeToolsTests {
         #expect(try await run("get_entity", ["entityID": .string(UUID().uuidString)]).isError)
         #expect(try await run("get_entity", ["entityID": .string("not-a-uuid")]).isError)
         #expect(try await run("get_entity", ["entityID": .string(Self.project.uuidString), "limit": .number(21)]).isError)
+        let wiki = try await run("get_wiki_page", ["entityID": .string(Self.project.uuidString)])
+        #expect(wiki.content.contains("no generated narrative for this page; read its claims with get_entity"))
+        #expect(try await run("get_wiki_page", ["entityID": .string(UUID().uuidString)]).isError)
     }
 
     @Test func theTimelinePutsStatedTimeFirstAndUndatedLast() async throws {
@@ -216,6 +219,6 @@ struct ChatKnowledgeToolsTests {
         #expect(ChatKnowledgeToolText.valueText(.string("quoted")) == "quoted")
         let date = KnowledgeTemporalValue(text: "2026-11-12", precision: .day)
         #expect(date.map { ChatKnowledgeToolText.valueText(.date($0)) } == "2026-11-12")
-        #expect(ChatKnowledgeTools.names.count == 12)
+        #expect(ChatKnowledgeTools.names.count == 13)
     }
 }

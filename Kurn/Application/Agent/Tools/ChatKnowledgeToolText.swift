@@ -52,6 +52,12 @@ enum ChatKnowledgeToolText {
         return line + "\nclaims (assertion | claim | qualifiers | meeting | first evidence):"
     }
 
+    static func paragraph(_ paragraph: KnowledgeWikiNarrative.Paragraph, index: Int) -> Rendered {
+        let text = ChatSourceToolText.renderedField(paragraph.text, limit: 2_000)
+        let cites = paragraph.assertionIDs.map(\.uuidString).joined(separator: ", ")
+        return Rendered(text: "- \(index) | \(text.text) | \(cites)", omittedScalars: text.omittedScalars)
+    }
+
     static func claim(_ entry: KnowledgeWikiPage.Entry) -> Rendered {
         let text = ChatSourceToolText.renderedField(claimText(entry), limit: 400)
         var line = "- \(entry.fact.id.uuidString) | \(text.text) | \(qualifiers(entry.fact.qualifiers))"
