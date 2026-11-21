@@ -49,6 +49,27 @@ struct KnowledgeDeletionCoordinatorTests {
         #expect(rearm.calls == 2)
     }
 
+    /// Blocks the main thread, as a store transaction running on it does.
+    private func blockMain(until posted: DispatchSemaphore) -> DispatchTimeoutResult {
+        posted.wait(timeout: .now() + 5)
+    }
+
+    @Test func aStoreSaveNeverWaitsForTheMainThreadAndStillDrains() async {
+        let script = Script([])
+        let coordinator = KnowledgeDeletionCoordinator(queue: queue(), purge: { _ in try script.next() })
+        coordinator.observeStoreSaves()
+        let posted = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            NotificationCenter.default.post(name: .NSManagedObjectContextDidSave, object: nil)
+            posted.signal()
+        }
+        #expect(blockMain(until: posted) == .success)
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while script.calls == 0, ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(10)) }
+        await coordinator.waitUntilIdle()
+        #expect(script.calls >= 1)
+    }
+
     @Test func aFailureStopsTheDrainKeepsItsCodeAndAClearRunResetsIt() async {
         let script = Script([.failure(KnowledgeStoreError.invalidJob), .success(nil)])
         let coordinator = KnowledgeDeletionCoordinator(queue: queue(), purge: { _ in try script.next() })
