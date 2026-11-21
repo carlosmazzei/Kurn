@@ -25,10 +25,8 @@ final class AttachmentDeleteFlowUITests: FlowUITestCase {
         // Cancel: the dialog is fully on screen and the attachment stays.
         let delete = revealSwipeAction(on: row, identifier: "detail.attachments.delete", label: "Delete")
         XCTAssertTrue(delete.waitForExistence(timeout: 5))
-        delete.tap()
-
         let title = app.staticTexts["dialog.title"]
-        XCTAssertTrue(title.waitForExistence(timeout: 5), "Deleting an attachment must ask first")
+        XCTAssertTrue(tap(delete, until: title), "Deleting an attachment must ask first")
         let cancel = app.buttons["dialog.secondary"]
         let confirm = app.buttons["dialog.primary"]
         XCTAssertTrue(cancel.isHittable, "Cancel must be reachable without scrolling")
@@ -41,8 +39,7 @@ final class AttachmentDeleteFlowUITests: FlowUITestCase {
         // Confirm: the attachment is removed.
         let deleteAgain = revealSwipeAction(on: row, identifier: "detail.attachments.delete", label: "Delete")
         XCTAssertTrue(deleteAgain.waitForExistence(timeout: 5))
-        deleteAgain.tap()
-        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertTrue(tap(deleteAgain, until: title))
         confirm.tap()
         XCTAssertTrue(title.waitForNonExistence(timeout: 5))
         XCTAssertTrue(row.waitForNonExistence(timeout: 5), "Confirming must remove the attachment")

@@ -112,7 +112,10 @@ final class SemanticIndexCoordinator {
         let allMeetings = (try? modelContext.fetch(FetchDescriptor<Meeting>())) ?? []
         let transcribedRecordingIDs = Set(allMeetings.flatMap { meeting in
             meeting.recordings
-                .filter { !($0.transcript?.segments.isEmpty ?? true) }
+                .filter { recording in
+                    guard let transcript = recording.transcript else { return false }
+                    return !transcript.segments.isEmpty || transcript.isSegmentsDataCorrupted
+                }
                 .map(\.id)
         })
         let stale = ((try? modelContext.fetch(FetchDescriptor<SemanticChunk>())) ?? []).filter { chunk in
