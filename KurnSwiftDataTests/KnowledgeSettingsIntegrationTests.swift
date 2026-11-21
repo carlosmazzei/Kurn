@@ -20,9 +20,14 @@ struct KnowledgeSettingsIntegrationTests {
         let provider = AIProvider.appleOnDevice
         let gate: Gate?
         var calls = 0
+        var narrativeCalls = 0
         init(gate: Gate? = nil) { self.gate = gate }
         func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult { SummaryResult(sections: []) }
         func chat(systemPrompt: String, messages: [ChatMessage], options: TextGenerationOptions) async throws -> String {
+            if systemPrompt == KnowledgeNarrativePrompt.systemPrompt {
+                narrativeCalls += 1
+                return "Example topic is open [c1].\n\nAn uncited aside."
+            }
             calls += 1
             if calls == 1 { await gate?.wait() }
             let data = try #require(messages.first?.content.data(using: .utf8))
@@ -99,7 +104,7 @@ struct KnowledgeSettingsIntegrationTests {
         #expect(try await f.management.preview(meetingIDs: f.ids, rebuild: false).pending.isEmpty)
     }
 
-    @Test func explicitRebuildRetriesReuseTheirGenerationAndPageRebuildNeedsNoModel() async throws {
+    @Test func explicitRebuildRetriesReuseTheirGenerationAndPageRebuildWritesNarratives() async throws {
         let f = try fixture()
         #expect(await f.compiler.compile(meetingID: f.meeting.id, trigger: .explicit) == .completed)
         let plan = try await f.management.preview(meetingIDs: f.ids, rebuild: true)
@@ -107,8 +112,15 @@ struct KnowledgeSettingsIntegrationTests {
         f.management.start(plan); await f.management.waitUntilIdle()
         #expect(await f.provider.calls == 2)
         try await f.management.rebuildPages(meetingIDs: f.ids)
+        let narrativeCalls = await f.provider.narrativeCalls
         #expect(await f.provider.calls == 2)
+        #expect(narrativeCalls == 1)
         let store = await f.queue.writer()
+        let compiler = f.compiler, ids = f.ids
+        let read = try await store.browserRead(meetingIDs: ids, authorization: { await compiler.browserReadAuthorization(meetingIDs: ids) })
+        let narrative = try #require(read.pages.first?.narrative)
+        #expect(narrative.paragraphs.map(\.text) == ["Example topic is open."])
+        #expect(narrative.paragraphs.first?.assertionIDs == read.pages.first?.sections.flatMap(\.entries).map(\.fact.id))
         #expect(try await store.pendingProjection() == nil)
         let coverage = try await f.management.coverage(meetingIDs: f.ids)
         #expect(coverage.report.coverage.first?.examinedSegments == 1)

@@ -90,7 +90,31 @@ final class KnowledgeSettingsCoordinator {
                 ?? KnowledgeSourceAuthorization(featureEnabled: false, meetingIDs: [], policies: [], sourceClassifications: [])
         }
         let snapshot = try await store.wikiProjectionSnapshot(meetingIDs: meetingIDs, scope: "workspace", authorization: authorization)
-        _ = try await store.publishWikiProjection(snapshot, authorization: authorization)
+        let classifications = try await store.browserRead(meetingIDs: meetingIDs, authorization: authorization).sourceClassifications
+        let narratives = await pageNarratives(snapshot.wiki, classifications: classifications)
+        _ = try await store.publishWikiProjection(snapshot, narratives: narratives, authorization: authorization)
+    }
+
+    /// Pages that get a generated narrative per rebuild, the ones with the most claims first.
+    static let narrativePageLimit = 24
+
+    /// Best effort: a page whose generation fails or cites none of its claims keeps its claims alone.
+    private func pageNarratives(_ wiki: KnowledgeWikiSnapshot, classifications: [KnowledgeClassification]) async -> [KnowledgeWikiNarrative] {
+        guard let llm = compilation.narrativeModel(classifications: classifications),
+              let pages = try? KnowledgeWikiProjector.project(wiki) else { return [] }
+        let ranked = pages.sorted { $0.sections.flatMap(\.entries).count > $1.sections.flatMap(\.entries).count }
+        var narratives: [KnowledgeWikiNarrative] = []
+        for page in ranked.prefix(Self.narrativePageLimit) {
+            guard !Task.isCancelled else { break }
+            guard let request = KnowledgeNarrativePrompt.request(page),
+                  let text = try? await withResourceReservation(.knowledgeGeneration(onDevice: llm.provider.kind == .appleOnDevice), {
+                      try await llm.chat(systemPrompt: KnowledgeNarrativePrompt.systemPrompt,
+                                         messages: [ChatMessage(role: .user, content: request.userPrompt)])
+                  }),
+                  let narrative = KnowledgeNarrativePrompt.parse(text, entityID: page.entity.id, references: request.references) else { continue }
+            narratives.append(narrative)
+        }
+        return narratives
     }
 
     private func read(meetingIDs: Set<UUID>) async throws -> KnowledgeBackfillRead {

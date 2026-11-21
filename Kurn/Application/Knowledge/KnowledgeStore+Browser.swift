@@ -32,7 +32,10 @@ extension KnowledgeStore {
             contexts[source.meetingID] = KnowledgeBrowserContext(id: contextID, kind: source.contextKind, name: occasion.name,
                                                                   classification: source.contextClassification)
         }
-        return try KnowledgeBrowserRead(meetingIDs: meetingIDs, wiki: snapshot.wiki, meetingTitles: titles, selectedEvidence: evidence,
+        let narratives = (try? KnowledgeWikiProjectionRows.read(meetingIDs: meetingIDs, scope: "workspace", auth: auth,
+                                                                container: modelContainer))?.pages.compactMap(\.narrative) ?? []
+        return try KnowledgeBrowserRead(meetingIDs: meetingIDs, wiki: snapshot.wiki, meetingTitles: titles, narratives: narratives,
+                                        selectedEvidence: evidence,
             policyRevisionKey: snapshot.policyRevisionKey, allowsEmbedding: allowsEmbedding, meetingContexts: contexts)
     }
 }

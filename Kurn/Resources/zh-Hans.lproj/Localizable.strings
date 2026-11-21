@@ -1433,6 +1433,9 @@
 "knowledge.browser.refresh" = "刷新";
 "knowledge.browser.export" = "导出 Knowledge";
 "knowledge.browser.export_failed" = "无法导出 Knowledge";
+"knowledge.browser.narrative" = "笔记";
+"knowledge.browser.narrative_note" = "根据下方的陈述生成；依赖前请先核对。";
+"knowledge.browser.narrative_sources" = "依据 %d 条陈述";
 "knowledge.browser.ask_entity" = "就此提问";
 "knowledge.browser.ask_draft" = "关于%@我们知道什么？";
 "knowledge.browser.page" = "页面部分";
