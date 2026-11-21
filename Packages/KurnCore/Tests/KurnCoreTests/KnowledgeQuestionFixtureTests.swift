@@ -27,7 +27,7 @@ struct KnowledgeQuestionSet: Decodable {
         let citable: [String]
 
         var expectation: KnowledgeAnswerScorer.Expectation {
-            .init(expected: Set(expected), forbidden: Set(forbidden.map { "!\($0)" }), mustRefuse: mustRefuse)
+            .init(expected: Set(expected), forbidden: Set(forbidden.map { "!\($0)" }), mustRefuse: mustRefuse, citable: Set(citable))
         }
     }
 
@@ -94,7 +94,7 @@ struct KnowledgeQuestionFixtureTests {
         }
         let summary = KnowledgeAnswerScorer.summary(scores)
         #expect(summary == .init(questions: set.questions.count, precision: 1, recall: 1, forbiddenStated: 0,
-                                 refusalsHonoured: 1, citationsResolvable: 1))
+                                 refusalsHonoured: 1, citationsResolvable: 1, citationsGrounded: 1))
     }
 
     @Test func declineEverythingIsABaselineNotAPass() throws {
@@ -107,10 +107,17 @@ struct KnowledgeQuestionFixtureTests {
     }
 
     @Test func statingATemptingClaimOrCitingAMissingSegmentIsPenalised() {
-        let expectation = KnowledgeAnswerScorer.Expectation(expected: ["a1"], forbidden: ["!0"], mustRefuse: false)
+        let expectation = KnowledgeAnswerScorer.Expectation(expected: ["a1"], forbidden: ["!0"], mustRefuse: false, citable: ["m1/s1"])
         let score = KnowledgeAnswerScorer.score(.init(stated: ["a1", "!0"], refused: false, cited: ["m1/s1", "m9/s9"]),
                                                 against: expectation, resolvable: ["m1/s1"])
-        #expect(score == .init(precision: 0.5, recall: 1, forbiddenStated: 1, refusalHonoured: true, citationsResolvable: false))
+        #expect(score == .init(precision: 0.5, recall: 1, forbiddenStated: 1, refusalHonoured: true, citationsResolvable: false,
+                               citationsGrounded: false))
+        // A real segment unrelated to the question, or no citation at all, is not grounding.
+        let unrelated = KnowledgeAnswerScorer.score(.init(stated: ["a1"], refused: false, cited: ["m1/s2"]),
+                                                    against: expectation, resolvable: ["m1/s1", "m1/s2"])
+        #expect(unrelated.citationsResolvable && !unrelated.citationsGrounded)
+        #expect(!KnowledgeAnswerScorer.score(.init(stated: ["a1"], refused: false, cited: []), against: expectation,
+                                             resolvable: ["m1/s1"]).citationsGrounded)
         #expect(KnowledgeAnswerScorer.summary([]).questions == 0)
     }
 }

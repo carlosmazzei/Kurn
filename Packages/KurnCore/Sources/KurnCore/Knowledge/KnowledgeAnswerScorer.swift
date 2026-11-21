@@ -8,11 +8,14 @@ public enum KnowledgeAnswerScorer {
         public let expected: Set<String>
         public let forbidden: Set<String>
         public let mustRefuse: Bool
+        /// The `source/segment` IDs a grounded answer may cite.
+        public let citable: Set<String>
 
-        public init(expected: Set<String>, forbidden: Set<String>, mustRefuse: Bool) {
+        public init(expected: Set<String>, forbidden: Set<String>, mustRefuse: Bool, citable: Set<String>) {
             self.expected = expected
             self.forbidden = forbidden
             self.mustRefuse = mustRefuse
+            self.citable = citable
         }
     }
 
@@ -36,6 +39,8 @@ public enum KnowledgeAnswerScorer {
         public let forbiddenStated: Int
         public let refusalHonoured: Bool
         public let citationsResolvable: Bool
+        /// Cites only the question's citable segments, and cites at least one when it must state something.
+        public let citationsGrounded: Bool
     }
 
     public struct Summary: Equatable, Sendable {
@@ -45,6 +50,7 @@ public enum KnowledgeAnswerScorer {
         public let forbiddenStated: Int
         public let refusalsHonoured: Double
         public let citationsResolvable: Double
+        public let citationsGrounded: Double
     }
 
     /// `resolvable` is every `source/segment` ID in the question's fixture.
@@ -54,7 +60,9 @@ public enum KnowledgeAnswerScorer {
                      recall: expectation.expected.isEmpty ? 1 : Double(correct) / Double(expectation.expected.count),
                      forbiddenStated: observation.stated.intersection(expectation.forbidden).count,
                      refusalHonoured: observation.refused == expectation.mustRefuse,
-                     citationsResolvable: observation.cited.isSubset(of: resolvable))
+                     citationsResolvable: observation.cited.isSubset(of: resolvable),
+                     citationsGrounded: observation.cited.isSubset(of: expectation.citable)
+                        && (expectation.expected.isEmpty || !observation.cited.isEmpty))
     }
 
     public static func summary(_ scores: [Score]) -> Summary {
@@ -64,6 +72,7 @@ public enum KnowledgeAnswerScorer {
         return Summary(questions: scores.count, precision: mean(\.precision), recall: mean(\.recall),
                        forbiddenStated: scores.map(\.forbiddenStated).reduce(0, +),
                        refusalsHonoured: mean { $0.refusalHonoured ? 1 : 0 },
-                       citationsResolvable: mean { $0.citationsResolvable ? 1 : 0 })
+                       citationsResolvable: mean { $0.citationsResolvable ? 1 : 0 },
+                       citationsGrounded: mean { $0.citationsGrounded ? 1 : 0 })
     }
 }
