@@ -35,9 +35,10 @@ extension MeetingDetailView {
             .accessibilityHint(NSLocalizedString("detail.attachments.open_hint", comment: "Opens the document"))
             .clearListRow(insets: EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
             .swipeActions(edge: .trailing) {
-                Button(role: .destructive) { attachments.delete(attachment, context: modelContext) } label: {
+                Button(role: .destructive) { attachments.requestDelete(attachment) } label: {
                     Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
                 }
+                .accessibilityIdentifier("detail.attachments.delete")
             }
         }
         addAttachmentButton
@@ -75,6 +76,23 @@ extension MeetingDetailView {
         .buttonStyle(.plain)
         .disabled(attachments.isImporting)
         .accessibilityIdentifier("detail.attachments.add")
+        .kurnDialog(
+            isPresented: Binding(
+                get: { attachments.pendingDelete != nil },
+                set: { if !$0 { attachments.cancelDelete() } }
+            ),
+            iconSystemName: "trash.circle.fill",
+            iconTint: Theme.warning,
+            title: NSLocalizedString("detail.attachments.delete_confirm.title", comment: "Delete attachment confirmation"),
+            message: String(
+                format: NSLocalizedString("detail.attachments.delete_confirm.message", comment: "Delete attachment message"),
+                attachments.pendingDelete?.displayName ?? ""
+            ),
+            primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
+            primaryRole: .destructive,
+            primaryAction: { attachments.confirmDelete(context: modelContext) },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
     }
 }
 
