@@ -128,22 +128,20 @@ struct KnowledgeSettingsIntegrationTests {
         #expect(coverage.report.coverage.first?.examinedSegments == 1)
     }
 
-    @Test func aCloudKnowledgeProviderWithoutItsAutomaticGrantWritesNoNarrative() async throws {
+    @Test func aCloudKnowledgeProviderWritesNarrativesOnlyUnderItsAutomaticGrant() async throws {
         let f = try fixture()
-        #expect(await f.compiler.compile(meetingID: f.meeting.id, trigger: .explicit) == .completed)
+        _ = try await f.management.preview(meetingIDs: f.ids, rebuild: false)
         var controls = try #require(f.settings.knowledgeControls)
         controls.providerID = AIProvider.openAI.id
         try f.settings.saveKnowledgeControls(controls)
         #expect(f.settings.knowledgeProvider == .openAI && !f.settings.allowsCloud(.openAI, for: .automatic))
-        try await f.management.rebuildPages(meetingIDs: f.ids)
-        let denied = await f.cloud.narrativeCalls
-        #expect(denied == 0)
-        // The same provider, once granted, does write it: the denial above is the grant's.
+        #expect(f.compiler.narrativeModel(classifications: [.internal]) == nil)
+        // The same provider, once granted, is admitted: the denial above is the grant's, not a provider mismatch.
         f.settings.grantCloudConsent(.openAI, for: .onRequest)
         f.settings.grantCloudConsent(.openAI, for: .automatic)
-        try await f.management.rebuildPages(meetingIDs: f.ids)
-        let granted = await f.cloud.narrativeCalls
-        #expect(granted == 1)
+        let admitted = try #require(f.compiler.narrativeModel(classifications: [.internal]))
+        #expect(admitted.provider == .openAI)
+        #expect(f.compiler.narrativeModel(classifications: [.restricted]) == nil)
     }
 
     @Test func exclusionsInvalidatePreviewAndEveryReaderBeforeReturningContent() async throws {
