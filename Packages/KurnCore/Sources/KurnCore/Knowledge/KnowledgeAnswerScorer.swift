@@ -10,12 +10,16 @@ public enum KnowledgeAnswerScorer {
         public let mustRefuse: Bool
         /// The `source/segment` IDs a grounded answer may cite.
         public let citable: Set<String>
+        /// Each expected assertion's evidence segments: a grounded answer cites one for every claim it states.
+        public let evidence: [String: Set<String>]
 
-        public init(expected: Set<String>, forbidden: Set<String>, mustRefuse: Bool, citable: Set<String>) {
+        public init(expected: Set<String>, forbidden: Set<String>, mustRefuse: Bool, citable: Set<String>,
+                    evidence: [String: Set<String>] = [:]) {
             self.expected = expected
             self.forbidden = forbidden
             self.mustRefuse = mustRefuse
             self.citable = citable
+            self.evidence = evidence
         }
     }
 
@@ -42,7 +46,8 @@ public enum KnowledgeAnswerScorer {
         public let forbiddenStated: Int
         public let refusalHonoured: Bool
         public let citationsResolvable: Bool
-        /// Cites only the question's citable segments, and cites at least one when it must state something.
+        /// Cites only the question's citable segments, at least one when it must state something, and
+        /// some evidence of every expected claim it states.
         public let citationsGrounded: Bool
     }
 
@@ -66,7 +71,10 @@ public enum KnowledgeAnswerScorer {
                      refusalHonoured: observation.refused == expectation.mustRefuse,
                      citationsResolvable: observation.cited.isSubset(of: resolvable),
                      citationsGrounded: observation.cited.isSubset(of: expectation.citable)
-                        && (expectation.expected.isEmpty || !observation.cited.isEmpty))
+                        && (expectation.expected.isEmpty || !observation.cited.isEmpty)
+                        && observation.stated.intersection(expectation.expected).allSatisfy { claim in
+                            expectation.evidence[claim].map { !$0.isDisjoint(with: observation.cited) } ?? true
+                        })
     }
 
     public static func summary(_ scores: [Score]) -> Summary {

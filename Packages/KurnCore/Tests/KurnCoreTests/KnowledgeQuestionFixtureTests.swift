@@ -26,8 +26,15 @@ struct KnowledgeQuestionSet: Decodable {
         let mustRefuse: Bool
         let citable: [String]
 
-        var expectation: KnowledgeAnswerScorer.Expectation {
-            .init(expected: Set(expected), forbidden: Set(forbidden.map { "!\($0)" }), mustRefuse: mustRefuse, citable: Set(citable))
+        var expectation: KnowledgeAnswerScorer.Expectation { expectation(in: nil) }
+
+        func expectation(in fixture: KnowledgeFixture?) -> KnowledgeAnswerScorer.Expectation {
+            let assertions = fixture?.expected.assertions.filter { expected.contains($0.ref) } ?? []
+            let evidence = Dictionary(uniqueKeysWithValues: assertions.map { assertion in
+                (assertion.ref, Set(assertion.evidence.flatMap { item in item.segmentIDs.map { "\(item.source)/\($0)" } }))
+            })
+            return .init(expected: Set(expected), forbidden: Set(forbidden.map { "!\($0)" }), mustRefuse: mustRefuse,
+                         citable: Set(citable), evidence: evidence)
         }
     }
 
@@ -89,8 +96,9 @@ struct KnowledgeQuestionFixtureTests {
         for question in set.questions {
             let oracle = KnowledgeAnswerScorer.Observation(stated: Set(question.expected), refused: question.mustRefuse,
                                                            cited: Set(question.citable))
-            scores.append(KnowledgeAnswerScorer.score(oracle, against: question.expectation,
-                                                      resolvable: Self.segments(try Self.fixture(question.fixture))))
+            let fixture = try Self.fixture(question.fixture)
+            scores.append(KnowledgeAnswerScorer.score(oracle, against: question.expectation(in: fixture),
+                                                      resolvable: Self.segments(fixture)))
         }
         let summary = KnowledgeAnswerScorer.summary(scores)
         #expect(summary == .init(questions: set.questions.count, precision: 1, recall: 1, forbiddenStated: 0,
@@ -119,6 +127,10 @@ struct KnowledgeQuestionFixtureTests {
         #expect(!KnowledgeAnswerScorer.score(.init(stated: ["a1"], refused: false, cited: []), against: expectation,
                                              resolvable: ["m1/s1"]).citationsGrounded)
         #expect(KnowledgeAnswerScorer.summary([]).questions == 0)
+        let both = KnowledgeAnswerScorer.Expectation(expected: ["a7", "a8"], forbidden: [], mustRefuse: false,
+            citable: ["m2/s7", "m2/s8"], evidence: ["a7": ["m2/s7"], "a8": ["m2/s8"]])
+        #expect(!KnowledgeAnswerScorer.score(.init(stated: ["a7", "a8"], refused: false, cited: ["m2/s7"]), against: both,
+                                             resolvable: ["m2/s7", "m2/s8"]).citationsGrounded)
         let invented = KnowledgeAnswerScorer.score(.init(stated: ["a1"], unsupportedClaims: 1, refused: false, cited: ["m1/s1"]),
                                                    against: expectation, resolvable: ["m1/s1"])
         #expect(invented.precision == 0.5)
