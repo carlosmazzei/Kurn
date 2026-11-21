@@ -112,7 +112,9 @@ struct KnowledgeSettingsIntegrationTests {
         f.management.start(plan); await f.management.waitUntilIdle()
         #expect(await f.provider.calls == 2)
         try await f.management.rebuildPages(meetingIDs: f.ids)
-        #expect(await f.provider.calls == 2 && f.provider.narrativeCalls == 1)
+        let narrativeCalls = await f.provider.narrativeCalls
+        #expect(await f.provider.calls == 2)
+        #expect(narrativeCalls == 1)
         let store = await f.queue.writer()
         let compiler = f.compiler, ids = f.ids
         let read = try await store.browserRead(meetingIDs: ids, authorization: { await compiler.browserReadAuthorization(meetingIDs: ids) })
