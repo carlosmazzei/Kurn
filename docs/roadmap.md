@@ -518,8 +518,8 @@ VoiceOver order.
 | # | Result | Where | Fix (phase) |
 | --- | --- | --- | --- |
 | G1 | **Destructive action with no confirmation, three places** (done). Swipe-delete of an attached PDF (`MeetingAttachmentsViewModel.pendingDelete` + `kurnDialog`); "Clear wiki" (`WikiSettingsView` `kurnDialog` naming regeneration cost); "Clear index" (`SemanticSearchSettingsView` `kurnDialog` naming local rebuild) | `MeetingDetailAttachments.swift`, `MeetingDetailView.swift`, `WikiSettingsView.swift`, `SemanticSearchSettingsView.swift` | Done (`kurnDialog` naming what is lost and what regenerating costs) |
-| G2 | **Tap targets under 44 pt with no `contentShape`:** pause, stop and the other transcription controls in recording rows (30 pt, 5 places) and the 34 pt play button; photo-capture controls (36–40 pt); a 36 pt control in `DesignComponents`; 32–40 pt swatches in the folder form and template editor | `RecordingSegmentRow.swift:42,105–167`, `PhotoCaptureView.swift:153,215,290`, `DesignComponents.swift:212`, `FolderFormView.swift:53,101`, `TemplateEditorView.swift:22` | Keep the glyph, extend the hit area to 44 × 44 with `contentShape` and padding; the audit's `.hitRegion` should then pass (U3.4) |
-| G3 | **System colours instead of tokens for status** (done). Routed `.green`, `.red`, `.orange`, `.yellow` through `Theme.success`, `Theme.accent`, `Theme.warning` and `Theme.cameraAccent`, with adaptive light-mode variants (`#1B7F37`, `#C91F16`, `#9E5800`, `#0055B3`) that exceed 4.5:1 text and 3:1 glyph contrast | `StorageSettingsView.swift`, `HealthRecoveryView+Sections.swift`, `StorageSettingsSections.swift`, `LanguagePickerRow.swift`, `PhotoCaptureView.swift`, `Theme.swift` | Done (U2) |
+| G2 | **Tap targets under 44 pt with no `contentShape`** (done). Expanded hit targets to ≥ 44 × 44 pt with `frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())` across recording row controls, scrubber controls, transcript rows, photo capture, folder form icon/color swatches and chips; added localized `FolderIconCatalog.accessibleName(for:)` labels across 7 locales | `RecordingSegmentRow.swift`, `SegmentPlaybackScrubber.swift`, `TranscriptView.swift`, `PhotoCaptureView.swift`, `DesignComponents.swift`, `FolderFormView.swift`, `ColorAccessibility.swift` | Done (U3.4) |
+| G3 | **System colours instead of tokens for status** (done). Routed `.green`, `.red`, `.orange`, `.yellow` through `Theme.success`, `Theme.accent`, `Theme.warning` and `Theme.cameraAccent`, with adaptive light-mode variants (`#116629`, `#B31912`, `#854600`, `#004A9F`) that exceed 4.5:1 text and 3:1 glyph contrast | `StorageSettingsView.swift`, `HealthRecoveryView+Sections.swift`, `StorageSettingsSections.swift`, `LanguagePickerRow.swift`, `PhotoCaptureView.swift`, `Theme.swift` | Done (U2) |
 | G4 | **Sheet size:** about 59 presentations, and only 12 files set `presentationDetents`. Short forms with none: filter bar, tag editor, tag merge, folder form, folder picker, knowledge meeting selection, chat source sheet. Settings or call sites may set them elsewhere, so confirm each on a device | `FilterBarView`, `TagEditorView`, `TagMergeView`, `FolderFormView`, `FolderPickerView`, `KnowledgeMeetingSelectionView`, `ChatSourceSheet` | `.medium`/`[.medium, .large]` per "Modal weight" (U1, rule 8) |
 | G5 | **Sheet chrome to confirm:** `TranscriptionSettingsView`, `MeetingChatView` and `MeetingWikiView` are presented as sheets but their own files hold no `NavigationStack`; the host may supply it | those files | Confirm each has a title and an explicit Cancel/Done on a device (U0b.1) |
 | G6 | **Button styles in use:** `.plain` 85, `.borderless` 16, `.glassProminent` 12, `.bordered` 9, `.glass` 4. `.borderless` is outside the table; whether each screen has exactly one prominent action was not checked | `grep` | Add `.borderless` to the table with its reason; check one prominent action per screen in the pattern table (U0b.1) |
@@ -800,21 +800,22 @@ screenshots with no severity-3 or -4 visual finding.
 ### U3 · Elastic layout to AX5 (2 sprints)
 
 Work through the baseline counts, not the whole list of anti-patterns:
-1. Replace the 8 non-exempt fixed sizes with `Theme` fonts or `@ScaledMetric`
+1. **Replace non-exempt fixed sizes** (done) with `Theme` fonts or `@ScaledMetric`
    (`PhotoCaptureView`, `DesignComponents`, `TemplateEditorView`, `FolderFormView`,
-   `MeetingDetailTabs`, `MeetingChatView`, `TranscriptView`). Each remaining
-   `.system(size:)` keeps its inline reason.
-2. Remove `.lineLimit(1)` on content (list rows, chips, `ChatSessionListView`,
-   `DocumentsListView`, `MeetingsListComponents`); chips wrap or move to a
-   vertical layout.
-3. Make `MeetingDetailTabs` heights (42/54 pt) `minHeight` scaled with
-   `@ScaledMetric`; `TagChipsView`, tab picker and `FilterBarView` use
-   `ViewThatFits` with a vertical fallback. The recorder and mini bar keep their
-   capped `dynamicTypeSize(...accessibility2)` and gain a Large Content Viewer
-   (`accessibilityShowsLargeContentViewer`) for their icon-only transport
-   controls.
-4. Hit targets: every icon-only control ≥ 44×44 pt (`SegmentPlaybackScrubber`
-   at 24 pt is the known one) via `contentShape`, not a bigger glyph.
+   `MeetingDetailTabs`, `TranscriptView`), and localize all 18 `FolderIconCatalog`
+   SF Symbol accessibility labels (`ColorAccessibility.swift`) so `FolderFormView`
+   never exposes raw symbol identifiers to VoiceOver.
+2. **Remove `.lineLimit(1)` clipping on content** (done) across list rows, chips,
+   `ChatSessionListView`, `DocumentsListView`, `MeetingsListComponents`,
+   `FilterChip` and `KnowledgeChipLabel`.
+3. **Make `MeetingDetailTabs` heights (`44`/`54` pt) `minHeight` scaled with
+   `@ScaledMetric`** (done), and add Large Content Viewer
+   (`accessibilityShowsLargeContentViewer`) to icon-only transport controls in
+   `RecorderView` and `RecordingMiniBar`.
+4. **Hit targets** (done): every interactive icon-only control and chip reaches
+   ≥ 44×44 pt (`RecordingSegmentRow`, `SegmentPlaybackScrubber`, `TranscriptView`,
+   `FolderFormView`, `PhotoCaptureView`, `FilterChip`, `KnowledgeChipLabel`,
+   `RecordingMiniBar`) via `frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())`.
 5. `GeometryReader` stays for the scrubber, graph canvas and chat sizing; none
    decides a text layout.
 Exit: `.dynamicType`, `.textClipped` and `.hitRegion` audits clean at AX5.

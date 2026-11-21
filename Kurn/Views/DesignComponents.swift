@@ -39,7 +39,7 @@ struct FlowLayout: Layout {
         var rowHeight: CGFloat = 0
 
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            let size = measuredSize(of: subview, maxWidth: bounds.width)
             if x > bounds.minX, x + size.width > bounds.maxX {
                 x = bounds.minX
                 y += rowHeight + verticalSpacing
@@ -62,7 +62,7 @@ struct FlowLayout: Layout {
         var contentWidth: CGFloat = 0
 
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            let size = measuredSize(of: subview, maxWidth: width)
             if x > 0, x + size.width > width {
                 x = 0
                 y += rowHeight + verticalSpacing
@@ -74,6 +74,15 @@ struct FlowLayout: Layout {
         }
 
         return (contentWidth, subviews.isEmpty ? 0 : y + rowHeight)
+    }
+
+    private func measuredSize(of subview: LayoutSubview, maxWidth: CGFloat) -> CGSize {
+        let natural = subview.sizeThatFits(.unspecified)
+        guard maxWidth.isFinite, maxWidth > 0, natural.width > maxWidth else {
+            return natural
+        }
+        let constrained = subview.sizeThatFits(ProposedViewSize(width: maxWidth, height: nil))
+        return CGSize(width: min(natural.width, max(constrained.width, maxWidth)), height: constrained.height)
     }
 }
 
@@ -152,7 +161,8 @@ struct FilterChip: View {
         Button(action: action) {
             Text(title)
                 .font(.system(.footnote, design: .default, weight: isSelected ? .semibold : .regular))
-                .lineLimit(1)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 6)
                 .foregroundStyle(isSelected ? selectedForeground : Theme.textSecondary)
@@ -166,6 +176,8 @@ struct FilterChip: View {
                             .strokeBorder(isSelected ? selectedForeground.opacity(0.4) : Theme.separator, lineWidth: 1)
                     }
                 }
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -241,9 +253,8 @@ struct KurnDialogModifier: ViewModifier {
                     Circle()
                         .fill(iconTint.opacity(0.14))
                         .frame(width: 36, height: 36)
-                    // Fixed size to fit the fixed 36x36 icon well.
                     Image(systemName: iconSystemName)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(Theme.calloutEmphasized)
                         .foregroundStyle(iconTint)
                 }
 

@@ -224,11 +224,21 @@ struct RecordingMiniBar: View {
                     .foregroundStyle(Theme.textPrimary)
                     .frame(width: controlSize, height: controlSize)
                     .background(Theme.fill, in: Circle())
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(isPaused
                 ? NSLocalizedString("recorder.resume", comment: "Resume")
                 : NSLocalizedString("recorder.pause", comment: "Pause"))
+            .accessibilityShowsLargeContentViewer {
+                Label(
+                    isPaused
+                        ? NSLocalizedString("recorder.resume", comment: "Resume")
+                        : NSLocalizedString("recorder.pause", comment: "Pause"),
+                    systemImage: isPaused ? "play.fill" : "pause.fill"
+                )
+            }
             .accessibilityIdentifier("recorder.mini.pause")
 
             Button {
@@ -240,9 +250,14 @@ struct RecordingMiniBar: View {
                     .foregroundStyle(.white)
                     .frame(width: controlSize, height: controlSize)
                     .background(Theme.accent, in: Circle())
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(NSLocalizedString("recorder.stop", comment: "Stop"))
+            .accessibilityShowsLargeContentViewer {
+                Label(NSLocalizedString("recorder.stop", comment: "Stop"), systemImage: "stop.fill")
+            }
             .accessibilityIdentifier("recorder.mini.stop")
         }
         .padding(.leading, 16)

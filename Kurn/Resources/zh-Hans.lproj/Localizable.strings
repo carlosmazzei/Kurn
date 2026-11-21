@@ -1671,3 +1671,22 @@
 "settings.wiki_clear_confirm.message" = "所有已生成的会议 Wiki 文章都将从此设备中移除。重新生成将调用已配置的 AI 提供商，并可能产生费用。";
 "settings.semantic_clear_confirm.title" = "清除语义搜索索引？";
 "settings.semantic_clear_confirm.message" = "本地语义搜索索引将被移除。你可以随时在此设备上重建索引，不会删除你的会议。";
+/* Folder icon accessibility labels */
+"folder.icon.folder" = "文件夹";
+"folder.icon.briefcase" = "工作";
+"folder.icon.house" = "家庭";
+"folder.icon.people" = "人员";
+"folder.icon.graduationcap" = "教育";
+"folder.icon.heart" = "健康";
+"folder.icon.star" = "星标";
+"folder.icon.book" = "书籍";
+"folder.icon.document" = "文档";
+"folder.icon.bookmark" = "书签";
+"folder.icon.bag" = "购物";
+"folder.icon.airplane" = "旅行";
+"folder.icon.car" = "交通";
+"folder.icon.gift" = "礼物";
+"folder.icon.camera" = "相机";
+"folder.icon.pin" = "图钉";
+"folder.icon.flag" = "旗帜";
+"folder.icon.tag" = "标签";

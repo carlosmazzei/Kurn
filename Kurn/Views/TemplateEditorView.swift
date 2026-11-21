@@ -12,14 +12,14 @@ import SwiftUI
 /// Row shown in the settings templates list.
 struct TemplateRow: View {
     let template: SummaryTemplate
+    @ScaledMetric(relativeTo: .callout) private var iconWellSize: CGFloat = 32
 
     var body: some View {
         HStack(spacing: 12) {
-            // Fixed size to fit the fixed 32x32 icon well.
             Image(systemName: template.iconName)
-                .font(.system(size: 16))
+                .font(Theme.callout)
                 .foregroundStyle(Theme.accent)
-                .frame(width: 32, height: 32)
+                .frame(width: iconWellSize, height: iconWellSize)
                 .background(Theme.fill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {

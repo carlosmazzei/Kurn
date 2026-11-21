@@ -1671,3 +1671,22 @@
 "settings.wiki_clear_confirm.message" = "Tutti gli articoli wiki delle riunioni generati verranno rimossi da questo dispositivo. Rigenerarli chiama il fornitore IA configurato e può comportare costi.";
 "settings.semantic_clear_confirm.title" = "Cancellare l’indice di ricerca semantica?";
 "settings.semantic_clear_confirm.message" = "L’indice locale di ricerca semantica verrà rimosso. Puoi ricostruirlo su questo dispositivo in qualsiasi momento senza eliminare le riunioni.";
+/* Folder icon accessibility labels */
+"folder.icon.folder" = "Cartella";
+"folder.icon.briefcase" = "Lavoro";
+"folder.icon.house" = "Casa";
+"folder.icon.people" = "Persone";
+"folder.icon.graduationcap" = "Istruzione";
+"folder.icon.heart" = "Salute";
+"folder.icon.star" = "Stella";
+"folder.icon.book" = "Libro";
+"folder.icon.document" = "Documento";
+"folder.icon.bookmark" = "Segnalibro";
+"folder.icon.bag" = "Acquisti";
+"folder.icon.airplane" = "Viaggio";
+"folder.icon.car" = "Trasporto";
+"folder.icon.gift" = "Regalo";
+"folder.icon.camera" = "Fotocamera";
+"folder.icon.pin" = "Puntina";
+"folder.icon.flag" = "Bandiera";
+"folder.icon.tag" = "Tag";

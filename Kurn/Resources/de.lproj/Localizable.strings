@@ -1671,3 +1671,22 @@
 "settings.wiki_clear_confirm.message" = "Alle erzeugten Meeting-Wiki-Artikel werden von diesem Gerät entfernt. Das erneute Erzeugen ruft deinen konfigurierten KI-Anbieter auf und kann Anbietergebühren verursachen.";
 "settings.semantic_clear_confirm.title" = "Semantischen Suchindex löschen?";
 "settings.semantic_clear_confirm.message" = "Der lokale semantische Suchindex wird entfernt. Du kannst ihn jederzeit auf diesem Gerät neu aufbauen, ohne deine Besprechungen zu löschen.";
+/* Folder icon accessibility labels */
+"folder.icon.folder" = "Ordner";
+"folder.icon.briefcase" = "Arbeit";
+"folder.icon.house" = "Zuhause";
+"folder.icon.people" = "Personen";
+"folder.icon.graduationcap" = "Bildung";
+"folder.icon.heart" = "Gesundheit";
+"folder.icon.star" = "Stern";
+"folder.icon.book" = "Buch";
+"folder.icon.document" = "Dokument";
+"folder.icon.bookmark" = "Lesezeichen";
+"folder.icon.bag" = "Einkauf";
+"folder.icon.airplane" = "Reise";
+"folder.icon.car" = "Transport";
+"folder.icon.gift" = "Geschenk";
+"folder.icon.camera" = "Kamera";
+"folder.icon.pin" = "Pin";
+"folder.icon.flag" = "Flagge";
+"folder.icon.tag" = "Tag";

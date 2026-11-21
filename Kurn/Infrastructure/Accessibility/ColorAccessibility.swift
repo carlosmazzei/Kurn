@@ -53,3 +53,34 @@ extension TagColorPalette {
         }
     }
 }
+
+extension FolderIconCatalog {
+    private static let accessibilityKeys: [String: String] = [
+        "folder.fill": "folder.icon.folder",
+        "briefcase.fill": "folder.icon.briefcase",
+        "house.fill": "folder.icon.house",
+        "person.2.fill": "folder.icon.people",
+        "graduationcap.fill": "folder.icon.graduationcap",
+        "heart.fill": "folder.icon.heart",
+        "star.fill": "folder.icon.star",
+        "book.fill": "folder.icon.book",
+        "doc.fill": "folder.icon.document",
+        "bookmark.fill": "folder.icon.bookmark",
+        "bag.fill": "folder.icon.bag",
+        "airplane": "folder.icon.airplane",
+        "car.fill": "folder.icon.car",
+        "gift.fill": "folder.icon.gift",
+        "camera.fill": "folder.icon.camera",
+        "pin.fill": "folder.icon.pin",
+        "flag.fill": "folder.icon.flag",
+        "tag.fill": "folder.icon.tag"
+    ]
+
+    /// A human-readable, localized label for an SF Symbol in `FolderIconCatalog.icons`,
+    /// so VoiceOver and accessibility audits read a meaningful icon name instead of a
+    /// raw symbol identifier like `"graduationcap.fill"`.
+    static func accessibleName(for symbol: String) -> String {
+        guard let key = accessibilityKeys[symbol] else { return symbol }
+        return NSLocalizedString(key, comment: "Folder icon accessibility label")
+    }
+}

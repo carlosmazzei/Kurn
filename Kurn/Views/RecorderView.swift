@@ -391,6 +391,9 @@ private struct RecorderContent: View {
                 .disabled(vm.state != .recording)
                 .sensoryFeedback(.success, trigger: vm.highlightCount)
                 .accessibilityLabel(NSLocalizedString("recorder.highlight", comment: "Highlight"))
+                .accessibilityShowsLargeContentViewer {
+                    Label(NSLocalizedString("recorder.highlight", comment: "Highlight"), systemImage: "bookmark.fill")
+                }
 
                 // Photo. Same fixed-circle treatment and the same "recording
                 // only" guard as highlight — a photo needs an active
@@ -408,6 +411,9 @@ private struct RecorderContent: View {
                 .buttonBorderShape(.circle)
                 .disabled(vm.state != .recording)
                 .accessibilityLabel(NSLocalizedString("recorder.photo", comment: "Photo"))
+                .accessibilityShowsLargeContentViewer {
+                    Label(NSLocalizedString("recorder.photo", comment: "Photo"), systemImage: "camera.fill")
+                }
             }
         }
         .opacity(vm.state == .idle ? 0.5 : 1)

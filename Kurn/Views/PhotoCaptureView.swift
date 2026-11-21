@@ -138,7 +138,19 @@ struct PhotoCaptureView: View {
 
     private var lensRow: some View {
         let active = PhotoZoom.activeStop(in: controller.lensStops, zoomFactor: controller.zoomFactor)
-        return HStack(spacing: 8) {
+        return ViewThatFits(in: .horizontal) {
+            lensButtonsRow(active: active)
+            ScrollView(.horizontal, showsIndicators: false) {
+                lensButtonsRow(active: active)
+            }
+        }
+        .padding(4)
+        .background(.black.opacity(0.25), in: Capsule())
+        .kurnAnimation(.easeOut(duration: 0.2), value: controller.zoomFactor)
+    }
+
+    private func lensButtonsRow(active: PhotoLensStop?) -> some View {
+        HStack(spacing: 8) {
             ForEach(controller.lensStops, id: \.deviceFactor) { stop in
                 let isActive = stop == active
                 let label = isActive
@@ -148,10 +160,14 @@ struct PhotoCaptureView: View {
                     controller.selectLens(stop)
                 } label: {
                     Text(isActive ? "\(label)×" : label)
-                        .font(.system(size: isActive ? 15 : 13, weight: .semibold))
+                        .font(isActive ? Theme.subheadlineEmphasized : Theme.footnoteEmphasized)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                         .foregroundStyle(isActive ? Theme.cameraAccent : .white)
-                        .frame(width: 40, height: 40)
-                        .background(.black.opacity(0.4), in: Circle())
+                        .padding(.horizontal, 8)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .background(.black.opacity(0.4), in: Capsule())
+                        .contentShape(Capsule())
                         .rotationEffect(.degrees(iconRotation))
                 }
                 .accessibilityLabel(String(
@@ -161,9 +177,6 @@ struct PhotoCaptureView: View {
                 .accessibilityAddTraits(isActive ? .isSelected : [])
             }
         }
-        .padding(4)
-        .background(.black.opacity(0.25), in: Capsule())
-        .kurnAnimation(.easeOut(duration: 0.2), value: controller.zoomFactor)
     }
 
     private var bottomBar: some View {
@@ -211,12 +224,14 @@ struct PhotoCaptureView: View {
         // Decorative: the Button or Menu wrapping it carries the label.
         Image(systemName: systemName)
             .accessibilityHidden(true)
-            .font(.system(size: 18, weight: .semibold))
+            .font(Theme.bodyEmphasized)
             .foregroundStyle(.white)
             .frame(width: 40, height: 40)
             .background(.black.opacity(0.4), in: Circle())
             .rotationEffect(.degrees(iconRotation))
             .kurnAnimation(.easeOut(duration: 0.25), value: iconRotation)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
     }
 
     // MARK: - Capture
@@ -286,9 +301,10 @@ private struct FocusControl: View {
             .allowsHitTesting(false)
             .overlay(alignment: sunOnLeading ? .leading : .trailing) {
                 Image(systemName: "sun.max.fill")
-                    .font(.system(size: 20))
+                    .font(Theme.title3)
                     .foregroundStyle(Theme.cameraAccent)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                     .offset(x: sunOnLeading ? -44 : 44, y: CGFloat(-exposure) * PhotoExposure.trackHeight / 2)
                     .gesture(
                         DragGesture()

@@ -1671,3 +1671,22 @@
 "settings.wiki_clear_confirm.message" = "All generated meeting wiki articles will be removed from this device. Regenerating them calls your configured AI provider and may incur provider fees.";
 "settings.semantic_clear_confirm.title" = "Clear Semantic Search Index?";
 "settings.semantic_clear_confirm.message" = "The local semantic search index will be removed. You can rebuild it on this device at any time without deleting your meetings.";
+/* Folder icon accessibility labels */
+"folder.icon.folder" = "Folder";
+"folder.icon.briefcase" = "Work";
+"folder.icon.house" = "Home";
+"folder.icon.people" = "People";
+"folder.icon.graduationcap" = "Education";
+"folder.icon.heart" = "Health";
+"folder.icon.star" = "Star";
+"folder.icon.book" = "Book";
+"folder.icon.document" = "Document";
+"folder.icon.bookmark" = "Bookmark";
+"folder.icon.bag" = "Shopping";
+"folder.icon.airplane" = "Travel";
+"folder.icon.car" = "Transport";
+"folder.icon.gift" = "Gift";
+"folder.icon.camera" = "Camera";
+"folder.icon.pin" = "Pin";
+"folder.icon.flag" = "Flag";
+"folder.icon.tag" = "Tag";

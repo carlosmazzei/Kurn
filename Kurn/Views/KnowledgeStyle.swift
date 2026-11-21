@@ -49,7 +49,7 @@ struct KnowledgeChipLabel: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: systemImage).accessibilityHidden(true)
-            Text(title).lineLimit(1)
+            Text(title).lineLimit(2)
         }
         .font(Theme.footnoteEmphasized)
         .foregroundStyle(Theme.textSecondary)
@@ -61,7 +61,8 @@ struct KnowledgeChipLabel: View {
                 Capsule().strokeBorder(Theme.separator, lineWidth: 1)
             }
         }
-        .contentShape(Capsule())
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
     }
 }
 
