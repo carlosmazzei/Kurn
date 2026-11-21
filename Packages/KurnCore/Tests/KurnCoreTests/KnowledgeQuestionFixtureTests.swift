@@ -119,5 +119,8 @@ struct KnowledgeQuestionFixtureTests {
         #expect(!KnowledgeAnswerScorer.score(.init(stated: ["a1"], refused: false, cited: []), against: expectation,
                                              resolvable: ["m1/s1"]).citationsGrounded)
         #expect(KnowledgeAnswerScorer.summary([]).questions == 0)
+        let invented = KnowledgeAnswerScorer.score(.init(stated: ["a1"], unsupportedClaims: 1, refused: false, cited: ["m1/s1"]),
+                                                   against: expectation, resolvable: ["m1/s1"])
+        #expect(invented.precision == 0.5)
     }
 }

@@ -20,14 +20,17 @@ public enum KnowledgeAnswerScorer {
     }
 
     /// What an answer did, as judged against the fixture: the assertion references it states
-    /// (expected or forbidden ones), whether it declined, and the `source/segment` IDs it cites.
+    /// (expected or forbidden ones), claims matching neither and unsupported by the fixture, whether
+    /// it declined, and the `source/segment` IDs it cites.
     public struct Observation: Equatable, Sendable {
         public let stated: Set<String>
+        public let unsupportedClaims: Int
         public let refused: Bool
         public let cited: Set<String>
 
-        public init(stated: Set<String>, refused: Bool, cited: Set<String>) {
+        public init(stated: Set<String>, unsupportedClaims: Int = 0, refused: Bool, cited: Set<String>) {
             self.stated = stated
+            self.unsupportedClaims = max(0, unsupportedClaims)
             self.refused = refused
             self.cited = cited
         }
@@ -56,7 +59,8 @@ public enum KnowledgeAnswerScorer {
     /// `resolvable` is every `source/segment` ID in the question's fixture.
     public static func score(_ observation: Observation, against expectation: Expectation, resolvable: Set<String>) -> Score {
         let correct = observation.stated.intersection(expectation.expected).count
-        return Score(precision: observation.stated.isEmpty ? 1 : Double(correct) / Double(observation.stated.count),
+        let claims = observation.stated.count + observation.unsupportedClaims
+        return Score(precision: claims == 0 ? 1 : Double(correct) / Double(claims),
                      recall: expectation.expected.isEmpty ? 1 : Double(correct) / Double(expectation.expected.count),
                      forbiddenStated: observation.stated.intersection(expectation.forbidden).count,
                      refusalHonoured: observation.refused == expectation.mustRefuse,
