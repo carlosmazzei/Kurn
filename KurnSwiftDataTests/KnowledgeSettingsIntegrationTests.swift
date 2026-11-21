@@ -17,11 +17,11 @@ struct KnowledgeSettingsIntegrationTests {
     }
 
     private actor Provider: LLMProvider {
-        let provider = AIProvider.appleOnDevice
+        let provider: AIProvider
         let gate: Gate?
         var calls = 0
         var narrativeCalls = 0
-        init(gate: Gate? = nil) { self.gate = gate }
+        init(_ provider: AIProvider = .appleOnDevice, gate: Gate? = nil) { self.provider = provider; self.gate = gate }
         func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult { SummaryResult(sections: []) }
         func chat(systemPrompt: String, messages: [ChatMessage], options: TextGenerationOptions) async throws -> String {
             if systemPrompt == KnowledgeNarrativePrompt.systemPrompt {
@@ -53,6 +53,7 @@ struct KnowledgeSettingsIntegrationTests {
         let compiler: KnowledgeCompilationCoordinator
         let management: KnowledgeSettingsCoordinator
         let provider: Provider
+        let cloud: Provider
         var ids: Set<UUID> { [meeting.id] }
     }
 
@@ -74,12 +75,13 @@ struct KnowledgeSettingsIntegrationTests {
         settings.knowledgeEnabled = true
         settings.aiProviderID = AIProvider.openAI.id
         let queue = KnowledgeJobQueue(container: container, eraseJobs: erase ?? { try await $0.eraseJobs(kind: $1, createdBefore: $2) })
-        let provider = Provider(gate: gate)
+        let provider = Provider(gate: gate), cloud = Provider(.openAI)
         let compiler = KnowledgeCompilationCoordinator(queue: queue, settings: settings, resolveProvider: { selected, _ in
+            if selected == .openAI { return cloud }
             #expect(selected == .appleOnDevice); return provider
         }, isProviderUsable: { _ in true })
         return Fixture(container: container, meeting: meeting, settings: settings, queue: queue, compiler: compiler,
-            management: KnowledgeSettingsCoordinator(compilation: compiler), provider: provider)
+            management: KnowledgeSettingsCoordinator(compilation: compiler), provider: provider, cloud: cloud)
     }
 
     private func wait(_ gate: Gate) async throws {
@@ -124,6 +126,22 @@ struct KnowledgeSettingsIntegrationTests {
         #expect(try await store.pendingProjection() == nil)
         let coverage = try await f.management.coverage(meetingIDs: f.ids)
         #expect(coverage.report.coverage.first?.examinedSegments == 1)
+    }
+
+    @Test func aCloudKnowledgeProviderWritesNarrativesOnlyUnderItsAutomaticGrant() async throws {
+        let f = try fixture()
+        _ = try await f.management.preview(meetingIDs: f.ids, rebuild: false)
+        var controls = try #require(f.settings.knowledgeControls)
+        controls.providerID = AIProvider.openAI.id
+        try f.settings.saveKnowledgeControls(controls)
+        #expect(f.settings.knowledgeProvider == .openAI && !f.settings.allowsCloud(.openAI, for: .automatic))
+        #expect(f.compiler.narrativeModel(classifications: [.internal]) == nil)
+        // The same provider, once granted, is admitted: the denial above is the grant's, not a provider mismatch.
+        f.settings.grantCloudConsent(.openAI, for: .onRequest)
+        f.settings.grantCloudConsent(.openAI, for: .automatic)
+        let admitted = try #require(f.compiler.narrativeModel(classifications: [.internal]))
+        #expect(admitted.provider == .openAI)
+        #expect(f.compiler.narrativeModel(classifications: [.restricted]) == nil)
     }
 
     @Test func exclusionsInvalidatePreviewAndEveryReaderBeforeReturningContent() async throws {
