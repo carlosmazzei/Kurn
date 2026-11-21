@@ -117,6 +117,19 @@ struct ChatKnowledgeStructureToolsTests {
         #expect(try await run("compare_state", ["entityID": .string(Self.project.uuidString), "from": .string("2026-10-10")]).isError)
     }
 
+    @Test func traceInfluenceOrdersClaimsAndNamesWhatTheyReplace() async throws {
+        let output = try await run("trace_influence", ["entityID": .string(Self.project.uuidString)])
+        #expect(output.content.contains("influence on entity \(Self.project.uuidString)"))
+        let lines = output.content.split(separator: "\n").map(String.init)
+        let open = try #require(lines.firstIndex { $0.contains("Example portal hasStatus open") })
+        let blocked = try #require(lines.firstIndex { $0.contains("Example portal hasStatus blocked") })
+        #expect(open < blocked)
+        #expect(lines[open].contains("replaces none"))
+        #expect(!lines[blocked].contains("replaces none") && lines[blocked].contains("| speakers "))
+        #expect(try await run("trace_influence", ["entityID": .string(UUID().uuidString)]).isError)
+        #expect(try await run("trace_influence", [:]).isError)
+    }
+
     @Test func openActionsLeaveOutDefinitelyCompletedOnes() async throws {
         let output = try await run("list_open_actions", [:])
         #expect(output.content.contains("- action \(Self.migrate.uuidString) | Migrate billing | status: committed (definite, since 2026-10-20)"
