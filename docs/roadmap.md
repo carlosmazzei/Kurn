@@ -453,7 +453,7 @@ hypothesis to confirm on a device before it becomes a change.
 
 | # | Finding | Evidence | Direction |
 | --- | --- | --- | --- |
-| F1 | One idea, three names: the meeting's condensed article is "Wiki" (menu "View wiki", sheet "Meeting Wiki", Settings → Wiki), the cross-meeting facts are "Knowledge" (tab, Settings, reader), and the generated paragraphs on an entity page are "Notes" | `detail.wiki.*`, `tab.knowledge`, `knowledge.browser.narrative` | Pick one vocabulary (glossary below) and apply it to strings, identifiers in prose, and Settings |
+| F1 | One idea, three names: the meeting's condensed article is "Wiki" (menu "View wiki", sheet "Meeting Wiki", Settings → Wiki), the cross-meeting facts are "Knowledge" (tab, Settings, reader), and the generated paragraphs on an entity page are "Notes" (reads as the person's own notes) | `detail.wiki.*`, `tab.knowledge`, `knowledge.browser.narrative` | Keep "Wiki" for generated pages and "Knowledge" for the facts under them; retire "Notes" (rule 4 below) |
 | F2 | Ask and Chat are the same conversation under two names: root place "Ask", meeting tab "Chat", entity button "Ask about this"; two glyphs for it (`bubble.left.and.bubble.right` in `AppRootDestination` and `DocumentDetailView`, `bubble.left.and.text.bubble.right` in the list toolbar and `MeetingDetailMode`) | `AppRootDestination.swift`, `MeetingDetailMode.swift`, `MeetingsListToolbar.swift` | One name ("Ask") and one glyph, defined once |
 | F3 | `book.pages` means Knowledge (place, tab, Settings, reader rows) and also "Generate wiki" in the detail menu | `MeetingDetailToolbar.swift`, `AppRootDestination.swift` | One glyph per concept; give the wiki action its own or drop it with the F1 rename |
 | F4 | The place a thing lives depends on a setting: with Knowledge loaded the wiki moves from the overflow menu to the Knowledge tab; the list toolbar has two layouts | `CLAUDE.md` "Meeting detail Knowledge mode"; `browsingToolbar` | One home per action regardless of flags (U1.1 for the list; same rule for the detail menu) |
@@ -520,13 +520,20 @@ Each rule names the Kurn evidence it answers.
    appears as a fourth place only when switched on, and never changes where
    anything else lives (U1.1). Settings shows Knowledge as one row with its
    toggle, not its controls, until it is on. *Answers F4.*
-4. **Plain words, one per idea.** Proposed vocabulary, to be confirmed in the
-   expert review and in all seven languages: **Ask** for every conversation
-   (the Chat tab becomes Ask); **Notes** for the meeting's condensed article
-   (the word "wiki" leaves the UI); **Knowledge** only for the cross-meeting
-   facts, with the entity page's generated paragraphs called **Overview**.
-   Avoid internal terms (compile, canonical, projection, harness) in any visible
-   string. *Answers F1, F2.*
+4. **Plain words, one per idea; "Wiki" stays.** "Notes" reads as something the
+   person wrote, and the generated article is not that, so it is not used.
+   "Wiki" is the product's own term (an LLM-maintained wiki: generated,
+   cross-linked pages over what was said) and stays. The rule is one meaning
+   per word, to be confirmed in the expert review and in all seven languages:
+   **Wiki** for every generated page (a meeting's page and an entity's page);
+   **Knowledge** for the place that holds the evidence-backed facts those pages
+   are built from, and for those facts; **Ask** for every conversation (the Chat
+   tab becomes Ask). The entity page's generated paragraphs, today headed
+   "Notes" (`knowledge.browser.narrative`), are headed **Wiki** and keep
+   their "generated from the claims below" note. First use explains it in one
+   line ("A wiki the AI writes from this meeting") instead of assuming the
+   reader knows the term. Avoid internal terms (compile, canonical,
+   projection, harness) in any visible string. *Answers F1, F2.*
 5. **Show state, do not ask about it.** Each list row says what is happening to
    the meeting (recording, transcribing, summarizing, done, needs attention) in
    words and a symbol, and tells what the person can do next. Progress and
