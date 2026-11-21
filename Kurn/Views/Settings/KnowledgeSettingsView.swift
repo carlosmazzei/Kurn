@@ -121,7 +121,7 @@ struct KnowledgeSettingsView: View {
                 Toggle(KnowledgeSettingsCopy.text("pause"), isOn: binding(controls, \.isPaused))
                     .disabled(!settings.knowledgeEnabled).accessibilityIdentifier("knowledge.settings.paused")
                 Toggle(KnowledgeSettingsCopy.text("export"), isOn: Binding(get: { settings.knowledgeExportEnabled },
-                                                                           set: { settings.knowledgeExportEnabled = $0 }))
+                                                                           set: { enabled in Task { await setExport(enabled) } }))
                     .disabled(!settings.knowledgeEnabled).accessibilityIdentifier("knowledge.settings.export")
                 Picker(KnowledgeSettingsCopy.text("provider"), selection: Binding(
                     get: { controls.providerID },
@@ -205,6 +205,17 @@ struct KnowledgeSettingsView: View {
             return KnowledgeSettingsCopy.text("local_cost")
         }
         return String(format: KnowledgeSettingsCopy.text("cloud_cost"), provider.displayName)
+    }
+
+    /// Letting Knowledge leave the protected store re-authenticates like "Delete all data";
+    /// turning export off never needs it.
+    private func setExport(_ enabled: Bool) async {
+        guard enabled else { settings.knowledgeExportEnabled = false; return }
+        switch await SensitiveActionAuthorizer().authorize(requireAuth: settings.requireAuthForRecordings) {
+        case .authorized: settings.knowledgeExportEnabled = true
+        case .cancelled: return
+        case .denied(let error): model.error = error
+        }
     }
 
     /// Redirecting future transcripts off the device re-authenticates like
