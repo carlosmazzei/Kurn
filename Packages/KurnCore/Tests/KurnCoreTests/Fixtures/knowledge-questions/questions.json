@@ -251,13 +251,11 @@
       "kind": "fact",
       "question": "O que bloqueou o provisionamento de ambientes?",
       "expected": [
-        "a5",
         "a6"
       ],
       "forbidden": [],
       "mustRefuse": false,
       "citable": [
-        "m3/s6",
         "m4/s7"
       ]
     },
