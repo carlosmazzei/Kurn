@@ -109,9 +109,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         closeSheet(app)
         assertRootBarFits(app)
         XCTAssertTrue(app.buttons["meetingCard"].firstMatch.waitForExistence(timeout: 10))
-        // XCUITest does not report the selected trait for toolbar items, so
-        // only the current place's button is checked here.
-        XCTAssertTrue(app.buttons["root.destination.meetings"].isHittable)
+        XCTAssertFalse(app.buttons["root.destination.meetings"].exists)
         capture(app, named: "knowledge-navigation-meetings-prototype")
         app.buttons["root.destination.ask"].tap()
         XCTAssertTrue(app.buttons["chat.send"].waitForExistence(timeout: 10))
@@ -135,32 +133,58 @@ final class MeetingKnowledgeUITests: XCTestCase {
         capture(app, named: "knowledge-navigation-artifact")
     }
 
-    func testMeetingControlsAreOpenAtTheTopAndKeepTheirState() throws {
+    func testMeetingControlsAreUnifiedAtTopAndBottomAndKeepTheirState() throws {
         continueAfterFailure = false
         let app = launch()
         let library = app.buttons["meetings.library"]
         XCTAssertTrue(library.waitForExistence(timeout: 10))
         assertRootBarFits(app)
-        // The list's controls are in the navigation bar itself, not in a menu,
-        // and Settings beside them; recording stays in the bottom bar.
-        for control in [library, app.buttons["meetings.filters"], app.buttons["meetings.select"], app.buttons["Sort"],
-                        app.buttons["nav.settings"]] {
+        // List options (Filters, Sort, Select) share one trailing menu beside
+        // Settings; recording stays in its own group in the bottom bar.
+        let actions = app.buttons["meetings.actions"]
+        let settings = app.buttons["nav.settings"]
+        for control in [actions, settings] {
             XCTAssertTrue(control.isHittable)
-            XCTAssertLessThan(control.frame.midY, app.buttons["root.destination.meetings"].frame.minY)
+            XCTAssertLessThan(control.frame.midY, library.frame.minY)
         }
         XCTAssertFalse(app.navigationBars.buttons["meetings.record"].exists)
         capture(app, named: "knowledge-navigation-list-controls")
+        let firstCardBeforeSort = app.buttons["meetingCard"].firstMatch.label
+        actions.tap()
+        let sort = app.buttons["Sort"]
+        XCTAssertTrue(sort.waitForExistence(timeout: 5))
+        sort.tap()
+        let oldest = app.buttons["Oldest first"]
+        XCTAssertTrue(oldest.waitForExistence(timeout: 5))
+        oldest.tap()
+        XCTAssertNotEqual(app.buttons["meetingCard"].firstMatch.label, firstCardBeforeSort)
+        actions.tap()
+        XCTAssertTrue(sort.waitForExistence(timeout: 5))
+        sort.tap()
+        let newest = app.buttons["Newest first"]
+        XCTAssertTrue(newest.waitForExistence(timeout: 5))
+        newest.tap()
         library.tap()
         let favorites = app.buttons["library.bucket.favorites"]
         XCTAssertTrue(favorites.waitForExistence(timeout: 10))
         favorites.tap()
         XCTAssertTrue(library.waitForExistence(timeout: 10))
-        app.buttons["meetings.filters"].tap()
+        actions.tap()
+        let filters = app.buttons.matching(
+            NSPredicate(format: "identifier == %@ OR label BEGINSWITH %@", "meetings.filters", "Filters")
+        ).firstMatch
+        XCTAssertTrue(filters.waitForExistence(timeout: 5))
+        filters.tap()
         let week = app.segmentedControls.buttons["This week"]
         XCTAssertTrue(week.waitForExistence(timeout: 10))
         week.tap()
         app.navigationBars.buttons["Done"].tap()
-        app.buttons["meetings.select"].tap()
+        actions.tap()
+        let select = app.buttons.matching(
+            NSPredicate(format: "identifier == %@ OR label == %@", "meetings.select", "Select")
+        ).firstMatch
+        XCTAssertTrue(select.waitForExistence(timeout: 5))
+        select.tap()
         let done = app.buttons["meetings.selection.done"]
         XCTAssertTrue(done.waitForExistence(timeout: 10))
         app.buttons["meetingCard"].firstMatch.tap()
@@ -177,9 +201,40 @@ final class MeetingKnowledgeUITests: XCTestCase {
         XCTAssertTrue(favorites.waitForExistence(timeout: 10))
         XCTAssertTrue(favorites.isSelected)
         app.navigationBars.buttons["Done"].tap()
-        app.buttons["meetings.filters"].tap()
+        actions.tap()
+        XCTAssertTrue(filters.waitForExistence(timeout: 5))
+        filters.tap()
         XCTAssertTrue(week.waitForExistence(timeout: 10))
         XCTAssertTrue(week.isSelected)
+    }
+
+    func testKnowledgeButtonWhenDisabledShowsSettingsPrompt() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "UI-Testing-Screenshots",
+            "UI-Testing-DisableAnimations",
+            "UI-Testing-ResetDefaults",
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", "en_US"
+        ]
+        app.launch()
+        assertRootBarFits(app)
+        let knowledge = app.buttons["root.destination.knowledge"]
+        XCTAssertTrue(knowledge.waitForExistence(timeout: 10))
+        knowledge.tap()
+        XCTAssertTrue(app.staticTexts["Knowledge is turned off"].waitForExistence(timeout: 10))
+        let openSettings = app.buttons["knowledge.openSettings"]
+        XCTAssertTrue(openSettings.waitForExistence(timeout: 5))
+        openSettings.tap()
+        let toggle = app.switches["knowledge.settings.enabled"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+        toggle.switches.firstMatch.tap()
+        let done = app.navigationBars.allElementsBoundByIndex.last?.buttons["Done"].firstMatch
+            ?? app.navigationBars.buttons["Done"].firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        done.tap()
+        XCTAssertTrue(app.buttons["knowledge.chooseSources"].waitForExistence(timeout: 10))
     }
 
     func testKnowledgeHomeUsesExplicitSourceSelection() throws {
@@ -400,15 +455,20 @@ final class MeetingKnowledgeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["knowledge.browser.quote"].waitForExistence(timeout: 10))
     }
 
-    /// The bottom bar holds the four places and, in its own group to their
-    /// right, the record button, all on one row with real hit targets.
+    /// The bottom bar holds Library, Knowledge, Ask, and Documents in one group
+    /// and, in its own group to their right, the record button, all on one row.
     private func assertRootBarFits(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertEqual(app.tabBars.buttons.count, 0, file: file, line: line)
         let record = app.buttons["meetings.record"]
         XCTAssertTrue(record.waitForExistence(timeout: 10), file: file, line: line)
         XCTAssertTrue(record.isHittable, file: file, line: line)
-        for destination in ["meetings", "knowledge", "ask", "documents"] {
-            let button = app.buttons["root.destination.\(destination)"]
+        let bottomControls = [
+            app.buttons["meetings.library"],
+            app.buttons["root.destination.knowledge"],
+            app.buttons["root.destination.ask"],
+            app.buttons["root.destination.documents"]
+        ]
+        for button in bottomControls {
             XCTAssertTrue(button.isHittable, file: file, line: line)
             XCTAssertLessThanOrEqual(button.frame.maxX, record.frame.minX, file: file, line: line)
             XCTAssertEqual(button.frame.midY, record.frame.midY, accuracy: 8, file: file, line: line)
@@ -429,7 +489,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         let done = app.navigationBars.buttons["Done"].firstMatch
         XCTAssertTrue(done.waitForExistence(timeout: 10), file: file, line: line)
         done.tap()
-        XCTAssertTrue(app.buttons["root.destination.meetings"].waitForExistence(timeout: 10), file: file, line: line)
+        XCTAssertTrue(app.buttons["root.destination.knowledge"].waitForExistence(timeout: 10), file: file, line: line)
     }
 
     /// The graph's mode controls sit above its claims, which a lazy list

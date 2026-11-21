@@ -3223,37 +3223,37 @@ no native text-copy/export actions that would bypass the corporate export policy
 The fake audio adapter tests these boundaries without opening the
 simulator's audio session; real playback remains a physical-device check.
 
-With `knowledgeEnabled` there is still one main screen, the meetings list in
-its original stack (the compact stack, or the regular-width sidebar), with its
-buttons moved (`MeetingsListToolbar`). The bottom bar holds the four places —
-Meetings / Knowledge / Ask / Documents — in one glass group and, after a
-flexible `ToolbarSpacer`, the red Record button in its own (its title gives
-way to its icon at accessibility text sizes). Meetings is the screen itself,
-marked current by its filled symbol, the accent colour and the selected trait
-(never colour alone). The list's controls — Library, Filters, Sort and Select
-— are each open in the navigation bar, not collapsed into a menu, and Settings
-has its own group after a fixed spacer; on regular width the sidebar replaces
-the Library button. Selection mode keeps its bottom Export/Delete, as without
-Knowledge. With the feature off the original placements stay (Library, Filters,
-Ask and Documents at the bottom, Select and Sort beside Settings at the top).
-The navigation review first chose a `TabView` with a custom root bar; it was
-replaced by this single screen, so there is no tab bar to hide.
+Whether `knowledgeEnabled` is on or off, there is one main screen — the
+meetings list in its original stack (the compact stack, or the regular-width
+sidebar) — with one unified toolbar (`MeetingsListToolbar`). The bottom bar
+holds the four destinations — Library (hidden on regular width where the
+persistent sidebar is already visible), Knowledge, Ask and Documents — in one
+glass group and, after a flexible `ToolbarSpacer`, the red Record button in its
+own (its title gives way to its icon at accessibility text sizes). The
+navigation bar pairs a single 3-dot list-options `Menu` (`meetings.actions`:
+Filters, Sort and Select) with Settings (`nav.settings`) in one trailing glass
+group. Selection mode keeps its bottom Export/Delete, as before. The navigation
+review first chose a `TabView` with a custom root bar; it was replaced by this
+single screen, so there is no tab bar to hide.
 
-Knowledge opens `KnowledgeLibraryDestination` as a sheet with a Done button;
-Ask opens the library conversation in its existing sheet
-(`MeetingChatView(meeting: nil)`, the app-owned conversation; provider/source
-validation, history, draft and artifact behaviour are unchanged, and it is
-offered even with semantic search off, while a provider without agent support
-still disables the composer); Documents pushes `DocumentsListView` with its
-artifact detail/create flows. No chat/provider capability is enabled by
-navigation. The list hosts the recording mini bar as before, and so do the
-Knowledge and Ask sheets that cover it (`hostsRecordingMiniBarInSheet`):
-there, expanding the recorder closes the sheet and opens the recorder once the
-sheet has disappeared, since the recorder is presented from the root and cannot
-present over it or during its dismissal. The Knowledge
-sheet's source selection belongs to the list (`knowledgeSourceIDs`), so closing
-and reopening the sheet keeps it; turning Knowledge off closes the sheet and
-forgets the selection.
+Knowledge opens `KnowledgeLibraryDestination` as a sheet with a Done button:
+when `knowledgeEnabled` is off, it explains that Knowledge must be turned on in
+Settings and offers an Open Settings button presenting `KnowledgeSettingsView`
+directly; when on, it opens the source picker or reader. Ask opens the library
+conversation in its existing sheet (`MeetingChatView(meeting: nil)`, the
+app-owned conversation; provider/source validation, history, draft and artifact
+behaviour are unchanged, and it is offered even with semantic search off, while
+a provider without agent support still disables the composer); Documents pushes
+`DocumentsListView` with its artifact detail/create flows. No chat/provider
+capability is enabled by navigation. The list hosts the recording mini bar as
+before, and so do the Knowledge and Ask sheets that cover it
+(`hostsRecordingMiniBarInSheet`): there, expanding the recorder closes the
+sheet and opens the recorder once the sheet has disappeared, since the recorder
+is presented from the root and cannot present over it or during its dismissal.
+The Knowledge sheet's source selection belongs to the list
+(`knowledgeSourceIDs`), so closing and reopening the sheet keeps it; turning
+Knowledge off forgets the selection and shows the disabled-state prompt instead
+of dismissing the sheet.
 
 `KnowledgeLibraryDestination` starts without an inferred library source scope.
 Its picker requires an explicit selection of up to 16 meetings and disables
