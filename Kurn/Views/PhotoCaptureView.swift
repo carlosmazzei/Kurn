@@ -138,7 +138,19 @@ struct PhotoCaptureView: View {
 
     private var lensRow: some View {
         let active = PhotoZoom.activeStop(in: controller.lensStops, zoomFactor: controller.zoomFactor)
-        return HStack(spacing: 8) {
+        return ViewThatFits(in: .horizontal) {
+            lensButtonsRow(active: active)
+            ScrollView(.horizontal, showsIndicators: false) {
+                lensButtonsRow(active: active)
+            }
+        }
+        .padding(4)
+        .background(.black.opacity(0.25), in: Capsule())
+        .kurnAnimation(.easeOut(duration: 0.2), value: controller.zoomFactor)
+    }
+
+    private func lensButtonsRow(active: PhotoLensStop?) -> some View {
+        HStack(spacing: 8) {
             ForEach(controller.lensStops, id: \.deviceFactor) { stop in
                 let isActive = stop == active
                 let label = isActive
@@ -149,9 +161,12 @@ struct PhotoCaptureView: View {
                 } label: {
                     Text(isActive ? "\(label)×" : label)
                         .font(isActive ? Theme.subheadlineEmphasized : Theme.footnoteEmphasized)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                         .foregroundStyle(isActive ? Color.yellow : .white)
-                        .frame(width: 40, height: 40)
-                        .background(.black.opacity(0.4), in: Circle())
+                        .padding(.horizontal, 8)
+                        .frame(minWidth: 40, minHeight: 40)
+                        .background(.black.opacity(0.4), in: Capsule())
                         .rotationEffect(.degrees(iconRotation))
                         .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
@@ -163,9 +178,6 @@ struct PhotoCaptureView: View {
                 .accessibilityAddTraits(isActive ? .isSelected : [])
             }
         }
-        .padding(4)
-        .background(.black.opacity(0.25), in: Capsule())
-        .kurnAnimation(.easeOut(duration: 0.2), value: controller.zoomFactor)
     }
 
     private var bottomBar: some View {

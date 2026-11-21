@@ -40,4 +40,14 @@ struct FolderCatalogTests {
             #expect((try? pattern.wholeMatch(in: hex)) != nil, "Bad hex: \(hex)")
         }
     }
+
+    @Test func everyFolderIconHasALocalizedAccessibleNameAndUnknownSymbolFallsBack() {
+        for symbol in FolderIconCatalog.icons {
+            let label = FolderIconCatalog.accessibleName(for: symbol)
+            #expect(!label.isEmpty)
+            #expect(label != symbol, "Expected localized name for \(symbol), got raw symbol")
+            #expect(!label.hasPrefix("folder.icon."), "Unresolved localization key for \(symbol): \(label)")
+        }
+        #expect(FolderIconCatalog.accessibleName(for: "custom.unknown.symbol") == "custom.unknown.symbol")
+    }
 }

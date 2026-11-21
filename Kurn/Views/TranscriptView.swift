@@ -50,59 +50,63 @@ struct TranscriptView: View {
         let matchingPhotos = photos.filter { $0.capturedAt >= segment.startTime && $0.capturedAt < segment.endTime }
 
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Button {
-                    onSeek(segment.startTime)
-                } label: {
-                    HStack(spacing: 8) {
-                        ZStack {
-                            Circle().fill(color.opacity(0.2)).frame(width: avatarSize, height: avatarSize)
-                            Text(String(name.prefix(1)).uppercased())
-                                .font(Theme.caption2Emphasized)
-                                .foregroundStyle(color)
-                        }
-                        .accessibilityHidden(true)
-                        Text(name)
-                            .font(Theme.footnoteEmphasized)
+            Button {
+                onSeek(segment.startTime)
+            } label: {
+                HStack(spacing: 8) {
+                    ZStack {
+                        Circle().fill(color.opacity(0.2)).frame(width: avatarSize, height: avatarSize)
+                        Text(String(name.prefix(1)).uppercased())
+                            .font(Theme.caption2Emphasized)
                             .foregroundStyle(color)
-                        Text((segment.startTime + offset).clockDisplay)
-                            .font(Theme.caption2)
-                            .foregroundStyle(Theme.textTertiary)
-                        Spacer(minLength: 0)
                     }
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
+                    .accessibilityHidden(true)
+                    Text(name)
+                        .font(Theme.footnoteEmphasized)
+                        .foregroundStyle(color)
+                    Text((segment.startTime + offset).clockDisplay)
+                        .font(Theme.caption2)
+                        .foregroundStyle(Theme.textTertiary)
+                    Spacer(minLength: 0)
                 }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .combine)
-
-                ForEach(matchingHighlights) { highlight in
-                    Button {
-                        onSeek(highlight.timestamp)
-                    } label: {
-                        Image(systemName: "bookmark.fill")
-                            .font(.caption2)
-                            .foregroundStyle(Theme.warning)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(NSLocalizedString("transcript.jump_to_highlight", comment: "Jump to highlight"))
-                }
-                ForEach(matchingPhotos) { photo in
-                    Button {
-                        onShowPhoto?(photo)
-                    } label: {
-                        Image(systemName: "camera.fill")
-                            .font(.caption2)
-                            .foregroundStyle(Theme.accent)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(NSLocalizedString("transcript.view_photo", comment: "View photo"))
-                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+
+            if !matchingHighlights.isEmpty || !matchingPhotos.isEmpty {
+                FlowLayout(horizontalSpacing: 4, verticalSpacing: 4) {
+                    ForEach(matchingHighlights) { highlight in
+                        Button {
+                            onSeek(highlight.timestamp)
+                        } label: {
+                            Image(systemName: "bookmark.fill")
+                                .font(.caption2)
+                                .foregroundStyle(Theme.warning)
+                                .frame(minWidth: 44, minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(NSLocalizedString("transcript.jump_to_highlight", comment: "Jump to highlight"))
+                    }
+                    ForEach(matchingPhotos) { photo in
+                        Button {
+                            onShowPhoto?(photo)
+                        } label: {
+                            Image(systemName: "camera.fill")
+                                .font(.caption2)
+                                .foregroundStyle(Theme.accent)
+                                .frame(minWidth: 44, minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(NSLocalizedString("transcript.view_photo", comment: "View photo"))
+                    }
+                }
+                .padding(.leading, 34)
+            }
+
             Button {
                 onSeek(segment.startTime)
             } label: {
