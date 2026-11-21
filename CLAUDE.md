@@ -3036,7 +3036,7 @@ Where the checkout makes the specification bend:
 | Graph as SwiftData relations | `Meeting` cascades its derived artifacts; there is no shared-entity model yet | Entities, assertions and evidence relate by persisted UUIDs, never by `@Relationship` to `Meeting` (no blind cascade across shared entities, spec §13). Deletion is explicit: `MeetingLibrary` commits a tombstone with each meeting or transcribed-recording deletion, `KnowledgeDeletionCoordinator` purges it, and `LibraryEraser` removes every knowledge row ("Knowledge deletion (K2.8)") |
 | Typed `AppRoute` and `kurn://entity/…` deep links | The app deliberately declares no URL scheme (any app could open one, see "Cross-device control") | Typed in-process routes only; Markdown links in generated pages resolve through a router that accepts `entity:`/`evidence:` IDs and nothing else, consistent with `MarkdownPresentation` disabling links. No registered URL scheme |
 | Embeddings and hybrid retrieval | `SemanticSearchService.hybridSearch` (on-device `NLContextualEmbedding` + BM25 + RRF) over `SemanticChunk` | Extend the same index with typed documents (page, assertion, event, alias) carrying `modelIdentifier`; no cloud embeddings, so no extra consent for indexing |
-| Export bundle (JSONL, Markdown, GraphML) | Meeting export via share sheet (`MeetingExport`, `DocumentExport`) | Knowledge export is disabled by default, has no generic share sheet in the corporate mode, and lands last (K6) after the egress audit |
+| Export bundle (JSONL, Markdown, GraphML) | Meeting export via share sheet (`MeetingExport`, `DocumentExport`) | Knowledge export (K6.2) is off by default (`AppSettings.knowledgeExportEnabled`, which sets the local policy's `exportAllowed` and `.export`); the browser saves a `kurn.knowledge-export` JSON bundle through `fileExporter`, with no generic share sheet |
 | Settings → Knowledge with provider, scope, backfill | Settings → Wiki (`WikiSettingsView`) with `wikiEnabled` and bulk missing/rebuild | Settings → Wiki becomes Settings → Knowledge: the meeting wiki keeps its own toggle and consent, Knowledge adds its own; neither implies the other |
 | `ProcessingPolicy`, `KnowledgeWorkspace`, `KnowledgeContext` (§20.1) | Provider consent is per feature (`wikiEnabled`, `correctionEnabled`, …); the provider circuit breaker gates automatic calls | One workspace in `mode=privateCorporate`; `KnowledgeProcessingPolicy` (KurnCore, pure) evaluates destination × operation × classification and is checked before retrieval, prompt assembly, egress and export. Folders are not ACLs |
 
@@ -3813,7 +3813,11 @@ state, stated validity), each name and quote clipped to one line, a `page:` line
 - **Knowledge egress (K6.1)**: the `knowledge-network` rule in `Tools/check_static_policy.py` rejects `URLSession`,
   `URLRequest`, `LLMHTTP`, `ProviderHTTPTransport`, `NWConnection` and CloudKit/iCloud key-value stores in Knowledge
   code (`Application/Knowledge/`, `ChatKnowledgeTools*`, `Views/Knowledge*`, `Views/MeetingKnowledge*`, KurnCore
-  `Knowledge/`); its only egress is the provider call admitted by the policy and the consent ledger. Runs without knowledge tools keep the old prompt.
+  `Knowledge/`); its only egress is the provider call admitted by the policy and the consent ledger.
+- **Knowledge export (K6.2)**: `KnowledgeCompilationCoordinator.exportKnowledge` authorizes `.export` before the
+  browser read and again with the read's classifications, then encodes KurnCore `KnowledgeExportBundle` (format
+  `kurn.knowledge-export`, schema 1: meetings, entities, claims with qualifiers and evidence, sorted by ID). The browser
+  writes it with `fileExporter` (a save to a chosen location), never the generic share sheet. Runs without knowledge tools keep the old prompt.
 
 ### Attached documents (PDFs)
 
