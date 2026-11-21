@@ -59,52 +59,28 @@ struct KnowledgeDeletionCoordinatorTests {
         }
     }
 
-    // DIAGNOSTIC (temporary): does a background save wait for the main thread?
-    @Test func diagnosticSaveWhileMainBlocked() async {
-        let control = Self.backgroundContainer()
-        let start = ContinuousClock.now
-        await Task.detached {
-            let context = ModelContext(control)
-            try? context.transaction { context.insert(Meeting(title: "Synthetic save")) }
-        }.value
-        print("DIAG-SAVE control elapsed=\(ContinuousClock.now - start)")
-        let container = Self.backgroundContainer(), posted = DispatchSemaphore(value: 0)
-        let blocked = ContinuousClock.now
-        DispatchQueue.global().async {
-            let context = ModelContext(container)
-            try? context.transaction { context.insert(Meeting(title: "Synthetic save")) }
-            posted.signal()
-        }
-        let result = Self.wait(posted, seconds: 30)
-        print("DIAG-SAVE blocked finished=\(result == .success) elapsed=\(ContinuousClock.now - blocked)")
-        if result == .timedOut {
-            while Self.wait(posted, seconds: 0) == .timedOut { try? await Task.sleep(for: .milliseconds(10)) }
-            print("DIAG-SAVE blocked completed after unblocking elapsed=\(ContinuousClock.now - blocked)")
-        }
-    }
-
-    private static func wait(_ semaphore: DispatchSemaphore, seconds: Double) -> DispatchTimeoutResult {
-        semaphore.wait(timeout: .now() + seconds)
-    }
-
     /// Blocks the main thread, as a store transaction running on it does.
-    private func blockMain(until posted: DispatchSemaphore) -> DispatchTimeoutResult {
-        posted.wait(timeout: .now() + 5)
+    /// Generous, because a loaded test host can be slow to start the saver.
+    private func blockMain(until saved: DispatchSemaphore) -> DispatchTimeoutResult {
+        saved.wait(timeout: .now() + 30)
     }
 
     @Test func aStoreSaveNeverWaitsForTheMainThreadAndStillDrains() async {
         let script = Script([])
         let coordinator = KnowledgeDeletionCoordinator(queue: queue(), purge: { _ in try script.next() })
         coordinator.observeStoreSaves()
-        let posted = DispatchSemaphore(value: 0)
-        // Core Data posts this synchronously from inside the saving context's
-        // transaction; an observer queue would make the post wait for main.
-        DispatchQueue.global().async {
-            NotificationCenter.default.post(name: .NSManagedObjectContextDidSave, object: nil)
-            posted.signal()
-        }
-        #expect(blockMain(until: posted) == .success)
-        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        let container = Self.backgroundContainer(), saved = DispatchSemaphore(value: 0)
+        // A real transaction, as the store's publish makes, on its own thread
+        // so a busy dispatch pool cannot delay it. Its save posts the
+        // did-save notification synchronously; an observer queue would make
+        // that post wait for the blocked main thread.
+        Thread {
+            let context = ModelContext(container)
+            try? context.transaction { context.insert(Meeting(title: "Synthetic save")) }
+            saved.signal()
+        }.start()
+        #expect(blockMain(until: saved) == .success)
+        let deadline = ContinuousClock.now.advanced(by: .seconds(60))
         while script.calls == 0, ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(10)) }
         await coordinator.waitUntilIdle()
         #expect(script.calls >= 1)
