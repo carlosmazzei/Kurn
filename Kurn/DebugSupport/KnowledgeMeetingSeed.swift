@@ -49,7 +49,7 @@ enum KnowledgeMeetingSeed {
         }
         try context.save()
         let auth = KnowledgeExtractionAuthorization(featureEnabled: true,
-            policies: [.defaultDeny(id: KnowledgeCompilationCoordinator.localPolicyID)], sourceClassifications: [.internal])
+            policies: [KnowledgeCompilationCoordinator.localPolicy(AppSettings())], sourceClassifications: [.internal])
         let sourceContext = ModelContext(container)
         let snapshot = try KnowledgeStoreRows.readSnapshot(meetingID: meeting.id, scope: "workspace", auth: auth, in: sourceContext)
         let anchor = segment.id.uuidString.lowercased()
@@ -88,6 +88,24 @@ enum KnowledgeMeetingSeed {
         let request = KnowledgeCommitRequest(snapshot: snapshot, extractorVersion: "synthetic-meeting-ui-v1", schemaVersion: 1,
             provider: .appleOnDevice, compilations: [try KnowledgeRecordingCompilation(recordingID: recording.id, result: result)])
         _ = try KnowledgeStoreRows.commit(request, auth: auth, container: container, beforeSave: {})
+        if ProcessInfo.processInfo.arguments.contains("UI-Testing-KnowledgeNarrativeFixture") {
+            try seedNarrative(meetingID: meeting.id, auth: auth, container: container)
+        }
+    }
+
+    private static func seedNarrative(meetingID: UUID, auth: KnowledgeExtractionAuthorization, container: ModelContainer) throws {
+        let wikiAuth = KnowledgeWikiAuthorization(featureEnabled: true, meetingIDs: [meetingID],
+            policies: auth.policies, sourceClassifications: auth.sourceClassifications)
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let sources = try KnowledgeWikiSourceRows.sources(meetingIDs: [meetingID], scope: "workspace", auth: wikiAuth, in: context)
+        let snapshot = try KnowledgeWikiSourceRows.snapshot(sources: sources, in: context)
+        guard let entity = snapshot.wiki.entities.first(where: { $0.name == "Example portal" }),
+              let fact = snapshot.wiki.facts.first(where: { $0.subjectID == entity.id }) else { return }
+        let narrative = KnowledgeWikiNarrative(entityID: entity.id, paragraphs: [
+            .init(text: "The Example portal remains open for review by the team.", assertionIDs: [fact.id])
+        ])
+        _ = try KnowledgeWikiProjectionRows.publish(snapshot, narratives: [narrative], auth: wikiAuth, container: container, beforeSave: {})
     }
 
     /// The graph fixture: a second entity related to the portal, so the

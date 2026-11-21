@@ -296,6 +296,7 @@ jobs:
             selection: >-
               -only-testing:KurnUITests
               -skip-testing:KurnUITests/ScreenshotUITests
+              -skip-testing:KurnUITests/AccessibilityBaselineUITests
               -skip-testing:KurnUITests/LibraryFlowUITests
               -skip-testing:KurnUITests/SettingsFlowUITests
           - shard: flows
