@@ -31,6 +31,13 @@ struct KnowledgeExportBundleTests {
         #expect(try KnowledgeExportBundle.decode(bundle.encoded()) == bundle)
     }
 
+    @Test func everyClaimReferenceResolvesToAnExportedEntity() throws {
+        let bundle = KnowledgeExportBundle(revision: 3, exportedAt: Date(timeIntervalSince1970: 2_000),
+                                           meetingTitles: [meeting: "Weekly sync"], pages: try pages())
+        let ids = Set(bundle.entities.map(\.id))
+        #expect(bundle.facts.allSatisfy { ids.contains($0.subjectID) && ($0.objectID.map(ids.contains) ?? true) })
+    }
+
     @Test func theSameKnowledgeEncodesToTheSameBytes() throws {
         let pages = try pages()
         let date = Date(timeIntervalSince1970: 2_000)

@@ -33,6 +33,15 @@ public struct KnowledgeExportBundle: Codable, Equatable, Sendable {
         for entity in pages.map(\.entity) + entries.flatMap({ [$0.subject] + ($0.object.map { [$0] } ?? []) }) {
             entities[entity.id] = entities[entity.id] ?? entity
         }
+        // A claim recorded against a since-merged entity keeps its original ID: export that ID as a
+        // redirect (`targetID`) to the entity it resolves to, so every reference in the bundle resolves.
+        for entry in entries {
+            for (raw, resolved) in [(entry.fact.subjectID, entry.subject), (entry.fact.objectID, entry.object)] {
+                guard let raw, let resolved, raw != resolved.id, entities[raw] == nil else { continue }
+                entities[raw] = KnowledgeWikiSnapshot.Entity(id: raw, kind: resolved.kind, name: resolved.name, aliases: [],
+                                                             targetID: resolved.id)
+            }
+        }
         self.entities = entities.values.sorted { $0.id.uuidString < $1.id.uuidString }
         var facts: [UUID: KnowledgeWikiSnapshot.Fact] = [:]
         for entry in entries { facts[entry.fact.id] = entry.fact }
