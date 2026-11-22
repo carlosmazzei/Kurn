@@ -443,6 +443,19 @@
 "post_phase.generating_title" = "Generating title…";
 "post_phase.indexing" = "Indexing transcript…";
 "post_phase.generating_wiki" = "Generating wiki…";
+"phase.knowledge.reading" = "Reading transcript";
+"phase.knowledge.extracting" = "Extracting facts · recording %1$d of %2$d";
+"phase.knowledge.checking" = "Checking facts";
+"phase.knowledge.publishing" = "Publishing";
+"detail.knowledge.update" = "Update knowledge";
+"detail.knowledge.updating" = "Knowledge · updating…";
+"detail.knowledge.update.stats" = "%1$@ · %2$d%% · %3$@ · %4$ds · %5$@";
+"knowledge.updated.fact.one" = "%d new fact";
+"knowledge.updated.fact.other" = "%d new facts";
+"knowledge.updated_empty" = "No new facts — the model found no statements";
+"knowledge.updated_none" = "No new facts";
+"knowledge.updated_rejected" = "Output rejected by the integrity check";
+"knowledge.update_failed" = "The knowledge update failed.";
 
 /* Meeting form */
 "form.title_section" = "Title";

@@ -29,11 +29,15 @@ struct MeetingKnowledgeView: View {
             VStack(alignment: .leading, spacing: 16) {
                 if case let .loaded(read) = state, !read.contributions.isEmpty {
                     headerRow(read)
+                    knowledgeProgressRow
+                    compileResultNote
                     statusRow
                     factsSections(read)
                     pagesChips(read)
                     pageLinkRow
                 } else {
+                    knowledgeProgressRow
+                    compileResultNote
                     statusRow
                     if case let .loaded(read) = state {
                         if read.contributions.isEmpty, meeting.wikiArticle != nil {
@@ -70,6 +74,56 @@ struct MeetingKnowledgeView: View {
         }
     }
 
+    /// The compile's live progress — the same shape as the Summary bar's
+    /// generating state: a pill label, a thin determinate bar and a one-line
+    /// stat row; the facts stay visible underneath at all times.
+    @ViewBuilder
+    private var knowledgeProgressRow: some View {
+        if let progress = coordinator.progress(for: meeting.id) ?? (updateInFlight ? pendingProgress : nil) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(NSLocalizedString("detail.knowledge.updating", comment: "Knowledge · updating…"))
+                    .font(Theme.footnoteEmphasized).foregroundStyle(Theme.textPrimary)
+                    .padding(.horizontal, 14).frame(minHeight: 32)
+                    .background(Theme.fill, in: Capsule())
+                ProgressView(value: progress.fraction)
+                    .progressViewStyle(.linear)
+                    .tint(Theme.ink)
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(updateStats(progress, at: context.date))
+                        .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+                }
+            }
+            .accessibilityIdentifier("knowledge.progress")
+        }
+    }
+
+    /// The stat line "<phase> · <N%> · <model> · <elapsed>s · <N facts>" —
+    /// the summary's generating line's order, with the phase in front.
+    private func updateStats(_ progress: KnowledgeCompilationProgress, at now: Date) -> String {
+        let elapsed = Int(now.timeIntervalSince(progress.startedAt))
+        let model = progress.modelLabel.isEmpty ? progress.providerLabel : progress.modelLabel
+        return String(
+            format: NSLocalizedString("detail.knowledge.update.stats", comment: "phase, percent, model, elapsed, facts"),
+            progress.phase.displayName, Int((progress.fraction * 100).rounded()), model, elapsed,
+            knowledgeCountText("knowledge.count.fact", progress.factsSoFar)
+        )
+    }
+
+    /// What the just-finished compile published, briefly — a real count, the
+    /// honest "the model found nothing" note, or nothing when it was a
+    /// no-op replay that committed no new assertions.
+    @ViewBuilder
+    private var compileResultNote: some View {
+        if let result = coordinator.result(for: meeting.id) {
+            Text(result.factCount > 0
+                 ? knowledgeCountText("knowledge.updated.fact", result.factCount)
+                 : NSLocalizedString(result.modelEmpty ? "knowledge.updated_empty" : "knowledge.updated_none",
+                                     comment: "No new facts"))
+            .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+            .transition(.opacity)
+        }
+    }
+
     /// Generation in flight or the last explicit failure — a row that joins and
     /// leaves without moving the facts underneath.
     @ViewBuilder
@@ -81,7 +135,7 @@ struct MeetingKnowledgeView: View {
                             writerLabel))
                     .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
             }
-        } else if let errorText = compileErrorText ?? lastAttemptErrorText {
+        } else if let errorText = lastCompileErrorText ?? lastAttemptErrorText {
             HStack(spacing: 10) {
                 Text(errorText)
                     .font(Theme.footnote).foregroundStyle(Theme.destructive)
@@ -225,6 +279,25 @@ struct MeetingKnowledgeView: View {
         }
     }
 
+    /// The most recent explicit compile refusal for this meeting — surfaced
+    /// identically whether the request came from the tab or the ⋯ menu, and
+    /// an integrity-gate rejection reads as its own sentence.
+    private var lastCompileErrorText: String? {
+        guard coordinator.lastExplicitFailure?.meetingID == meeting.id,
+              let code = coordinator.lastExplicitFailure?.code else { return nil }
+        let isDeferredReason = KnowledgeJobDeferred.Reason(rawValue: code) != nil
+            || code == "no_transcript" || code == "last_attempt_failed"
+        let description = if KnowledgeExtractionError(rawValue: code) != nil {
+            NSLocalizedString("knowledge.updated_rejected", comment: "Integrity check rejected output")
+        } else if isDeferredReason {
+            AppError.wikiGenerationDeferred(reason: code).errorDescription
+                ?? AppError.wikiGenerationDeferred(reason: code).localizedDescription
+        } else {
+            NSLocalizedString("knowledge.update_failed", comment: "Generic knowledge update failure")
+        }
+        return String(format: NSLocalizedString("knowledge.last_attempt_failed", comment: "Inline failure reason"), description)
+    }
+
     /// The most recent explicit failure's reason, only when it belongs to
     /// this meeting — automatic runs stay silent (logs only).
     private var lastAttemptErrorText: String? {
@@ -233,9 +306,10 @@ struct MeetingKnowledgeView: View {
                       error.errorDescription ?? error.localizedDescription)
     }
 
+    /// "Update knowledge" — a forced explicit recompile with real progress.
     private var refreshButton: some View {
-        KnowledgeChipButton(title: NSLocalizedString("detail.knowledge.refresh", comment: "Refresh contributions"),
-                            systemImage: "arrow.clockwise", action: onRefresh)
+        KnowledgeChipButton(title: NSLocalizedString("detail.knowledge.update", comment: "Update knowledge"),
+                            systemImage: "sparkles", action: updateKnowledge)
             .accessibilityIdentifier("knowledge.refresh")
     }
 
@@ -249,24 +323,38 @@ struct MeetingKnowledgeView: View {
         )
     }
 
-    /// The most recent explicit compile failure's reason — the facts are the
-    /// content, so a refused extraction explains itself in the same row style
-    /// as the article's "Last attempt failed".
-    @State private var compileErrorText: String?
+    /// True while a tab-initiated compile is anywhere before the worker —
+    /// the progress row shows its first phase until real progress arrives.
+    @State private var updateInFlight = false
+    @State private var compileTask: Task<Void, Never>?
+
+    /// Placeholder used between the tap and the worker's first phase report.
+    private var pendingProgress: KnowledgeCompilationProgress {
+        KnowledgeCompilationProgress(startedAt: Date(),
+                                     providerLabel: settings.knowledgeProvider?.displayName ?? "",
+                                     modelLabel: settings.knowledgeProvider.map { settings.summaryModel(for: $0) } ?? "")
+    }
+
+    private func updateKnowledge() {
+        compileTask?.cancel()
+        compileTask = Task { await updateKnowledgeRun() }
+    }
+
+    /// Forced explicit recompile — the failure reason lands on the
+    /// coordinator's `lastExplicitFailure`, the count on its result note.
+    private func updateKnowledgeRun() async {
+        updateInFlight = true
+        defer { updateInFlight = false }
+        let outcome = await coordinator.compile(meetingID: meeting.id, trigger: .explicit, force: true)
+        if outcome != .deferred { onRefresh() }
+    }
 
     private func generate() {
         Task {
-            compileErrorText = nil
-            // Explicit Generate also refreshes the extracted facts: a stale or
-            // missing compilation re-runs through the same explicit path, a
-            // current one is a cheap no-op replay.
-            let outcome = await coordinator.compile(meetingID: meeting.id, trigger: .explicit)
-            if outcome != .completed, let code = coordinator.lastFailureCode {
-                let error = AppError.wikiGenerationDeferred(reason: code)
-                compileErrorText = String(format: NSLocalizedString("knowledge.last_attempt_failed", comment: "Inline failure reason"),
-                                          error.errorDescription ?? error.localizedDescription)
-            }
-            if outcome != .deferred { onRefresh() }
+            // Regenerate rebuilds the facts first (knowledge progress row),
+            // then the article (the wiki "Writing…" row) — sequential, the
+            // facts underneath never move.
+            await updateKnowledgeRun()
             if generatesLocally {
                 _ = await coordinator.generateLocalMeetingNotes(meeting, wiki: wiki)
             } else {

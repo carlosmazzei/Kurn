@@ -212,8 +212,31 @@ extension MeetingDetailView {
     /// regardless of the provider circuit breaker or a matching content
     /// hash, the same way `WikiCoordinator.rebuildWiki()` treats every
     /// meeting it touches.
+    /// "Update knowledge": a forced explicit recompile of this meeting's
+    /// facts — the same request the Wiki tab's Update button issues, with
+    /// the coordinator's progress/result/failure state driving the tab's rows.
+    func updateKnowledge() {
+        Task {
+            _ = await knowledgeCompilation.compile(meetingID: meeting.id, trigger: .explicit, force: true)
+            meetingKnowledge.invalidate()
+            knowledgeRefresh += 1
+        }
+    }
+
+    /// Regenerate rebuilds the extracted facts first, then rewrites the
+    /// article — the same compile + generate sequence the Wiki tab's
+    /// Generate runs, so a stale compilation can't back a "new" page.
     func regenerateWiki() {
-        Task { await wiki.generate(meeting, trigger: .explicit, force: true) }
+        Task {
+            _ = await knowledgeCompilation.compile(meetingID: meeting.id, trigger: .explicit, force: true)
+            meetingKnowledge.invalidate()
+            knowledgeRefresh += 1
+            if settings.wikiGenerationProvider.kind == .appleOnDevice {
+                _ = await knowledgeCompilation.generateLocalMeetingNotes(meeting, wiki: wiki)
+            } else {
+                await wiki.generate(meeting, trigger: .explicit, force: true)
+            }
+        }
     }
 
     /// Same gate as `canGenerateWiki`, for the AI title action.

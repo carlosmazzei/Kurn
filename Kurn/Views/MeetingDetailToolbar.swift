@@ -104,6 +104,23 @@ extension MeetingDetailView {
                             )
                         }
                     }
+                    if settings.knowledgeEnabled {
+                        Button { updateKnowledge() } label: {
+                            if knowledgeCompilation.progress(for: meeting.id) != nil {
+                                Label {
+                                    Text(NSLocalizedString("detail.knowledge.updating", comment: "Knowledge updating"))
+                                } icon: {
+                                    ProgressView().controlSize(.mini)
+                                }
+                            } else {
+                                Label(
+                                    NSLocalizedString("detail.knowledge.update", comment: "Update knowledge"),
+                                    systemImage: "sparkles"
+                                )
+                            }
+                        }
+                        .disabled(knowledgeCompilation.progress(for: meeting.id) != nil)
+                    }
                     if canGenerateWiki {
                         Button { regenerateWiki() } label: {
                             if isGeneratingWiki {

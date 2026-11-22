@@ -130,6 +130,48 @@ enum PostTranscriptionPhase: Sendable, Equatable {
     }
 }
 
+/// Stage within an explicit knowledge compilation ("Update knowledge"), the
+/// same shape `TranscriptionPhase` uses: a name plus an always-determinate
+/// `fractionComplete` whose fixed bands only move forward.
+enum KnowledgeCompilationPhase: Sendable, Equatable {
+    /// The snapshot/read validation before any extraction runs.
+    case readingTranscript
+    /// Extracting facts from one recording: the 1-based index and the total.
+    case extracting(recording: Int, of: Int)
+    /// The post-extraction revalidation and integrity checks before commit.
+    case checking
+    /// The canonical commit itself.
+    case publishing
+
+    var displayName: String {
+        switch self {
+        case .readingTranscript:
+            return NSLocalizedString("phase.knowledge.reading", comment: "Reading transcript")
+        case .extracting(let recording, let total):
+            return String(
+                format: NSLocalizedString("phase.knowledge.extracting", comment: "Extracting facts per recording"),
+                recording, total
+            )
+        case .checking:
+            return NSLocalizedString("phase.knowledge.checking", comment: "Checking facts")
+        case .publishing:
+            return NSLocalizedString("phase.knowledge.publishing", comment: "Publishing")
+        }
+    }
+
+    /// Extraction owns the wide middle band; within it the fraction advances
+    /// one step per recording completed.
+    var fractionComplete: Double {
+        switch self {
+        case .readingTranscript: return 0.1
+        case .extracting(let recording, let total):
+            return 0.15 + 0.6 * min(1, Double(recording) / Double(max(1, total)))
+        case .checking: return 0.8
+        case .publishing: return 0.95
+        }
+    }
+}
+
 /// Chunk counter surfaced in the transcription progress UI.
 ///
 /// `completed` is the chunk currently being shown to the user: it is the index

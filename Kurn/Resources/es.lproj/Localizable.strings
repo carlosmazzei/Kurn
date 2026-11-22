@@ -443,6 +443,19 @@
 "post_phase.generating_title" = "Generando título…";
 "post_phase.indexing" = "Indexando transcripción…";
 "post_phase.generating_wiki" = "Generando wiki…";
+"phase.knowledge.reading" = "Leyendo la transcripción";
+"phase.knowledge.extracting" = "Extrayendo hechos · grabación %1$d de %2$d";
+"phase.knowledge.checking" = "Comprobando los hechos";
+"phase.knowledge.publishing" = "Publicando";
+"detail.knowledge.update" = "Actualizar conocimiento";
+"detail.knowledge.updating" = "Conocimiento · actualizando…";
+"detail.knowledge.update.stats" = "%1$@ · %2$d%% · %3$@ · %4$ds · %5$@";
+"knowledge.updated.fact.one" = "%d hecho nuevo";
+"knowledge.updated.fact.other" = "%d hechos nuevos";
+"knowledge.updated_empty" = "No hay hechos nuevos: el modelo no encontró afirmaciones";
+"knowledge.updated_none" = "No hay hechos nuevos";
+"knowledge.updated_rejected" = "Salida rechazada por la comprobación de integridad";
+"knowledge.update_failed" = "La actualización del conocimiento falló.";
 
 /* Formulario de reunión */
 "form.title_section" = "Título";

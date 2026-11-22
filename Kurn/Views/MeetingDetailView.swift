@@ -39,6 +39,9 @@ struct MeetingDetailView: View {
     /// overflow menu's "Generate/Regenerate Wiki" reuses the same instance
     /// the post-transcription pipeline and Settings → Wiki already drive.
     @Environment(WikiCoordinator.self) var wiki
+    /// Explicit per-meeting knowledge compiles ("Update knowledge"); the tab's
+    /// progress row reads `progress(for:)` off the same coordinator.
+    @Environment(KnowledgeCompilationCoordinator.self) var knowledgeCompilation
     /// The app-wide recording session "Add segment" starts (or re-opens, when
     /// a recording is already running minimized).
     @Environment(RecordingSessionController.self) private var recordingSession
@@ -85,7 +88,9 @@ struct MeetingDetailView: View {
     @State var tab: Tab = .summary
     @State private var tabInitialized = false
     @State var meetingKnowledge = MeetingKnowledgeViewModel()
-    @State private var knowledgeRefresh = 0
+    /// Not `private` — `MeetingDetailActions.updateKnowledge()` bumps it after
+    /// a compile so the Wiki tab's fact list re-reads the store.
+    @State var knowledgeRefresh = 0
 
     /// Drives the full-screen photo viewer from the Recordings tab's photo
     /// strip — shown there independently of the Transcript tab's inline

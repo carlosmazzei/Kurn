@@ -282,6 +282,50 @@ struct KnowledgeCompilationQueueTests {
         #expect(await provider.calls == 0)
     }
 
+    @Test func explicitCompilePublishesLiveProgressAndAFactCountResult() async throws {
+        let gate = Gate()
+        let provider = Provider(gateAt: 1, gate: gate)
+        let f = try fixture(recordings: 2, provider: provider)
+        let task = Task { await f.coordinator.compile(meetingID: f.meeting.id, trigger: .explicit, force: true) }
+        try await wait(gate)
+        // Mid-run the tab sees a real phase, a partial fraction and labels.
+        let live = try #require(f.coordinator.progress(for: f.meeting.id))
+        #expect(live.phase == .extracting(recording: 1, of: 2))
+        #expect(live.fraction > 0 && live.fraction < 1)
+        #expect(live.startedAt <= Date())
+        #expect(!live.providerLabel.isEmpty)
+        await gate.release()
+        #expect(await task.value == .completed)
+        // Progress leaves with the run; the transient note reports the count.
+        #expect(f.coordinator.progress(for: f.meeting.id) == nil)
+        let result = try #require(f.coordinator.result(for: f.meeting.id))
+        #expect(result.factCount == 2)
+        #expect(result.modelEmpty == false)
+    }
+
+    @Test func forcedCompileRecompilesAnAlreadyCurrentMeeting() async throws {
+        let provider = Provider()
+        let f = try fixture(provider: provider)
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id) == .completed)
+        #expect(await provider.calls == 1)
+        // A plain compile replays the current provenance without calling out.
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id) == .completed)
+        #expect(await provider.calls == 1)
+        // The explicit Update forces a fresh extraction pass.
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id, trigger: .explicit, force: true) == .completed)
+        #expect(await provider.calls == 2)
+    }
+
+    @Test func progressAndFailureStateClearConsistentlyWhenACompileFails() async throws {
+        let provider = Provider(failAt: 1)
+        let f = try fixture(provider: provider)
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id, trigger: .explicit, force: true) == .failed)
+        #expect(f.coordinator.progress(for: f.meeting.id) == nil)
+        #expect(f.coordinator.result(for: f.meeting.id) == nil)
+        #expect(f.coordinator.lastExplicitFailure?.meetingID == f.meeting.id)
+        #expect(f.coordinator.lastExplicitFailure?.code != nil)
+    }
+
     @Test func explicitRebuildGenerationIsIdempotentAndRetiresPreviousMachineAssertions() async throws {
         let provider = Provider()
         let f = try fixture(provider: provider)

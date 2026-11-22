@@ -443,6 +443,19 @@
 "post_phase.generating_title" = "正在生成标题…";
 "post_phase.indexing" = "正在索引转录…";
 "post_phase.generating_wiki" = "正在生成维基…";
+"phase.knowledge.reading" = "正在读取转录";
+"phase.knowledge.extracting" = "正在提取事实 · 录音 %1$d/%2$d";
+"phase.knowledge.checking" = "正在检查事实";
+"phase.knowledge.publishing" = "正在发布";
+"detail.knowledge.update" = "更新知识";
+"detail.knowledge.updating" = "知识 · 正在更新…";
+"detail.knowledge.update.stats" = "%1$@ · %2$d%% · %3$@ · %4$ds · %5$@";
+"knowledge.updated.fact.one" = "%d 条新事实";
+"knowledge.updated.fact.other" = "%d 条新事实";
+"knowledge.updated_empty" = "没有新事实——模型未找到任何陈述";
+"knowledge.updated_none" = "没有新事实";
+"knowledge.updated_rejected" = "输出被完整性检查拒绝";
+"knowledge.update_failed" = "知识更新失败。";
 
 /* 会议表单 */
 "form.title_section" = "标题";
