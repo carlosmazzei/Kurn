@@ -16,4 +16,16 @@ struct StructuredExtractionRequestTests {
         #expect(GoogleProvider.generationConfig(.document)["responseMimeType"] == nil)
         #expect(GoogleProvider.generationConfig(.document)["maxOutputTokens"] as? Int == TextGenerationOptions.document.maxOutputTokens)
     }
+
+    @Test func anthropicCachesTheExtractionSystemPromptOnly() {
+        let cached = AnthropicProvider.systemField("system", extraction) as? [[String: Any]]
+        #expect(cached?.first?["cache_control"] as? [String: String] == ["type": "ephemeral"])
+        #expect(AnthropicProvider.systemField("system", .document) as? String == "system")
+    }
+
+    @Test func reasoningModelsGetLowEffort() {
+        #expect(OpenAIProvider.usesLowReasoningEffort("gpt-6.1-terra"))
+        #expect(OpenAIProvider.usesLowReasoningEffort("gpt-5.4"))
+        #expect(!OpenAIProvider.usesLowReasoningEffort("gpt-4o-mini"))
+    }
 }
