@@ -1026,6 +1026,7 @@
 "read_aloud.stop" = "停止朗读";
 "read_aloud.dismiss_error" = "关闭";
 "read_aloud.start" = "朗读";
+"read_aloud.preparing" = "正在准备音频…";
 "read_aloud.pause" = "暂停";
 "read_aloud.resume" = "继续";
 "read_aloud.kind.summary" = "摘要";

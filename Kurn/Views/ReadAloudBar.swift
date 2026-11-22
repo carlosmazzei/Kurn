@@ -43,7 +43,7 @@ struct ReadAloudBar: View {
                             .foregroundStyle(Theme.destructive)
                             .lineLimit(2)
                     } else {
-                        Text(subtitle)
+                        subtitleText
                             .font(Theme.caption)
                             .monospacedDigit()
                             .foregroundStyle(Theme.textSecondary)
@@ -104,17 +104,25 @@ struct ReadAloudBar: View {
         .padding(.bottom, 6)
     }
 
-    /// "Paragraph N of M · <voice>" — the voice is "Device voice" for the
-    /// system synthesizer, else the provider's name.
-    private var subtitle: String {
-        let progress = String(
-            format: NSLocalizedString("read_aloud.progress_named", comment: "Paragraph N of M"),
-            controller.chunkIndex + 1, controller.chunkCount
-        )
-        let voice = settings.speechProvider.speechSynthesisAPI == .system
-            ? NSLocalizedString("read_aloud.voice.device", comment: "Device voice")
-            : settings.speechProvider.displayName
-        return "\(progress) · \(voice)"
+    /// While preparing: "Preparing audio…". Once speaking: "Paragraph N of
+    /// M · <voice>", dropping the voice when the full line would truncate.
+    @ViewBuilder
+    private var subtitleText: some View {
+        if phase == .preparing {
+            Text(NSLocalizedString("read_aloud.preparing", comment: "Preparing audio"))
+        } else {
+            let progress = String(
+                format: NSLocalizedString("read_aloud.progress_named", comment: "Paragraph N of M"),
+                controller.chunkIndex + 1, controller.chunkCount
+            )
+            let voice = settings.speechProvider.speechSynthesisAPI == .system
+                ? NSLocalizedString("read_aloud.voice.device", comment: "Device voice")
+                : settings.speechProvider.displayName
+            ViewThatFits(in: .horizontal) {
+                Text("\(progress) · \(voice)")
+                Text(progress)
+            }
+        }
     }
 
     private func transportButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
@@ -137,9 +145,11 @@ struct ReadAloudBar: View {
                 if phase == .preparing {
                     ProgressView()
                         .controlSize(.small)
+                        .tint(Theme.onInk)
                 } else {
                     Image(systemName: phase == .paused ? "play.fill" : "pause.fill")
                         .font(.system(.callout, weight: .bold))
+                        .foregroundStyle(Theme.onInk)
                 }
             }
             .foregroundStyle(Theme.onInk)
@@ -148,9 +158,15 @@ struct ReadAloudBar: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(phase == .paused
-            ? NSLocalizedString("read_aloud.resume", comment: "Resume reading")
-            : NSLocalizedString("read_aloud.pause", comment: "Pause reading"))
+        .accessibilityLabel(toggleAccessibilityLabel)
         .accessibilityIdentifier("readAloud.toggle")
+    }
+
+    private var toggleAccessibilityLabel: String {
+        switch phase {
+        case .preparing: return NSLocalizedString("read_aloud.preparing", comment: "Preparing audio")
+        case .paused: return NSLocalizedString("read_aloud.resume", comment: "Resume reading")
+        default: return NSLocalizedString("read_aloud.pause", comment: "Pause reading")
+        }
     }
 }

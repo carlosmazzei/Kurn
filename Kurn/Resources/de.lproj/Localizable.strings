@@ -1026,6 +1026,7 @@
 "read_aloud.stop" = "Vorlesen beenden";
 "read_aloud.dismiss_error" = "Schließen";
 "read_aloud.start" = "Vorlesen";
+"read_aloud.preparing" = "Audio wird vorbereitet…";
 "read_aloud.pause" = "Pause";
 "read_aloud.resume" = "Fortsetzen";
 "read_aloud.kind.summary" = "Zusammenfassung";
