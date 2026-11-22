@@ -28,4 +28,12 @@ struct StructuredExtractionRequestTests {
         #expect(OpenAIProvider.usesLowReasoningEffort("gpt-5.4"))
         #expect(!OpenAIProvider.usesLowReasoningEffort("gpt-4o-mini"))
     }
+
+    @Test func jsonModeMentionsJSONInTheInputMessage() {
+        let wire = [["role": "system", "content": "s"], ["role": "user", "content": "segments"]]
+        let reminded = OpenAIProvider.withJSONReminder(wire)
+        #expect(reminded[0]["content"] == "s")
+        #expect(reminded[1]["content"]?.contains("JSON") == true)
+        #expect(OpenAIProvider.withJSONReminder([["role": "system", "content": "s"]]).last?["role"] == "user")
+    }
 }

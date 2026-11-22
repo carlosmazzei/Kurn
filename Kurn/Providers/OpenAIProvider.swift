@@ -356,7 +356,12 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
         if provider.id == AIProvider.openAI.id, Self.usesLowReasoningEffort(chatModel) {
             body["reasoning_effort"] = "low"
         }
-        if let format = Self.jsonResponseFormat(options, providerID: provider.id) { body["response_format"] = format }
+        if let format = Self.jsonResponseFormat(options, providerID: provider.id) {
+            body["response_format"] = format
+            // The Responses API rejects JSON mode unless an *input* message
+            // (not the system instructions) mentions JSON.
+            body["messages"] = Self.withJSONReminder(wire)
+        }
         // One cache key per extraction prompt version: every block of every
         // meeting shares the same long system prompt, so OpenAI can route the
         // passes to the same prompt cache (official endpoint only).
@@ -540,6 +545,16 @@ private extension Data {
 
 extension OpenAIProvider {
     static let extractionPromptCacheKey = "kurn.knowledge.extraction.v1"
+
+    /// Appends "Respond with JSON." to the last user message.
+    static func withJSONReminder(_ wire: [[String: String]]) -> [[String: String]] {
+        guard let index = wire.lastIndex(where: { $0["role"] == "user" }) else {
+            return wire + [["role": "user", "content": "Respond with JSON."]]
+        }
+        var copy = wire
+        copy[index]["content", default: ""] += "\n\nRespond with JSON."
+        return copy
+    }
 
     /// GPT-5 and later reasoning models count hidden reasoning against the
     /// completion budget; low effort keeps a chat answer or a structured
