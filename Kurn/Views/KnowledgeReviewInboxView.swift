@@ -13,6 +13,9 @@ struct KnowledgeReviewInboxView: View {
     @State private var path: [UUID] = []
     @State private var pending: KnowledgeReviewCommand?
     @State private var evidence: EvidenceRoute?
+    @State private var segment: ReviewSegment = .pending
+
+    private enum ReviewSegment: Hashable { case pending, kept, history }
 
     private struct EvidenceRoute: Identifiable {
         let selection: KnowledgeEvidenceSelection
@@ -77,23 +80,50 @@ struct KnowledgeReviewInboxView: View {
     }
 
     private func inbox(_ read: KnowledgeReviewRead) -> some View {
-        ScrollView {
+        let open = read.candidates.filter { !$0.isDismissed }
+        return ScrollView {
             LazyVStack(alignment: .leading, spacing: 12) {
                 notices(read)
-                KnowledgeSectionLabel(KnowledgeReviewCopy.text("identities")).padding(.top, 8)
-                let open = read.candidates.filter { !$0.isDismissed }
-                if open.isEmpty { emptyCard } else { ForEach(open) { candidate in candidateLink(candidate) } }
-                KnowledgeSectionLabel(KnowledgeReviewCopy.text("warnings")).padding(.top, 8)
-                if read.warnings.isEmpty { emptyCard } else { ForEach(read.warnings) { warning in warningCard(warning) } }
-                KnowledgeSectionLabel(KnowledgeReviewCopy.text("history")).padding(.top, 8)
-                ForEach(read.merges) { merge in mergeCard(merge, allowsMutation: read.allowsMutation) }
-                ForEach(read.candidates.filter(\.isDismissed)) { candidate in candidateLink(candidate) }
-                if read.merges.isEmpty && !read.candidates.contains(where: \.isDismissed) { emptyCard }
+                Picker(KnowledgeReviewCopy.text("title"), selection: $segment) {
+                    Text("\(KnowledgeReviewCopy.text("pending")) · \(open.count)").tag(ReviewSegment.pending)
+                    Text(KnowledgeReviewCopy.text("kept")).tag(ReviewSegment.kept)
+                    Text(KnowledgeReviewCopy.text("history")).tag(ReviewSegment.history)
+                }
+                .pickerStyle(.segmented)
+                .padding(.top, 4)
+                segmentContent(read, open: open)
             }
             .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
         }
         .knowledgeReadingSurface()
         .accessibilityIdentifier("knowledge.review.inbox")
+    }
+
+    @ViewBuilder
+    private func segmentContent(_ read: KnowledgeReviewRead, open: [KnowledgeReviewRead.Candidate]) -> some View {
+        switch segment {
+        case .pending:
+            KnowledgeSectionLabel(KnowledgeReviewCopy.text("identities")).padding(.top, 8)
+            if open.isEmpty { emptyCard } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(open.enumerated()), id: \.element.id) { index, candidate in
+                        if index > 0 { Divider().overlay(Theme.separator).padding(.leading, 58).accessibilityHidden(true) }
+                        candidateLink(candidate)
+                    }
+                }
+                .knowledgeGroup()
+            }
+            KnowledgeSectionLabel(KnowledgeReviewCopy.text("warnings")).padding(.top, 8)
+            if read.warnings.isEmpty { emptyCard } else {
+                ForEach(read.warnings) { warning in warningCard(warning) }
+            }
+        case .kept:
+            ForEach(read.candidates.filter(\.isDismissed)) { candidate in candidateLink(candidate) }
+            if !read.candidates.contains(where: \.isDismissed) { emptyCard }
+        case .history:
+            ForEach(read.merges) { merge in mergeCard(merge, allowsMutation: read.allowsMutation) }
+            if read.merges.isEmpty { emptyCard }
+        }
     }
 
     @ViewBuilder
@@ -175,8 +205,11 @@ struct KnowledgeReviewInboxView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(verbatim: candidate.source.name + " · " + candidate.target.name)
                         .font(Theme.subheadlineEmphasized).foregroundStyle(Theme.textPrimary)
-                    Text(KnowledgeReviewCopy.text(candidate.isDismissed ? "kept_separate" : "possible_match"))
+                    Text(candidate.isDismissed
+                         ? KnowledgeReviewCopy.text("kept_separate")
+                         : KnowledgeReviewCopy.text("candidate_reason"))
                         .font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -184,7 +217,16 @@ struct KnowledgeReviewInboxView: View {
     }
 
     private func read() async throws -> KnowledgeReviewRead { try await coordinator.readKnowledgeReview(meetingIDs: meetingIDs) }
-    private func decide(_ command: KnowledgeReviewCommand) { path = []; pending = command }
+    private func decide(_ command: KnowledgeReviewCommand) {
+        path = []
+        pending = command
+        // The decision's outcome lives in another segment: land on it.
+        switch command {
+        case .merge: segment = .history
+        case .dismiss: segment = .kept
+        case .reopen, .undo: segment = .pending
+        }
+    }
     private func clear() { pending = nil; evidence = nil; model.invalidate() }
     private func reload() { clear(); refresh += 1 }
 }

@@ -124,6 +124,7 @@ struct KnowledgeGraphView: View {
     private func summary(_ scene: KnowledgeGraphPresentation.Scene) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             footnote(scene.summary)
+            footnote(String(format: KnowledgeGraphPresentation.copy("footer_counts"), scene.nodes.count, scene.edges.count))
             if scene.isTruncated { footnote(KnowledgeGraphPresentation.copy("truncated")) }
             if scene.nodes.contains(where: \.hasMore) { footnote(KnowledgeGraphPresentation.copy("has_more_footer")) }
             ForEach(Array(scene.cycles.enumerated()), id: \.offset) { _, names in
@@ -248,7 +249,7 @@ private struct KnowledgeGraphCanvas: View {
             // Tentative claims are dashed, inferred ones dotted and negated ones crossed out: a
             // shape, not only a colour, carries each state.
             let style = StrokeStyle(lineWidth: touching.contains(edge.factID) ? 2.5 : 1.2, dash: edge.isTentative ? [6, 4] : edge.isInferred ? [1, 4] : [])
-            let shading: GraphicsContext.Shading = .color(touching.contains(edge.factID) ? Theme.ink : Theme.textSecondary)
+            let shading: GraphicsContext.Shading = .color(touching.contains(edge.factID) ? Theme.ink : Theme.decorationTertiary)
             context.stroke(line, with: shading, style: style)
             context.fill(arrowhead(from: from, to: to), with: shading)
             if edge.isNegated { context.stroke(cross(at: midpoint(from, to)), with: shading, lineWidth: 2) }
@@ -256,23 +257,35 @@ private struct KnowledgeGraphCanvas: View {
         }
         for node in scene.nodes {
             let centre = KnowledgeGraphPresentation.point(node.point, in: size)
-            // The centre is a square, every other node a circle: its shape,
-            // not only its colour, says which one the graph is centred on.
-            let frame = CGRect(x: centre.x - radius, y: centre.y - radius, width: radius * 2, height: radius * 2)
-            let mark = node.isRoot ? Path(roundedRect: frame, cornerRadius: 3) : Path(ellipseIn: frame)
-            context.fill(mark, with: .color(node.isRoot ? Theme.ink : Theme.textSecondary))
+            // The centre is an ink-filled rounded rect carrying its name; every
+            // other node is a paper circle with an ink stroke and the name below.
+            if node.isRoot {
+                let label = Text(verbatim: node.name).font(Theme.captionEmphasized).foregroundStyle(Theme.onInk)
+                let resolved = context.resolve(label)
+                let width = max(resolved.measure(in: size).width + 18, radius * 2 + 10)
+                let frame = CGRect(x: centre.x - width / 2, y: centre.y - radius - 4, width: width, height: (radius + 4) * 2)
+                context.fill(Path(roundedRect: frame, cornerRadius: 8), with: .color(Theme.ink))
+                context.draw(resolved, at: centre, anchor: .center)
+            } else {
+                let frame = CGRect(x: centre.x - radius, y: centre.y - radius, width: radius * 2, height: radius * 2)
+                let circle = Path(ellipseIn: frame)
+                context.fill(circle, with: .color(Theme.surface))
+                context.stroke(circle, with: .color(Theme.ink), lineWidth: 1.5)
+            }
             if node.hasMore {
                 let outer = Path(ellipseIn: CGRect(x: centre.x - radius - 5, y: centre.y - radius - 5,
                                                    width: (radius + 5) * 2, height: (radius + 5) * 2))
-                context.stroke(outer, with: .color(Theme.textSecondary), style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
+                context.stroke(outer, with: .color(Theme.decorationTertiary), style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
             }
             if node.id == selected {
                 let ring = Path(ellipseIn: CGRect(x: centre.x - radius - 9, y: centre.y - radius - 9,
                                                   width: (radius + 9) * 2, height: (radius + 9) * 2))
                 context.stroke(ring, with: .color(Theme.textPrimary), lineWidth: 2.5)
             }
-            context.draw(Text(verbatim: node.name).font(Theme.captionEmphasized).foregroundStyle(Theme.textPrimary),
-                         at: CGPoint(x: centre.x, y: centre.y + radius + 14), anchor: .center)
+            if !node.isRoot {
+                context.draw(Text(verbatim: node.name).font(Theme.captionEmphasized).foregroundStyle(Theme.textPrimary),
+                             at: CGPoint(x: centre.x, y: centre.y + radius + 14), anchor: .center)
+            }
         }
     }
 

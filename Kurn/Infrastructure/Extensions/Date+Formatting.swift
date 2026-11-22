@@ -49,6 +49,19 @@ extension Date {
     /// long, e.g. a chip label distinguishing same-day summaries.
     var shortTime: String { Self.shortTimeFormatter.string(from: self) }
 
+    /// "Today" / "Yesterday" / the short localized date — the relative day a
+    /// list row was recorded at.
+    var relativeDay: String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(self) {
+            return NSLocalizedString("meetings.day.today", comment: "Today")
+        }
+        if calendar.isDateInYesterday(self) {
+            return NSLocalizedString("meetings.day.yesterday", comment: "Yesterday")
+        }
+        return formatted(date: .abbreviated, time: .omitted)
+    }
+
     /// Compact date used in default meeting titles. e.g. "2025-06-16".
     var isoDay: String { Self.isoDayFormatter.string(from: self) }
 

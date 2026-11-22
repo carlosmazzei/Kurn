@@ -15,7 +15,7 @@ enum AppRootDestination: String, CaseIterable, Hashable {
     var systemImage: String {
         switch self {
         case .meetings: "mic"
-        case .knowledge: "book.pages"
+        case .knowledge: "book"
         case .ask: "bubble.left.and.bubble.right"
         case .documents: "doc.text"
         }

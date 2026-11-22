@@ -898,14 +898,14 @@
 "settings.correction" = "校正转录错误";
 "settings.correction_footer" = "转录完成后使用你的摘要 AI 提供方。它会先审阅转录内容，识别会议主题以及与主题不符的词语，再修正不确定或被指出部分的拼写、标点和听错的词语，只保留听起来与原话一致的修改。默认关闭——它会发起云端调用，且可能需要更长时间完成。";
 "settings.correction_needs_key" = "请为你的摘要提供方添加 API 密钥以启用 AI 校正。";
-"detail.wiki.view" = "查看维基";
-"detail.wiki.generate" = "生成维基";
-"detail.wiki.regenerate" = "重新生成维基";
-"detail.wiki.generating" = "正在生成维基…";
+"detail.wiki.view" = "查看页面";
+"detail.wiki.generate" = "生成页面";
+"detail.wiki.regenerate" = "重新生成页面";
+"detail.wiki.generating" = "正在生成页面…";
 "detail.title.generate" = "生成标题";
 "detail.title.regenerate" = "重新生成标题";
 "detail.title.generating" = "正在生成标题…";
-"detail.wiki.title" = "会议维基";
+"detail.wiki.title" = "会议页面";
 "detail.wiki.updated" = "更新于 %@";
 
 /* 生成的文档 */
@@ -1074,7 +1074,7 @@
 "chat.sources.part.transcript" = "转录";
 "chat.sources.part.summary" = "摘要";
 "chat.sources.part.wiki" = "Wiki";
-"chat.sources.part.knowledge" = "知识";
+"chat.sources.part.knowledge" = "维基";
 "chat.sources.part.attachments" = "附件";
 "chat.sources.parts.none" = "未选择内容";
 "chat.sources.summary.one" = "1 场会议 · %@";
@@ -1356,15 +1356,15 @@
 /* Meeting knowledge contributions (K2.3). */
 "tab.knowledge" = "Wiki";
 "detail.knowledge.counts" = "实体：%ld · 陈述：%ld · 片段：%ld";
-"detail.knowledge.contributions" = "本次会议的贡献";
+"detail.knowledge.contributions" = "变更的页面";
 "detail.knowledge.refresh" = "刷新";
-"detail.knowledge.notes" = "会议笔记";
-"detail.knowledge.notes_empty" = "根据本次会议的转录生成精简笔记。";
+"detail.knowledge.notes" = "会议页面";
+"detail.knowledge.notes_empty" = "根据本次会议的转录生成页面。";
 "detail.knowledge.loading" = "正在加载贡献…";
-"detail.knowledge.unavailable" = "知识暂不可用";
+"detail.knowledge.unavailable" = "维基暂不可用";
 "detail.knowledge.unavailable_detail" = "访问权限或源数据可能已更改。请刷新后重试。";
 "detail.knowledge.empty" = "暂无贡献";
-"detail.knowledge.empty_detail" = "处理本次会议的知识后，将在此显示贡献。";
+"detail.knowledge.empty_detail" = "处理本次会议的维基后，将在此显示贡献。";
 "detail.knowledge.claim_count" = "陈述：%ld";
 "detail.knowledge.negated" = "否定陈述";
 "detail.knowledge.attribution" = "归属于 %@";
@@ -1430,14 +1430,14 @@
 "knowledge.value.false" = "假";
 
 // Scoped knowledge reader
-"knowledge.browser.title" = "知识";
+"knowledge.browser.title" = "维基";
 "knowledge.browser.refresh" = "刷新";
-"knowledge.browser.export" = "导出 Knowledge";
-"knowledge.browser.export_failed" = "无法导出 Knowledge";
-"knowledge.browser.narrative" = "笔记";
-"knowledge.browser.narrative_note" = "根据下方的陈述生成；依赖前请先核对。";
-"knowledge.browser.narrative_sources" = "依据 %d 条陈述";
-"knowledge.browser.ask_entity" = "就此提问";
+"knowledge.browser.export" = "导出 维基";
+"knowledge.browser.export_failed" = "无法导出 维基";
+"knowledge.browser.narrative" = "Wiki";
+"knowledge.browser.narrative_note" = "由下列事实生成；依赖前请先核对。";
+"knowledge.browser.narrative_sources" = "基于 %d 条事实";
+"knowledge.browser.ask_entity" = "询问此页面";
 "knowledge.browser.ask_draft" = "关于%@我们知道什么？";
 "knowledge.browser.page" = "页面部分";
 "knowledge.browser.overview" = "概览";
@@ -1529,7 +1529,7 @@
 "knowledge.graph.filter" = "筛选";
 "knowledge.graph.unnamed" = "未命名";
 "knowledge.late.header" = "之后修订";
-"knowledge.late.footer" = "之后记录的知识改变了这些较早日期成立的内容。";
+"knowledge.late.footer" = "稍后记录的事实改变了这些早前日期中的有效内容。";
 "knowledge.late.recorded" = "记录于 %@";
 "knowledge.late.from" = "自 %@ 起";
 "knowledge.late.on" = "%@";
@@ -1552,12 +1552,12 @@
 
 // Knowledge source selection
 "knowledge.browser.choose_sources" = "选择会议";
-"knowledge.browser.choose_sources_detail" = "最多选择 16 场会议以浏览其知识。";
-"knowledge.browser.disabled_title" = "Knowledge 已关闭";
-"knowledge.browser.disabled_detail" = "请在设置 → Knowledge 中开启 Knowledge，以跨会议整理实体、决策和依据。";
+"knowledge.browser.choose_sources_detail" = "每次最多 16 场会议。";
+"knowledge.browser.disabled_title" = "你的会议维基";
+"knowledge.browser.disabled_detail" = "AI 会阅读转录并维护关于人物、项目和决策的页面，每个事实都注明来源行。所有处理均在本机完成。";
 
 /* Local, source-authorized Knowledge search. */
-"knowledge.browser.search_prompt" = "搜索名称、别名和论断";
+"knowledge.browser.search_prompt" = "搜索页面和事实";
 "knowledge.browser.search_page" = "页面";
 "knowledge.browser.search_alias" = "别名";
 "knowledge.browser.search_assertion" = "论断";
@@ -1588,36 +1588,36 @@
 "knowledge.review.keep" = "要保留的身份";
 "knowledge.review.merge_detail" = "合并身份会保留目标名称。原始说法和段落仍可追溯。你可以在历史记录中撤销合并。";
 "knowledge.review.reopen" = "重新审核";
-"knowledge.review.merge" = "合并身份";
+"knowledge.review.merge" = "合并…";
 "knowledge.review.dismiss" = "保持独立";
-"knowledge.review.confirm_title" = "合并这些身份？";
-"knowledge.review.confirm_detail" = "将“%@”保留为规范身份。你可以在历史记录中撤销此次合并。";
+"knowledge.review.confirm_title" = "将“%1$@”合并到“%2$@”？";
+"knowledge.review.confirm_detail" = "两者的事实将显示在同一页面上。你可以在历史记录中撤销。";
 
 // Knowledge settings and explicit backfill
-"knowledge.settings.title" = "Knowledge";
-"knowledge.settings.unreadable" = "无法读取 Knowledge 偏好设置";
+"knowledge.settings.title" = "维基";
+"knowledge.settings.unreadable" = "无法读取 维基 偏好设置";
 "knowledge.settings.reset" = "恢复安全默认值";
-"knowledge.settings.unlock" = "请解锁资料库以管理 Knowledge";
+"knowledge.settings.unlock" = "请解锁资料库以管理 维基";
 "knowledge.settings.confirm" = "编译这些会议？";
 "knowledge.settings.start" = "开始编译";
 "knowledge.settings.local_cost" = "预计提供商费用：0.00 美元。处理保留在此设备上，耗时可能不同。";
-"knowledge.settings.reset_detail" = "Knowledge 将关闭，其偏好设置将重置。会议内容和已保存的 Knowledge 将保留。";
-"knowledge.settings.enable" = "启用 Knowledge";
+"knowledge.settings.reset_detail" = "维基 将关闭，其偏好设置将重置。会议内容和已保存的 维基 将保留。";
+"knowledge.settings.enable" = "启用 维基";
 "knowledge.settings.automatic" = "自动编译未来的转录";
-"knowledge.settings.pause" = "暂停 Knowledge 编译";
-"knowledge.settings.export" = "允许将 Knowledge 导出为 JSON";
+"knowledge.settings.pause" = "暂停 维基 编译";
+"knowledge.settings.export" = "允许将 维基 导出为 JSON";
 "knowledge.settings.provider" = "处理提供商";
 "knowledge.settings.unavailable" = "设备端处理不可用";
 "knowledge.settings.use_local" = "使用设备端处理";
-"knowledge.settings.cloud_title" = "在云端编译 Knowledge？";
+"knowledge.settings.cloud_title" = "在云端编译 维基？";
 "knowledge.settings.cloud_message" = "每次编译（包括新录音的自动编译）都会将范围内会议的转写发送到 %2$@ 上的 %1$@。将产生提供商费用。你可以在“隐私与云端”中停止。";
 "knowledge.settings.cloud_allow" = "允许自动发送";
 "knowledge.settings.cloud_cost" = "处理会将这些转写发送到 %@，并产生提供商费用。";
 "knowledge.settings.scope" = "范围和排除项";
-"knowledge.settings.automatic_detail" = "自动编译适用于未来的转录。启用 Knowledge 不会处理旧会议。已获授权的待处理任务可能继续；请使用暂停来停止编译。";
+"knowledge.settings.automatic_detail" = "自动编译适用于未来的转录。启用 维基 不会处理旧会议。已获授权的待处理任务可能继续；请使用暂停来停止编译。";
 "knowledge.settings.choose" = "选择会议";
 "knowledge.settings.selected" = "已选会议：%d";
-"knowledge.settings.recompile" = "重新编译现有 Knowledge";
+"knowledge.settings.recompile" = "重新编译现有 维基";
 "knowledge.settings.preview" = "编译预览";
 "knowledge.settings.coverage" = "覆盖率";
 "knowledge.settings.pages" = "重建已保存页面";
@@ -1626,23 +1626,23 @@
 "knowledge.settings.current" = "编译已更新";
 "knowledge.settings.needs_work" = "需要编译或检查";
 "knowledge.settings.planned" = "要处理的会议：%d";
-"knowledge.settings.recompile_required" = "部分来源需要重新编译。请启用重新编译现有 Knowledge，然后再次预览。";
+"knowledge.settings.recompile_required" = "部分来源需要重新编译。请启用重新编译现有 维基，然后再次预览。";
 "knowledge.settings.progress" = "编译进度";
 "knowledge.settings.progress_counts" = "已完成：%d · 已延后：%d · 失败：%d";
 "knowledge.settings.failed" = "操作已停止或未能完成。请检查当前范围并刷新预览后重试。";
 "knowledge.settings.all" = "包含所有会议";
-"knowledge.settings.scope_detail" = "范围适用于 Knowledge 读取和编译。排除的会议仍保留在会议资料库中。";
+"knowledge.settings.scope_detail" = "范围适用于 维基 读取和编译。排除的会议仍保留在会议资料库中。";
 "knowledge.settings.coverage_counts" = "已检查片段：%d / %d";
 "knowledge.settings.coverage_detail" = "覆盖率衡量已检查的转录片段，而非语义准确率或召回率。";
-"knowledge.settings.delete" = "删除 Knowledge";
-"knowledge.settings.delete_detail" = "从你的会议编译出的所有实体、陈述、引文、审阅项和已保存页面都将从此设备中删除。会议、转写文本、会议 Wiki 文章以及你的 Knowledge 设置会保留，之后你可以重新编译。";
-"knowledge.settings.delete_footer" = "仅删除已编译的 Knowledge。删除会议或录音时，也会删除 Knowledge 由其编译出的全部内容。";
-"knowledge.settings.deleted" = "Knowledge 已删除。";
-"knowledge.settings.delete_failed" = "无法完全删除 Knowledge。下次打开应用时将自动完成删除。";
+"knowledge.settings.delete" = "删除 维基";
+"knowledge.settings.delete_detail" = "从你的会议编译出的所有实体、陈述、引文、审阅项和已保存页面都将从此设备中删除。会议、转写文本、会议 Wiki 文章以及你的 维基 设置会保留，之后你可以重新编译。";
+"knowledge.settings.delete_footer" = "仅删除已编译的 维基。删除会议或录音时，也会删除 维基 由其编译出的全部内容。";
+"knowledge.settings.deleted" = "维基 已删除。";
+"knowledge.settings.delete_failed" = "无法完全删除 维基。下次打开应用时将自动完成删除。";
 
 /* Privacy and cloud settings */
 "privacy.cloud.title" = "隐私与云端";
-"privacy.cloud.rule" = "内容只会发送到你允许的提供商。按需：仅在你请求时（摘要、聊天、文档）。自动：每次录音时（自动标题、Wiki、校正、Knowledge）。音频上传：云端转写，需单独授权。";
+"privacy.cloud.rule" = "内容只会发送到你允许的提供商。按需：仅在你请求时（摘要、聊天、文档）。自动：每次录音时（自动标题、Wiki、校正、维基）。音频上传：云端转写，需单独授权。";
 "privacy.cloud.none" = "未允许任何云端提供商。所有内容都保留在此设备上。";
 "privacy.cloud.other" = "其他共享";
 "privacy.cloud.downloads" = "设备端模型下载只获取模型文件，不会发送你的任何内容。可在“存储”中管理。";
@@ -1655,16 +1655,16 @@
 "privacy.cloud.revoke_title" = "停止自动发送？";
 "privacy.cloud.revoke_text_title" = "停止自动发送文本？";
 "privacy.cloud.revoke_automatic" = "停止自动发送";
-"privacy.cloud.revoke_detail" = "云端转写、自动标题、Wiki、校正和 Knowledge 将停止向此提供商发送并对其关闭。按需请求摘要或聊天回答仍可使用。";
-"privacy.cloud.revoke_text_detail" = "自动标题、Wiki 和校正将对此提供商关闭，Knowledge 也将停止向其发送内容。云端转写的音频上传不受影响，请单独关闭。按需请求摘要或聊天回答仍可使用。";
+"privacy.cloud.revoke_detail" = "云端转写、自动标题、Wiki、校正和 维基 将停止向此提供商发送并对其关闭。按需请求摘要或聊天回答仍可使用。";
+"privacy.cloud.revoke_text_detail" = "自动标题、Wiki 和校正将对此提供商关闭，维基 也将停止向其发送内容。云端转写的音频上传不受影响，请单独关闭。按需请求摘要或聊天回答仍可使用。";
 "privacy.cloud.feature.transcription" = "云端转写";
 "privacy.cloud.feature.title" = "自动标题";
 "privacy.cloud.feature.wiki" = "会议 Wiki";
 "privacy.cloud.feature.correction" = "转写校正";
-"privacy.cloud.feature.knowledge" = "Knowledge";
+"privacy.cloud.feature.knowledge" = "维基";
 "privacy.cloud.revoke_all" = "移除所有权限";
 "privacy.cloud.revoke_all_title" = "移除此提供商的所有权限？";
-"privacy.cloud.revoke_all_detail" = "将不再向此提供商发送任何内容，无论按需还是自动。使用它的摘要和 Knowledge 将改为在设备端处理。";
+"privacy.cloud.revoke_all_detail" = "将不再向此提供商发送任何内容，无论按需还是自动。使用它的摘要和 维基 将改为在设备端处理。";
 "privacy.cloud.audio" = "音频上传";
 
 /* G1 destructive action confirmations */
@@ -1770,3 +1770,57 @@
 "detail.compare.only_in" = "仅见于%@";
 "detail.compare.no_differences" = "没有差异";
 "detail.compare.local_note" = "在本设备上对比；不调用 AI。";
+
+// P3 — wiki surfaces
+"knowledge.browser.enable" = "开启维基";
+"knowledge.browser.explore" = "探索";
+"knowledge.browser.relations" = "关系";
+"knowledge.browser.updated_today" = "今日更新";
+"knowledge.browser.pages" = "页面";
+"knowledge.browser.all_pages" = "全部页面";
+"knowledge.browser.page_subtitle" = "%1$@ · %2$@ · %3$@";
+"knowledge.browser.scope_week" = "本周";
+"knowledge.browser.scope_today" = "今天";
+"knowledge.browser.scope_meetings" = "%ld 场会议";
+"knowledge.browser.actions" = "维基操作";
+"knowledge.browser.settings" = "维基设置";
+"knowledge.sources.choose" = "自选";
+"knowledge.sources.use" = "使用 %ld";
+"knowledge.entity.page_actions" = "页面操作";
+"knowledge.entity.facts" = "事实";
+"knowledge.entity.updated" = "更新于 %@";
+"knowledge.entity.provenance" = "由 AI 根据以下事实撰写";
+"knowledge.entity.mentioned_in" = "提及于";
+"knowledge.entity.ask_about" = "询问 %@";
+"knowledge.graph.footer_counts" = "%1$ld 个页面 · %2$ld 条关系 · 虚线 = 提议";
+"knowledge.review.candidate_reason" = "多场会议中名称相同。没有你确认不会合并。";
+"knowledge.review.pending" = "待处理";
+"knowledge.review.kept" = "已保留";
+"knowledge.search.aliases" = "别名";
+"detail.knowledge.changed_summary" = "%1$@ · %2$@";
+"detail.knowledge.entity_facts" = "%1$@ · +%2$@";
+"detail.wiki.provenance" = "由 AI 撰写 · %@";
+"detail.knowledge.no_page" = "暂无页面";
+"detail.knowledge.no_page_detail" = "根据本次会议的转录生成页面。";
+"knowledge.entity_kind.topic" = "主题";
+"knowledge.entity_kind.project" = "项目";
+"knowledge.entity_kind.initiative" = "计划";
+"knowledge.entity_kind.person" = "人物";
+"knowledge.entity_kind.team" = "团队";
+"knowledge.entity_kind.organization" = "组织";
+"knowledge.entity_kind.system" = "系统";
+"knowledge.entity_kind.technology" = "技术";
+"knowledge.entity_kind.decisionThread" = "决策线";
+"knowledge.entity_kind.actionItem" = "行动项";
+"knowledge.entity_kind.risk" = "风险";
+"knowledge.entity_kind.question" = "问题";
+"knowledge.entity_kind.metric" = "指标";
+"knowledge.entity.day_facts" = "%1$@ · %2$@";
+
+// P3 — plural counts (key selection by count, no stringsdict needed)
+"knowledge.count.fact.one" = "%d 条事实";
+"knowledge.count.fact.other" = "%d 条事实";
+"knowledge.count.meeting.one" = "%d 场会议";
+"knowledge.count.meeting.other" = "%d 场会议";
+"knowledge.count.page.one" = "%d 个页面";
+"knowledge.count.page.other" = "%d 个页面";

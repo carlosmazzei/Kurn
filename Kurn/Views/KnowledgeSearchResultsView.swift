@@ -23,7 +23,19 @@ struct KnowledgeSearchResultsView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 10) {
                         KnowledgeSectionLabel(String(format: KnowledgeBrowserCopy.text("scope"), scopeCount))
-                        ForEach(hits) { document in resultRow(document) }
+                        ForEach([KnowledgeSearchDocument.Kind.page, .alias, .assertion], id: \.self) { kind in
+                            let group = hits.filter { $0.kind == kind }
+                            if !group.isEmpty {
+                                KnowledgeSectionLabel(sectionTitle(kind)).padding(.top, 8)
+                                VStack(spacing: 0) {
+                                    ForEach(Array(group.enumerated()), id: \.element.id) { index, document in
+                                        if index > 0 { Divider().overlay(Theme.separator).padding(.leading, 58).accessibilityHidden(true) }
+                                        resultRow(document)
+                                    }
+                                }
+                                .knowledgeGroup()
+                            }
+                        }
                     }
                     .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 24)
                 }
@@ -33,10 +45,18 @@ struct KnowledgeSearchResultsView: View {
         }
     }
 
+    private func sectionTitle(_ kind: KnowledgeSearchDocument.Kind) -> String {
+        switch kind {
+        case .page: KnowledgeBrowserCopy.text("pages")
+        case .alias: NSLocalizedString("knowledge.search.aliases", comment: "Alias matches")
+        case .assertion: NSLocalizedString("knowledge.entity.facts", comment: "Fact matches")
+        }
+    }
+
     private func resultRow(_ document: KnowledgeSearchDocument) -> some View {
         KnowledgeLinkCard(route: route(document)) {
             HStack(alignment: .top, spacing: 12) {
-                KnowledgeIconWell(systemImage: document.assertionID == nil ? "book.pages" : "text.quote",
+                KnowledgeIconWell(systemImage: document.assertionID == nil ? "book" : "text.quote",
                                   tint: document.assertionID == nil ? Theme.textSecondary : Theme.info)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(verbatim: document.title).font(Theme.headline).foregroundStyle(Theme.textPrimary)
