@@ -42,10 +42,12 @@ custom cryptographic algorithm is implemented anywhere in the app:
    implement its own file or database encryption.
 2. **In-transit encryption for optional network requests.** Kurn's core
    functionality — recording, on-device transcription, and organizing
-   meetings — makes no network requests at all. Two features are opt-in and
-   off by default: cloud transcription (an OpenAI-compatible Whisper API)
-   and cloud AI summaries (OpenAI, Anthropic, Google, Groq, or a compatible
-   endpoint the user configures). When either is enabled, requests are sent
+   meetings — runs on device. Optional network features include cloud
+   transcription (a Whisper-compatible API or ElevenLabs Scribe), cloud AI
+   summaries, chat, wiki generation and transcript correction, cloud read-aloud,
+   and user-approved model downloads. While a cloud summary/chat provider with
+   a key is selected, the app also checks the remote model catalog at most
+   once a day. These requests are sent
    over standard HTTPS/TLS via Apple's `URLSession`, the same standard
    transport-layer encryption used by any app or website — not a
    proprietary protocol.

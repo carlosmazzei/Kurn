@@ -35,7 +35,7 @@ Trust boundaries:
 - **WatchConnectivity** messages (`PhoneSessionController.session(_:didReceiveMessage:)`): paired Watch app.
 - **iCloud KVS** (`CloudSettingsSync`): the user's other devices on the same Apple ID (templates/settings).
 - **Network responses**: cloud providers, user-configured custom endpoints, model-download hosts, the remote model catalog (and anyone on-path if TLS/redirect policy is weak). Anyone who can merge to this repository's default branch can change the catalog.
-- **GitHub PRs** → `swift.yml` (`pull_request` to `main`, `contents: read`); tag pushes → release jobs with protected `release` environment.
+- **GitHub PRs** → `swift.yml` (`pull_request` to any branch, `contents: read`); tag pushes → release jobs with protected `release` environment.
 
 ## Assets and sensitivity
 
@@ -58,7 +58,7 @@ Owner: meeting content and provider API keys matter **equally** and are top prio
 - Keychain with this-device-only accessibility; keys never in UserDefaults/iCloud.
 - `ProviderURLPolicy`: base-URL validation, unsafe-path rejection, same-origin redirect policy.
 - Model downloads: SHA-256 verification at install (`ModelFileDownloader.verify`, `ModelVerification`), explicit download consent.
-- Remote model catalog: read strictly (`ModelCatalogDocument`: one format and schema, bounded size, model count, IDs and numeric ranges; refused whole otherwise), never older than the bundled catalogs or the one applied, never dated in the future; it can change only context-window, capability and cost estimates, never an endpoint, key or what is sent.
+- Remote model catalog: read strictly (`ModelCatalogDocument`: one format and schema, bounded size, model count, IDs and numeric ranges; refused whole otherwise), never older than the bundled catalogs or the one applied, never dated more than two days in the future; it can change only context-window, capability and cost estimates, never an endpoint, key or what is sent.
 - Knowledge egress (K6.1): extraction and Ask synthesis reach a cloud provider only when the default-deny `KnowledgeProcessingPolicy` admits the operation and the provider's grant in the cloud-consent ledger exists when the work starts; reads are authorized before and after they run, so unauthorized names, counts, quotes and errors are not returned; embeddings of knowledge pages need their own `embedding` authorization. `Tools/check_static_policy.py`'s `knowledge-network` rule fails CI if Knowledge code names `URLSession`, `URLRequest`, `LLMHTTP`, `ProviderHTTPTransport`, `NWConnection` or a CloudKit/iCloud key-value store, so its only egress is the provider call.
 - Cloud features off by default; `LSSupportsOpeningDocumentsInPlace = false`; Inbox copies deleted after decision.
 - CI: `permissions: contents: read` default, `persist-credentials: false`, SHA-pinned actions, protected `release` environment requiring admin approval.

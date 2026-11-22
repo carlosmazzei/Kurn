@@ -33,8 +33,8 @@ the process in [SECURITY.md](SECURITY.md) instead.
 Kurn is an iOS + watchOS app built with Swift 6, SwiftUI, and SwiftData.
 Building and testing requires Apple's toolchain.
 
-- macOS with Xcode 16 or newer (the project has been opened with Xcode 26.5).
-- iOS 17.0+ simulator or device for the main app.
+- macOS with Xcode 26 or newer (the project has been opened with Xcode 26.5).
+- iOS 26.0+ simulator or device for the main app.
 - watchOS 10.0+ simulator or a paired Apple Watch for the watchOS target.
 - [SwiftLint](https://github.com/realm/SwiftLint) for local linting
   (`brew install swiftlint`).
@@ -96,8 +96,9 @@ code:
   through computed properties (see `Transcript.segmentsData`).
 - **Relationships are set by assigning the parent** (e.g. `Recording(meeting:)`),
   not by appending to the parent collection — SwiftData maintains the inverse.
-- **Providers** go behind the `LLMProvider` protocol and are resolved through
-  `ProviderFactory`. Cloud transcription always uses OpenAI Whisper.
+- **Text-generation providers** go behind `LLMProvider` and are resolved through
+  `ProviderFactory`. Cloud transcription uses the selected `TranscriptionProvider`
+  (a Whisper-compatible endpoint or ElevenLabs Scribe).
 - **The watchOS target does not share source files with the app.** Types like
   `WatchCommand` are intentionally duplicated in `KurnWatch/`; keep both copies
   in sync when you change one.
@@ -110,7 +111,7 @@ code:
   lines, function body at 120, cyclomatic complexity at 15, type body at 400.
   Split files or extract helpers instead of adding `// swiftlint:disable`.
 - **Errors:** surface recoverable failures as `AppError`
-  (`Kurn/Infrastructure/AppError.swift`), a `LocalizedError` whose messages
+  (`Packages/KurnCore/Sources/KurnCore/Infrastructure/AppError.swift`), a `LocalizedError` whose messages
   come from `NSLocalizedString`. New error cases must add a matching
   localization key.
 - **Logging:** use `AppLog.<category>` (subsystem `ai.kurn.app`) and pick the
@@ -138,8 +139,11 @@ User-facing strings are localized through `NSLocalizedString`, with per-locale
 
 ## Tests
 
-- Tests live in the `KurnTests` target and use **Swift Testing** (`@Test`,
-  `#expect`) — not XCTest.
+- App unit tests live in `KurnTests` and the process-isolated
+  `KurnSwiftDataTests` target and use **Swift Testing** (`@Test`, `#expect`).
+  Foundation-only tests live in `Packages/KurnCore/Tests` and
+  `Packages/AgentHarness/Tests` and run with `swift test` on Linux.
+  UI tests in `KurnUITests` and `KurnWatchUITests` use XCTest.
 - Use `TestModelContainer.make()` for an in-memory `ModelContainer` when
   exercising real SwiftData relationship behavior.
 - New behavior should come with tests when it is reasonable to test it
