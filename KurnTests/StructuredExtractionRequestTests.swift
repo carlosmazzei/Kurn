@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Kurn
 
@@ -47,5 +48,24 @@ struct StructuredExtractionRequestTests {
         let small = TextGenerationOptions.knowledgeExtraction(for: .openAI, modelOutputLimit: 4_096)
         #expect(small.maxOutputTokens == 4_096)
         #expect(TextGenerationOptions.knowledgeExtraction(for: .appleOnDevice, modelOutputLimit: 128_000).maxOutputTokens == 1_024)
+    }
+
+    @Test func segmentAliasesRoundTripOnlyInSegmentReferenceFields() throws {
+        let sources = [KnowledgeExtractionPrompt.Source(id: "uuid-a", speaker: "A", startMs: 0, endMs: 1, text: "x"),
+                       KnowledgeExtractionPrompt.Source(id: "uuid-b", speaker: "B", startMs: 1, endMs: 2, text: "y")]
+        let aliases = KnowledgeExtractionService.aliases(for: sources)
+        #expect(KnowledgeExtractionService.aliased(sources, aliases).map(\.id) == ["s1", "s2"])
+        let reply: [String: Any] = ["examinedSegmentIDs": ["s1", "s2"], "entities": [["ref": "s1", "name": "s2"]],
+            "assertions": [["attributedToSegmentID": "s2", "subject": "s1", "evidence": [["segmentIDs": ["s1", "s9"], "quote": "s1"]]]]]
+        let mapped = try #require(try JSONSerialization.jsonObject(
+            with: KnowledgeExtractionService.dealiased(JSONSerialization.data(withJSONObject: reply), aliases: aliases)) as? [String: Any])
+        #expect(mapped["examinedSegmentIDs"] as? [String] == ["uuid-a", "uuid-b"])
+        let assertion = try #require((mapped["assertions"] as? [[String: Any]])?.first)
+        #expect(assertion["attributedToSegmentID"] as? String == "uuid-b")
+        #expect(assertion["subject"] as? String == "s1")
+        let evidence = try #require((assertion["evidence"] as? [[String: Any]])?.first)
+        #expect(evidence["segmentIDs"] as? [String] == ["uuid-a", "s9"])
+        #expect(evidence["quote"] as? String == "s1")
+        #expect((mapped["entities"] as? [[String: Any]])?.first?["ref"] as? String == "s1")
     }
 }
