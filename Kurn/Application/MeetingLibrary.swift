@@ -59,11 +59,11 @@ struct MeetingLibrary {
         language: MeetingLanguage = .autoDetect
     ) throws(AppError) -> Meeting {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let finalTitle = trimmed.isEmpty
-            ? String(format: NSLocalizedString("meeting.default_title", comment: "Default title"),
-                     Date().titleStamp)
-            : trimmed
-        let meeting = Meeting(title: finalTitle, notes: notes, language: language)
+        // One `createdAt` feeds both the generated title and the meeting, so
+        // `Meeting.isDefaultTitle` still recognizes it across a minute rollover.
+        let createdAt = Date()
+        let finalTitle = trimmed.isEmpty ? Meeting.generatedTitle(for: createdAt) : trimmed
+        let meeting = Meeting(title: finalTitle, createdAt: createdAt, notes: notes, language: language)
         context.insert(meeting)
         if let failure = persist(context) {
             context.delete(meeting)

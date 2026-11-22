@@ -33,8 +33,25 @@ final class RecordingCommandRouter {
     /// than time-based: commands are issued one at a time by hand, so a
     /// small fixed window comfortably covers any realistic retry without
     /// growing unbounded over a long recording.
-    private var recentCommands: [(id: String, handled: Bool, phase: WatchAckPhase)] = []
+    private struct WatchCommandResult {
+        var handled: Bool
+        var phase: WatchAckPhase
+        var error: String?
+    }
+
+    private var recentCommands: [(id: String, result: WatchCommandResult)] = []
     private let recentCommandCapacity = 20
+
+    /// Error attached to the most recent `handleWatchCommand` result — the
+    /// tuple itself stays `(handled, phase)` for the dedup cache, so the one
+    /// new failure kind (`.start` while already recording) reaches the reply
+    /// through here.
+    private(set) var lastCommandError: String?
+
+    /// Test seams for the `.start` path: production reads the real app
+    /// state and asks `RecordingLauncher` to queue a meeting.
+    var isForeground: () -> Bool = { UIApplication.shared.applicationState == .active }
+    var requestStart: () -> Bool = { RecordingLauncher.shared.requestAutoStart() }
 
     private var terminationObserver: NSObjectProtocol?
 
@@ -95,6 +112,11 @@ final class RecordingCommandRouter {
         onStop = nil
         onHighlight = nil
         recentCommands.removeAll()
+        lastCommandError = nil
+        // Test seams back to production — a test that swapped them and tore
+        // down its session can't leak the fake into the next test.
+        isForeground = { UIApplication.shared.applicationState == .active }
+        requestStart = { RecordingLauncher.shared.requestAutoStart() }
         if let terminationObserver {
             NotificationCenter.default.removeObserver(terminationObserver)
             self.terminationObserver = nil
@@ -130,47 +152,62 @@ final class RecordingCommandRouter {
     func handleWatchCommand(_ command: WatchCommand, commandID: String) -> (handled: Bool, phase: WatchAckPhase) {
         if let cached = recentCommands.first(where: { $0.id == commandID }) {
             AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: replaying cached result for duplicate Watch command \(commandID, privacy: .public)")
-            return (cached.handled, cached.phase)
+            lastCommandError = cached.result.error
+            return (cached.result.handled, cached.result.phase)
         }
         let result = performWatchCommand(command)
-        recentCommands.append((commandID, result.handled, result.phase))
+        lastCommandError = result.error
+        recentCommands.append((commandID, result))
         if recentCommands.count > recentCommandCapacity {
             recentCommands.removeFirst(recentCommands.count - recentCommandCapacity)
         }
-        return result
+        return (result.handled, result.phase)
     }
 
-    private func performWatchCommand(_ command: WatchCommand) -> (handled: Bool, phase: WatchAckPhase) {
+    private func performWatchCommand(_ command: WatchCommand) -> WatchCommandResult {
         AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: Watch command received: \(command.rawValue, privacy: .public)")
         switch command {
+        case .start:
+            // Starting a recording from the wrist goes through the same
+            // queue the Control Center intent uses: `RecordingLauncher`
+            // creates the meeting and `RecordingSessionPresenter` starts
+            // capture — but only while the app is foreground (or next
+            // becomes it, hence the `.queued` acknowledgement).
+            guard !hasActiveSession else {
+                return WatchCommandResult(handled: false, phase: .received, error: WatchSessionReplyError.recordingAlreadyActive)
+            }
+            guard requestStart() else {
+                return WatchCommandResult(handled: false, phase: .received, error: WatchSessionReplyError.noActiveRecording)
+            }
+            return WatchCommandResult(handled: true, phase: isForeground() ? .stateChanged : .queued, error: nil)
         case .pause:
             guard let onPause else {
                 AppLog.recorderUI.atError.error("RecordingCommandRouter: Watch pause ignored, no active session")
-                return (false, .received)
+                return WatchCommandResult(handled: false, phase: .received, error: WatchSessionReplyError.noActiveRecording)
             }
             onPause()
-            return (true, .stateChanged)
+            return WatchCommandResult(handled: true, phase: .stateChanged, error: nil)
         case .resume:
             guard let onResume else {
                 AppLog.recorderUI.atError.error("RecordingCommandRouter: Watch resume ignored, no active session")
-                return (false, .received)
+                return WatchCommandResult(handled: false, phase: .received, error: WatchSessionReplyError.noActiveRecording)
             }
             onResume()
-            return (true, .stateChanged)
+            return WatchCommandResult(handled: true, phase: .stateChanged, error: nil)
         case .stop:
             guard let onStop else {
                 AppLog.recorderUI.atError.error("RecordingCommandRouter: Watch stop ignored, no active session")
-                return (false, .received)
+                return WatchCommandResult(handled: false, phase: .received, error: WatchSessionReplyError.noActiveRecording)
             }
             let finalized = onStop()
-            return (true, finalized ? .finalized : .stateChanged)
+            return WatchCommandResult(handled: true, phase: finalized ? .finalized : .stateChanged, error: nil)
         case .highlight:
             guard let onHighlight else {
                 AppLog.recorderUI.atError.error("RecordingCommandRouter: Watch highlight ignored, no active session")
-                return (false, .received)
+                return WatchCommandResult(handled: false, phase: .received, error: WatchSessionReplyError.noActiveRecording)
             }
             onHighlight()
-            return (true, .stateChanged)
+            return WatchCommandResult(handled: true, phase: .stateChanged, error: nil)
         }
     }
 }

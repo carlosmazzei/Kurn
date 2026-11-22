@@ -15,7 +15,7 @@
 "widget.startRecording.displayName" = "Démarrer l'enregistrement";
 "widget.startRecording.description" = "Démarre un nouvel enregistrement Kurn depuis l'écran d'accueil, l'écran verrouillé ou le mode En veille. Le widget n'affiche jamais le contenu des réunions.";
 "widget.startRecording.title" = "Enregistrer";
-"widget.startRecording.subtitle" = "Démarrer une nouvelle réunion";
+"widget.startRecording.subtitle" = "Nouvelle réunion";
 
 /* Live Activity button intent (hidden from Shortcuts) */
 "intent.recordingControl.title" = "Contrôler l’enregistrement";

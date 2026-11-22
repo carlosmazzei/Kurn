@@ -110,7 +110,8 @@ extension PhoneSessionController: WCSessionDelegate {
             let (handled, phase) = await MainActor.run {
                 RecordingCommandRouter.shared.handleWatchCommand(decoded.command, commandID: decoded.commandID)
             }
-            reply.call(RecordingSurfacePayloads.commandReply(handled: handled, phase: phase))
+            let error = await MainActor.run { RecordingCommandRouter.shared.lastCommandError }
+            reply.call(RecordingSurfacePayloads.commandReply(handled: handled, phase: phase, error: error))
         }
     }
 }

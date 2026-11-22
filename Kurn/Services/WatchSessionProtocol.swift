@@ -24,6 +24,9 @@ import Foundation
 
 /// Command watch → phone.
 enum WatchCommand: String, Sendable {
+    /// Ask the phone to start a new recording — the one direction that
+    /// creates rather than controls a session (P5).
+    case start
     case pause
     case resume
     case stop
@@ -67,6 +70,9 @@ enum WatchSessionState {
 enum WatchSessionReplyError {
     static let unknownCommand = "unknown_command"
     static let noActiveRecording = "no_active_recording"
+    /// A `.start` command arrived while a recording was already running —
+    /// there is one microphone, so a second capture is never started.
+    static let recordingAlreadyActive = "recording_already_active"
 }
 
 /// How far the phone got before replying to a Watch command (H8 PR 20, item
@@ -85,4 +91,7 @@ enum WatchAckPhase: String {
     case stateChanged
     /// The recording was durably finalized to disk (stop only).
     case finalized
+    /// The phone accepted a `.start` while backgrounded: the recording
+    /// begins when the app next becomes active, not immediately.
+    case queued
 }

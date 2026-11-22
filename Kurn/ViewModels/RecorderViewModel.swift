@@ -45,6 +45,10 @@ final class RecorderViewModel {
     var permissionDenied = false
     /// Set once a recording has been saved so the view can dismiss.
     var didSaveRecording = false
+    /// True when the saved recording was actually kept — `didSaveRecording`
+    /// also flips on the too-short auto-discard path, which produced nothing
+    /// to navigate to (P5's open-the-meeting-after-stop reads this).
+    private(set) var savedRecordingKept = false
     /// True while `startRecording()` is setting up the audio session/engine
     /// (including any Bluetooth-route retry) but recording hasn't begun yet —
     /// `recorder.state` stays `.idle` for that whole window, so the view needs
@@ -167,10 +171,85 @@ final class RecorderViewModel {
     var routeMessage: String? { recorder.routeChangeMessage ?? recorder.storageState.userMessage }
     var highlightCount: Int { recorder.highlights.count }
 
-    /// Editable meeting title, surfaced as the recorder's "Add title…" field.
+    /// Name of the input the session is currently routed to, for the
+    /// recorder's "Recording · <mic>" status line. Read live from the audio
+    /// session — it changes with route switches the same way capture does.
+    var currentMicName: String? {
+        guard let input = AVAudioSession.sharedInstance().currentRoute.inputs.first else { return nil }
+        // `portName` is the user-facing route label, but some routes report
+        // the raw port-type id in it ("MicrophoneBuiltIn" on the simulator) —
+        // those get a localized name instead of echoing the id.
+        if !input.portName.isEmpty, input.portName != input.portType.rawValue {
+            return input.portName
+        }
+        return Self.localizedMicName(for: input.portType) ?? (input.portName.isEmpty ? nil : input.portName)
+    }
+
+    /// Localized stand-in for routes whose `portName` is just the type id.
+    private static func localizedMicName(for portType: AVAudioSession.Port) -> String? {
+        switch portType {
+        case .builtInMic:
+            return NSLocalizedString("recorder.mic.builtin", comment: "Built-in microphone")
+        case .bluetoothHFP, .bluetoothLE:
+            return NSLocalizedString("recorder.mic.bluetooth", comment: "Bluetooth microphone")
+        case .headsetMic:
+            return NSLocalizedString("recorder.mic.headset", comment: "Headset microphone")
+        case .usbAudio:
+            return NSLocalizedString("recorder.mic.usb", comment: "USB microphone")
+        default:
+            return nil
+        }
+    }
+
+    /// When the meeting was created — the recorder's title placeholder is
+    /// "Meeting at <time>" stamped with the moment capture began.
+    var recordingStartDate: Date { meeting.createdAt }
+
+    /// The title line the mini bar shows before the user names the meeting:
+    /// its real title once set, else the provisional "Meeting at <time>".
+    var titleOrProvisional: String {
+        meetingTitle.isEmpty ? provisionalTitle : meetingTitle
+    }
+
+    /// The "Meeting at <time>" placeholder, shared between the title field's
+    /// prompt and the mini bar's provisional title line.
+    var provisionalTitle: String {
+        String(
+            format: NSLocalizedString("recorder.provisional_title", comment: "Provisional meeting title with start time"),
+            recordingStartDate.formatted(date: .omitted, time: .shortened)
+        )
+    }
+
+    /// Editable meeting title, surfaced as the recorder's title field. Reads
+    /// empty while the meeting still carries the library's generated
+    /// placeholder, so the field shows the "Meeting at <time>" prompt instead
+    /// of pre-filling generated text; writing back an empty value restores
+    /// the placeholder rather than leaving a blank title.
     var meetingTitle: String {
-        get { meeting.title }
-        set { meeting.title = newValue }
+        get { meeting.isDefaultTitle ? "" : meeting.title }
+        set {
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            meeting.title = trimmed.isEmpty ? Meeting.generatedTitle(for: meeting.createdAt) : newValue
+        }
+    }
+
+    /// Opens the mic chooser on demand (the recorder's mic button). There is
+    /// only something to choose when more than one input is available — a
+    /// single-input device keeps the button inert rather than showing a
+    /// one-row dialog.
+    func presentMicChoices() {
+        guard micChoices.isEmpty else { return }
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(
+            .playAndRecord,
+            mode: .default,
+            options: [.defaultToSpeaker, .allowBluetoothHFP]
+        )
+        let inputs = session.availableInputs ?? []
+        guard inputs.count > 1 else { return }
+        micChoices = inputs.map {
+            MicInputOption(id: $0.uid, name: $0.portName, isBuiltIn: $0.portType == .builtInMic)
+        }
     }
 
     /// Entry point from the recorder sheet: resolve which microphone to use —
@@ -213,9 +292,12 @@ final class RecorderViewModel {
 
     /// Resolve the pending microphone choice (or `nil` to defer to the system
     /// default) and unblock `prepareToRecord()`. Called from the picker UI,
-    /// including its cancel/dismiss path.
+    /// including its cancel/dismiss path. The pick is also stored on the
+    /// recorder so a choice made from the mic button (outside `prepareToRecord`)
+    /// applies to the next capture start.
     func chooseMic(uid: String?) {
         micChoices = []
+        recorder.preferredInputUID = uid
         micChoiceContinuation?.resume(returning: uid)
         micChoiceContinuation = nil
     }
@@ -530,6 +612,7 @@ final class RecorderViewModel {
             return false
         }
         if recording.captureState == .ready {
+            savedRecordingKept = true
             didSaveRecording = true
             return true
         } else {

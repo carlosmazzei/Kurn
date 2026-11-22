@@ -1,6 +1,11 @@
-"watch.open_iphone" = "Öffne Kurn auf deinem iPhone, um aufzunehmen";
 "watch.unreachable" = "iPhone konnte nicht erreicht werden";
 "watch.pause" = "Pause";
 "watch.resume" = "Fortsetzen";
 "watch.stop" = "Stopp";
 "watch.highlight" = "Markieren";
+
+"watch.start.title" = "Auf dem iPhone aufnehmen";
+"watch.start.subtitle" = "Das iPhone nimmt auf; die Uhr steuert.";
+"watch.start.queued" = "Kurn auf dem iPhone öffnen, um zu starten";
+"watch.state.recording" = "Aufnahme";
+"watch.state.paused" = "Pausiert";

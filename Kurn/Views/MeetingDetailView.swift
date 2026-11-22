@@ -195,6 +195,16 @@ struct MeetingDetailView: View {
         .onChange(of: tab) { _, newTab in
             tabMemory?.set(newTab, for: meeting.id)
         }
+        // Lets an outside actor (the meetings list, after a recording saved
+        // into this meeting) flip the tab live: the memory is the only
+        // channel reaching a detail already on screen. `tab`'s own onChange
+        // writes the same value back, so this never loops.
+        .onChange(of: tabMemory?.tab(for: meeting.id)) { _, remembered in
+            if let remembered, remembered != tab,
+               Tab.visible(knowledgeEnabled: settings.knowledgeEnabled).contains(remembered) {
+                tab = remembered
+            }
+        }
         .background {
             if settings.knowledgeEnabled {
                 MeetingKnowledgeRefreshDriver(meetingID: meeting.id, model: meetingKnowledge, refreshID: knowledgeRefresh)

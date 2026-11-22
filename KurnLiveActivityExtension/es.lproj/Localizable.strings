@@ -15,7 +15,7 @@
 "widget.startRecording.displayName" = "Iniciar grabación";
 "widget.startRecording.description" = "Inicia una nueva grabación de Kurn desde la pantalla de inicio, la pantalla bloqueada o el modo En Reposo. El widget nunca muestra contenido de reuniones.";
 "widget.startRecording.title" = "Grabar";
-"widget.startRecording.subtitle" = "Iniciar una nueva reunión";
+"widget.startRecording.subtitle" = "Nueva reunión";
 
 /* Live Activity button intent (hidden from Shortcuts) */
 "intent.recordingControl.title" = "Controlar Grabación";

@@ -121,6 +121,18 @@ final class Meeting {
     /// Convenience: whether the meeting is currently archived.
     var isArchived: Bool { archivedAt != nil }
 
+    /// The title `MeetingLibrary.createMeeting` assigns when a recording
+    /// starts unnamed. Single source for the recorder, which treats this
+    /// placeholder as "no title yet" so its title field stays empty behind
+    /// the prompt instead of pre-filling generated text.
+    static func generatedTitle(for date: Date) -> String {
+        String(format: NSLocalizedString("meeting.default_title", comment: "Default title"), date.titleStamp)
+    }
+
+    /// Whether `title` is still that generated placeholder rather than a name
+    /// the user typed or the AI suggested.
+    var isDefaultTitle: Bool { title == Self.generatedTitle(for: createdAt) }
+
     var summaryMapCheckpoint: SummaryMapCheckpoint? {
         get { summaryMapCheckpointOutcome.decodedValue }
         set {

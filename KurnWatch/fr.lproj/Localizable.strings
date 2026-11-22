@@ -1,6 +1,11 @@
-"watch.open_iphone" = "Ouvrez Kurn sur votre iPhone pour enregistrer";
 "watch.unreachable" = "Impossible de joindre l'iPhone";
 "watch.pause" = "Pause";
 "watch.resume" = "Reprendre";
 "watch.stop" = "Arrêter";
 "watch.highlight" = "Marquer";
+
+"watch.start.title" = "Enregistrer sur l’iPhone";
+"watch.start.subtitle" = "L’iPhone enregistre ; la montre contrôle.";
+"watch.start.queued" = "Ouvrez Kurn sur l’iPhone pour commencer";
+"watch.state.recording" = "Enregistrement";
+"watch.state.paused" = "En pause";

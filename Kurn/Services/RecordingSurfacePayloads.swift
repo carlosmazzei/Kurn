@@ -100,11 +100,11 @@ enum RecordingSurfacePayloads {
         ]
     }
 
-    static func commandReply(handled: Bool, phase: WatchAckPhase) -> [String: Any] {
+    static func commandReply(handled: Bool, phase: WatchAckPhase, error: String? = nil) -> [String: Any] {
         guard handled else {
             return [
                 WatchSessionKey.ok: false,
-                WatchSessionKey.error: WatchSessionReplyError.noActiveRecording,
+                WatchSessionKey.error: error ?? WatchSessionReplyError.noActiveRecording,
                 WatchSessionKey.ackPhase: phase.rawValue
             ]
         }

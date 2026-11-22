@@ -2,14 +2,22 @@
 //  WatchRecorderView.swift
 //  KurnWatch
 //
-//  Single-screen remote control: mirrors the iPhone's recording state and
-//  lets the user pause, resume, or stop without touching the phone.
+//  Single-screen remote control: starts a recording on the iPhone from the
+//  idle screen, and mirrors its state with pause, resume, or stop without
+//  touching the phone.
 //
 
 import SwiftUI
 
 struct WatchRecorderView: View {
     @Environment(WatchConnectivityManager.self) private var connectivity
+    /// While a `.start` command is awaiting the phone's reply.
+    @State private var startInFlight = false
+    /// The phone accepted `.start` while backgrounded — it records once the
+    /// app comes to the foreground.
+    @State private var startQueued = false
+
+    private static let buttonGrey = Color(red: 0x2c / 255, green: 0x2c / 255, blue: 0x2e / 255)
 
     var body: some View {
         VStack(spacing: 12) {
@@ -42,14 +50,63 @@ struct WatchRecorderView: View {
 
     private var idleView: some View {
         VStack(spacing: 8) {
-            Image(systemName: "iphone.gen3")
-                .font(.largeTitle)
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-            Text("watch.open_iphone")
+            // The phone owns capture; this button only asks it to start —
+            // a red disc inside a dark circle, like the recorder's Stop.
+            Button {
+                Task { await startRecording() }
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(Self.buttonGrey)
+                        .frame(width: 84, height: 84)
+                    Circle()
+                        .fill(.red)
+                        .frame(width: 34, height: 34)
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(startInFlight)
+            .accessibilityLabel(Text("watch.start.title"))
+
+            if startInFlight {
+                ProgressView()
+            }
+
+            Text("watch.start.subtitle")
                 .font(.footnote)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
+
+            if startQueued {
+                Text("watch.start.queued")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            if connectivity.lastCommandFailed {
+                Text("watch.unreachable")
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private func startRecording() async {
+        startInFlight = true
+        defer { startInFlight = false }
+        let outcome = await connectivity.sendWithOutcome(.start)
+        switch (outcome.ok, outcome.phase, outcome.error) {
+        case (true, .queued, _):
+            startQueued = true
+        case (true, _, _):
+            startQueued = false
+        case (false, _, WatchSessionReplyError.recordingAlreadyActive):
+            // Already recording on the phone — nothing to show; the pushed
+            // context flips this view to the active state on its own.
+            startQueued = false
+            connectivity.clearCommandFailure()
+        default:
+            startQueued = false
         }
     }
 
@@ -62,7 +119,7 @@ struct WatchRecorderView: View {
         highlightCount: Int
     ) -> some View {
         VStack(spacing: 8) {
-            Text(title)
+            Text("\(Text(isPaused ? "watch.state.paused" : "watch.state.recording")) · \(title)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -82,24 +139,31 @@ struct WatchRecorderView: View {
                     Task { await connectivity.send(isPaused ? .resume : .pause) }
                 } label: {
                     Image(systemName: isPaused ? "play.fill" : "pause.fill")
+                        .frame(width: 52, height: 52)
+                        .background(Self.buttonGrey, in: Circle())
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.plain)
                 .accessibilityLabel(Text(isPaused ? "watch.resume" : "watch.pause"))
 
                 Button(role: .destructive) {
                     Task { await connectivity.send(.stop) }
                 } label: {
                     Image(systemName: "stop.fill")
+                        .foregroundStyle(.white)
+                        .frame(width: 52, height: 52)
+                        .background(.red, in: Circle())
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
                 .accessibilityLabel(Text("watch.stop"))
 
                 Button {
                     Task { await connectivity.send(.highlight) }
                 } label: {
                     Image(systemName: "bookmark.fill")
+                        .frame(width: 52, height: 52)
+                        .background(Self.buttonGrey, in: Circle())
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
                 .disabled(isPaused)
                 .accessibilityLabel(Text("watch.highlight"))
             }

@@ -15,7 +15,7 @@
 "widget.startRecording.displayName" = "Start Recording";
 "widget.startRecording.description" = "Starts a new Kurn recording from the Home Screen, Lock Screen or StandBy. The widget never shows meeting content.";
 "widget.startRecording.title" = "Record";
-"widget.startRecording.subtitle" = "Start a new meeting";
+"widget.startRecording.subtitle" = "New meeting";
 
 /* Live Activity button intent (hidden from Shortcuts) */
 "intent.recordingControl.title" = "Control Recording";

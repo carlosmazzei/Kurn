@@ -183,7 +183,7 @@ struct RecordingMiniBar: View {
                 HStack(spacing: 12) {
                     statusIndicator
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(vm.meetingTitle)
+                        Text(vm.titleOrProvisional)
                             .font(Theme.subheadlineEmphasized)
                             .foregroundStyle(Theme.textPrimary)
                             .lineLimit(1)
@@ -192,11 +192,6 @@ struct RecordingMiniBar: View {
                             .foregroundStyle(isPaused ? Theme.warning : Theme.record)
                     }
                     Spacer(minLength: 8)
-                    Text(vm.elapsed.clockDisplay)
-                        .font(Theme.subheadlineEmphasized)
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.textPrimary)
-                        .contentTransition(.numericText())
                 }
                 .contentShape(Rectangle())
             }
@@ -207,8 +202,8 @@ struct RecordingMiniBar: View {
                     "recorder.mini.accessibility_label",
                     comment: "Mini recorder bar: status, meeting title, elapsed time"
                 ),
-                statusText,
-                vm.meetingTitle,
+                statusWord,
+                vm.titleOrProvisional,
                 vm.elapsed.clockDisplay
             ))
             .accessibilityHint(NSLocalizedString("recorder.mini.hint", comment: "Opens the full recorder"))
@@ -284,7 +279,19 @@ struct RecordingMiniBar: View {
         }
     }
 
+    /// Second line, in words plus elapsed time: "Recording · 04:13".
     private var statusText: String {
+        String(
+            format: NSLocalizedString(
+                isPaused ? "recorder.mini.paused_elapsed" : "recorder.mini.recording_elapsed",
+                comment: "Mini recorder bar: state with elapsed time"
+            ),
+            vm.elapsed.clockDisplay
+        )
+    }
+
+    /// The state word alone, for the VoiceOver label's composed phrase.
+    private var statusWord: String {
         isPaused
             ? NSLocalizedString("recorder.mini.paused", comment: "Mini recorder bar: paused")
             : NSLocalizedString("recorder.mini.recording", comment: "Mini recorder bar: recording")

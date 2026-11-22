@@ -43,6 +43,7 @@ private struct RecorderContent: View {
 
     @State private var levels: [Float] = Array(repeating: 0, count: 40)
     @State private var showingPhotoCapture = false
+    @Environment(\.openURL) private var openURL
     /// Fixed 20 Hz drive for the waveform scroll — the same cadence as the
     /// recorder's metering tick.
     private let waveformClock = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
@@ -61,23 +62,29 @@ private struct RecorderContent: View {
             .ignoresSafeArea()
             .opacity(vm.state == .recording ? 1 : 0.4)
 
-            VStack(spacing: 0) {
-                Spacer()
-                statusBadge
-                startingIndicator
-                timer
-                    .padding(.top, 22)
-                waveform
-                    .padding(.top, 26)
-                titleField
-                    .padding(.top, 28)
-                liveTranscriptArea
-                routeMessage
-                Spacer()
-                controls
+            if vm.permissionDenied {
+                permissionDeniedContent
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    headerLine
+                    titleField
+                        .padding(.top, 8)
+                    startingIndicator
+                    timer
+                        .padding(.top, 14)
+                    statusLine
+                        .padding(.top, 8)
+                    waveform
+                        .padding(.top, 20)
+                    liveTranscriptArea
+                        .padding(.top, 16)
+                    routeMessage
+                    Spacer()
+                    controls
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 40)
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 40)
         }
         // This screen is a fixed, immersive layout (58pt transport buttons,
         // a hand-tuned timer size) rather than a scrolling list of text, so —
@@ -87,7 +94,7 @@ private struct RecorderContent: View {
         .navigationTitle(NSLocalizedString("recorder.title", comment: "Record"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItemGroup(placement: .topBarLeading) {
                 // `cancel()` deletes the in-progress recording once one
                 // exists, so the label and role must say so — a plain
                 // "Cancel" here would misrepresent a destructive action as a
@@ -101,8 +108,6 @@ private struct RecorderContent: View {
                 ) {
                     session.discard()
                 }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
                 // Collapses the recorder into the floating mini bar so the
                 // rest of the app stays usable while capture continues.
                 Button {
@@ -113,6 +118,36 @@ private struct RecorderContent: View {
                 }
                 .disabled(!session.canMinimize)
                 .accessibilityIdentifier("recorder.minimize")
+            }
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                // Photo — a photo needs an active recording to attach its
+                // timestamp to (see `AudioRecorderService.registerPhoto`).
+                Button {
+                    AppLog.recorderUI.atInfo.info("UI: photo tapped, state=\(String(describing: vm.state), privacy: .public)")
+                    showingPhotoCapture = true
+                } label: {
+                    Image(systemName: "camera")
+                        .accessibilityLabel(NSLocalizedString("recorder.photo", comment: "Photo"))
+                }
+                .disabled(vm.state != .recording)
+                .accessibilityShowsLargeContentViewer {
+                    Label(NSLocalizedString("recorder.photo", comment: "Photo"), systemImage: "camera")
+                }
+
+                // Highlight. Marking during a pause has no "current instant"
+                // to capture (mirrors `markHighlight()`'s guard).
+                Button {
+                    AppLog.recorderUI.atInfo.info("UI: highlight tapped, state=\(String(describing: vm.state), privacy: .public)")
+                    vm.markHighlight()
+                } label: {
+                    Image(systemName: "flag")
+                        .accessibilityLabel(NSLocalizedString("recorder.highlight", comment: "Highlight"))
+                }
+                .disabled(vm.state != .recording)
+                .sensoryFeedback(.success, trigger: vm.highlightCount)
+                .accessibilityShowsLargeContentViewer {
+                    Label(NSLocalizedString("recorder.highlight", comment: "Highlight"), systemImage: "flag")
+                }
             }
         }
         // The backdrop is a fixed immersive black, so pin the whole screen —
@@ -145,15 +180,6 @@ private struct RecorderContent: View {
                 vm.chooseMic(uid: nil)
             }
         }
-        .kurnDialog(
-            isPresented: $vm.permissionDenied,
-            iconSystemName: "mic.slash.fill",
-            iconTint: Theme.warning,
-            title: NSLocalizedString("recorder.permission.title", comment: "Mic permission"),
-            message: NSLocalizedString("recorder.permission.message", comment: ""),
-            primaryTitle: NSLocalizedString("common.ok", comment: "OK"),
-            primaryAction: { session.discard() }
-        )
         .errorAlert(Binding(
             get: { vm.error },
             set: { newValue in
@@ -176,27 +202,6 @@ private struct RecorderContent: View {
     }
 
     // MARK: - Subviews
-
-    @ViewBuilder
-    private var statusBadge: some View {
-        HStack(spacing: 8) {
-            if vm.state == .recording {
-                PulsingDot(color: Theme.record)
-                    .accessibilityHidden(true)
-            } else {
-                Circle()
-                    .fill(vm.state == .paused ? Theme.warning : Theme.record)
-                    .frame(width: 10, height: 10)
-                    .accessibilityHidden(true)
-            }
-            Text(vm.state == .paused
-                 ? NSLocalizedString("recorder.paused", comment: "Paused")
-                 : "REC")
-                .font(.system(.footnote, design: .default, weight: .bold))
-                .tracking(2.5)
-                .foregroundStyle(vm.state == .paused ? Theme.warning : Theme.record)
-        }
-    }
 
     @ViewBuilder
     private var startingIndicator: some View {
@@ -251,39 +256,40 @@ private struct RecorderContent: View {
     }
 
     private var titleField: some View {
-        VStack(spacing: 8) {
-            TextField(
-                NSLocalizedString("recorder.add_title", comment: "Add title…"),
-                text: $vm.meetingTitle
-            )
-            .multilineTextAlignment(.center)
-            .font(Theme.body)
-            .foregroundStyle(.white)
-            .tint(Theme.record)
-            // Explicit, persistent label — VoiceOver stops reading the
-            // placeholder as soon as the field has a value, unlike a label.
-            .accessibilityLabel(NSLocalizedString(
-                "recorder.title_field.accessibility_label",
-                comment: "Meeting title text field (VoiceOver)"
-            ))
-            Rectangle()
-                .fill(.white.opacity(0.1))
-                .frame(height: 1)
-        }
+        TextField(
+            "",
+            text: $vm.meetingTitle,
+            prompt: Text(vm.provisionalTitle).foregroundStyle(.white.opacity(0.35))
+        )
+        .font(.title2.bold())
+        .foregroundStyle(.white)
+        .tint(Theme.record)
+        // Explicit, persistent label — VoiceOver stops reading the
+        // placeholder as soon as the field has a value, unlike a label.
+        .accessibilityLabel(NSLocalizedString(
+            "recorder.title_field.accessibility_label",
+            comment: "Meeting title text field (VoiceOver)"
+        ))
     }
 
     @ViewBuilder
     private var liveTranscriptArea: some View {
         if vm.isLiveTranscriptionRequested {
-            ScrollView {
-                Text(liveTranscriptText)
-                    .font(Theme.subheadline)
-                    .foregroundStyle(liveTranscriptColor)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(NSLocalizedString("recorder.live_caption", comment: "Live transcript caption"))
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.5)
+                    .foregroundStyle(.white.opacity(0.45))
+                ScrollView {
+                    Text(liveTranscriptText)
+                        .font(Theme.subheadline)
+                        .foregroundStyle(liveTranscriptColor)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 90)
             }
-            .frame(maxHeight: 90)
-            .padding(.top, 16)
+            .padding(14)
+            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
     }
 
@@ -332,104 +338,84 @@ private struct RecorderContent: View {
         .accessibilityHidden(true)
     }
 
-    // Two rows rather than one four-wide HStack: pause/stop are the primary,
-    // full-width pills, and squeezing highlight+photo into the same row left
-    // "Pausar"/"Parar" too narrow to lay out on one line at larger Dynamic
-    // Type sizes. Highlight and photo are secondary actions, so a smaller
-    // centered row below reads fine.
+    /// Three fixed circles: pause and the mic at 64pt on dark glass, and the
+    /// one red control — Stop — larger at 84pt with a thin white ring.
     private var controls: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 14) {
-                // Pause / resume.
-                Button {
-                    AppLog.recorderUI.atInfo.info("UI: pause/resume tapped, state=\(String(describing: vm.state), privacy: .public)")
-                    vm.togglePause()
-                } label: {
-                    pillLabel(
-                        systemImage: vm.state == .paused ? "play.fill" : "pause.fill",
-                        title: vm.state == .paused
-                            ? NSLocalizedString("recorder.resume", comment: "Resume")
-                            : NSLocalizedString("recorder.pause", comment: "Pause")
-                    )
-                }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.capsule)
-                .disabled(vm.state == .idle)
-
-                // Stop & save.
-                Button {
-                    AppLog.recorderUI.atInfo.info("UI: stop tapped, state=\(String(describing: vm.state), privacy: .public)")
-                    vm.stopAndSave()
-                } label: {
-                    pillLabel(
-                        systemImage: "stop.fill",
-                        title: NSLocalizedString("recorder.stop", comment: "Stop")
-                    )
-                }
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.capsule)
-                .tint(Theme.record)
-                .disabled(vm.state == .idle)
+        HStack(spacing: 28) {
+            controlCircle(size: 64, disabled: vm.state == .idle) {
+                AppLog.recorderUI.atInfo.info("UI: pause/resume tapped, state=\(String(describing: vm.state), privacy: .public)")
+                vm.togglePause()
+            } label: {
+                Image(systemName: vm.state == .paused ? "play.fill" : "pause.fill")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .accessibilityLabel(vm.state == .paused
+                ? NSLocalizedString("recorder.resume", comment: "Resume")
+                : NSLocalizedString("recorder.pause", comment: "Pause"))
+            .accessibilityShowsLargeContentViewer {
+                Label(
+                    vm.state == .paused
+                        ? NSLocalizedString("recorder.resume", comment: "Resume")
+                        : NSLocalizedString("recorder.pause", comment: "Pause"),
+                    systemImage: vm.state == .paused ? "play.fill" : "pause.fill"
+                )
             }
 
-            HStack(spacing: 14) {
-                // Highlight. Fixed-size circle rather than a full-width pill,
-                // since marking is a secondary action relative to pause/stop.
-                Button {
-                    AppLog.recorderUI.atInfo.info("UI: highlight tapped, state=\(String(describing: vm.state), privacy: .public)")
-                    vm.markHighlight()
-                } label: {
-                    Image(systemName: "bookmark.fill")
-                        .font(.system(size: 20, weight: .semibold))
-                        .frame(width: 52, height: 52)
-                }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .tint(Theme.warning)
-                // Stricter than pause/stop: marking during a pause has no
-                // "current instant" to capture (mirrors `markHighlight()`'s guard).
-                .disabled(vm.state != .recording)
-                .sensoryFeedback(.success, trigger: vm.highlightCount)
-                .accessibilityLabel(NSLocalizedString("recorder.highlight", comment: "Highlight"))
-                .accessibilityShowsLargeContentViewer {
-                    Label(NSLocalizedString("recorder.highlight", comment: "Highlight"), systemImage: "bookmark.fill")
-                }
+            // Stop & save — the only red control on the screen.
+            Button {
+                AppLog.recorderUI.atInfo.info("UI: stop tapped, state=\(String(describing: vm.state), privacy: .public)")
+                vm.stopAndSave()
+            } label: {
+                Image(systemName: "stop.fill")
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 84, height: 84)
+                    .background(Theme.record, in: Circle())
+                    .overlay(Circle().stroke(.white.opacity(0.18), lineWidth: 5))
+            }
+            .buttonStyle(.plain)
+            .disabled(vm.state == .idle)
+            .accessibilityLabel(NSLocalizedString("recorder.stop", comment: "Stop"))
+            .accessibilityIdentifier("recorder.stop")
+            .accessibilityShowsLargeContentViewer {
+                Label(NSLocalizedString("recorder.stop", comment: "Stop"), systemImage: "stop.fill")
+            }
 
-                // Photo. Same fixed-circle treatment and the same "recording
-                // only" guard as highlight — a photo needs an active
-                // recording to attach its timestamp to (see
-                // `AudioRecorderService.registerPhoto`).
-                Button {
-                    AppLog.recorderUI.atInfo.info("UI: photo tapped, state=\(String(describing: vm.state), privacy: .public)")
-                    showingPhotoCapture = true
-                } label: {
-                    Image(systemName: "camera.fill")
-                        .font(.system(size: 20, weight: .semibold))
-                        .frame(width: 52, height: 52)
-                }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .disabled(vm.state != .recording)
-                .accessibilityLabel(NSLocalizedString("recorder.photo", comment: "Photo"))
-                .accessibilityShowsLargeContentViewer {
-                    Label(NSLocalizedString("recorder.photo", comment: "Photo"), systemImage: "camera.fill")
-                }
+            controlCircle(size: 64, disabled: false) {
+                vm.presentMicChoices()
+            } label: {
+                Image(systemName: "mic")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .accessibilityLabel(NSLocalizedString("recorder.choose_mic.title", comment: "Choose microphone"))
+            .accessibilityShowsLargeContentViewer {
+                Label(
+                    NSLocalizedString("recorder.choose_mic.title", comment: "Choose microphone"),
+                    systemImage: "mic"
+                )
             }
         }
+        .frame(maxWidth: .infinity)
         .opacity(vm.state == .idle ? 0.5 : 1)
     }
 
-    /// The transport controls stay full-width, thumb-sized content buttons
-    /// rather than toolbar items — they're the primary target mid-recording —
-    /// but take their surface from the glass button styles above.
-    private func pillLabel(systemImage: String, title: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: systemImage)
-                .accessibilityHidden(true)
-            Text(title).font(Theme.calloutEmphasized)
+    /// The 64pt glass circle shared by the pause and mic controls.
+    private func controlCircle<Label: View>(
+        size: CGFloat,
+        disabled: Bool,
+        action: @escaping () -> Void,
+        @ViewBuilder label: () -> Label
+    ) -> some View {
+        Button(action: action) {
+            label()
+                .frame(width: size, height: size)
+                .background(.white.opacity(0.14), in: Circle())
+                .overlay(Circle().stroke(.white.opacity(0.08), lineWidth: 0.5))
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 58)
+        .buttonStyle(.plain)
+        .disabled(disabled)
     }
 
     private var barColor: Color {
@@ -446,13 +432,14 @@ private struct RecorderContent: View {
 /// Shared with the mini bar (`RecordingMiniBar`).
 struct PulsingDot: View {
     let color: Color
+    var size: CGFloat = 10
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dim = false
 
     var body: some View {
         Circle()
             .fill(color)
-            .frame(width: 10, height: 10)
+            .frame(width: size, height: size)
             .opacity(dim ? 0.25 : 1)
             .onAppear {
                 // Reduce Motion: never start the infinite pulse, just render solid.
@@ -462,4 +449,105 @@ struct PulsingDot: View {
                 }
             }
     }
+}
+
+private extension RecorderContent {
+    /// "New meeting · <Fri, Nov 21>" — the date the capture started, kept
+    /// small and secondary above the editable title.
+    private var headerLine: some View {
+        Text(String(
+            format: NSLocalizedString("recorder.header", comment: "Recorder header with date"),
+            vm.recordingStartDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        ))
+        .font(.footnote)
+        .foregroundStyle(.white.opacity(0.6))
+    }
+
+    /// One line under the timer: state word + the input in use. The mic name
+    /// comes from the live route, so it follows a mid-recording switch to a
+    /// headset.
+    private var statusLine: some View {
+        HStack(spacing: 8) {
+            if vm.state == .recording {
+                PulsingDot(color: Theme.record, size: 9)
+                    .accessibilityHidden(true)
+            } else {
+                Circle()
+                    .fill(vm.state == .paused ? Theme.warning : Theme.record)
+                    .frame(width: 9, height: 9)
+                    .accessibilityHidden(true)
+            }
+            Text(statusLineText)
+                .font(.footnote)
+                .foregroundStyle(.white.opacity(0.7))
+        }
+    }
+
+    private var statusLineText: String {
+        let paused = vm.state == .paused
+        if let mic = vm.currentMicName {
+            return String(
+                format: NSLocalizedString(
+                    paused ? "recorder.status.paused_with_mic" : "recorder.status.recording_with_mic",
+                    comment: "Recorder status with microphone name"
+                ),
+                mic
+            )
+        }
+        return NSLocalizedString(
+            paused ? "recorder.mini.paused" : "recorder.mini.recording",
+            comment: "Recorder status"
+        )
+    }
+
+    /// Replaces the old mic-permission dialog: the screen itself explains
+    /// what is missing and offers the system Settings route, with a close
+    /// button that discards the (empty) session exactly as the old OK did.
+    private var permissionDeniedContent: some View {
+        ZStack(alignment: .topTrailing) {
+            VStack(spacing: 14) {
+                Spacer()
+                Image(systemName: "mic.slash")
+                    .font(.system(size: 44))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .accessibilityHidden(true)
+                Text(NSLocalizedString("recorder.permission.title", comment: "Mic permission"))
+                    .font(.title3.bold())
+                    .foregroundStyle(.white)
+                Text(NSLocalizedString("recorder.permission.message", comment: ""))
+                    .font(.callout)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(url)
+                    }
+                } label: {
+                    Text(NSLocalizedString("recorder.permission.open_settings", comment: "Open Settings"))
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(Theme.onInk)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(Theme.ink, in: Capsule())
+                }
+                .padding(.top, 6)
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
+
+            Button {
+                session.discard()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .padding(14)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(NSLocalizedString("common.close", comment: "Close"))
+            .padding(10)
+        }
+    }
+
 }

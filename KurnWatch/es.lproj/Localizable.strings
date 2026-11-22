@@ -1,6 +1,11 @@
-"watch.open_iphone" = "Abre Kurn en tu iPhone para grabar";
 "watch.unreachable" = "No se pudo conectar con el iPhone";
 "watch.pause" = "Pausar";
 "watch.resume" = "Reanudar";
 "watch.stop" = "Detener";
 "watch.highlight" = "Destacar";
+
+"watch.start.title" = "Grabar en el iPhone";
+"watch.start.subtitle" = "El iPhone graba; el reloj controla.";
+"watch.start.queued" = "Abre Kurn en el iPhone para empezar";
+"watch.state.recording" = "Grabando";
+"watch.state.paused" = "En pausa";

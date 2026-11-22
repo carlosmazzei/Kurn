@@ -26,20 +26,44 @@ enum RemoteRecordingState: Equatable {
 /// since the callbacks arrive off the main actor.
 private final class WatchCommandReplyBox: @unchecked Sendable {
     private let lock = NSLock()
-    private var continuation: CheckedContinuation<Bool, Never>?
+    private var continuation: CheckedContinuation<WatchCommandOutcome, Never>?
 
-    func store(_ continuation: CheckedContinuation<Bool, Never>) {
+    func store(_ continuation: CheckedContinuation<WatchCommandOutcome, Never>) {
         lock.lock()
         self.continuation = continuation
         lock.unlock()
     }
 
-    func resume(with result: Bool) {
+    func resume(with result: WatchCommandOutcome) {
         lock.lock()
         let toResume = continuation
         continuation = nil
         lock.unlock()
         toResume?.resume(returning: result)
+    }
+}
+
+/// What the phone answered to a command: the `ok` flag plus the lifecycle
+/// phase it reached and a failure reason when there is one. Built inside
+/// the `sendMessage` reply handler, because the raw `[String: Any]` reply
+/// isn't `Sendable` and can't cross into the awaiting task.
+struct WatchCommandOutcome: Sendable {
+    let ok: Bool
+    let phase: WatchAckPhase?
+    let error: String?
+
+    static let unreachable = WatchCommandOutcome(ok: false, phase: nil, error: nil)
+
+    init(ok: Bool, phase: WatchAckPhase?, error: String?) {
+        self.ok = ok
+        self.phase = phase
+        self.error = error
+    }
+
+    init(_ reply: [String: Any]) {
+        ok = (reply[WatchSessionKey.ok] as? Bool) ?? false
+        phase = (reply[WatchSessionKey.ackPhase] as? String).flatMap(WatchAckPhase.init(rawValue:))
+        error = reply[WatchSessionKey.error] as? String
     }
 }
 
@@ -69,6 +93,10 @@ final class WatchConnectivityManager: NSObject {
     private(set) var isAvailable = false
     /// Set when the last command failed to reach the iPhone.
     private(set) var lastCommandFailed = false
+
+    /// Clears the unreachable indicator — e.g. a `.start` the phone refused
+    /// because a recording is already running isn't a reachability failure.
+    func clearCommandFailure() { lastCommandFailed = false }
 
     override init() {
         super.init()
@@ -131,30 +159,38 @@ final class WatchConnectivityManager: NSObject {
 
     @discardableResult
     func send(_ command: WatchCommand) async -> Bool {
+        await sendWithOutcome(command).ok
+    }
+
+    /// Sends a command and returns the phone's full reply — needed by the
+    /// `.start` flow, which distinguishes "started now" (`.stateChanged`)
+    /// from "queued until the app is foreground" (`.queued`).
+    @discardableResult
+    func sendWithOutcome(_ command: WatchCommand) async -> WatchCommandOutcome {
         guard WCSession.isSupported(), WCSession.default.activationState == .activated else {
             lastCommandFailed = true
-            return false
+            return .unreachable
         }
         let commandID = UUID().uuidString
         let box = WatchCommandReplyBox()
-        let ok = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+        let outcome = await withCheckedContinuation { (continuation: CheckedContinuation<WatchCommandOutcome, Never>) in
             box.store(continuation)
             WCSession.default.sendMessage(
                 [WatchSessionKey.command: command.rawValue, WatchSessionKey.commandID: commandID],
                 replyHandler: { @Sendable reply in
-                    box.resume(with: (reply[WatchSessionKey.ok] as? Bool) ?? false)
+                    box.resume(with: WatchCommandOutcome(reply))
                 },
                 errorHandler: { @Sendable _ in
-                    box.resume(with: false)
+                    box.resume(with: .unreachable)
                 }
             )
             Task {
                 try? await Task.sleep(for: Self.commandTimeout)
-                box.resume(with: false)
+                box.resume(with: .unreachable)
             }
         }
-        lastCommandFailed = !ok
-        return ok
+        lastCommandFailed = !outcome.ok
+        return outcome
     }
 
     private func applyContext(_ context: WatchRecordingContext) {
