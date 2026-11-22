@@ -915,14 +915,14 @@
 "settings.correction" = "Transkriptionsfehler korrigieren";
 "settings.correction_footer" = "Nutzt deinen Zusammenfassungs-KI-Anbieter nach der Transkription. Zuerst prüft er das Transkript, um das Thema des Meetings und unpassende Wörter zu erkennen; dann korrigiert er Rechtschreibung, Zeichensetzung und falsch verstandene Wörter in unsicheren oder markierten Passagen und behält nur Änderungen, die wie das Gesagte klingen. Standardmäßig deaktiviert — es werden Cloud-Aufrufe getätigt und der Vorgang kann länger dauern.";
 "settings.correction_needs_key" = "Füge einen API-Schlüssel für deinen Zusammenfassungs-Anbieter hinzu, um die KI-Korrektur zu aktivieren.";
-"detail.wiki.view" = "Seite anzeigen";
-"detail.wiki.generate" = "Seite erstellen";
-"detail.wiki.regenerate" = "Seite neu erstellen";
-"detail.wiki.generating" = "Seite wird erstellt…";
+"detail.wiki.view" = "Wiki anzeigen";
+"detail.wiki.generate" = "Wiki generieren";
+"detail.wiki.regenerate" = "Wiki neu generieren";
+"detail.wiki.generating" = "Wiki wird generiert…";
 "detail.title.generate" = "Titel Erstellen";
 "detail.title.regenerate" = "Titel Neu Erstellen";
 "detail.title.generating" = "Titel wird erstellt…";
-"detail.wiki.title" = "Seite der Besprechung";
+"detail.wiki.title" = "Wiki der Besprechung";
 "detail.wiki.updated" = "Aktualisiert am %@";
 
 /* Generierte Dokumente */
@@ -931,6 +931,8 @@
 "documents.new" = "Chat öffnen";
 "documents.empty.title" = "Noch keine Dokumente";
 "documents.empty.subtitle" = "Dokumente entstehen über Ask: fordere ein Protokoll, einen Bericht oder einen Plan an.";
+"documents.ask" = "Fordere ein Dokument in Ask an";
+"documents.needs_provider" = "Der ausgewählte Anbieter kann keine Dokumente erstellen.";
 "documents.prompt.title" = "Anweisungen";
 "documents.source.transcripts" = "Transkripte";
 "documents.source.tags" = "Tags";
@@ -1376,8 +1378,8 @@
 "detail.knowledge.counts" = "Entitäten: %ld · Aussagen: %ld · Passagen: %ld";
 "detail.knowledge.contributions" = "Geänderte Seiten";
 "detail.knowledge.refresh" = "Aktualisieren";
-"detail.knowledge.notes" = "Seite der Besprechung";
-"detail.knowledge.notes_empty" = "Erstelle eine Seite aus dem Transkript dieses Meetings.";
+"detail.knowledge.notes" = "Wiki der Besprechung";
+"detail.knowledge.notes_empty" = "Generiere ein Wiki aus dem Transkript dieser Besprechung.";
 "detail.knowledge.loading" = "Beiträge werden geladen…";
 "detail.knowledge.unavailable" = "Wiki ist nicht verfügbar";
 "detail.knowledge.unavailable_detail" = "Zugriff oder Quelldaten haben sich möglicherweise geändert. Aktualisiere, um es erneut zu versuchen.";
@@ -1782,6 +1784,7 @@
 "detail.recording.add" = "Aufnahme hinzufügen";
 "detail.attachments.reading" = "„%@“ wird gelesen …";
 "detail.read_aloud.title" = "Zusammenfassung wird vorgelesen";
+"detail.read_aloud.wiki_title" = "Wiki wird vorgelesen";
 "read_aloud.progress_named" = "Absatz %1$d von %2$d";
 "read_aloud.voice.device" = "Gerätestimme";
 "detail.voice" = "Stimme";
@@ -1822,8 +1825,12 @@
 "detail.knowledge.changed_summary" = "%1$@ · %2$@";
 "detail.knowledge.entity_facts" = "%1$@ · +%2$@";
 "detail.wiki.provenance" = "Von der KI geschrieben · %@";
-"detail.knowledge.no_page" = "Noch keine Seite";
-"detail.knowledge.no_page_detail" = "Erstelle eine Seite aus dem Transkript dieser Besprechung.";
+"detail.knowledge.no_page" = "Noch kein Wiki";
+"detail.knowledge.no_page_detail" = "Generiere ein Wiki aus dem Transkript dieser Besprechung.";
+"detail.knowledge.fact_sentence" = "%1$@ %2$@ %3$@";
+"detail.knowledge.facts_title" = "Wissen aus dieser Besprechung";
+"detail.knowledge.page_written" = "Wiki · geschrieben %@";
+"detail.wiki.writing" = "Wiki der Besprechung wird geschrieben · %@";
 "knowledge.entity_kind.topic" = "Thema";
 "knowledge.entity_kind.project" = "Projekt";
 "knowledge.entity_kind.initiative" = "Initiative";

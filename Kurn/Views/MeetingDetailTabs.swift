@@ -180,8 +180,6 @@ struct SummaryTab: View {
     /// photos, hiding the chip row entirely (see `SummaryView.onShowPhoto`).
     var onShowPhoto: ((TimeInterval) -> Void)?
 
-    private var controller: ReadAloudController { .shared }
-
     private var sortedSummaries: [Summary] {
         meeting.summaries.sorted { $0.createdAt > $1.createdAt }
     }
@@ -211,7 +209,7 @@ struct SummaryTab: View {
                     onShare: onShare,
                     onDeleteSummary: onDeleteSummary,
                     onCancel: onCancel,
-                    onListen: listen
+                    listenItem: readAloudItem
                 )
             }
 
@@ -232,11 +230,6 @@ struct SummaryTab: View {
     private var generatingTitle: String {
         settings.summaryTemplates.first { $0.id == settings.lastSummaryTemplateID }?.displayName
             ?? NSLocalizedString("detail.summary.untitled", comment: "Summary")
-    }
-
-    private func listen() {
-        guard let item = readAloudItem else { return }
-        controller.toggle(item, settings: settings)
     }
 
     /// Streaming replaces the finished summary in place — the pill reads
@@ -395,9 +388,16 @@ struct MeetingGenerateEmptyState: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label(title, systemImage: systemImage)
+            Label {
+                Text(title)
+                    // Long localized titles wrap instead of truncating.
+                    .fixedSize(horizontal: false, vertical: true)
+            } icon: {
+                Image(systemName: systemImage)
+            }
         } description: {
             Text(description)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier(descriptionIdentifier ?? "")
         } actions: {
             if let actionTitle, let action {

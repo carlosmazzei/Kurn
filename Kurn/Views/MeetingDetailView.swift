@@ -388,19 +388,18 @@ struct MeetingDetailView: View {
         case .knowledge:
             if settings.knowledgeEnabled {
                 MeetingKnowledgeView(meeting: meeting, state: meetingKnowledge.presentation(for: meeting.id),
-                    headerText: meetingKnowledge.header(for: meeting.id),
                     isGeneratingArticle: isGeneratingWiki,
                     canGenerateArticle: canGenerateWiki, generatesLocally: settings.wikiGenerationProvider.kind == .appleOnDevice, onRefresh: {
                         meetingKnowledge.invalidate()
                         knowledgeRefresh += 1
-                    })
+                    }, onOpenPage: { showingWiki = true }, onSeek: seekEvidence)
             }
         }
     }
 
     /// Tap on a `[m:ss]` cited in a chat answer: find the recording
     /// whose span contains that absolute meeting time and seek into it.
-    private func jumpToTime(_ absolute: TimeInterval) {
+    func jumpToTime(_ absolute: TimeInterval) {
         for recording in sortedRecordings {
             let offset = startOffset(of: recording)
             if absolute >= offset && absolute <= offset + recording.duration {

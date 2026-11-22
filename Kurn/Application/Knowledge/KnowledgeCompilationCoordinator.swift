@@ -90,12 +90,19 @@ final class KnowledgeCompilationCoordinator {
                 guard snapshot.transcriptFingerprint == expectedSource.fingerprint,
                       snapshot.policyRevisionKey == expectedSource.policyRevisionKey else { throw KnowledgeSettingsError.stalePreview }
             }
-            guard snapshot.recordings.contains(where: { !$0.segments.isEmpty }) else { return .deferred }
+            guard snapshot.recordings.contains(where: { !$0.segments.isEmpty }) else {
+                lastFailureCode = "no_transcript"
+                AppLog.knowledge.atNotice.notice("knowledge compile deferred meeting=\(meetingID, privacy: .private) reason=no_transcript")
+                return .deferred
+            }
             let work = try KnowledgeQueuedWork.extraction(snapshot: snapshot, provider: provider, model: model,
                 rebuildGeneration: rebuildGeneration?.uuidString.lowercased())
             // Validate completed provenance/current support before the queue's
             // terminal shortcut. A -> B -> A requires an explicit new generation.
-            if try await store.compilationReplay(work, authorization: authorize) != nil { return .completed }
+            if try await store.compilationReplay(work, authorization: authorize) != nil {
+                AppLog.knowledge.atInfo.info("knowledge compile skipped meeting=\(meetingID, privacy: .private) reason=already_current")
+                return .completed
+            }
             AppLog.knowledge.atNotice.notice("knowledge compile submitted meeting=\(meetingID, privacy: .private) provider=\(provider.id, privacy: .public) model=\(model, privacy: .public) explicit=\(trigger == .explicit, privacy: .public)")
             let submitted = try await jobQueue.submit(work, explicit: trigger == .explicit)
             if let code = submitted.code { lastFailureCode = code }
@@ -250,9 +257,19 @@ final class KnowledgeCompilationCoordinator {
                 _ = try await currentSource(handle)
                 let context = KnowledgeExtractionContext(recordedAt: source.recordedAt.ISO8601Format(),
                     timeZone: handle.work.compilation?.timeZone ?? "UTC", kind: snapshot.contextKind)
+                AppLog.knowledge.atInfo.info("knowledge extraction recording=\(source.id, privacy: .private) segments=\(source.segments.count, privacy: .public) provider=\(handle.work.provider.id, privacy: .public) model=\(handle.work.model, privacy: .public)")
                 let result = try await KnowledgeExtractionService().extract(segments: source.segments, language: source.language,
                     context: context, llm: llm, budget: handle.work.provider.kind == .appleOnDevice ? .onDevice : .conservative,
                     authorization: authorize)
+                // A clean empty answer and a gate rejection are different
+                // events: the integrity check throws before this point, so
+                // zero here means the model itself asserted nothing.
+                let assertionCount = result.passes.reduce(0) { $0 + $1.assertions.count }
+                if assertionCount == 0 {
+                    AppLog.knowledge.atNotice.notice("knowledge extraction returned zero facts recording=\(source.id, privacy: .private) reason=model_empty")
+                } else {
+                    AppLog.knowledge.atInfo.info("knowledge extraction facts recording=\(source.id, privacy: .private) count=\(assertionCount, privacy: .public)")
+                }
                 _ = try await currentSource(handle)
                 progress.recordings.append(try KnowledgeRecordingCompilation(recordingID: source.id, result: result))
                 try await jobQueue.checkpoint(KnowledgeStoreRows.authoritativeData(progress), for: handle)
@@ -262,7 +279,8 @@ final class KnowledgeCompilationCoordinator {
             let current = try await currentSource(handle)
             let request = KnowledgeCommitRequest(snapshot: current, extractorVersion: handle.work.pipelineVersion, schemaVersion: 1,
                 provider: handle.work.provider, compilations: progress.recordings, generation: handle.work.generation, lease: handle)
-            _ = try await store.commit(request, authorization: authorize)
+            let receipt = try await store.commit(request, authorization: authorize)
+            AppLog.knowledge.atInfo.info("knowledge compilation published meeting=\(handle.work.meetingID, privacy: .private) facts=\(receipt.assertionCount, privacy: .public)")
         } catch KnowledgeExtractionServiceError.policyDenied {
             _ = try await currentSource(handle) // Preserve the precise deferral/obsolescence reason.
             throw KnowledgeJobDeferred(reason: .policyDenied)

@@ -915,14 +915,14 @@
 "settings.correction" = "校正转录错误";
 "settings.correction_footer" = "转录完成后使用你的摘要 AI 提供方。它会先审阅转录内容，识别会议主题以及与主题不符的词语，再修正不确定或被指出部分的拼写、标点和听错的词语，只保留听起来与原话一致的修改。默认关闭——它会发起云端调用，且可能需要更长时间完成。";
 "settings.correction_needs_key" = "请为你的摘要提供方添加 API 密钥以启用 AI 校正。";
-"detail.wiki.view" = "查看页面";
-"detail.wiki.generate" = "生成页面";
-"detail.wiki.regenerate" = "重新生成页面";
-"detail.wiki.generating" = "正在生成页面…";
+"detail.wiki.view" = "查看 Wiki";
+"detail.wiki.generate" = "生成 Wiki";
+"detail.wiki.regenerate" = "重新生成 Wiki";
+"detail.wiki.generating" = "正在生成 Wiki…";
 "detail.title.generate" = "生成标题";
 "detail.title.regenerate" = "重新生成标题";
 "detail.title.generating" = "正在生成标题…";
-"detail.wiki.title" = "会议页面";
+"detail.wiki.title" = "会议 Wiki";
 "detail.wiki.updated" = "更新于 %@";
 
 /* 生成的文档 */
@@ -931,6 +931,8 @@
 "documents.new" = "打开聊天";
 "documents.empty.title" = "还没有文档";
 "documents.empty.subtitle" = "文档通过“询问”创建：可以请求会议纪要、报告或计划。";
+"documents.ask" = "在“询问”中请求文档";
+"documents.needs_provider" = "所选提供商无法创建文档。";
 "documents.prompt.title" = "说明";
 "documents.source.transcripts" = "转写";
 "documents.source.tags" = "标签";
@@ -1376,8 +1378,8 @@
 "detail.knowledge.counts" = "实体：%ld · 陈述：%ld · 片段：%ld";
 "detail.knowledge.contributions" = "变更的页面";
 "detail.knowledge.refresh" = "刷新";
-"detail.knowledge.notes" = "会议页面";
-"detail.knowledge.notes_empty" = "根据本次会议的转录生成页面。";
+"detail.knowledge.notes" = "会议 Wiki";
+"detail.knowledge.notes_empty" = "根据本次会议的转录生成 Wiki。";
 "detail.knowledge.loading" = "正在加载贡献…";
 "detail.knowledge.unavailable" = "维基暂不可用";
 "detail.knowledge.unavailable_detail" = "访问权限或源数据可能已更改。请刷新后重试。";
@@ -1782,6 +1784,7 @@
 "detail.recording.add" = "添加录音";
 "detail.attachments.reading" = "正在读取“%@”…";
 "detail.read_aloud.title" = "正在朗读摘要";
+"detail.read_aloud.wiki_title" = "正在朗读 Wiki";
 "read_aloud.progress_named" = "第 %1$d 段，共 %2$d 段";
 "read_aloud.voice.device" = "设备语音";
 "detail.voice" = "语音";
@@ -1822,8 +1825,12 @@
 "detail.knowledge.changed_summary" = "%1$@ · %2$@";
 "detail.knowledge.entity_facts" = "%1$@ · +%2$@";
 "detail.wiki.provenance" = "由 AI 撰写 · %@";
-"detail.knowledge.no_page" = "暂无页面";
-"detail.knowledge.no_page_detail" = "根据本次会议的转录生成页面。";
+"detail.knowledge.no_page" = "暂无 Wiki";
+"detail.knowledge.no_page_detail" = "根据本次会议的转录生成 Wiki。";
+"detail.knowledge.fact_sentence" = "%1$@ %2$@ %3$@";
+"detail.knowledge.facts_title" = "本次会议提取的知识";
+"detail.knowledge.page_written" = "Wiki · 写于 %@";
+"detail.wiki.writing" = "正在撰写会议 Wiki · %@";
 "knowledge.entity_kind.topic" = "主题";
 "knowledge.entity_kind.project" = "项目";
 "knowledge.entity_kind.initiative" = "计划";

@@ -16,6 +16,7 @@ struct DocumentsListView: View {
     private var documents: [GeneratedDocument]
 
     @State private var showingCreate = false
+    @State private var showingProviderSettings = false
     @State private var searchText = ""
     @State private var selectedDocument: GeneratedDocument?
     @State private var pendingDelete: GeneratedDocument?
@@ -36,28 +37,36 @@ struct DocumentsListView: View {
     var body: some View {
         List {
             if documents.isEmpty {
-                if !settings.aiProvider.kind.supportsAgentChat {
-                    ChatArtifactProviderNotice()
-                        .clearListRow()
-                }
-                ContentUnavailableView {
-                    Label(
-                        NSLocalizedString("documents.empty.title", comment: "No documents"),
-                        systemImage: "doc.text"
+                // One empty state, the same shape the Summary and Wiki tabs
+                // use — with an agent-capable provider it offers Ask and the
+                // writer footnote; without one it offers provider setup with
+                // the reason instead of a second stacked empty state.
+                if settings.aiProvider.kind.supportsAgentChat {
+                    MeetingGenerateEmptyState(
+                        systemImage: "doc.text",
+                        title: NSLocalizedString("documents.empty.title", comment: "No documents"),
+                        description: NSLocalizedString("documents.empty.subtitle", comment: "Create a document"),
+                        actionTitle: NSLocalizedString("documents.ask", comment: "Ask for a document"),
+                        actionIdentifier: "documents.new",
+                        footnote: MeetingGenerateEmptyState.modelNudge(
+                            provider: settings.aiProvider,
+                            model: settings.summaryModel(for: settings.aiProvider)
+                        ),
+                        action: { showingCreate = true }
                     )
-                } description: {
-                    Text(NSLocalizedString("documents.empty.subtitle", comment: "Create a document"))
-                } actions: {
-                    if settings.aiProvider.kind.supportsAgentChat {
-                        Button { showingCreate = true } label: {
-                            Text(NSLocalizedString("documents.new", comment: "New document"))
-                                .frame(maxWidth: .infinity)
-                        }
-                        .inkProminent()
-                        .accessibilityIdentifier("documents.new")
-                    }
+                    .clearListRow()
+                } else {
+                    MeetingGenerateEmptyState(
+                        systemImage: "doc.text",
+                        title: NSLocalizedString("documents.empty.title", comment: "No documents"),
+                        description: NSLocalizedString("documents.empty.subtitle", comment: "Create a document"),
+                        actionTitle: NSLocalizedString("chat.provider.setup", comment: "Set up provider"),
+                        actionIdentifier: "chat.artifact.provider.settings",
+                        footnote: NSLocalizedString("documents.needs_provider", comment: "Provider cannot create documents"),
+                        action: { showingProviderSettings = true }
+                    )
+                    .clearListRow()
                 }
-                .clearListRow()
             } else {
                 ForEach(filteredDocuments) { document in
                     Button { selectedDocument = document } label: {
@@ -117,6 +126,18 @@ struct DocumentsListView: View {
                         Button(NSLocalizedString("common.done", comment: "Done")) { showingCreate = false }
                     }
                 }
+            }
+        }
+        .sheet(isPresented: $showingProviderSettings) {
+            NavigationStack {
+                ProvidersSettingsView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(NSLocalizedString("common.done", comment: "Done")) {
+                                showingProviderSettings = false
+                            }
+                        }
+                    }
             }
         }
         .kurnDialog(

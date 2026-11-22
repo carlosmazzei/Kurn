@@ -13,6 +13,15 @@ enum MeetingKnowledgeClaimPresentation {
         return claim
     }
 
+    /// The meeting-tab row: one plain "<subject> <predicate> <object>"
+    /// sentence — no arrow glyph, no "Not:" prefix (negation is a tag there).
+    static func sentence(_ entry: KnowledgeWikiPage.Entry) -> String {
+        let predicate = NSLocalizedString("knowledge.predicate." + entry.fact.predicate.rawValue, comment: "Claim predicate")
+        let object = entry.object?.name ?? entry.fact.value.map(valueText) ?? ""
+        return String(format: NSLocalizedString("detail.knowledge.fact_sentence", comment: "Plain fact sentence"),
+            entry.subject.name, predicate, object)
+    }
+
     static func valueText(_ value: KnowledgeTypedValue) -> String {
         switch value {
         case let .string(text): text

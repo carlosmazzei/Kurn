@@ -30,7 +30,8 @@ struct MeetingDetailSummaryBar: View {
     let onShare: () -> Void
     let onDeleteSummary: (Summary) -> Void
     let onCancel: () -> Void
-    let onListen: () -> Void
+    /// The summary being read aloud by the trailing Listen ghost, when shown.
+    let listenItem: ReadAloudItem?
 
     @Environment(AppSettings.self) private var settings
 
@@ -48,7 +49,9 @@ struct MeetingDetailSummaryBar: View {
                 } else if let selected {
                     summaryMenu(selected: selected)
                     Spacer(minLength: 0)
-                    listenGhost
+                    if let listenItem {
+                        ReadAloudListenButton(item: listenItem)
+                    }
                 }
             }
             .frame(minHeight: 44)
@@ -130,21 +133,6 @@ struct MeetingDetailSummaryBar: View {
         } label: {
             pillLabel(title: pillTitle(for: selected))
         }
-    }
-
-    private var listenGhost: some View {
-        Button(action: onListen) {
-            HStack(spacing: 6) {
-                Image(systemName: "speaker.wave.2")
-                    .accessibilityHidden(true)
-                Text(NSLocalizedString("detail.summary.listen", comment: "Listen"))
-            }
-            .font(Theme.footnote)
-            .foregroundStyle(Theme.textSecondary)
-            .padding(.horizontal, 12)
-            .frame(minHeight: 44)
-        }
-        .buttonStyle(.plain)
     }
 
     private var cancelGhost: some View {
