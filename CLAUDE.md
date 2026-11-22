@@ -4081,7 +4081,10 @@ the call stack by hand and risking silent information loss.
 ### Visual system (design review, prototype revision 10)
 
 The interface follows the "Kurn Revisão de Interface" prototype (revision 10,
-2026-11-21). The decisions it fixed, so a new screen does not drift:
+2026-11-21), kept in the repository as
+`docs/design/kurn-interface-review-r10.html` with `docs/design/README.md`
+listing the intentional deviations. The decisions it fixed, so a new screen does
+not drift:
 
 - **Colour roles, not raw colours** (`Theme.swift`, top-of-file table). `ink`
   (the label colour) fills primary buttons, selected chips and segments, the

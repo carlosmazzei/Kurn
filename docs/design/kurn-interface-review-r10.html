@@ -1,0 +1,969 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Kurn Revisão de Interface</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: índice à esquerda, telefone navegável no centro, detalhes da tela à direita */
+:root{--bg:#f4f4f2;--fg:#1c1c1e;--muted:#62666d;--line:#dcdcd8;--card:#fff;--pill:#e9e9e6;--acc:#2f55d4;--new:#1f7a46;--chg:#9a5a00;--same:#62666d;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141518;--fg:#ececea;--muted:#9a9ea6;--line:#2c2f36;--card:#1c1e23;--pill:#2a2d33;--acc:#8fa6ff;--new:#7fd3a0;--chg:#f0b45a;--same:#9a9ea6;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141518;--fg:#ececea;--muted:#9a9ea6;--line:#2c2f36;--card:#1c1e23;--pill:#2a2d33;--acc:#8fa6ff;--new:#7fd3a0;--chg:#f0b45a;--same:#9a9ea6;color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font:14.5px/1.5 -apple-system,"SF Pro Text",Inter,system-ui,sans-serif;margin:0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.app{max-width:1380px;margin:0 auto;display:grid;grid-template-columns:270px 410px minmax(0,1fr);gap:28px;align-items:start}
+header.top{max-width:1380px;margin:0 auto 18px;display:flex;flex-wrap:wrap;gap:12px 24px;align-items:baseline;justify-content:space-between}
+header.top h1{font-size:26px;letter-spacing:-.02em;margin:0}
+header.top p{margin:0;color:var(--muted);max-width:70ch}
+.views{display:flex;gap:6px;flex-wrap:wrap}
+.views button,.nav button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.views button{background:var(--pill);border-radius:99px;padding:6px 14px;font-weight:600;font-size:13.5px}
+.views button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.nav{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;padding-right:6px}
+.nav h3{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:16px 0 4px}
+.nav button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:5px 8px;border-radius:8px;font-size:13.5px}
+.nav button:hover{background:var(--pill)}
+.nav button[aria-current="true"]{background:var(--card);font-weight:650;box-shadow:inset 0 0 0 1px var(--line)}
+.nav button .n{flex:1}
+.st-pill{font-size:10.5px;font-weight:700;border-radius:99px;padding:0 7px;letter-spacing:.02em}
+.st-pill.novo{color:var(--new);background:color-mix(in srgb,var(--new) 14%,transparent)}
+.st-pill.muda{color:var(--chg);background:color-mix(in srgb,var(--chg) 14%,transparent)}
+.st-pill.igual{color:var(--same);background:var(--pill)}
+.navsel{display:none}
+.stage{position:sticky;top:12px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.stage .hint{font-size:12.5px;color:var(--muted);text-align:center}
+.stepper{display:flex;gap:8px;align-items:center;font-size:13px}
+.stepper button{font:inherit;background:var(--pill);border:0;border-radius:99px;padding:5px 12px;cursor:pointer;color:inherit}
+.info{min-width:0;display:flex;flex-direction:column;gap:18px;padding-bottom:40px}
+.info h2{font-size:24px;letter-spacing:-.015em;margin:0}
+.info .where{color:var(--muted);font-size:13px;margin-top:2px}
+.info h4{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.info ul{margin:0;padding-left:18px}.info li{margin-bottom:5px}
+.info .go{color:var(--acc);cursor:pointer;text-decoration:underline;text-underline-offset:2px;background:none;border:0;font:inherit;padding:0}
+.today{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.today img{width:190px;max-width:100%;border-radius:24px;box-shadow:0 0 0 5px #1c1c1e}
+.today p{flex:1;min-width:200px;color:var(--muted)}
+.panel{background:var(--card);border-radius:14px;padding:16px 18px;box-shadow:inset 0 0 0 1px var(--line)}
+.wide{max-width:1380px;margin:0 auto}
+.tw{overflow-x:auto;border-radius:14px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+td code{font-size:12.5px}
+.flows{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.flows .panel ol{margin:6px 0 0;padding-left:20px}
+.sys{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.sw{display:flex;align-items:center;gap:10px;margin:6px 0}.sw i{width:26px;height:26px;border-radius:8px;display:block;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+@media (max-width:1180px){.app{grid-template-columns:240px minmax(0,1fr)}.info{grid-column:1 / -1}}
+@media (max-width:760px){.app{grid-template-columns:minmax(0,1fr)}.nav{display:none}.navsel{display:block;width:100%;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--fg);margin-bottom:12px}.stage{position:static}}
+
+/* ===================== telefone (iOS claro, cores próprias da tela) ===================== */
+.phone{--ink:#000;--ink2:#3c3c43;--sec:#6c6c70;--ter:#aeaeb2;--sep:#e3e3e8;--grp:#f2f2f7;--white:#fff;--fill:#e4e4e9;--fill2:#f0f0f3;--rec:#d70015;--green:#248a3d;--blue:#0a64d6;--orange:#c75f00;--yellow:#f5b400;--paper:#fff;--prim:#1c1c1e;--onprim:#fff;--chev:#c4c4c8;--ter2:#c7c7cc;--gray:#8e8e93;--ph:#8a8a8e;--glass:rgba(255,255,255,.75);--glass2:rgba(255,255,255,.92);--menu:rgba(250,250,252,.96);--alertbg:rgba(248,248,250,.97);--dimc:rgba(0,0,0,.28);--citeb:#e8eefc;--citef:#2349b8;--wlc:#b9c4ee;--ix:#a5a5aa;--togoff:#e9e9ea;--kb:#d1d3d9;--key:#fff;--aAb:#e4e6fb;--aAf:#3a3aa8;--aPb:#dcf1e3;--aPf:#1f6f3c;--aSb:#fbe8d6;--aSf:#8a4a12;--toast:#1c1c1e;--sgbg:#ececf0;--seg2:#e9e9ee;--segon:#fff;--quote:#d4d4d9;--ring2:#d8d8dd;--warn:#c42b1c;
+ position:relative;width:392px;height:850px;border-radius:50px;overflow:hidden;background:var(--grp);color:var(--ink);flex:none;
+ box-shadow:0 0 0 7px #1c1c1e,0 24px 48px rgba(0,0,0,.18);font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;font-size:15px;line-height:1.3;-webkit-font-smoothing:antialiased;user-select:none}
+@media (max-width:440px){.phone{zoom:.86}}
+.phone *{box-sizing:border-box}
+.phone.watchdev{width:226px;height:276px;border-radius:60px;margin:150px 0;box-shadow:0 0 0 10px #2a2a2c,0 0 0 12px #0d0d0d,0 24px 48px rgba(0,0,0,.3);background:#000}
+.phone.watchdev .scr{border-radius:52px}
+.phone svg{display:block;flex:none}
+.phone [data-go]{cursor:pointer}
+.phone [data-go]:hover{filter:brightness(.97)}
+.phone.paper,.scr.paper{background:var(--paper)}
+.scr{position:absolute;inset:0;overflow:hidden;background:var(--grp)}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:122px;height:35px;border-radius:20px;background:#000;z-index:50}
+.sb{height:50px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 36px 4px 42px;font-weight:600;font-size:16px;position:relative;z-index:40}
+.sb .ind{display:flex;gap:5px;align-items:center}
+.home{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:var(--ink);z-index:60}
+.nb{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:relative}
+.nb .ttl{position:absolute;left:70px;right:70px;text-align:center;font-weight:600;font-size:17px;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gl{display:flex;align-items:center;background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-radius:999px;box-shadow:0 1px 3px rgba(0,0,0,.07),inset 0 0 0 .5px rgba(0,0,0,.08);color:var(--ink);position:relative;z-index:2}
+.gl.c{width:44px;height:44px;justify-content:center}
+.gl.g{height:44px;padding:0 4px}.gl.g>span{width:42px;height:44px;display:grid;place-items:center}
+.gl .t{font-weight:600;font-size:16px;padding:0 15px;height:44px;display:flex;align-items:center}
+.gl.prom{background:var(--prim);color:var(--onprim)}
+.lt{font-size:33px;font-weight:700;letter-spacing:-.025em;padding:0 20px 8px;line-height:1.1}
+.h1{font-size:29px;font-weight:700;letter-spacing:-.025em;line-height:1.12;padding:2px 20px 6px}
+.h1.sm{font-size:23px}
+.srch{margin:4px 16px 12px;height:38px;border-radius:12px;background:var(--fill);display:flex;align-items:center;gap:7px;padding:0 10px;color:#8a8a8e;font-size:17px}
+.srch.on{background:var(--white);box-shadow:inset 0 0 0 1px var(--sep);color:var(--ink)}
+.chips{display:flex;gap:8px;padding:0 16px 4px;flex-wrap:nowrap;overflow:hidden}
+.chip{height:32px;border-radius:99px;padding:0 13px;display:flex;align-items:center;gap:5px;font-size:15px;background:var(--fill);color:var(--ink);white-space:nowrap;flex:none}
+.chip.on{background:var(--prim);color:var(--onprim);font-weight:600}
+.chip.out{background:transparent;box-shadow:inset 0 0 0 1px var(--sep)}
+.day{display:flex;gap:9px;align-items:baseline;padding:16px 32px 7px}
+.day b{font-size:20px;font-weight:700;letter-spacing:-.01em}.day span{color:var(--sec);font-size:15px}
+.sect{font-size:13px;color:var(--sec);padding:20px 36px 7px;text-transform:uppercase;letter-spacing:.03em;display:flex;justify-content:space-between}
+.sect a{text-transform:none;letter-spacing:0;color:var(--blue);font-size:14px}
+.foot{font-size:13px;color:var(--sec);padding:7px 36px 0;line-height:1.35}
+.grp{margin:0 16px;background:var(--white);border-radius:18px;overflow:hidden}
+.grp.flat{background:var(--fill2)}
+.r{display:flex;gap:12px;align-items:center;padding:11px 16px;position:relative;min-height:48px}
+.r+.r::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--sep)}
+.r.ind+.r::before,.r.ind::before{left:60px}
+.r .bd{flex:1;min-width:0}
+.r .tt{font-size:17px;letter-spacing:-.015em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r .tt.b{font-weight:600}
+.r .mm{font-size:14px;color:var(--sec);margin-top:2px;display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden}
+.r .tg{display:flex;gap:10px;margin-top:4px;font-size:13px;color:var(--sec);white-space:nowrap;overflow:hidden}
+.r .tg span{display:inline-flex;align-items:center;gap:4px}
+.r .tg i{width:6px;height:6px;border-radius:50%;display:block}
+.r .val{color:var(--sec);font-size:16px;white-space:nowrap}
+.r.dest .tt{color:var(--rec)}
+.r.link .tt{color:var(--blue)}
+.ix{display:flex;gap:8px;align-items:center;color:var(--ix);flex:none}
+.ix em{font-style:normal;font-size:12px;font-weight:600;margin-left:-6px}
+.chev{color:var(--chev)}
+.ico{width:30px;height:30px;border-radius:8px;background:var(--fill2);display:grid;place-items:center;flex:none;color:var(--ink2)}
+.ico.f{background:#8e8e93;color:#fff}
+.tog{width:51px;height:31px;border-radius:99px;background:var(--togoff);position:relative;flex:none}
+.tog::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.18)}
+.tog.on{background:#34c759}.tog.on::after{left:22px}
+.chk{width:22px;height:22px;border-radius:50%;border:1.8px solid #c4c4c8;flex:none;display:grid;place-items:center}
+.chk.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.prog{display:flex;align-items:center;gap:6px;color:var(--sec)}
+.ring{width:15px;height:15px;border-radius:50%;background:conic-gradient(var(--ink2) 62%,var(--ring2) 0);-webkit-mask:radial-gradient(circle,transparent 4.5px,#000 5px);mask:radial-gradient(circle,transparent 4.5px,#000 5px);flex:none}
+.bb{position:absolute;left:14px;right:14px;bottom:28px;display:flex;justify-content:space-between;align-items:center;z-index:5}
+.bb .gl.g{height:56px;padding:0 6px}.bb .gl.g>span{width:50px;height:56px;color:var(--ink)}
+.recb{height:56px;border-radius:999px;background:var(--rec);color:#fff;display:flex;align-items:center;gap:9px;padding:0 21px 0 17px;font-weight:600;font-size:17px;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 6px 16px rgba(215,0,21,.25)}
+.recb i{width:13px;height:13px;border-radius:50%;background:#fff;display:block}
+.dm{color:var(--sec);font-size:15px;padding:0 20px 10px}
+.ppl{display:flex;gap:6px;padding:0 20px 12px;flex-wrap:wrap}
+.pp{display:flex;align-items:center;gap:6px;height:28px;border-radius:99px;padding:0 10px 0 3px;background:var(--fill2);font-size:13.5px;font-weight:500}
+.pp i{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:11px;font-weight:700}
+.pp.tag{padding:0 10px 0 9px;color:var(--sec);background:transparent;box-shadow:inset 0 0 0 1px var(--sep);gap:5px}
+.pp.tag b{width:6px;height:6px;border-radius:50%;display:block}
+.sg{margin:2px 20px 0;background:var(--sgbg);border-radius:11px;padding:2px;display:flex}
+.sg span{flex:1;height:32px;display:grid;place-items:center;border-radius:9px;color:var(--ink2);font-size:13px;font-weight:500}
+.sg .on{background:var(--segon);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12);font-weight:650}
+.tb{display:flex;justify-content:space-between;align-items:center;padding:16px 20px 2px}
+.pillm{display:inline-flex;align-items:center;gap:6px;height:32px;border-radius:99px;padding:0 12px;background:var(--fill2);font-size:14px;font-weight:600}
+.ghost{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--sec)}
+.doc{padding:4px 20px 0}
+.doc h3{font-size:19px;font-weight:700;letter-spacing:-.01em;margin:16px 0 8px}
+.doc ul{margin:0;padding:0 0 0 18px}.doc li{font-size:16px;line-height:1.42;margin-bottom:8px}
+.doc li::marker{color:#b4b4b9}
+.doc p{font-size:16px;line-height:1.45;margin:0 0 8px}
+.fade{position:absolute;left:0;right:0;bottom:0;height:150px;background:linear-gradient(transparent,var(--paper) 55%);pointer-events:none;z-index:3}
+.fade.g{background:linear-gradient(transparent,var(--grp) 55%)}
+.ask{position:absolute;left:14px;right:14px;bottom:30px;height:52px;border-radius:26px;background:var(--glass2);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 4px 18px rgba(0,0,0,.12),inset 0 0 0 .5px rgba(0,0,0,.1);display:flex;align-items:center;gap:10px;padding:0 7px 0 16px;color:#8a8a8e;font-size:16px;z-index:6}
+.go{margin-left:auto;width:38px;height:38px;border-radius:50%;background:var(--prim);color:var(--onprim);display:grid;place-items:center;flex:none}
+.go.off{background:#d1d1d6}
+.ts{padding:11px 20px 5px}
+.ts .sh{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:650}
+.ts .sh time{margin-left:auto;color:var(--sec);font-weight:400;font-variant-numeric:tabular-nums;font-size:13px}
+.ts p{font-size:16.5px;line-height:1.42;margin:4px 0 0;padding-left:30px}
+.ts.hl p{background:#fff6d6;border-radius:8px;margin-left:24px;padding:4px 6px}
+.av{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;flex:none}
+.play{width:36px;height:36px;border-radius:50%;background:var(--fill2);display:grid;place-items:center;flex:none}
+.big{font-size:32px;font-weight:700;letter-spacing:-.025em;padding:4px 20px 10px}
+.hint{color:var(--sec);font-size:13px;padding:10px 20px 0}
+.cta{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--prim);color:var(--onprim);font-weight:600;font-size:16px;height:48px;padding:0 22px;border-radius:99px;box-shadow:inset 0 1px 0 rgba(255,255,255,.2)}
+.cta.w{width:calc(100% - 40px);margin:0 20px}
+.cta.sec{background:var(--fill);color:var(--ink);box-shadow:none}
+.cta.red{background:var(--rec);color:#fff}
+.empty{text-align:center;padding:0 36px}
+.empty .ic{color:#8e8e93;display:grid;place-items:center;margin-bottom:12px}
+.empty b{display:block;font-size:21px;letter-spacing:-.01em}
+.empty p{color:var(--sec);font-size:15px;margin:6px 0 20px;line-height:1.4}
+.para{font-size:16px;line-height:1.45;padding:0 20px;margin:0}
+.wl{text-decoration:underline;text-decoration-color:var(--wlc);text-decoration-thickness:1.5px;text-underline-offset:3px}
+.gen{font-size:12.5px;color:var(--sec);display:flex;align-items:center;gap:6px;margin-top:8px;padding:0 20px}
+.typ{display:inline-flex;align-items:center;height:24px;border-radius:99px;padding:0 10px;font-size:13px;font-weight:500;background:var(--fill2);color:var(--ink2)}
+.quote{margin:4px 16px 12px;border-left:2px solid var(--quote);padding-left:10px;font-size:14.5px;line-height:1.4}
+.quote small{display:block;color:var(--sec);font-size:12.5px;margin-top:3px}
+.kv{padding:11px 16px}.kv+.kv{border-top:.5px solid var(--sep);margin-left:16px;padding-left:0}
+.kv .k{font-size:13px;color:var(--sec)}.kv .v{font-size:16px;font-weight:500;margin-top:1px}
+.kv .q{font-size:13px;color:var(--sec);margin-top:3px}
+.tent{font-style:italic;color:var(--sec);font-weight:400}
+/* camadas */
+.dim{position:absolute;inset:0;background:var(--dimc);z-index:20}
+.dim.light{background:rgba(0,0,0,.12)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--grp);border-radius:36px 36px 0 0;z-index:30;overflow:hidden;box-shadow:0 -2px 20px rgba(0,0,0,.1)}
+.sheet.full{top:44px}
+.sheet.med{top:420px}
+.sheet.paper{background:var(--paper)}
+.grab{width:38px;height:5px;border-radius:3px;background:#c7c7cc;margin:7px auto 0}
+.sheet .nb{height:58px}
+.menu{position:absolute;z-index:35;width:262px;background:var(--menu);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-radius:26px;box-shadow:0 12px 40px rgba(0,0,0,.2),inset 0 0 0 .5px rgba(0,0,0,.08);padding:6px 0;font-size:17px}
+.menu .mi{display:flex;align-items:center;gap:12px;padding:10px 18px;min-height:44px}
+.menu .mi .lab{flex:1}
+.menu .mi small{display:block;color:var(--sec);font-size:13px;margin-top:1px}
+.menu .mi.dest{color:var(--rec)}
+.menu .mi.on .lab{font-weight:600}
+.menu .ms{height:.5px;background:var(--sep);margin:5px 0}
+.menu .mh{font-size:13px;color:var(--sec);padding:6px 18px 2px}
+.alert{position:absolute;z-index:40;left:50%;top:50%;transform:translate(-50%,-50%);width:300px;background:var(--alertbg);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-radius:30px;padding:22px 20px 14px;text-align:center;box-shadow:0 14px 44px rgba(0,0,0,.25)}
+.alert b{display:block;font-size:17px}
+.alert p{font-size:14px;color:var(--ink2);margin:6px 0 16px;line-height:1.35}
+.alert .ab{display:flex;flex-direction:column;gap:8px}
+.alert .ab span{height:46px;border-radius:99px;display:grid;place-items:center;font-size:16px;font-weight:600;background:var(--fill)}
+.alert .ab span.p{background:var(--prim);color:var(--onprim)}
+.alert .ab span.d{background:var(--rec);color:#fff}
+.alert .ab.row{flex-direction:row}.alert .ab.row span{flex:1}
+.toast{position:absolute;z-index:40;left:50%;transform:translateX(-50%);bottom:110px;background:var(--toast);color:#fff;border-radius:99px;padding:10px 16px;font-size:14px;font-weight:500;display:flex;gap:8px;align-items:center;white-space:nowrap}
+.field{background:var(--white);border-radius:12px;margin:0 16px;padding:12px 14px;font-size:17px}
+.field.ph{color:var(--ph)}
+.seg2{display:flex;background:var(--seg2);border-radius:10px;padding:2px;margin:0 16px}
+.seg2 span{flex:1;text-align:center;height:30px;display:grid;place-items:center;border-radius:8px;font-size:14px;font-weight:500}
+.seg2 .on{background:var(--segon);font-weight:650;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.badge{background:var(--fill);border-radius:99px;font-size:12px;font-weight:650;padding:1px 8px;margin-left:6px;color:var(--ink2)}
+.cmp2{position:absolute;left:12px;right:12px;bottom:28px;background:var(--white);border-radius:26px;padding:13px 12px 10px 16px;box-shadow:0 4px 18px rgba(0,0,0,.1),inset 0 0 0 .5px rgba(0,0,0,.08);z-index:6}
+.cmp2 .ph2{color:var(--ph);font-size:16.5px;padding-bottom:12px}
+.cmp2 .rw{display:flex;align-items:center;gap:8px}
+.mchip{display:inline-flex;align-items:center;gap:5px;height:30px;border-radius:99px;padding:0 11px;background:var(--fill2);font-size:13.5px;font-weight:600}
+.gauge{width:22px;height:22px;border-radius:50%;background:conic-gradient(var(--ink2) 18%,var(--sep) 0);-webkit-mask:radial-gradient(circle,transparent 7px,#000 7.5px);mask:radial-gradient(circle,transparent 7px,#000 7.5px)}
+.bubble{margin:8px 20px 8px 70px;background:var(--fill2);border-radius:20px;padding:10px 14px;font-size:16px;line-height:1.4}
+.ans{padding:6px 20px;font-size:16px;line-height:1.45}
+.ans p{margin:0 0 8px}
+.cite{display:inline-flex;align-items:center;height:22px;border-radius:7px;padding:0 6px;background:var(--citeb);color:var(--citef);font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.act{display:flex;align-items:center;gap:7px;color:var(--sec);font-size:14px;padding:6px 20px}
+.art{margin:6px 20px;background:var(--white);border-radius:16px;box-shadow:inset 0 0 0 1px var(--sep);padding:12px 14px;display:flex;gap:12px;align-items:center}
+.wave{display:flex;align-items:center;gap:3px;height:70px;justify-content:center}
+.wave i{width:3px;border-radius:2px;background:#fff;display:block}
+.scrub{height:4px;border-radius:2px;background:var(--sep);margin:4px 0;position:relative}
+.scrub b{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--ink)}
+.scrub i{position:absolute;top:-6px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.tl{padding:0 20px}
+.tl .m{font-size:13px;color:var(--sec);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 6px}
+.tl .e{display:flex;gap:12px;padding:6px 0}
+.tl .e .ln{width:10px;display:flex;flex-direction:column;align-items:center}
+.tl .e .ln i{width:10px;height:10px;border-radius:50%;background:var(--ink);display:block;margin-top:5px}
+.tl .e .ln b{flex:1;width:1.5px;background:var(--sep);display:block}
+.tl .e .x{flex:1;font-size:15.5px}
+.tl .e .x small{display:block;color:var(--sec);font-size:13px}
+.kb{position:absolute;left:0;right:0;bottom:0;height:300px;background:var(--kb);z-index:25;display:flex;flex-direction:column;gap:9px;padding:10px 4px 0}
+.kb div{display:flex;gap:6px;justify-content:center}
+.kb div span{width:33px;height:42px;border-radius:6px;background:var(--key);box-shadow:0 1px 0 rgba(0,0,0,.3)}
+.cover{position:absolute;inset:0;background:var(--grp);z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:40px}
+.phone.dark{--ink:#fff;--ink2:#d1d1d6;--sec:#98989d;--ter:#636366;--sep:#38383a;--grp:#000;--white:#1c1c1e;--fill:#2c2c2e;--fill2:#2c2c2e;--rec:#ff453a;--green:#30d158;--blue:#409cff;--orange:#ff9f0a;--yellow:#ffd60a;--paper:#000;--prim:#f2f2f7;--onprim:#000;--chev:#5a5a5e;--ter2:#48484a;--gray:#8e8e93;--ph:#7c7c80;--glass:rgba(44,44,46,.74);--glass2:rgba(44,44,46,.92);--menu:rgba(38,38,40,.97);--alertbg:rgba(38,38,40,.98);--dimc:rgba(0,0,0,.55);--citeb:#1d2b4f;--citef:#9db8ff;--wlc:#4b5d96;--ix:#7c7c80;--togoff:#39393d;--kb:#2b2b2d;--key:#5a5a5e;--aAb:#2a2d55;--aAf:#b4b9ff;--aPb:#163824;--aPf:#7fd8a1;--aSb:#45301a;--aSf:#f0b073;--toast:#3a3a3c;--sgbg:#1c1c1e;--seg2:#1c1c1e;--segon:#636366;--quote:#48484a;--ring2:#3a3a3c;--warn:#ff6961;box-shadow:0 0 0 7px #3a3a3c,0 24px 48px rgba(0,0,0,.3)}
+.themebar{display:flex;gap:6px}.themebar button{font:inherit;font-size:13px;font-weight:600;background:var(--pill);color:inherit;border:0;border-radius:99px;padding:5px 14px;cursor:pointer}.themebar button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+</style>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<g id="s" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></g>
+<symbol id="i-ell" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="7.6" cy="12" r="1.35" fill="currentColor"/><circle cx="12" cy="12" r="1.35" fill="currentColor"/><circle cx="16.4" cy="12" r="1.35" fill="currentColor"/></symbol>
+<symbol id="i-ell2" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="18.5" cy="12" r="1.7" fill="currentColor"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" d="M10.3 2.8h3.4l.5 2.4 1.6.9 2.3-.8 1.7 2.9-1.8 1.6v1.9l1.8 1.6-1.7 2.9-2.3-.8-1.6.9-.5 2.4h-3.4l-.5-2.4-1.6-.9-2.3.8-1.7-2.9 1.8-1.6v-1.9L4.2 8.2l1.7-2.9 2.3.8 1.6-.9z"/><circle cx="12" cy="12" r="3.1" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.4 15.4 20 20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3-4.6-4.4 6.3-.9z"/></symbol>
+<symbol id="i-staro" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3-4.6-4.4 6.3-.9z"/></symbol>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M15 4.5 7.5 12l7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-updown" viewBox="0 0 24 24"><path d="M8 9.5l4-4 4 4M8 14.5l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+<symbol id="i-books" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="4" width="4.5" height="16" rx="1"/><rect x="9.5" y="4" width="4.5" height="16" rx="1"/><path d="M15.6 5.2l3.9-1 3 15.2-3.9 1z"/></g></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 6.2C10.2 4.8 7.6 4.3 4 4.5v13.8c3.6-.2 6.2.3 8 1.7 1.8-1.4 4.4-1.9 8-1.7V4.5c-3.6-.2-6.2.3-8 1.7z"/><path d="M12 6.2V20"/></g></symbol>
+<symbol id="i-graph" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="6" cy="6" r="2.6"/><circle cx="18" cy="8" r="2.6"/><circle cx="10" cy="18" r="2.6"/><path d="M8.5 6.7 15.4 7.6M7 8.4l2 7.2M16.3 10l-4.6 6"/></g></symbol>
+<symbol id="i-bubble" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4h0A2.5 2.5 0 0 1 4 13.5z"/><path d="M8 8.2h8M8 11.3h5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M6.5 2.8h7.2l4.8 4.8v12.1a1.5 1.5 0 0 1-1.5 1.5h-10.5a1.5 1.5 0 0 1-1.5-1.5V4.3a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M13.5 3v4.8h4.8M8.5 12h7M8.5 15.5h7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+<symbol id="i-docplus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M6.5 2.8h7.2l4.8 4.8v12.1a1.5 1.5 0 0 1-1.5 1.5h-10.5a1.5 1.5 0 0 1-1.5-1.5V4.3a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M13.5 3v4.8h4.8M12 11v6M9 14h6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path fill="currentColor" d="M10 3.5l1.6 4.9 4.9 1.6-4.9 1.6L10 16.5l-1.6-4.9L3.5 10l4.9-1.6zM17.5 13l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z"/></symbol>
+<symbol id="i-lines" viewBox="0 0 24 24"><path d="M4 6h16M4 10.5h16M4 15h16M4 19.5h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+<symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 12h1.5M7 8.5v7M10.5 5v14M14 8v8M17.5 10v4M21 12h-.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-checkc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 12.3l2.7 2.7L16.2 9.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3 22 20H2z"/><path d="M12 9.5v4.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1.2" fill="#fff"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5.2v13.6a.8.8 0 0 0 1.2.7l10.6-6.8a.8.8 0 0 0 0-1.4L9.2 4.5A.8.8 0 0 0 8 5.2z"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-spk" viewBox="0 0 24 24"><path fill="currentColor" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.2 9a4.2 4.2 0 0 1 0 6M17.8 6.6a7.6 7.6 0 0 1 0 10.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 7v5.3l3.4 2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+<symbol id="i-history" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v3.7h3.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 8v4.4l3 1.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+<symbol id="i-review" viewBox="0 0 24 24"><path d="M4 8h12l-3-3M20 16H8l3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-cloud" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" d="M7 18.5h10.5a4 4 0 0 0 .4-8 5.6 5.6 0 0 0-10.8-1.4A4.7 4.7 0 0 0 7 18.5z"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="5.5" cy="7" r="1.6"/><circle cx="5.5" cy="17" r="1.6"/><path d="M10 7h9.5M10 17h9.5"/></g></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path fill="currentColor" d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.6l2 2h8.4A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></symbol>
+<symbol id="i-foldero" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.6l2 2h8.4A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></symbol>
+<symbol id="i-tag" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M3.5 4.8v6.4l8.8 8.8 7.7-7.7-8.8-8.8H4.8a1.3 1.3 0 0 0-1.3 1.3z"/><circle cx="8" cy="8.5" r="1.4" fill="currentColor"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.1-5M19 4.5V8h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M15.5 4.5l4 4L8.5 19.5 4 20l.5-4.5z"/></symbol>
+<symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V3.5M8 7.5l4-4 4 4M7 11H5.5v9.5h13V11H17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-archive" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="4" rx="1"/><path d="M5 8.5v10a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5v-10M10 12.5h4" stroke-linecap="round"/></g></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.5h15M9.5 6.5V4.5h5v2M6.5 6.5l.9 12.6a1.5 1.5 0 0 0 1.5 1.4h6.2a1.5 1.5 0 0 0 1.5-1.4l.9-12.6M10 10.5v6M14 10.5v6"/></symbol>
+<symbol id="i-mic" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></g></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3.5 8a1.5 1.5 0 0 1 1.5-1.5h2.5l1.5-2h6l1.5 2H19A1.5 1.5 0 0 1 20.5 8v10a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18z"/><circle cx="12" cy="12.8" r="3.6"/></g></symbol>
+<symbol id="i-flag" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M5.5 21V4M5.5 4.5h11.5l-2.5 4 2.5 4H5.5"/></symbol>
+<symbol id="i-chevd" viewBox="0 0 24 24"><path d="M5 9l7 7 7-7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/></g></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.5 3.8 5.5 3.8 9s-1.2 6.5-3.8 9c-2.6-2.5-3.8-5.5-3.8-9S9.4 5.5 12 3z"/></g></symbol>
+<symbol id="i-inbox" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M3.5 13.5l2.5-8h12l2.5 8v5a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 3.5 18.5zM3.5 13.5h5l1 2.5h5l1-2.5h5"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 20V12M10 20V5M15 20v-9M20 20V8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></g></symbol>
+<symbol id="i-face" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3.5 8V5.5a2 2 0 0 1 2-2H8M16 3.5h2.5a2 2 0 0 1 2 2V8M20.5 16v2.5a2 2 0 0 1-2 2H16M8 20.5H5.5a2 2 0 0 1-2-2V16M9 9v1.5M15 9v1.5M12 9v4h-1M9 16c1.8 1.4 4.2 1.4 6 0"/></g></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M12 3l7 3v5.5c0 4.4-2.9 7.9-7 9.5-4.1-1.6-7-5.1-7-9.5V6z"/></symbol>
+<symbol id="i-cpu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><rect x="6.5" y="6.5" width="11" height="11" rx="2"/><path d="M9.5 3.5v3M14.5 3.5v3M9.5 17.5v3M14.5 17.5v3M3.5 9.5h3M3.5 14.5h3M17.5 9.5h3M17.5 14.5h3" stroke-linecap="round"/></g></symbol>
+<symbol id="i-disk" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.5" y="6" width="17" height="12" rx="2"/><path d="M7 14.5h4" stroke-linecap="round"/><circle cx="16.5" cy="14.5" r="1" fill="currentColor"/></g></symbol>
+<symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 12 2.5-6h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 11v5.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="12" cy="7.8" r="1.2" fill="currentColor"/></symbol>
+<symbol id="i-compose" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M19 13v5.5A1.5 1.5 0 0 1 17.5 20h-12A1.5 1.5 0 0 1 4 18.5v-12A1.5 1.5 0 0 1 5.5 5H11M17.5 3.5l3 3-8 8-3.7.7.7-3.7z"/></symbol>
+<symbol id="i-branch" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="6" cy="5.5" r="2"/><circle cx="6" cy="18.5" r="2"/><circle cx="18" cy="9" r="2"/><path d="M6 7.5v9M18 11c0 3.5-4 4-11 6"/></g></symbol>
+<symbol id="i-person" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="3.8"/><path d="M4.5 20c.8-3.7 3.8-6 7.5-6s6.7 2.3 7.5 6" stroke-linecap="round"/></g></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4" stroke-linecap="round"/></g></symbol>
+<symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 7h16M7 12h10M10 17h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="i-select" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 12.3l2.7 2.7L16.2 9.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-sort" viewBox="0 0 24 24"><path d="M7.5 19V5M4 8.5 7.5 5 11 8.5M16.5 5v14M13 15.5l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-wand" viewBox="0 0 24 24"><path d="M4 20 15 9M13.5 7.5l3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path fill="currentColor" d="M18 3l.7 2 2 .7-2 .7L18 8.4l-.7-2-2-.7 2-.7zM9 3.5l.5 1.3 1.3.5-1.3.5L9 7.1l-.5-1.3-1.3-.5 1.3-.5z"/></symbol>
+<symbol id="i-b15" viewBox="0 0 24 24"><path d="M5 12a7 7 0 1 0 2.1-5M7.1 3.5V7H10.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><text x="12" y="15.3" font-size="7" text-anchor="middle" fill="currentColor" font-family="-apple-system,Arial" font-weight="700">15</text></symbol>
+<symbol id="i-f15" viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.1-5M16.9 3.5V7H13.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><text x="12" y="15.3" font-size="7" text-anchor="middle" fill="currentColor" font-family="-apple-system,Arial" font-weight="700">15</text></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2.5 2.5M14 9l2 2"/></g></symbol>
+<symbol id="i-down2" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-paper" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M20 11.5l-8 8a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.3 8.3a1.7 1.7 0 0 1-2.4-2.4L15 7"/></symbol>
+<symbol id="i-photo" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 16l4.5-4.5 4 4 3-3 5.5 5.5"/><circle cx="15.5" cy="9" r="1.4"/></g></symbol>
+<symbol id="i-bolt" viewBox="0 0 24 24"><path fill="currentColor" d="M13 2.5 5 13.5h6l-1 8 8-11h-6z"/></symbol>
+<symbol id="i-heart" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.3 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z"/></symbol>
+<symbol id="i-hand" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 10V4a1.5 1.5 0 0 1 3 0v6M14 10.5V5.5a1.5 1.5 0 0 1 3 0V13c0 4.4-2.5 7.5-6.5 7.5-3 0-4.6-1.6-6-4l-1.5-2.7a1.4 1.4 0 0 1 2.3-1.6L8 14"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2" fill="currentColor"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+</defs></svg>
+
+<header class="top">
+ <div><h1>Kurn: protótipo de interface</h1>
+ <p>Revisão 10. Todas as telas do app, dos widgets e do Apple Watch, no modo claro e no escuro, com diálogos, folhas e menus, numa proposta navegável. Toque no telefone para seguir o fluxo; ao lado ficam o detalhe da tela, as interações e a tela de hoje quando capturada. Nada foi implementado.</p></div>
+ <div class="views" role="tablist">
+  <button data-view="proto" aria-pressed="true">Protótipo</button>
+  <button data-view="fluxos" aria-pressed="false">Fluxos</button>
+  <button data-view="mapa" aria-pressed="false">Mapa de telas</button>
+  <button data-view="sistema" aria-pressed="false">Sistema visual</button>
+ </div>
+</header>
+
+<div id="v-proto" class="app">
+ <nav class="nav" id="nav" aria-label="Telas"></nav>
+ <div>
+  <select class="navsel" id="navsel" aria-label="Escolher tela"></select>
+  <div class="stage">
+   <div class="themebar" role="group" aria-label="Aparência"><button data-mode="light" aria-pressed="true">Claro</button><button data-mode="dark" aria-pressed="false">Escuro</button></div>
+   <div id="phone"></div>
+   <div class="stepper" id="stepper"></div>
+   <div class="hint">Toque nos elementos do telefone para navegar.</div>
+  </div>
+ </div>
+ <div class="info" id="info"></div>
+</div>
+
+<div id="v-fluxos" class="wide" hidden></div>
+<div id="v-mapa" class="wide" hidden></div>
+<div id="v-sistema" class="wide" hidden></div>
+
+<script>
+/* ---------- componentes do telefone ---------- */
+const I=(n,s=20,c='')=>`<svg width="${s}" height="${s}"${c?` style="color:${c}"`:''} aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const G=id=>id?` data-go="${id}"`:'';
+const BAT=`<svg width="27" height="13"><rect x=".5" y=".5" width="23" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="20" height="9" rx="2" fill="currentColor"/><rect x="24.5" y="4.5" width="1.8" height="4" rx="1" fill="currentColor" opacity=".4"/></svg>`;
+const SIG=`<svg width="18" height="12"><rect x="0" y="8" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5.5" width="3" height="6.5" rx="1" fill="currentColor"/><rect x="10" y="3" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>`;
+const SB=(t='19:28',light)=>`<div class="sb"${light?' style="color:#fff"':''}><span>${t}</span><span class="ind">${SIG}${BAT}</span></div>`;
+const HOME=(light)=>`<div class="home"${light?' style="background:var(--white)"':''}></div>`;
+const glass=(items)=>`<div class="gl g">${items.map(x=>typeof x==='string'?x:`<span${G(x.go)} aria-label="${x.l||''}"${x.c?` style="color:${x.c}"`:''}>${x.t?`<b style="font-weight:600;font-size:16px;padding:0 6px">${x.t}</b>`:I(x.i,x.s||23)}</span>`).join('')}</div>`;
+const gc=(i,go,l)=>`<div class="gl c"${G(go)} aria-label="${l||''}">${I(i,22)}</div>`;
+const gt=(t,go,prom)=>`<div class="gl${prom?' prom':''}"${G(go)}><span class="t">${t}</span></div>`;
+const NB=(left,right,title)=>`<div class="nb">${title?`<span class="ttl">${title}</span>`:''}${left||'<span></span>'}${right||'<span></span>'}</div>`;
+const sect=(t,a,ago)=>`<div class="sect"><span>${t}</span>${a?`<a${G(ago)}>${a}</a>`:''}</div>`;
+const foot=t=>`<div class="foot">${t}</div>`;
+function row(o){
+ const lead=o.ico?`<span class="ico${o.icf?' f':''}">${I(o.ico,17)}</span>`:o.ic?I(o.ic,22,o.icc||'var(--ink2)'):o.lead||'';
+ let tr='';
+ if(o.tr==='chev')tr=I('chev',14,'var(--chev)');
+ else if(o.tr==='tog')tr='<span class="tog"></span>';
+ else if(o.tr==='ton')tr='<span class="tog on"></span>';
+ else if(o.tr==='check')tr=I('check',20,'var(--blue)');
+ else if(o.tr)tr=o.tr;
+ const val=o.val?`<span class="val">${o.val}</span>`:'';
+ return `<div class="r${o.dest?' dest':''}${o.link?' link':''}${(o.ico||o.ic)?' ind':''}"${G(o.go)}>${lead}<div class="bd"><div class="tt${o.b?' b':''}"${o.ts?` style="${o.ts}"`:''}>${o.t}</div>${o.m?`<div class="mm">${o.m}</div>`:''}${o.tg?`<div class="tg">${o.tg}</div>`:''}</div>${val}${tr}</div>`;
+}
+const grp=(rows,cls='')=>`<div class="grp ${cls}">${rows.map(r=>typeof r==='string'?r:row(r)).join('')}</div>`;
+const sheet=(content,o={})=>`<div class="dim"${G(o.close)}></div><div class="sheet ${o.size||'full'}${o.paper?' paper':''}"${o.top?` style="top:${o.top}px"`:''}><div class="grab"></div>${o.nb===false?'':NB(o.left,o.right,o.title)}${content}</div>`;
+function menu(items,pos={right:16,top:96},close){
+ const st=Object.entries(pos).map(([k,v])=>`${k}:${v}px`).join(';');
+ return `<div class="dim light"${G(close)}></div><div class="menu" style="${st}">${items.map(x=>{
+  if(x==='-')return '<div class="ms"></div>';
+  if(x.h)return `<div class="mh">${x.h}</div>`;
+  return `<div class="mi${x.dest?' dest':''}${x.on?' on':''}"${G(x.go)}>${x.on!==undefined?`<span style="width:18px">${x.on?I('check',17):''}</span>`:''}<div class="lab">${x.l}${x.s?`<small>${x.s}</small>`:''}</div>${x.chev?I('chev',13,'var(--ter)'):''}${x.i?I(x.i,20):''}</div>`;}).join('')}</div>`;
+}
+const alertBox=(t,m,btns,rowFlag,field)=>`<div class="dim"></div><div class="alert"><b>${t}</b>${m?`<p>${m}</p>`:'<div style="height:14px"></div>'}${field?`<div style="background:var(--white);border-radius:12px;padding:10px 12px;font-size:16px;text-align:left;box-shadow:inset 0 0 0 1px var(--sep);margin:-2px 0 16px;display:flex;align-items:center;gap:6px"><span style="flex:1">${field}</span><span style="width:2px;height:19px;background:var(--blue)"></span></div>`:''}<div class="ab${rowFlag?' row':''}">${btns.map(b=>`<span class="${b.k||''}"${G(b.go)}>${b.l}</span>`).join('')}</div></div>`;
+const askBar=(t='Pergunte sobre esta reunião',go='ask-meeting')=>`<div class="ask"${G(go)}>${I('spark',19)}${t}<span class="go">${I('up',18)}</span></div>`;
+const TABS=[['spark','Resumo','m-summary'],['lines','Transcrição','m-transcript'],['wave','Áudio','m-audio'],['book','Wiki','m-wiki']];
+const tabs=(on,mt=6)=>`<div class="sg" style="margin-top:${mt}px">${TABS.map(([i,l,g])=>`<span class="${l===on?'on':''}"${G(g)} aria-label="${l}">${I(i,20)}</span>`).join('')}</div>`;
+const AV={A:['var(--aAb)','var(--aAf)','Alex'],P:['var(--aPb)','var(--aPf)','Priya'],S:['var(--aSb)','var(--aSf)','Sam']};
+const av=k=>`<span class="av" style="background:${AV[k][0]};color:${AV[k][1]}">${k}</span>`;
+const mTop=(extra='')=>NB(gc('back','list','Voltar'),glass([{i:'star',c:'#f5b400',go:'',l:'Favorita',s:22},{i:'ell',go:'m-more',l:'Mais opções'}]))+extra;
+const mHead=(full)=>full?`<div class="h1">Alinhamento do roadmap</div><div class="dm">Sex., 21 nov. · 18:28 · 12 min · Português</div><div class="ppl"><span class="pp"><i style="background:var(--aAb);color:var(--aAf)">A</i>Alex</span><span class="pp"><i style="background:var(--aPb);color:var(--aPf)">P</i>Priya</span><span class="pp"><i style="background:var(--aSb);color:var(--aSf)">S</i>Sam</span><span class="pp tag"><b style="background:#6e5bd8"></b>Produto</span><span class="pp tag"><b style="background:#e5484d"></b>Roadmap</span><span class="pp tag"><b style="background:#e5484d"></b>T3</span></div>`:`<div class="h1 sm">Alinhamento do roadmap</div>`;
+const tagsLine=(arr,more)=>arr.map(([c,n,f])=>f?`<span>${I('folder',12)}${n}</span>`:`<span><i style="background:${c}"></i>${n}</span>`).join('')+(more?`<span>+${more}</span>`:'');
+const ixs=(st,tr,su)=>`<div class="ix">${st?I('star',13):''}${tr?I('lines',15):''}${su?I('spark',15)+(su>1?`<em>${su}</em>`:''):''}</div>`;
+const bottomBar=()=>`<div class="bb">${glass([{i:'books',go:'library',l:'Biblioteca',s:24},{i:'book',go:'wiki-home',l:'Wiki',s:24},{i:'bubble',go:'ask-library',l:'Perguntar',s:24},{i:'doc',go:'docs',l:'Documentos',s:24}])}<div class="recb"${G('rec')}><i></i>Gravar</div></div>`;
+const phone=(inner,o={})=>`<div class="scr${o.paper?' paper':''}"${o.bg?` style="background:${o.bg}"`:''}>${inner}</div><div class="island"></div>${HOME(o.light)}`;
+const sum1=`<div class="doc"><h3>Decisões</h3><ul><li>Sincronização offline e exportação são as duas prioridades do trimestre.</li><li>Remover o suporte ao formato de importação antigo.</li></ul><h3>Próximos passos</h3><ul><li><b>Sam</b> finaliza o design da exportação e compartilha os mockups antes de quinta.</li><li><b>Priya</b> dimensiona a sincronização offline com o time mobile até sexta.</li></ul><h3>Pontos em aberto</h3><ul><li>O formato antigo sai nesta versão ou na próxima?</li></ul></div>`;
+const sum2=`<div class="doc"><h3>Alex</h3><ul><li><b>Fez:</b> fechou as prioridades do T3.</li><li><b>Próximo:</b> revisão de roadmap na quinta.</li></ul><h3>Priya</h3><ul><li><b>Próximo:</b> dimensionar a sincronização offline até sexta.</li><li><b>Impedimento:</b> nenhum.</li></ul><h3>Sam</h3><ul><li><b>Próximo:</b> mockups da exportação antes de quinta.</li></ul></div>`;
+
+const TODAY={}; // capturas do app anterior removidas no repositório (ver docs/design/README.md)
+
+/* ---------- registro ---------- */
+const S=[];const add=o=>S.push(o);
+const listRows=()=>`<div class="day"><b>Hoje</b><span>sexta, 21 de novembro</span></div>`+grp([
+ {t:'Sync semanal',b:1,m:`<span class="prog"><span class="ring"></span>Transcrevendo… 62%</span>`,go:'m-transcribing'},
+ {t:'Alinhamento do roadmap',b:1,m:'18:28 · 12 min',tg:tagsLine([[0,'Produto',1],['#e5484d','Roadmap'],['#e5484d','T3']]),tr:ixs(1,1,2),go:'m-summary'},
+ {t:'Revisão de design',b:1,m:'16:28 · 7 min',tg:tagsLine([[0,'Design',1],['#e0882b','Design'],['#e5484d','Interface']]),tr:ixs(0,1,1),go:'list-row-menu'},
+ {t:'Onboarding do cliente',b:1,m:'13:28 · 6 min',tg:tagsLine([['#2fa55a','Clientes'],['#e5484d','Onboarding']],1),tr:ixs(0,1,0),go:'m-summary-empty'}
+])+`<div class="day"><b>Ontem</b><span>quinta, 20 de novembro</span></div>`+grp([
+ {t:'Entrevista com cliente',b:1,m:'13:28 · 8 min',tr:ixs(0,1,1),go:'m-summary'}
+]);
+const listTop=()=>SB()+NB('<span></span>',glass([{i:'ell',go:'list-menu',l:'Opções da lista'},{i:'gear',go:'settings',l:'Ajustes'}]),'Kurn');
+const listBody=()=>listTop()+`<div class="srch"${G('list-search')}>${I('search',17)}Buscar reuniões</div><div class="chips"><span class="chip on">Todas</span><span class="chip">Favoritas</span><span class="chip">Sem resumo</span></div>`+listRows();
+const listScreen=()=>phone(listBody()+`<div class="fade g" style="height:120px"></div>`+bottomBar());
+
+add({id:'list',g:'Reuniões',n:'Lista de reuniões',st:'muda',today:'c1-list',file:['MeetingsListView','MeetingsListComponents','MeetingsListToolbar','FilterBarView'],
+ r:listScreen,
+ what:['Título "Kurn" centralizado e o grupo ⋯ + Ajustes, como hoje.','Busca e filtros rápidos: Todas, Favoritas, Sem resumo.','Reuniões agrupadas por dia: "Hoje sexta, 21 de novembro", "Ontem…", depois só a data.','Cada linha: título; hora e duração; pasta e tags com ponto de cor (+N quando não cabe); à direita, favorito, transcrição e resumo (com número quando há mais de um) em cinza.','Estados com cor só quando pedem atenção, como "Transcrevendo… 62%" (a linha "Sync semanal" é só exemplo desse estado).','Barra inferior: Biblioteca, Wiki, Perguntar, Documentos e "● Gravar".'],
+ acts:[['Toque numa reunião','m-summary'],['Toque longo numa reunião','list-row-menu'],['⋯','list-menu'],['Ajustes','settings'],['Busca','list-search'],['Biblioteca','library'],['Wiki','wiki-home'],['Perguntar','ask-library'],['Documentos','docs'],['Gravar','rec']],
+ notes:['O app guarda hoje uma pasta por reunião (Meeting.folder). Várias pastas pedem mudança no modelo de dados; pastas inteligentes já agrupam por tag.','Deslizar para a esquerda: Arquivar e Excluir; para a direita: Favoritar (como hoje).']});
+
+add({id:'list-empty',g:'Reuniões',n:'Lista vazia (primeiro uso)',st:'muda',file:['MeetingsListView'],
+ r:()=>phone(listTop()+`<div style="margin-top:220px" class="empty"><span class="ic">${I('wave',48)}</span><b>Nenhuma reunião ainda</b><p>Grave uma conversa e o Kurn transcreve, separa quem falou e escreve o resumo, tudo no aparelho.</p><span class="cta red"${G('rec')}><span style="width:12px;height:12px;border-radius:50%;background:#fff;display:block"></span>Gravar a primeira</span></div>`+bottomBar()),
+ what:['ContentUnavailableView com uma frase do que o app faz e um único botão.','O botão vermelho aqui é a própria ação de gravar, então mantém a cor de gravação.'],acts:[['Gravar a primeira','rec']]});
+
+add({id:'list-menu',g:'Reuniões',n:'Menu ⋯ da lista',st:'igual',today:'h-list-menu',file:['MeetingsListToolbar'],
+ r:()=>phone(listBody()+bottomBar()+menu([{l:'Filtros',i:'filter',go:'filters'},{l:'Selecionar',i:'select',go:'list-select'},'-',{l:'Ordenar',s:'Mais recentes',i:'sort',chev:1,go:'list-sort'}],{right:16,top:98},'list')),
+ what:['Mesmo conteúdo de hoje: Filtros, Selecionar e Ordenar (submenu).','Ordenar mostra a ordem atual como subtítulo.'],acts:[['Filtros','filters'],['Selecionar','list-select'],['Ordenar','list-sort'],['Fora do menu','list']]});
+
+add({id:'list-sort',g:'Reuniões',n:'Ordenar',st:'igual',file:['MeetingsListToolbar'],
+ r:()=>phone(listBody()+bottomBar()+menu([{h:'Ordenar por'},{l:'Mais recentes',on:1,go:'list'},{l:'Mais antigas',on:0,go:'list'},{l:'Título (A–Z)',on:0,go:'list'},{l:'Duração',on:0,go:'list'}],{right:16,top:98},'list')),
+ what:['Submenu nativo com a opção atual marcada.','Com ordem por título ou duração, a lista deixa de agrupar por dia e mostra a data na linha de metadados.'],acts:[['Escolher uma ordem','list']]});
+
+add({id:'filters',g:'Reuniões',n:'Filtros',st:'muda',today:'h-filters',file:['FilterBarView'],
+ r:()=>phone(listBody()+bottomBar()+sheet(sect('Período')+`<div class="chips" style="padding:0 16px;flex-wrap:wrap;gap:8px"><span class="chip on">Qualquer data</span><span class="chip">Hoje</span><span class="chip">7 dias</span><span class="chip">30 dias</span><span class="chip">Escolher…</span></div>`+sect('Tags','Limpar')+grp([{lead:'<span class="dot" style="background:#e5484d"></span>',t:'Roadmap',tr:'check'},{lead:'<span class="dot" style="background:#e5484d"></span>',t:'T3',tr:'check'},{lead:'<span class="dot" style="background:#2fa55a"></span>',t:'Clientes'},{lead:'<span class="dot" style="background:#e0882b"></span>',t:'Design'}])+sect('Situação')+grp([{t:'Transcrita'},{t:'Sem transcrição'},{t:'Com resumo'},{t:'Sem resumo'},{t:'Com falha'}])+sect('Duração')+grp([{t:'Mais de',val:'qualquer'},{t:'Menos de',val:'qualquer'}])+`<div style="padding:18px 16px 30px">${grp([{t:'Salvar como pasta inteligente',link:1,go:'smart-folder'}])}</div>`,{left:gt('Cancelar','list'),right:gt('Mostrar 2','list',1),title:'Filtros',close:'list'})),
+ what:['Período em chips (substitui Todas/Hoje/Esta semana, que agora são os cabeçalhos da lista).','Tags com ponto de cor e várias escolhas (marcadas com ✓).','Situação inclui "Com resumo/Sem resumo" e "Com falha" em português (hoje aparece "Sem transcript").','O botão principal diz quantas reuniões o filtro mostra.'],
+ acts:[['Mostrar 2','list'],['Salvar como pasta inteligente','smart-folder'],['Cancelar','list']],notes:['Hoje "Sem transcript" aparece sem tradução no filtro de status.']});
+
+add({id:'smart-folder',g:'Reuniões',n:'Salvar pasta inteligente',st:'igual',file:['FilterBarView'],
+ r:()=>phone(listBody()+bottomBar()+alertBox('Nova pasta inteligente','Guarda este filtro como uma pasta que se atualiza sozinha.',[{l:'Salvar',k:'p',go:'library'},{l:'Cancelar',go:'filters'}],0,'Roadmap e T3')),
+ what:['Pede só o nome. A pasta aparece na Biblioteca, em "Pastas inteligentes".'],acts:[['Salvar','library'],['Cancelar','filters']]});
+
+add({id:'library',g:'Reuniões',n:'Biblioteca',st:'muda',today:'h-library',file:['FolderSidebarView','FolderPickerView'],
+ r:()=>phone(listBody()+bottomBar()+sheet(grp([{ic:'books',t:'Todas',val:'6',tr:'check',go:'list'},{ic:'inbox',t:'Caixa de entrada',val:'1'},{ic:'star',t:'Favoritas',val:'1'},{ic:'archive',t:'Arquivo',val:'1'}])+sect('Pastas','Nova','folder-form')+grp([{ic:'folder',icc:'#6e5bd8',t:'Produto',val:'2',tr:'chev',go:'folder-analytics'},{ic:'folder',icc:'#e0882b',t:'Design',val:'1',tr:'chev'},{ic:'folder',icc:'#2fa55a',t:'Clientes',val:'2',tr:'chev'}])+sect('Pastas inteligentes')+grp([{ic:'filter',t:'Roadmap e T3',val:'1'}])+sect('Tags')+`<div class="chips" style="flex-wrap:wrap;padding:0 16px"><span class="chip out"><span class="dot" style="background:#e5484d"></span>Roadmap</span><span class="chip out"><span class="dot" style="background:#e5484d"></span>T3</span><span class="chip out"><span class="dot" style="background:#2fa55a"></span>Clientes</span></div>`,{left:gc('chart','folder-analytics','Insights'),right:gt('OK','list'),title:'Biblioteca',close:'list'})),
+ what:['Ícones em cinza, contagens à direita e ✓ no escopo atual (hoje o ícone e o ✓ são vermelhos).','Pastas com a cor da pasta no ícone; "Nova" no título da seção em vez do + vermelho.','Pastas inteligentes e tags ficam na mesma folha, para filtrar a lista com um toque.','Botão de insights à esquerda.'],
+ acts:[['Todas','list'],['Produto','folder-analytics'],['Nova pasta','folder-form'],['Insights','folder-analytics'],['OK','list']],notes:['Toque longo numa pasta: Renomear, Nova subpasta, Excluir (com confirmação).']});
+
+add({id:'folder-form',g:'Reuniões',n:'Nova pasta',st:'muda',file:['FolderFormView'],
+ r:()=>phone(listBody()+sheet(`<div style="padding:6px 0 0">${grp([{t:'Produto',ts:'font-weight:500'}])}</div>`+sect('Cor')+`<div class="grp" style="padding:14px;display:flex;flex-wrap:wrap;gap:12px">${['#e5484d','#e0882b','#f5b400','#2fa55a','#0a84ff','#6e5bd8','#c03fa1','var(--gray)'].map((c,i)=>`<span style="width:34px;height:34px;border-radius:50%;background:${c};${i==5?'box-shadow:0 0 0 3px var(--white),0 0 0 5px '+c:''}"></span>`).join('')}</div>`+sect('Ícone')+`<div class="grp" style="padding:14px;display:grid;grid-template-columns:repeat(6,1fr);gap:14px;color:var(--ink2)">${['folder','book','person','cal','tag','star','chart','mic','doc','bubble','graph','heart'].map((x,i)=>`<span style="display:grid;place-items:center;height:36px;border-radius:10px;${i==0?'background:var(--aAb);color:var(--aAf)':''}">${I(x,20)}</span>`).join('')}</div>`,{left:gt('Cancelar','library'),right:gt('Criar','library',1),title:'Nova pasta',size:'full',close:'library'})),
+ what:['Nome, cor e ícone das listas curadas de hoje.','"Criar" é o botão principal em tinta; Cancelar à esquerda.'],acts:[['Criar','library'],['Cancelar','library']]});
+
+add({id:'folder-analytics',g:'Reuniões',n:'Insights da pasta',st:'igual',file:['FolderAnalyticsView'],
+ r:()=>phone(SB()+NB(gc('back','library'),gt('OK','library'),'Produto')+`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:6px 16px">${[['Reuniões','2'],['Duração total','19 min'],['Média','9 min'],['Com resumo','2']].map(([a,b])=>`<div class="grp" style="margin:0;padding:12px 14px"><div style="color:var(--sec);font-size:13px">${a}</div><div style="font-size:24px;font-weight:700;letter-spacing:-.02em">${b}</div></div>`).join('')}</div>`+sect('Quem mais falou')+grp([{lead:av('A'),t:'Alex',val:'41%'},{lead:av('P'),t:'Priya',val:'33%'},{lead:av('S'),t:'Sam',val:'26%'}])+sect('Tags mais usadas')+grp([{lead:'<span class="dot" style="background:#e5484d"></span>',t:'Roadmap',val:'2'},{lead:'<span class="dot" style="background:#e5484d"></span>',t:'T3',val:'1'}])),
+ what:['Números grandes no topo e listas abaixo; mesmo conteúdo de hoje com o estilo de grupos do resto do app.'],acts:[['Voltar','library']]});
+
+add({id:'list-search',g:'Reuniões',n:'Busca',st:'muda',file:['MeetingsListView'],
+ r:()=>phone(SB()+`<div style="display:flex;gap:10px;align-items:center;padding:8px 16px 4px"><div class="srch on" style="flex:1;margin:0">${I('search',17,'var(--ph)')}exportação</div><span style="color:var(--blue);font-size:17px"${G('list')}>Cancelar</span></div>`+sect('No texto')+grp([{t:'Alinhamento do roadmap',b:1,m:'Hoje · "…sincronização offline e <b style=color:var(--ink)>exportação</b> sempre aparecem."',tr:ixs(1,1,2),go:'m-transcript'},{t:'Revisão de design',b:1,m:'Hoje · "…design da <b style=color:var(--ink)>exportação</b>…"',tr:ixs(0,1,1)}])+sect('Relacionadas')+grp([{t:'Onboarding do cliente',b:1,m:'Hoje · fala sobre exportar relatórios',tr:ixs(0,1,0)}])+foot('As relacionadas vêm da busca semântica, no aparelho.')+`<div class="kb" style="height:290px"><div>${'<span></span>'.repeat(10)}</div><div>${'<span></span>'.repeat(9)}</div><div>${'<span></span>'.repeat(7)}</div></div>`),
+ what:['Resultados em duas seções: "No texto" (com o trecho e a palavra em destaque) e "Relacionadas" (busca semântica).','Tocar num resultado abre a reunião na transcrição, no ponto encontrado.'],acts:[['Resultado','m-transcript'],['Cancelar','list']]});
+
+add({id:'list-row-menu',g:'Reuniões',n:'Menu de uma reunião (toque longo)',st:'muda',file:['MeetingsListView'],
+ r:()=>phone(listBody()+bottomBar()+`<div class="dim"${G('list')}></div><div style="position:absolute;z-index:31;left:16px;right:16px;top:300px">${grp([{t:'Revisão de design',b:1,m:'16:28 · 7 min',tg:tagsLine([[0,'Design',1],['#e0882b','Design'],['#e5484d','Interface']]),tr:ixs(0,1,1)}])}</div>`+menu([{l:'Favoritar',i:'staro'},{l:'Renomear',i:'pencil',go:'meeting-edit'},{l:'Tags…',i:'tag',go:'tag-picker'},{l:'Mover para pasta…',i:'foldero',go:'folder-picker'},{l:'Compartilhar',i:'share',go:'share'},'-',{l:'Arquivar',i:'archive'},{l:'Excluir',i:'trash',dest:1,go:'meeting-delete'}],{left:16,top:400},'list')),
+ what:['Prévia da linha e as ações mais usadas, na ordem de hoje.','"Tags…" e "Mover para pasta…" abrem os seletores; Excluir pede confirmação.'],acts:[['Renomear','meeting-edit'],['Tags…','tag-picker'],['Mover para pasta…','folder-picker'],['Compartilhar','share'],['Excluir','meeting-delete']]});
+
+add({id:'meeting-delete',g:'Reuniões',n:'Excluir reunião',st:'igual',file:['MeetingsListView'],
+ r:()=>phone(listBody()+bottomBar()+alertBox('Excluir "Revisão de design"?','A gravação, a transcrição, os resumos e a página do wiki desta reunião serão apagados do aparelho.',[{l:'Excluir',k:'d',go:'list'},{l:'Cancelar',go:'list'}])),
+ what:['Diálogo do app (kurnDialog) com a ação destrutiva em vermelho e o que será apagado.'],acts:[['Excluir','list'],['Cancelar','list']]});
+
+add({id:'tag-picker',g:'Reuniões',n:'Tags da reunião',st:'muda',file:['TagPickerView','TagChipsView'],
+ r:()=>phone(listBody()+sheet(`<div class="srch" style="margin-top:0">${I('search',17)}Buscar ou criar tag</div>`+grp([{lead:'<span class="dot" style="background:#e0882b"></span>',t:'Design',tr:'check'},{lead:'<span class="dot" style="background:#e5484d"></span>',t:'Interface',tr:'check'},{lead:'<span class="dot" style="background:#e5484d"></span>',t:'Roadmap'},{lead:'<span class="dot" style="background:#2fa55a"></span>',t:'Clientes'},{t:'Sugerir tags com IA',link:1,go:'autotag'}]),{left:gt('Cancelar','list'),right:gt('OK','list',1),title:'Tags',size:'med',close:'list'})),
+ what:['Várias tags por reunião, marcadas com ✓; buscar e criar no mesmo campo.','"Sugerir tags com IA" abre a confirmação das sugestões.'],acts:[['OK','list'],['Sugerir tags com IA','autotag']]});
+
+add({id:'folder-picker',g:'Reuniões',n:'Mover para pasta',st:'muda',file:['FolderPickerView'],
+ r:()=>phone(listBody()+sheet(grp([{ic:'inbox',t:'Sem pasta'},{ic:'folder',icc:'#6e5bd8',t:'Produto',tr:'chev'},{ic:'folder',icc:'#e0882b',t:'Design',tr:'check'},{ic:'folder',icc:'#2fa55a',t:'Clientes'}])+foot('Uma reunião fica em uma pasta. Para agrupar por assunto em vários lugares, use tags ou pastas inteligentes.'),{left:gt('Cancelar','list'),right:gt('Mover','list',1),title:'Mover para',size:'med',close:'list'})),
+ what:['Lista das pastas com a atual marcada e subpastas por ›.','Nota explica a regra de uma pasta por reunião (até que o modelo mude).'],acts:[['Mover','list'],['Cancelar','list']]});
+
+add({id:'list-select',g:'Reuniões',n:'Seleção de várias',st:'muda',file:['MeetingsListSelectionMode'],
+ r:()=>phone(SB()+NB(gt('Todas',''),gt('OK','list',1),'2 selecionadas')+`<div class="srch">${I('search',17)}Buscar reuniões</div><div class="day"><b>Hoje</b><span>sexta, 21 de novembro</span></div>`+grp([{lead:'<span class="chk on">'+I('check',13)+'</span>',t:'Alinhamento do roadmap',b:1,m:'18:28 · 12 min',tr:ixs(1,1,2)},{lead:'<span class="chk on">'+I('check',13)+'</span>',t:'Revisão de design',b:1,m:'16:28 · 7 min',tr:ixs(0,1,1)},{lead:'<span class="chk"></span>',t:'Onboarding do cliente',b:1,m:'13:28 · 6 min',tr:ixs(0,1,0)}])+`<div class="bb">${glass([{i:'share',go:'bulk-export',l:'Exportar',s:24},{i:'foldero',go:'folder-picker',l:'Mover',s:24},{i:'tag',go:'tag-picker',l:'Tags',s:24}])}<div class="gl"${G('bulk-delete')}><span class="t" style="color:#d70015">${I('trash',20)}</span></div></div>`),
+ what:['Círculos de seleção, título com a contagem, "Todas" e OK.','Barra inferior com Exportar, Mover, Tags e Excluir (vermelho, separado).'],acts:[['Exportar','bulk-export'],['Excluir','bulk-delete'],['OK','list']],notes:['Mover e Tags em lote são novos; hoje a seleção tem só Exportar e Excluir.']});
+
+add({id:'bulk-delete',g:'Reuniões',n:'Excluir várias',st:'igual',file:['MeetingsListSelectionMode'],
+ r:()=>phone(SB()+NB(gt('Todas',''),gt('OK','list',1),'2 selecionadas')+`<div class="srch">${I('search',17)}Buscar reuniões</div>`+alertBox('Excluir 2 reuniões?','Isso não pode ser desfeito.',[{l:'Excluir 2',k:'d',go:'list'},{l:'Cancelar',go:'list-select'}])),
+ what:['Confirmação com o número de reuniões no botão.'],acts:[['Excluir 2','list'],['Cancelar','list-select']]});
+
+add({id:'bulk-export',g:'Reuniões',n:'Exportar várias',st:'muda',file:['MeetingBulkExportView'],
+ r:()=>phone(SB()+sheet(sect('Incluir')+grp([{t:'Resumo mais recente',tr:'ton'},{t:'Transcrições',tr:'tog'}])+sect('Arquivos')+`<div class="seg2"><span class="on">Um por reunião</span><span>Um só arquivo</span></div>`+sect('Formato')+grp([{t:'Formato',val:'Markdown',tr:I('updown',14,'var(--ter)')}])+foot('Markdown simples, sem metadados extras.')+`<div style="position:absolute;left:0;right:0;bottom:34px;display:flex;gap:10px;padding:0 20px"><span class="cta sec" style="flex:1">${I('copy',18)}Copiar</span><span class="cta" style="flex:2"${G('list')}>${I('share',18)}Compartilhar 2</span></div>`,{left:gt('Cancelar','list-select'),title:'Exportar 2 reuniões',close:'list-select'})),
+ what:['Mesmas opções de hoje em grupos: incluir, agrupamento, formato.','Botões no rodapé: Copiar (secundário) e Compartilhar (tinta). Hoje o botão principal é vermelho.'],acts:[['Compartilhar 2','list'],['Cancelar','list-select']]});
+
+add({id:'lock',g:'Reuniões',n:'App bloqueado',st:'muda',file:['SecurityCoverView','SecurityCoverWindow','PrivacyCoverView'],
+ r:()=>phone(SB()+`<div class="cover"><span style="color:var(--gray)">${I('lock',46)}</span><b style="font-size:22px">Kurn está bloqueado</b><p style="color:var(--sec);margin:0 0 18px;font-size:15px">Suas reuniões ficam protegidas até você entrar.</p><span class="cta"${G('list')}>${I('face',20)}Entrar com Face ID</span></div>`),
+ what:['Capa em janela própria, igual à de hoje no comportamento.','Botão em tinta (não vermelho) com Face ID.','Sem senha no aparelho, aparece o atalho para o ajuste de bloqueio, como hoje.'],acts:[['Entrar com Face ID','list']],notes:['A capa de privacidade do seletor de apps é a mesma tela sem o botão.']});
+
+add({id:'attach-meeting',g:'Reuniões',n:'PDF recebido de outro app',st:'muda',file:['AttachToMeetingView'],
+ r:()=>phone(listBody()+sheet(`<div style="padding:0 16px 10px;display:flex;gap:12px;align-items:center"><span class="ico" style="width:44px;height:52px;border-radius:8px;background:var(--white)">${I('doc',22)}</span><div><b>Roadmap T3.pdf</b><div style="color:var(--sec);font-size:14px">6 páginas · 482 KB</div></div></div>`+`<div class="srch" style="margin-top:4px">${I('search',17)}Buscar reunião</div>`+grp([{t:'Nova reunião com este PDF',link:1,ic:'plus',icc:'var(--blue)'}])+sect('Recentes')+grp([{t:'Alinhamento do roadmap',m:'Hoje · 18:28',tr:'check'},{t:'Revisão de design',m:'Hoje · 16:28'},{t:'Onboarding do cliente',m:'Hoje · 13:28'}]),{left:gt('Cancelar','list'),right:gt('Anexar','list',1),title:'Anexar a uma reunião',close:'list'})),
+ what:['Aparece quando um PDF é compartilhado com o Kurn.','Escolher uma reunião ou criar uma nova; o arquivo e o tamanho aparecem no topo.'],acts:[['Anexar','list'],['Cancelar','list']]});
+
+/* ---------- gravação ---------- */
+const recScreen=(paused)=>phone(SB('19:30',1)+NB(`<div style="display:flex;gap:10px">${gc('chevd','rec-mini','Minimizar')}<div class="gl"${G('rec-discard')}><span class="t" style="color:#ff453a">Descartar</span></div></div>`,glass([{i:'camera',l:'Foto',go:'photo'},{i:'flag',l:'Destaque'}]))+`<div style="color:#fff;padding:10px 24px 0"><div style="font-size:15px;opacity:.6">Nova reunião · Sex., 21 nov.</div><div style="font-size:26px;font-weight:700;letter-spacing:-.02em;margin-top:2px">Reunião de 19:30</div></div><div style="text-align:center;color:#fff;margin-top:70px"><div style="font-size:72px;font-weight:200;font-variant-numeric:tabular-nums;letter-spacing:-.02em">${paused?'04:12':'04:13'}</div><div style="font-size:15px;opacity:.7;display:flex;gap:7px;justify-content:center;align-items:center"><span style="width:9px;height:9px;border-radius:50%;background:${paused?'#f5b400':'#ff453a'}"></span>${paused?'Pausada':'Gravando'} · iPhone Microfone</div></div><div class="wave" style="margin-top:46px">${[8,20,34,18,46,30,60,40,22,50,28,64,36,18,42,26,14,30,10,20,8].map(h=>`<i style="height:${paused?6:h}px;opacity:${paused?.4:.9}"></i>`).join('')}</div><div style="margin:40px 24px 0;background:rgba(255,255,255,.08);border-radius:18px;padding:12px 14px;color:#fff;font-size:15px;line-height:1.4"><div style="opacity:.55;font-size:12px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Ao vivo</div>…então a ideia é fechar as prioridades do trimestre ainda hoje.</div><div style="position:absolute;left:0;right:0;bottom:56px;display:flex;justify-content:center;gap:28px;align-items:center"><span style="width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;display:grid;place-items:center"${G(paused?'rec':'rec-paused')}>${I(paused?'play':'pause',26)}</span><span style="width:84px;height:84px;border-radius:50%;background:#d70015;color:#fff;display:grid;place-items:center;box-shadow:0 0 0 5px rgba(255,255,255,.18)"${G('rec-saved')}>${I('stop',30)}</span><span style="width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;display:grid;place-items:center"${G('rec-mic')}>${I('mic',24)}</span></div>`,{bg:'#0c0c0e',light:1});
+add({id:'rec',g:'Gravação',n:'Gravador',st:'muda',file:['RecorderView','RecordingActionButton'],r:()=>recScreen(0),
+ what:['Fundo escuro, título provisório (a IA sugere o definitivo depois), cronômetro grande e onda de áudio.','Transcrição ao vivo num cartão discreto, quando ligada.','Controles grandes: pausar, parar (vermelho) e microfone. Foto e destaque ficam no topo.','Minimizar no canto vira a mini barra sobre o app.','"Descartar" fica no topo, em vidro separado do minimizar, como hoje; pede confirmação.'],
+ acts:[['Pausar','rec-paused'],['Parar (salva)','rec-saved'],['Microfone','rec-mic'],['Minimizar','rec-mini'],['Descartar','rec-discard'],['Foto','photo']],notes:['A tela de hoje não pôde ser capturada: o simulador não tem microfone.']});
+add({id:'rec-paused',g:'Gravação',n:'Gravador pausado',st:'muda',file:['RecorderView'],r:()=>recScreen(1),what:['Ponto amarelo e "Pausada" em texto; a onda fica parada.'],acts:[['Continuar','rec'],['Parar (salva)','rec-saved']]});
+add({id:'rec-discard',g:'Gravação',n:'Descartar gravação',st:'igual',file:['RecorderView'],
+ r:()=>phone(recScreen(0).replace(/<div class="island"><\/div>.*/,'')+alertBox('Descartar esta gravação?','O áudio gravado até agora será apagado do aparelho. Parar, em vez disso, mantém a gravação.',[{l:'Descartar',k:'d',go:'list'},{l:'Continuar gravando',go:'rec'}])+`<div class="island"></div>${HOME(1)}`),
+ what:['Mesmo diálogo de hoje: explica que o áudio será apagado e que Parar mantém a gravação.','"Descartar" em vermelho e "Continuar gravando".'],acts:[['Descartar','list'],['Continuar gravando','rec']]});
+add({id:'rec-saved',g:'Gravação',n:'Gravação salva',st:'muda',file:['RecorderView','RecordingSegmentRow'],
+ r:()=>phone(SB()+mTop()+`<div class="h1">Reunião de 19:30</div><div class="dm">Sex., 21 nov. · 19:30 · 4 min · Português</div>`+tabs('Áudio')+sect('Gravações')+grp([{lead:`<span class="play">${I('play',14)}</span>`,t:'Gravação 1',m:'19:30 · 4:12 · não transcrita',tr:`<span class="pillm" style="height:30px;font-size:13.5px"${G('m-transcribing')}>Transcrever</span>`},{t:`<span style="display:flex;align-items:center;gap:8px">${I('plus',18)}Adicionar gravação</span>`,link:1,go:'rec'}])+sect('Anexos')+grp([{t:`<span style="display:flex;align-items:center;gap:8px">${I('plus',18)}Adicionar PDF</span>`,link:1,go:'m-pdf'}])+`<div class="toast" style="bottom:110px">${I('check',16)}Gravação salva</div>`+askBar()),
+ what:['Parar só para e salva: um toque, sem folha de confirmação nem "Descartar".','A reunião abre na aba Áudio com a gravação pronta para ouvir e um botão "Transcrever".','Quem quiser apagar usa o menu da gravação ou da reunião, como qualquer outra exclusão.'],
+ acts:[['Transcrever','m-transcribing'],['Adicionar outra gravação','rec']],notes:['Se fizer sentido, um ajuste "Transcrever ao parar" (desligado) em Ajustes > Gravação devolve o comportamento automático para quem preferir.']});
+add({id:'rec-mic',g:'Gravação',n:'Escolher microfone',st:'igual',file:['RecorderView'],
+ r:()=>phone(recScreen(0).replace(/<div class="island"><\/div>.*/,'')+`<div class="dim"${G('rec')}></div><div class="sheet med" style="top:470px;background:var(--white)"><div class="grab"></div>${NB('',gt('OK','rec',1),'Microfone')}${grp([{ic:'mic',t:'iPhone Microfone',tr:'check'},{ic:'wave',t:'AirPods Pro'},{ic:'mic',t:'Microfone USB'}],'flat')}${foot('O microfone do iPhone grava em modo só de gravação, para que fones e aparelhos auditivos continuem tocando normalmente.')}</div><div class="island"></div>${HOME()}`),
+ what:['Lista de entradas de áudio com a atual marcada.'],acts:[['OK','rec']]});
+add({id:'rec-mini',g:'Gravação',n:'Mini barra de gravação',st:'igual',file:['RecordingSessionPresenter'],
+ r:()=>phone(listBody()+`<div style="position:absolute;left:14px;right:14px;bottom:100px;z-index:7;height:56px;border-radius:28px;background:var(--glass2);backdrop-filter:blur(18px);box-shadow:0 6px 20px rgba(0,0,0,.14),inset 0 0 0 .5px rgba(0,0,0,.08);display:flex;align-items:center;gap:10px;padding:0 8px 0 16px"${G('rec')}><span style="width:9px;height:9px;border-radius:50%;background:#ff3b30"></span><div style="flex:1"><div style="font-weight:600;font-size:15px">Reunião de 19:30</div><div style="font-size:13px;color:var(--sec);font-variant-numeric:tabular-nums">Gravando · 04:13</div></div><span class="gl c" style="width:40px;height:40px">${I('pause',18)}</span><span class="gl c" style="width:40px;height:40px;color:#d70015">${I('stop',16)}</span></div>`+bottomBar()),
+ what:['A mesma mini barra de hoje, flutuando sobre qualquer tela.','Tocar expande o gravador; pausar e parar direto na barra.'],acts:[['Expandir','rec']]});
+add({id:'photo',g:'Gravação',n:'Foto durante a gravação',st:'igual',file:['PhotoCaptureView','PhotoViewerView'],
+ r:()=>phone(SB('19:31',1)+`<div style="display:flex;align-items:center;gap:12px;padding:6px 16px">${gc('x','rec','Cancelar').replace('class="gl c"','class="gl c" style="background:rgba(60,60,64,.7);color:#fff"')}<span style="flex:1"></span><span class="gl c" style="background:rgba(60,60,64,.7);color:#fff" aria-label="Flash: Automático">${I('bolt',20)}</span><span class="gl c" style="background:rgba(60,60,64,.7);color:#fff" aria-label="Temporizador: Desligado">${I('clock',20)}</span></div><div style="position:absolute;top:118px;left:0;right:0;height:520px;background:linear-gradient(160deg,#4a525e,#23262c)"><div style="position:absolute;left:150px;top:200px;width:84px;height:84px;border:1.5px solid #ffd60a"></div><span style="position:absolute;left:246px;top:222px;color:#ffd60a">${I('sun',22)}</span><div style="position:absolute;bottom:16px;left:0;right:0;display:flex;justify-content:center;gap:8px">${['0,5','1×','2','3'].map((z,i)=>`<span style="min-width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.45);color:${i==1?'#ffd60a':'#fff'};display:grid;place-items:center;font-size:13px;font-weight:600">${z}</span>`).join('')}</div></div><div style="position:absolute;bottom:58px;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:0 40px"><span style="width:50px;height:50px;border-radius:10px;background:#7a828e;border:2px solid #fff" aria-label="Última foto tirada"></span><span style="width:78px;height:78px;border-radius:50%;border:4px solid #fff;display:grid;place-items:center"${G('rec')} aria-label="Tirar foto"><span style="width:64px;height:64px;border-radius:50%;background:#fff;display:block"></span></span><span style="width:50px;height:50px;border-radius:50%;background:rgba(60,60,64,.7);color:#fff;display:grid;place-items:center" aria-label="Virar câmera">${I('refresh',24)}</span></div>`,{bg:'#000',light:1}),
+ what:['Mantém os controles de hoje, no jeito da Câmera do sistema: fechar, menu de flash (Automático, Ligado, Desligado) e menu de temporizador no topo.','Quadrado de foco com o sol de exposição ao lado (arrastar para clarear ou escurecer).','Botões de lente (0,5 · 1× · 2 · 3) e zoom por pinça.','Embaixo: miniatura da última foto, disparador e virar câmera. Com temporizador, a contagem aparece no centro.'],
+ acts:[['Tirar foto','rec'],['Fechar','rec']],notes:['Sem mudança de funções; só o vidro dos botões segue o resto do app.']});
+add({id:'rec-permission',g:'Gravação',n:'Microfone sem permissão',st:'muda',file:['RecorderView'],
+ r:()=>phone(SB()+NB(gc('x','list'),'')+`<div class="empty" style="margin-top:200px"><span class="ic">${I('mic',48)}</span><b>O Kurn precisa do microfone</b><p>Permita o acesso ao microfone nos Ajustes do iPhone para gravar reuniões.</p><span class="cta">Abrir Ajustes</span></div>`),
+ what:['Estado vazio nativo com uma ação, em vez de alerta.'],acts:[['Fechar','list']]});
+
+/* ---------- reunião ---------- */
+const sumBar=(name,go='m-sum-menu')=>`<div class="tb"><span class="pillm"${G(go)}>${I('spark',15)}${name}${I('down',12)}</span><span class="ghost"${G('m-readaloud')}>${I('spk',18)}Ouvir</span></div>`;
+const meetingSummary=(o={})=>SB()+mTop()+mHead(true)+tabs('Resumo')+sumBar(o.name||'Geral · 18:28')+(o.body||sum1)+`<div class="fade"></div>`+askBar();
+add({id:'m-summary',g:'Reunião',n:'Resumo (abre aqui)',st:'muda',today:'c3-summary',file:['MeetingDetailView','MeetingDetailTabs','SummaryView','MeetingDetailToolbar'],
+ r:()=>phone(meetingSummary(),{paper:1}),
+ what:['A reunião abre no resumo quando ele existe; sem resumo, na transcrição.','Título grande, data com dia da semana, duração e idioma; participantes e pasta/tags (ponto de cor) em chips.','Abas só com ícones: resumo ✦, transcrição, áudio, wiki.','Pílula do resumo atual ("Geral · 18:28 ⌄") abre a lista de resumos e as ações; "Ouvir" lê em voz alta.','Texto em fundo branco, sem cartões; marcadores cinza; o responsável em negrito.','Barra "Pergunte sobre esta reunião" fixa no rodapé.'],
+ acts:[['Pílula do resumo','m-sum-menu'],['Ouvir','m-readaloud'],['Aba Transcrição','m-transcript'],['Aba Áudio','m-audio'],['Aba Wiki','m-wiki'],['⋯','m-more'],['Pergunte','ask-meeting'],['Voltar','list']],
+ notes:['Deslizar para os lados sobre o texto troca entre os resumos da reunião (ver fluxo "Vários resumos").']});
+
+add({id:'m-sum-menu',g:'Reunião',n:'Lista de resumos e ações',st:'novo',file:['MeetingDetailTabs'],
+ r:()=>phone(meetingSummary({name:'Geral · 18:28'})+menu([{h:'Resumos desta reunião'},{l:'Geral',s:'Hoje 18:28 · Apple Intelligence',on:1,go:'m-summary'},{l:'Daily / Standup',s:'Hoje 19:02 · Claude Sonnet 5.5',on:0,go:'m-summary-2'},'-',{l:'Novo resumo…',i:'plus',go:'m-template'},{l:'Traduzir…',i:'globe',go:'m-translate'},{l:'Copiar',i:'copy'},{l:'Compartilhar',i:'share',go:'share'},'-',{l:'Excluir este resumo',i:'trash',dest:1,go:'m-sum-delete'}],{left:20,top:330},'m-summary')),
+ what:['Um único lugar para todos os resumos: cada um com modelo de resumo, hora e o modelo de IA que escreveu.','O atual vem marcado; tocar em outro troca o resumo mostrado.','Ações do resumo atual: novo, traduzir, copiar, compartilhar, excluir.'],
+ acts:[['Daily / Standup','m-summary-2'],['Novo resumo…','m-template'],['Traduzir…','m-translate'],['Excluir este resumo','m-sum-delete']],
+ notes:['Substitui a fileira de pílulas pretas + botão "+" de hoje, que não cabe quando há vários resumos.']});
+
+add({id:'m-template',g:'Reunião',n:'Novo resumo: escolher modelo',st:'muda',today:'h-template',file:['SummaryTemplatePicker'],
+ r:()=>phone(meetingSummary()+sheet(grp([{ico:'spark',t:'Reunião geral',m:'Para quem não estava: o que se discutiu e decidiu',tr:I('check',18,'var(--blue)'),go:'m-generating'},{ico:'person',t:'Daily / Standup',m:'Progresso, próximos passos e impedimentos',go:'m-generating'},{ico:'bubble',t:'Entrevista',m:'Respostas-chave, pontos fortes, parecer',go:'m-generating'},{ico:'lines',t:'Outline da reunião',m:'Resumo curto e os temas em ordem',go:'m-generating'}])+sect('Escrever com')+grp([{ico:'cpu',t:'Claude Sonnet 5.5',m:'Anthropic · nuvem',tr:I('chev',14,'var(--chev)'),go:'ask-model'}])+foot('Cada novo resumo fica guardado ao lado dos anteriores, para comparar.')+`<div style="margin-top:14px">${grp([{t:'Gerenciar modelos de resumo',link:1,go:'set-templates'}])}</div>`,{left:gt('Cancelar','m-summary'),title:'Novo resumo',close:'m-summary'})),
+ what:['Modelos de resumo em lista, com uma linha de descrição; ícones neutros (hoje os ícones e a borda da seleção são vermelhos).','"Escrever com" mostra o provedor e o modelo de IA e permite trocar só para este resumo.','Atalho para gerenciar os modelos nos Ajustes.'],
+ acts:[['Escolher um modelo','m-generating'],['Trocar o modelo de IA','ask-model'],['Gerenciar modelos','set-templates'],['Cancelar','m-summary']]});
+
+add({id:'m-generating',g:'Reunião',n:'Gerando um resumo',st:'muda',file:['MeetingDetailTabs','StreamingIndicators'],
+ r:()=>phone(SB()+mTop()+mHead(true)+tabs('Resumo')+`<div class="tb"><span class="pillm">${I('spark',15)}Daily / Standup · escrevendo…</span><span class="ghost"${G('m-summary')}>Cancelar</span></div><div class="doc" style="color:var(--ink2)"><h3>Alex</h3><ul><li><b>Fez:</b> fechou as prioridades do T3.</li><li><b>Próximo:</b> revisão de roadmap na quinta.</li></ul><h3>Priya</h3><ul><li><b>Próximo:</b> dimensionar a sincronização offline até sex<span style="display:inline-block;width:2px;height:18px;background:var(--prim);vertical-align:-3px;margin-left:1px"></span></li></ul></div><div style="padding:10px 20px;color:var(--sec);font-size:13px;display:flex;gap:8px;align-items:center"${G('m-summary-2')}><span class="ring"></span>Claude Sonnet 5.5 · 9 s · 214 palavras</div>`+`<div class="fade"></div>`+askBar(),{paper:1}),
+ what:['O texto aparece enquanto é escrito, já formatado de forma simples; cursor no fim.','A pílula diz qual modelo está sendo escrito; "Cancelar" fica ao lado.','Linha discreta com modelo, tempo e palavras.','O resumo anterior continua guardado; ao terminar, o novo fica selecionado.'],
+ acts:[['Terminar (simulado)','m-summary-2'],['Cancelar','m-summary']]});
+
+add({id:'m-summary-2',g:'Reunião',n:'Segundo resumo',st:'novo',file:['MeetingDetailTabs','SummaryView'],
+ r:()=>phone(SB()+mTop()+mHead(true)+tabs('Resumo')+sumBar('Daily / Standup · 19:02')+`<div style="display:flex;justify-content:center;gap:6px;padding:8px 0 0"><span class="dot" style="background:var(--ter2)"${G('m-summary')}></span><span class="dot" style="background:var(--prim)"></span></div>`+sum2+`<div class="fade"></div>`+askBar(),{paper:1}),
+ what:['O resumo novo fica selecionado; a pílula mostra o modelo e a hora.','Pontos abaixo da pílula indicam quantos resumos há e qual está aberto (2 de 2); deslizar para os lados troca.','Na lista de reuniões o indicador passa a mostrar ✦2.'],
+ acts:[['Resumo anterior (ponto)','m-summary'],['Pílula','m-sum-menu-2']]});
+
+add({id:'m-sum-menu-2',g:'Reunião',n:'Lista com dois resumos',st:'novo',file:['MeetingDetailTabs'],
+ r:()=>phone(SB()+mTop()+mHead(true)+tabs('Resumo')+sumBar('Daily / Standup · 19:02')+sum2+`<div class="fade"></div>`+askBar()+menu([{h:'Resumos desta reunião'},{l:'Daily / Standup',s:'Hoje 19:02 · Claude Sonnet 5.5',on:1},{l:'Geral',s:'Hoje 18:28 · Apple Intelligence',on:0,go:'m-summary'},'-',{l:'Novo resumo…',i:'plus',go:'m-template'},{l:'Comparar lado a lado',i:'review',go:'m-compare'},{l:'Traduzir…',i:'globe',go:'m-translate'},'-',{l:'Excluir este resumo',i:'trash',dest:1,go:'m-sum-delete'}],{left:20,top:330},'m-summary-2')),
+ what:['Com dois ou mais resumos aparece "Comparar lado a lado".'],acts:[['Geral','m-summary'],['Comparar lado a lado','m-compare'],['Novo resumo…','m-template']]});
+
+add({id:'m-compare',g:'Reunião',n:'Comparar resumos',st:'novo',file:['MeetingDetailTabs'],
+ r:()=>phone(SB()+NB(gc('back','m-summary-2'),'','Comparar')+`<div class="seg2" style="margin:4px 16px 10px"><span>Geral</span><span class="on">Daily / Standup</span></div><div style="display:flex;gap:8px;padding:0 16px"><span class="chip on" style="height:28px;font-size:13px">Só diferenças</span><span class="chip" style="height:28px;font-size:13px">Tudo</span></div><div class="doc"><h3>Só no Daily / Standup</h3><ul><li><b>Priya</b> sem impedimentos.</li><li><b>Alex</b> marca a revisão de roadmap na quinta.</li></ul><h3>Só no Geral</h3><ul><li>Remover o suporte ao formato de importação antigo.</li><li>Pergunta em aberto sobre o formato antigo.</li></ul></div>`,{paper:1}),
+ what:['Proposta nova para quem gera vários resumos: alterna entre eles e mostra o que só um deles traz.','Opcional; pode ficar para uma etapa posterior.'],acts:[['Voltar','m-summary-2']],notes:['As diferenças seriam calculadas no aparelho a partir das seções; não há chamada à IA.']});
+
+add({id:'m-sum-delete',g:'Reunião',n:'Excluir resumo',st:'igual',file:['MeetingDetailView'],
+ r:()=>phone(meetingSummary()+alertBox('Excluir o resumo "Geral"?','Os outros resumos e a transcrição continuam.',[{l:'Excluir',k:'d',go:'m-summary-2'},{l:'Cancelar',go:'m-summary'}]),{paper:1}),what:['Confirmação com o nome do resumo.'],acts:[['Excluir','m-summary-2'],['Cancelar','m-summary']]});
+
+add({id:'m-translate',g:'Reunião',n:'Traduzir resumo',st:'muda',file:['SummaryTranslateLanguagePicker'],
+ r:()=>phone(meetingSummary()+sheet(sect('Sugeridos')+grp([{t:'English'},{t:'Español'}])+sect('Todos')+grp([{t:'Deutsch'},{t:'Français'},{t:'Italiano'},{t:'中文（简体）'}])+foot('A tradução vira um novo resumo; o original continua.'),{left:gt('Cancelar','m-summary'),title:'Traduzir para',size:'med',close:'m-summary'})),
+ what:['Idiomas sugeridos no topo; a tradução é guardada como mais um resumo.'],acts:[['Escolher idioma','m-generating'],['Cancelar','m-summary']]});
+
+add({id:'m-readaloud',g:'Reunião',n:'Ouvir resumo',st:'muda',file:['ReadAloudControl','MeetingDetailReadAloud'],
+ r:()=>phone(meetingSummary().replace(askBar(),'')+`<div style="position:absolute;left:14px;right:14px;bottom:30px;z-index:7;border-radius:26px;background:var(--glass2);backdrop-filter:blur(18px);box-shadow:0 6px 20px rgba(0,0,0,.14),inset 0 0 0 .5px rgba(0,0,0,.08);padding:12px 14px"><div style="display:flex;align-items:center;gap:12px"><div style="flex:1"><div style="font-weight:600;font-size:15px">Lendo o resumo</div><div style="font-size:13px;color:var(--sec)">Parágrafo 2 de 5 · Voz do aparelho</div></div><span>${I('b15',22)}</span><span class="go" style="margin:0"${G('m-summary')}>${I('pause',16)}</span><span>${I('f15',22)}</span><span style="color:var(--gray)"${G('m-summary')}>${I('x',18)}</span></div><div class="scrub" style="margin-top:12px"><b style="width:38%"></b></div></div>`,{paper:1}),
+ what:['Leitura em barra flutuante no lugar da barra Pergunte: anterior, pausar, próximo, fechar e progresso.','O parágrafo lido fica destacado no texto (não mostrado).'],acts:[['Pausar/fechar','m-summary']]});
+
+add({id:'m-summary-empty',g:'Reunião',n:'Sem resumo',st:'muda',file:['MeetingDetailTabs'],
+ r:()=>phone(SB()+mTop()+`<div class="h1">Onboarding do cliente</div><div class="dm">Sex., 21 nov. · 13:28 · 6 min · Português</div>`+tabs('Resumo')+`<div class="empty" style="margin-top:110px"><span class="ic">${I('spark',44)}</span><b>Nenhum resumo ainda</b><p>Escolha um modelo e o Kurn escreve o resumo a partir da transcrição.</p><span class="cta"${G('m-template')}>${I('spark',17)}Gerar resumo</span><div style="color:var(--sec);font-size:13px;margin-top:12px">Apple Intelligence · no aparelho</div></div>`+askBar(),{paper:1}),
+ what:['Estado vazio nativo, botão em tinta (hoje é vermelho e de largura total) e o modelo numa linha só.'],acts:[['Gerar resumo','m-template']]});
+
+/* transcrição */
+const photoMark=`<span style="display:inline-flex;align-items:center;gap:6px;margin:6px 0 0 30px;padding:4px 8px 4px 4px;border-radius:10px;background:var(--fill2);font-size:13px;color:var(--ink2)"${G('m-photo')} aria-label="Ver foto"><span style="width:30px;height:30px;border-radius:7px;background:#c9d3e6;display:block"></span>Foto · 0:41</span>`;
+const trBody=()=>`<div class="chips" style="padding:14px 20px 4px"><span class="chip on">Todos</span><span class="chip">Alex</span><span class="chip">Priya</span><span class="chip">Sam</span></div>`+[['A','0:00','Vamos começar pelo roadmap do terceiro trimestre. Quero fechar as três prioridades hoje.'],['P','0:18','Combinado. Nas conversas com clientes, sincronização offline e exportação sempre aparecem.'],['S','0:40','Eu fico com a exportação — já tenho um rascunho do design da última sprint.'],['A','1:01','Ótimo. Priya, consegue dimensionar a sincronização offline até sexta?']].map(([k,t,p],i)=>`<div class="ts"><div class="sh">${av(k)}<span style="color:${AV[k][1]}">${AV[k][2]}</span><time>${t}</time></div><p>${p}</p>${t==='0:40'?photoMark:''}</div>`).join('');
+add({id:'m-transcript',g:'Reunião',n:'Transcrição',st:'muda',today:'c4-transcript',file:['MeetingDetailTranscript','TranscriptView'],
+ r:()=>phone(SB()+mTop()+mHead(false)+tabs('Transcrição')+trBody()+`<div class="fade"></div>`+askBar(),{paper:1}),
+ what:['Cabeçalho recolhido (só o título) fora do resumo.','Filtro por participante.','Foto tirada durante uma fala aparece logo abaixo dela, como hoje; tocar abre a foto.','Nome em tom escuro da cor do falante; fala logo abaixo; horário à direita.','A lista de participantes continua no fim da transcrição, como hoje; tocar num nome renomeia.','Tocar no horário toca o áudio daquele ponto.'],
+ acts:[['Participantes (fim da transcrição)','m-speakers'],['Pergunte','ask-meeting']]});
+
+add({id:'m-speakers',g:'Reunião',n:'Participantes',st:'muda',file:['MeetingDetailTabs'],
+ r:()=>phone(SB()+mTop()+mHead(false)+tabs('Transcrição')+[['A','10:42','Só um complemento — Sam, pode compartilhar os mockups da exportação antes da revisão de quinta?'],['S','11:04','Sim, coloco na pasta compartilhada hoje à noite.']].map(([k,t,p])=>`<div class="ts"><div class="sh">${av(k)}<span style="color:${AV[k][1]}">${AV[k][2]}</span><time>${t}</time></div><p>${p}</p></div>`).join('')+sect('Participantes')+grp([{lead:av('A'),t:'Alex',val:'Speaker 1',go:'m-rename'},{lead:av('P'),t:'Priya',val:'Speaker 2'},{lead:av('S'),t:'Sam',val:'Speaker 3'}])+foot('Os participantes são detectados automaticamente e podem precisar de correção. Toque em um nome para renomear.')+askBar(),{paper:1}),
+ what:['Mesmo lugar de hoje: a lista de participantes no fim da transcrição, com a etiqueta original à direita.','Só o visual muda: avatar com a cor do falante no lugar do ponto colorido, em um grupo único.'],acts:[['Alex','m-rename']]});
+add({id:'m-rename',g:'Reunião',n:'Renomear participante',st:'igual',file:['MeetingDetailTabs'],
+ r:()=>phone(SB()+mTop()+mHead(false)+tabs('Transcrição')+trBody()+alertBox('Nome do Speaker 1','',[{l:'Salvar',k:'p',go:'m-transcript'},{l:'Cancelar',go:'m-speakers'}],0,'Alex')+`<div style="position:absolute;z-index:41;left:46px;right:46px;top:560px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><span class="chip" style="background:var(--white)">Alex Souza</span><span class="chip" style="background:var(--white)">Alexandre</span></div>`,{paper:1}),what:['Diálogo com o campo dentro dele, já preenchido e com o cursor.','Nomes usados em outras reuniões aparecem como sugestões abaixo do diálogo.'],acts:[['Salvar','m-transcript']]});
+add({id:'m-speaker-match',g:'Reunião',n:'Voz reconhecida',st:'igual',file:['CrossMeetingSpeakerMatchView','MeetingDetailCrossMeetingSpeakerMatch'],
+ r:()=>phone(SB()+mTop()+mHead(false)+tabs('Transcrição')+trBody()+sheet(`<div style="padding:4px 20px 0"><div style="display:flex;gap:12px;align-items:center">${av('P').replace('22px','44px').replace('22px','44px')}<div><b style="font-size:19px">Este é a Priya?</b><div style="color:var(--sec);font-size:14px">A voz do Speaker 2 parece a de Priya em "Revisão de design".</div></div></div></div><div style="display:flex;gap:10px;padding:22px 20px 0"><span class="cta sec" style="flex:1"${G('m-transcript')}>Não é</span><span class="cta" style="flex:1"${G('m-transcript')}>Sim, é a Priya</span></div>`,{size:'med',top:560,nb:false,close:'m-transcript'})),
+ what:['Sugestão, nunca aplicada sozinha; folha curta com duas respostas.'],acts:[['Sim','m-transcript'],['Não é','m-transcript']]});
+add({id:'m-transcribing',g:'Reunião',n:'Transcrevendo',st:'muda',file:['MeetingDetailTranscript','RecordingSegmentRow'],
+ r:()=>phone(SB()+mTop()+`<div class="h1">Sync semanal</div><div class="dm">Sex., 21 nov. · 19:30 · 4 min · Português</div>`+tabs('Transcrição')+`<div class="empty" style="margin-top:120px"><span class="ic"><span class="ring" style="width:44px;height:44px;-webkit-mask:radial-gradient(circle,transparent 17px,#000 18px);mask:radial-gradient(circle,transparent 17px,#000 18px)"></span></span><b>Transcrevendo… 62%</b><p>Separando quem falou. Você pode sair desta tela; o Kurn avisa quando terminar.</p><span class="cta sec">Pausar</span></div>`,{paper:1}),
+ what:['Progresso e etapa em texto, com Pausar.','Se o app for para segundo plano, continua de onde parou.'],acts:[['Voltar','list']]});
+add({id:'m-failed',g:'Reunião',n:'Transcrição com falha',st:'muda',file:['MeetingDetailTranscript'],
+ r:()=>phone(SB()+mTop()+`<div class="h1">Planejamento de sprint</div><div class="dm">Qui., 20 nov. · 10:00 · 22 min</div>`+tabs('Transcrição')+`<div class="empty" style="margin-top:110px"><span class="ic" style="color:var(--warn)">${I('warn',44)}</span><b>A transcrição falhou</b><p>O provedor recusou o arquivo. O áudio está salvo; tente de novo ou troque o motor de transcrição.</p><span class="cta"${G('m-transcribing')}>Tentar de novo</span><div style="margin-top:12px;color:var(--blue);font-size:15px"${G('set-transcription')}>Ajustes de transcrição</div></div>`,{paper:1}),
+ what:['Estado de erro com a causa em linguagem comum, a garantia de que o áudio está salvo e duas saídas.'],acts:[['Tentar de novo','m-transcribing'],['Ajustes de transcrição','set-transcription']],notes:['Transcrições com aviso ("concluída com avisos") mostram um banner amarelo discreto no topo, com "Ver detalhes".']});
+
+/* áudio */
+const PH=[['#c9d3e6','2:14'],['#e6d9c9','5:40'],['#d3e6c9','9:02']];
+const photoStrip=()=>sect('Fotos')+`<div style="display:flex;gap:12px;padding:0 16px">${PH.map(([c,tm])=>`<div style="text-align:center"${G('m-photo')}><span style="display:block;width:84px;height:84px;border-radius:14px;background:${c};box-shadow:inset 0 0 0 .5px rgba(0,0,0,.08)"></span><span style="font-size:12px;color:var(--gray);font-variant-numeric:tabular-nums">${tm}</span></div>`).join('')}</div>`;
+const okc=`<svg width="20" height="20" style="color:var(--green)" role="img" aria-label="Transcrita"><use href="#i-checkc"/></svg>`;
+const audioBody=(playing)=>sect('Gravações')+grp([{lead:`<span class="play"${G(playing?'m-audio':'m-audio-play')}>${I(playing?'pause':'play',14)}</span>`,t:'Gravação 1',m:'18:28 · 10:42',tr:okc,go:'m-rec-menu'},{lead:`<span class="play">${I('play',14)}</span>`,t:'Gravação 2',m:'18:40 · 1:36',tr:okc},{t:`<span style="display:flex;align-items:center;gap:8px">${I('plus',18)}Adicionar gravação</span>`,link:1,go:'rec'}])+(playing?`<div class="grp" style="margin-top:10px;padding:14px 16px"><div style="display:flex;justify-content:space-between;font-size:13px;color:var(--sec);font-variant-numeric:tabular-nums"><span>3:12</span><span>−7:30</span></div><div class="scrub"><b style="width:30%"></b><i style="left:28%"></i></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px"><span class="chip" style="height:30px;font-size:14px">1×</span><span>${I('b15',26)}</span><span class="go" style="margin:0;width:46px;height:46px">${I('pause',20)}</span><span>${I('f15',26)}</span><span class="chip on" style="height:30px;font-size:14px">${I('wand',14)}Voz</span></div></div>`:'')+photoStrip()+sect('Anexos')+grp([{ico:'doc',t:'Roadmap T3.pdf',m:'6 páginas · 482 KB',tr:'chev'},{t:`<span style="display:flex;align-items:center;gap:8px">${I('plus',18)}Adicionar PDF</span>`,link:1,go:'m-pdf'}]);
+add({id:'m-audio',g:'Reunião',n:'Áudio e anexos',st:'muda',today:'c2-rec',file:['RecordingSegmentRow','MeetingDetailAttachments'],
+ r:()=>phone(SB()+mTop()+mHead(false)+tabs('Áudio')+audioBody(0)+askBar()),
+ what:['Gravações em grupo, com play, data numa linha só e um ✓ verde para transcrita (o "Trans-crita" que quebrava a palavra some).','"+ Adicionar gravação" e "+ Adicionar PDF" como linhas azuis dentro de cada grupo, no lugar das caixas tracejadas.','Refazer transcrição sai do botão de cada linha e vai para o menu da gravação.','Fotos tiradas durante a gravação, como hoje: faixa de miniaturas com o momento da reunião, logo abaixo das gravações (aparece assim que a gravação é salva, antes de transcrever). Tocar abre a foto.','Anexo PDF com ícone neutro.'],
+ acts:[['Play','m-audio-play'],['Toque numa gravação','m-rec-menu'],['Adicionar gravação','rec'],['Foto','m-photo'],['Adicionar PDF','m-pdf']]});
+add({id:'m-photo',g:'Reunião',n:'Ver foto',st:'igual',file:['PhotoViewerView','MeetingDetailPhotos'],
+ r:()=>phone(SB()+mTop()+mHead(false)+tabs('Áudio')+audioBody(0)+sheet(`<div style="margin:0 16px;height:330px;border-radius:16px;background:linear-gradient(150deg,#c9d3e6,#8c9ab3);display:grid;place-items:center;color:#fff">${I('photo',40)}</div><div style="padding:10px 20px 0;color:var(--sec);font-size:14px">Gravação 1 · 2:14 da reunião</div>`+sect('Texto reconhecido')+`<div class="grp" style="padding:12px 14px;font-size:15px;line-height:1.4">Roadmap T3 — 1. Sincronização offline 2. Exportação 3. Formato de importação</div>`,{left:glass([{i:'trash',c:'#d70015',l:'Excluir foto',go:'m-audio'}]),right:gt('OK','m-audio',1),close:'m-audio'})),
+ what:['Como hoje: a foto em tela cheia, o momento da reunião em que foi tirada e o texto reconhecido nela (quadro, slide).','Excluir à esquerda e OK à direita.'],acts:[['OK','m-audio']],notes:['A mesma foto também abre pelo marcador na fala da transcrição e pela referência 📷 no resumo.']});
+add({id:'m-audio-play',g:'Reunião',n:'Tocando gravação',st:'muda',file:['SegmentPlaybackScrubber','EnhancementProgressView'],
+ r:()=>phone(SB()+mTop()+mHead(false)+tabs('Áudio')+audioBody(1)+askBar()),
+ what:['Player abre sob a lista: tempo, barra, velocidade, ±15 s e "Voz" (áudio melhorado).','Na tela bloqueada aparecem os controles do sistema, como hoje.'],acts:[['Pausar','m-audio']]});
+add({id:'m-rec-menu',g:'Reunião',n:'Menu de uma gravação',st:'novo',file:['RecordingSegmentRow'],
+ r:()=>phone(SB()+mTop()+mHead(false)+tabs('Áudio')+audioBody(0)+askBar()+menu([{l:'Refazer transcrição',i:'refresh',go:'m-retranscribe'},{l:'Renomear',i:'pencil'},{l:'Áudio melhorado',i:'wand'},'-',{l:'Excluir gravação',i:'trash',dest:1}],{right:16,top:330},'m-audio')),
+ what:['Refazer transcrição sai do botão circular de cada linha e entra aqui, com as outras ações da gravação.'],acts:[['Refazer transcrição','m-retranscribe']]});
+add({id:'m-retranscribe',g:'Reunião',n:'Refazer transcrição',st:'igual',file:['MeetingDetailView'],
+ r:()=>phone(SB()+mTop()+mHead(false)+tabs('Áudio')+audioBody(0)+alertBox('Refazer a transcrição?','A transcrição atual da Gravação 1 será substituída. Resumos já feitos continuam.',[{l:'Refazer',k:'p',go:'m-transcribing'},{l:'Cancelar',go:'m-audio'}])),what:['Confirmação que diz o que muda e o que fica.'],acts:[['Refazer','m-transcribing']]});
+add({id:'m-pdf',g:'Reunião',n:'Adicionar PDF',st:'igual',file:['MeetingDetailAttachments'],
+ r:()=>phone(SB()+mTop()+mHead(false)+tabs('Áudio')+audioBody(0)+`<div class="toast">${I('docplus',18)}Lendo "Roadmap T3.pdf"…</div>`),
+ what:['Abre o seletor de arquivos do sistema; durante a leitura do texto, um aviso curto no rodapé.','O texto do PDF passa a ser contexto do resumo e do chat.'],acts:[['Voltar','m-audio']]});
+
+/* wiki da reunião */
+add({id:'m-wiki',g:'Reunião',n:'Wiki da reunião',st:'muda',today:'c7-wiki',file:['MeetingKnowledgeView','MeetingWikiView','MeetingKnowledgeRefreshDriver'],
+ r:()=>phone(SB()+mTop()+mHead(false)+tabs('Wiki')+`<div class="tb" style="padding-top:18px"><span style="font-weight:650;font-size:15px">Página da reunião</span><span class="ghost">${I('refresh',17)}Atualizar</span></div><p class="para" style="margin-top:6px">A equipe definiu <span class="wl"${G('wiki-page')}>Sincronização offline</span> e <span class="wl"${G('wiki-page')}>Exportação</span> como prioridades do <span class="wl">Roadmap T3</span>. <span class="wl">Sam</span> assume o design da exportação; <span class="wl">Priya</span> dimensiona a sincronização até sexta.</p><div class="gen">${I('spark',13)}Escrito pela IA · 18:40</div><div class="day" style="padding:22px 20px 8px"><b style="font-size:17px">Páginas alteradas</b><span>3 páginas · 5 fatos</span></div>`+grp([{ico:'book',t:'Exportação',m:'Projeto · +2 fatos',tr:'chev',go:'wiki-page'},`<div class="quote">Responsável: Sam<small>"Eu fico com a exportação" · Sam · 0:40</small></div>`,{ico:'book',t:'Sincronização offline',m:'Decisão · página nova',tr:'chev',go:'wiki-page'},{ico:'book',t:'Priya',m:'Pessoa · +1 tarefa',tr:'chev',go:'wiki-page'}],'flat')+askBar(),{paper:1}),
+ what:['Página da reunião escrita pela IA, com ligações sublinhadas para páginas do wiki.','"Páginas alteradas": o que esta reunião criou ou mudou no wiki, com o fato em linguagem comum e a citação.','Os contadores que hoje ficam no cabeçalho aparecem aqui.'],
+ acts:[['Exportação','wiki-page'],['Pergunte','ask-meeting']],notes:['Sem o Wiki ligado, esta aba não aparece.','Sem página gerada ainda: estado vazio com "Gerar página" (no aparelho, ou no provedor com permissão).']});
+
+/* menu ⋯ e folhas da reunião */
+add({id:'m-more',g:'Reunião',n:'Menu ⋯ da reunião',st:'muda',today:'h-detail-menu',file:['MeetingDetailToolbar','MeetingDetailActions'],
+ r:()=>phone(meetingSummary()+menu([{l:'Editar',i:'pencil',go:'meeting-edit'},{l:'Compartilhar',i:'share',go:'share'},{l:'Tags…',i:'tag',go:'tag-picker'},{l:'Mover para pasta…',i:'foldero',go:'folder-picker'},'-',{l:'Novo resumo…',i:'spark',go:'m-template'},{l:'Gerar título',i:'wand'},{l:'Sugerir tags',i:'tag',go:'autotag'},{l:'Adicionar PDF',i:'docplus',go:'m-pdf'},'-',{l:'Refazer todas as transcrições',i:'refresh',go:'m-retranscribe'},{l:'Arquivar',i:'archive'},{l:'Excluir reunião',i:'trash',dest:1,go:'meeting-delete'}],{right:16,top:96},'m-summary'),{paper:1}),
+ what:['Agrupado: organizar, gerar com IA e manutenção, com Excluir por último em vermelho.','Entram Tags, Mover e Excluir, que hoje só existem na lista.'],
+ acts:[['Editar','meeting-edit'],['Compartilhar','share'],['Novo resumo…','m-template'],['Sugerir tags','autotag'],['Excluir reunião','meeting-delete']]});
+
+add({id:'meeting-edit',g:'Reunião',n:'Editar reunião',st:'muda',file:['MeetingFormView','LanguagePickerRow'],
+ r:()=>phone(SB()+sheet(sect('Título')+grp([{t:'Alinhamento do roadmap',ts:'font-weight:500'}])+sect('Idioma falado')+grp([{t:'Idioma',val:'Português',tr:'chev'}])+foot('Usado na transcrição. Apple Speech e Parakeet aceitam português.')+sect('Organização')+grp([{t:'Pasta',val:'Produto',tr:'chev',go:'folder-picker'},{t:'Tags',val:'Roadmap, T3',tr:'chev',go:'tag-picker'}])+sect('Notas')+`<div class="field ph" style="height:90px">Anotações suas sobre a reunião</div>`,{left:gt('Cancelar','m-summary'),right:gt('Salvar','m-summary',1),title:'Editar reunião'})),
+ what:['Título, idioma, pasta, tags e notas num só formulário.'],acts:[['Salvar','m-summary'],['Pasta','folder-picker'],['Tags','tag-picker']]});
+
+add({id:'share',g:'Reunião',n:'Compartilhar',st:'muda',today:'h-share',file:['MeetingShareSelectionView','ActivityView'],
+ r:()=>phone(meetingSummary()+sheet(sect('Resumos')+grp([{lead:'<span class="chk on">'+I('check',13)+'</span>',t:'Geral',m:'Hoje 18:28'},{lead:'<span class="chk on">'+I('check',13)+'</span>',t:'Daily / Standup',m:'Hoje 19:02'}])+sect('Transcrições')+grp([{lead:'<span class="chk on">'+I('check',13)+'</span>',t:'Gravação 1',m:'18:28 · 10:42'},{lead:'<span class="chk"></span>',t:'Gravação 2',m:'18:40 · 1:36'}])+sect('Formato')+`<div class="chips" style="flex-wrap:wrap;padding:0 16px"><span class="chip on">Markdown</span><span class="chip">PDF</span><span class="chip">Word</span><span class="chip">HTML</span><span class="chip">Texto</span><span class="chip">Obsidian</span></div>`+foot('Markdown simples, sem metadados extras.')+`<div style="position:absolute;left:0;right:0;bottom:34px;display:flex;gap:10px;padding:0 20px"><span class="cta sec" style="flex:1">${I('copy',18)}Copiar</span><span class="cta" style="flex:2"${G('m-summary')}>${I('share',18)}Compartilhar 3</span></div>`,{left:gt('Cancelar','m-summary'),title:'Compartilhar',close:'m-summary'})),
+ what:['Escolha com círculos de seleção (hoje são ✓ vermelhos e um botão de copiar por linha).','Formatos em chips visíveis, não num menu.','Copiar e Compartilhar no rodapé; o principal em tinta, não vermelho.'],acts:[['Compartilhar 3','m-summary'],['Cancelar','m-summary']]});
+
+add({id:'autotag',g:'Reunião',n:'Sugestão de tags',st:'muda',file:['AutoTagConfirmView','MeetingDetailAutoTagging'],
+ r:()=>phone(meetingSummary()+sheet(foot('A IA leu a transcrição e sugere estas tags.')+sect('Já existentes')+grp([{lead:'<span class="chk on">'+I('check',13)+'</span>',t:'Roadmap'},{lead:'<span class="chk on">'+I('check',13)+'</span>',t:'Produto'}])+sect('Novas')+grp([{lead:'<span class="chk on">'+I('check',13)+'</span>',t:'Exportação'},{lead:'<span class="chk"></span>',t:'Sincronização'}]),{left:gt('Cancelar','m-summary'),right:gt('Aplicar 3','m-summary',1),title:'Sugerir tags',size:'med',close:'m-summary'})),
+ what:['Separa tags existentes das novas; o usuário marca o que aceita.'],acts:[['Aplicar 3','m-summary']]});
+
+/* ---------- Pergunte ---------- */
+const composer=(ph='Faça uma pergunta…',typed)=>`<div class="cmp2"><div class="ph2"${typed?' style="color:var(--ink)"':''}>${ph}</div><div class="rw"><span class="mchip"${G('ask-model')}>${I('spark',14)}Claude Sonnet 5.5 · médio${I('down',12)}</span><span class="mchip"${G('ask-sources')}>${I('books',14)}Esta reunião</span><span class="gauge" role="img" aria-label="Contexto usado"></span><span class="go"${G('ask-answer')}>${I('up',18)}</span></div></div>`;
+const askHead=(sub,go='m-summary')=>NB(glass([{i:'history',go:'ask-history',l:'Histórico'}]),glass([{i:'ell',go:'ask-menu',l:'Mais'},{t:'OK',go}]))+`<div class="big" style="padding-bottom:2px">Pergunte</div><div class="hint" style="padding-top:0">${sub}</div>`;
+const askBase=(base,sub,back)=>phone(base+`<div class="dim"></div><div class="sheet full"><div class="grab"></div>${askHead(sub,back)}<div style="display:flex;flex-direction:column;gap:8px;padding:18px 20px">${['O que foi decidido?','Quais são os próximos passos e de quem?','O que ficou em aberto?','Escreva um e-mail de resumo para quem faltou'].map(s=>`<span style="align-self:flex-start;background:var(--white);border-radius:16px;padding:9px 14px;font-size:15px;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.08)"${G('ask-answer')}>${s}</span>`).join('')}</div>${composer()}</div>`);
+add({id:'ask-meeting',g:'Pergunte',n:'Pergunte sobre a reunião',st:'novo',today:'c5-chat',file:['MeetingChatView','ChatModelChip'],
+ r:()=>askBase(meetingSummary(),'Sobre "Alinhamento do roadmap" · transcrição, resumo e wiki','m-summary'),
+ what:['Folha aberta pela barra "Pergunte"; substitui a aba Chat.','Sugestões prontas que viram a pergunta com um toque.','Compositor como hoje: chip do modelo e nível de raciocínio, chip das fontes, medidor de contexto e enviar.','Topo: histórico à esquerda; ⋯ e OK à direita (some a fileira de quatro ícones de hoje).'],
+ acts:[['Sugestão','ask-answer'],['Chip do modelo','ask-model'],['Fontes','ask-sources'],['Histórico','ask-history'],['⋯','ask-menu'],['OK','m-summary']]});
+add({id:'ask-library',g:'Pergunte',n:'Pergunte (todas as reuniões)',st:'muda',file:['MeetingChatView'],
+ r:()=>askBase(listBody()+bottomBar(),'Todas as reuniões · 6 reuniões','list'),
+ what:['A mesma folha, aberta pela barra inferior, com escopo de toda a biblioteca.','O chip de fontes diz o escopo e abre a escolha de reuniões.'],acts:[['Sugestão','ask-answer'],['OK','list']]});
+add({id:'ask-answer',g:'Pergunte',n:'Conversa com resposta',st:'muda',file:['MeetingChatTurnView','ChatStepTimelineView','ChatToolGroupRow','ChatRunStatusLine','ChatArtifactCard'],
+ r:()=>phone(meetingSummary()+`<div class="dim"></div><div class="sheet full"><div class="grab"></div>${askHead('Sobre "Alinhamento do roadmap"')}<div class="bubble">O que foi decidido?</div><div class="act"${G('ask-steps')}>${I('spark',15)}Pensou por 6 s · 3 ações${I('down',12)}</div><div class="ans"><p>Foram duas decisões:</p><p>1. Sincronização offline e exportação são as prioridades do trimestre <span class="cite">0:18</span></p><p>2. O formato de importação antigo deixa de ser aceito <span class="cite">4:05</span></p><p style="color:var(--sec);font-size:14px">Ficou em aberto se isso entra nesta versão ou na próxima <span class="cite">9:40</span></p></div><div class="act" style="gap:18px">${I('copy',17)}${I('refresh',17)}${I('branch',17)}<span style="margin-left:auto;font-size:12.5px">1.240 tokens · US$ 0,004</span></div>${composer('Pergunte mais…')}</div>`),
+ what:['Pergunta em balão; resposta em texto corrido com horários tocáveis (abrem a transcrição naquele ponto).','A atividade da IA dobrada numa linha ("Pensou por 6 s · 3 ações"), que abre os passos.','Ações discretas: copiar, refazer, ramificar; custo estimado à direita.'],
+ acts:[['Pensou por 6 s','ask-steps'],['Horário citado','m-transcript'],['Enviar','ask-running']]});
+add({id:'ask-steps',g:'Pergunte',n:'Passos da resposta',st:'igual',file:['ChatStepTimelineView','ChatToolGroupRow'],
+ r:()=>phone(meetingSummary()+`<div class="dim"></div><div class="sheet full"><div class="grab"></div>${askHead('Sobre "Alinhamento do roadmap"')}<div class="bubble">O que foi decidido?</div><div class="act">${I('spark',15)}Pensou por 6 s · 3 ações${I('down',12,'')}</div><div style="padding:4px 20px 0 30px;font-size:14.5px;line-height:1.5;color:var(--ink2)"><div>● Leu o resumo <span style="color:var(--gray)">— Geral</span></div><div style="color:var(--gray)">⎿ 4 seções</div><div>● Leu 2 transcrições <span style="color:var(--gray)">— Gravação 1, Gravação 2</span></div><div style="color:var(--gray)">⎿ 62 falas</div><div>● Buscou "decisão importação"</div><div style="color:var(--gray)">⎿ 3 trechos</div><div style="margin-top:8px;color:var(--gray)"${G('ask-answer')}>Detalhes do contexto ›</div></div>${composer('Pergunte mais…')}</div>`),
+ what:['O mesmo desenho de hoje (estilo Claude Code), sem mudança.'],acts:[['Voltar','ask-answer']]});
+add({id:'ask-running',g:'Pergunte',n:'Respondendo',st:'igual',file:['ChatQueuedInputView','ChatRunStatusLine'],
+ r:()=>phone(meetingSummary()+`<div class="dim"></div><div class="sheet full"><div class="grab"></div>${askHead('Sobre "Alinhamento do roadmap"')}<div class="bubble">E quem ficou com cada tarefa?</div><div class="act"><span class="ring"></span>Lendo a transcrição · 4 s · 120 tokens</div><div class="ans"><p>Sam ficou com o design da exportação <span class="cite">0:40</span> e Priya com o dimensionamento da sincroniz<span style="display:inline-block;width:2px;height:16px;background:var(--ink);vertical-align:-2px"></span></p></div><div class="cmp2"><div class="ph2" style="color:var(--ink)">e o prazo de cada um?</div><div class="rw"><span class="mchip">Orientar</span><span class="mchip">Depois desta</span><span class="go" style="background:#d70015"${G('ask-answer')}>${I('stop',14)}</span></div></div></div>`),
+ what:['Linha de estado com o que a IA faz, tempo e tokens.','Com texto digitado durante a resposta: "Orientar" (entra no meio) ou "Depois desta" (fila), como hoje.','Parar em vermelho.'],acts:[['Parar','ask-answer']]});
+add({id:'ask-model',g:'Pergunte',n:'Modelo e raciocínio',st:'igual',file:['ChatModelChip'],
+ r:()=>phone(meetingSummary()+sheet(sect('Provedor')+grp([{ico:'cpu',t:'Anthropic',tr:'check'},{ico:'cpu',t:'OpenAI'},{ico:'cpu',t:'Google Gemini'}])+sect('Modelo')+grp([{t:'Claude Sonnet 5.5',m:'Janela de 1M tokens',tr:'check'},{t:'Claude Opus 5.5'},{t:'Claude Haiku 5.5'}])+sect('Raciocínio')+`<div class="seg2"><span>Auto</span><span>Baixo</span><span class="on">Médio</span><span>Alto</span></div>`+foot('O mesmo modelo é usado nos resumos. Mais raciocínio responde melhor perguntas difíceis e custa mais.'),{left:'',right:gt('OK','ask-meeting',1),title:'Modelo',close:'ask-meeting'})),
+ what:['Escolha de provedor, modelo e nível de raciocínio, como hoje (ChatModelSheet).','Os nomes de modelos são exemplos.'],acts:[['OK','ask-meeting']]});
+add({id:'ask-sources',g:'Pergunte',n:'Fontes',st:'igual',file:['ChatSourceSheet'],
+ r:()=>phone(meetingSummary()+sheet(sect('O que a IA pode ler')+grp([{t:'Transcrição',tr:'ton'},{t:'Resumos',tr:'ton'},{t:'Wiki',tr:'ton'},{t:'Anexos (PDF)',tr:'tog'}])+foot('Só o que estiver ligado é enviado ao provedor escolhido.'),{right:gt('OK','ask-meeting',1),title:'Fontes',size:'med',close:'ask-meeting'})),
+ what:['Mesmas opções de hoje; na biblioteca inclui escolher reuniões, tags ou pastas.'],acts:[['OK','ask-meeting']]});
+add({id:'ask-history',g:'Pergunte',n:'Histórico de conversas',st:'muda',file:['ChatSessionListView'],
+ r:()=>phone(meetingSummary()+sheet(`<div class="srch" style="margin-top:0">${I('search',17)}Buscar conversas</div>`+grp([{t:'O que foi decidido?',m:'Hoje 19:10 · 2 perguntas',tr:'chev',go:'ask-answer'},{t:'Prazos da exportação',m:'Hoje 18:55 · 5 perguntas',tr:'chev'},{t:'E-mail para quem faltou',m:'Ontem · 1 pergunta',tr:'chev'}]),{left:gt('Fechar','ask-meeting'),right:glass([{i:'compose',go:'ask-meeting',l:'Nova conversa'}]),title:'Conversas'})),
+ what:['Busca, lista com data e tamanho; deslizar para renomear ou excluir.','Nova conversa no canto.'],acts:[['Abrir conversa','ask-answer'],['Nova conversa','ask-meeting']]});
+add({id:'ask-menu',g:'Pergunte',n:'Menu da conversa',st:'igual',file:['ChatConversationMenu','ChatBranchViews'],
+ r:()=>phone(meetingSummary()+`<div class="dim"></div><div class="sheet full"><div class="grab"></div>${askHead('Sobre "Alinhamento do roadmap"')}<div class="bubble">O que foi decidido?</div>${composer()}</div>`+menu([{l:'Nova conversa',i:'compose',go:'ask-meeting'},{l:'Duplicar conversa',i:'copy'},{l:'Todas as ramificações',i:'branch'},'-',{l:'Resumir mensagens anteriores',i:'spark'},{l:'Exportar como…',i:'share'},{l:'Exportar arquivo da conversa',i:'down2'},{l:'Importar conversa',i:'docplus'}],{right:16,top:96},'ask-answer')),
+ what:['Reúne o que hoje está espalhado em dois menus ⋯.'],acts:[['Nova conversa','ask-meeting']]});
+add({id:'ask-confirm',g:'Pergunte',n:'Confirmar troca de documento',st:'igual',file:['ChatChangeConfirmationSheet'],
+ r:()=>phone(meetingSummary()+sheet(`<div style="padding:0 20px"><b style="font-size:20px">Substituir "Ata da reunião"?</b><p style="color:var(--sec);margin:6px 0 12px">A IA quer trocar o texto do documento pela versão abaixo. A versão atual fica no histórico.</p></div><div class="grp" style="padding:12px 14px;font-size:14.5px;line-height:1.45;max-height:300px;overflow:hidden"><b>Ata — Alinhamento do roadmap</b><br>Decisões: sincronização offline e exportação…</div><div style="display:flex;gap:10px;padding:18px 20px"><span class="cta sec" style="flex:1"${G('ask-answer')}>Recusar</span><span class="cta" style="flex:1"${G('ask-answer')}>Substituir</span></div>`,{nb:false,top:300,close:'ask-answer'})),
+ what:['Folha que mostra o texto novo antes de substituir um documento; só responde pelos seus botões.'],acts:[['Substituir','ask-answer'],['Recusar','ask-answer']]});
+add({id:'ask-noprov',g:'Pergunte',n:'Sem provedor',st:'muda',file:['ChatArtifactProviderNotice'],
+ r:()=>phone(meetingSummary()+`<div class="dim"></div><div class="sheet full"><div class="grab"></div>${NB('',gt('OK','m-summary'))}<div class="big">Pergunte</div><div class="empty" style="margin-top:130px"><span class="ic">${I('cloud',48)}</span><b>Conecte um provedor de IA</b><p>As respostas usam a transcrição e citam o horário de cada fala. Só as fontes escolhidas são enviadas ao provedor.</p><span class="cta"${G('set-providers')}>Configurar provedor</span></div></div>`),
+ what:['Um único estado vazio no lugar do aviso, link azul solto e cartão cinza de hoje.','Sem compositor desativado.'],acts:[['Configurar provedor','set-providers']]});
+
+/* ---------- Wiki ---------- */
+const wikiHome=()=>`<div class="grab"></div>${NB('',glass([{i:'ell',go:'wiki-menu',l:'Mais'},{t:'OK',go:'list'}]))}<div class="big" style="padding-bottom:6px">Wiki</div><div style="padding:0 20px 10px"><span class="pillm" style="background:var(--fill)"${G('wiki-scope')}>${I('list',15)}Esta semana · 4 reuniões${I('down',12)}</span></div><div class="srch" style="margin:0 16px 4px"${G('wiki-search')}>${I('search',17)}Buscar páginas e fatos</div>`+sect('Explorar')+grp([{ico:'clock',t:'Linha do tempo',tr:'chev',go:'wiki-timeline'},{ico:'graph',t:'Relações',tr:'chev',go:'wiki-graph'},{ico:'review',t:'Revisar<span class="badge">2</span>',tr:'chev',go:'wiki-review'}])+sect('Atualizadas hoje')+grp([{ico:'book',t:'Exportação',m:'Projeto · 4 fatos · 3 reuniões',tr:'chev',go:'wiki-page'},{ico:'book',t:'Sincronização offline',m:'Decisão · aprovada',tr:'chev',go:'wiki-page'},{ico:'book',t:'Priya',m:'Pessoa · 2 tarefas abertas',tr:'chev',go:'wiki-page'}]);
+add({id:'wiki-home',g:'Wiki',n:'Início do Wiki',st:'muda',today:'c6-knowledge',file:['KnowledgeLibraryDestination','KnowledgeBrowserView'],
+ r:()=>phone(listBody()+`<div class="dim"></div><div class="sheet full">${wikiHome()}</div>`),
+ what:['Abre já com as reuniões da semana; o chip troca o escopo.','Busca, Explorar (linha do tempo, relações, revisar com contador) e páginas atualizadas há pouco.','Sem o botão vermelho "Escolher reuniões".'],
+ acts:[['Escopo','wiki-scope'],['Busca','wiki-search'],['Linha do tempo','wiki-timeline'],['Relações','wiki-graph'],['Revisar','wiki-review'],['Exportação','wiki-page'],['⋯','wiki-menu']]});
+add({id:'wiki-off',g:'Wiki',n:'Wiki desligado',st:'muda',file:['KnowledgeLibraryDestination'],
+ r:()=>phone(listBody()+`<div class="dim"></div><div class="sheet full"><div class="grab"></div>${NB('',gt('OK','list'))}<div class="big">Wiki</div><div class="empty" style="margin-top:110px"><span class="ic">${I('book',48)}</span><b>Um wiki das suas reuniões</b><p>A IA lê as transcrições e mantém páginas sobre pessoas, projetos e decisões, cada fato com a fala de onde veio. Funciona no aparelho.</p><span class="cta"${G('set-wiki')}>Ligar o Wiki</span></div></div>`),
+ what:['Explica o que o Wiki faz antes de ligar; o botão leva ao ajuste.'],acts:[['Ligar o Wiki','set-wiki']]});
+add({id:'wiki-scope',g:'Wiki',n:'Escolher reuniões',st:'muda',file:['KnowledgeLibraryDestination','KnowledgeScopeSettingsView'],
+ r:()=>phone(listBody()+`<div class="dim"></div><div class="sheet full">${wikiHome()}</div>`+sheet(`<div class="seg2" style="margin-bottom:6px"><span>Hoje</span><span class="on">Esta semana</span><span>Escolher</span></div>`+grp([{lead:'<span class="chk on">'+I('check',13)+'</span>',t:'Alinhamento do roadmap',m:'Hoje'},{lead:'<span class="chk on">'+I('check',13)+'</span>',t:'Revisão de design',m:'Hoje'},{lead:'<span class="chk on">'+I('check',13)+'</span>',t:'Onboarding do cliente',m:'Hoje'},{lead:'<span class="chk on">'+I('check',13)+'</span>',t:'Entrevista com cliente',m:'Ontem'}])+foot('Até 16 reuniões por vez.'),{left:gt('Cancelar','wiki-home'),right:gt('Usar 4','wiki-home',1),title:'Reuniões',size:'full',top:110,close:'wiki-home'})),
+ what:['Atalhos Hoje/Esta semana e escolha manual; o limite de 16 fica numa nota.'],acts:[['Usar 4','wiki-home']]});
+add({id:'wiki-search',g:'Wiki',n:'Busca no Wiki',st:'muda',file:['KnowledgeSearchResultsView'],
+ r:()=>phone(listBody()+`<div class="dim"></div><div class="sheet full"><div class="grab"></div><div style="display:flex;gap:10px;align-items:center;padding:14px 16px 4px"><div class="srch on" style="flex:1;margin:0">${I('search',17,'var(--ph)')}export</div><span style="color:var(--blue);font-size:17px"${G('wiki-home')}>Cancelar</span></div>`+sect('Páginas')+grp([{ico:'book',t:'Exportação',m:'Projeto',tr:'chev',go:'wiki-page'}])+sect('Fatos')+grp([{t:'Responsável: Sam',m:'"Eu fico com a <b style=color:var(--ink)>export</b>ação" · 0:40',go:'wiki-evidence'},{t:'Status: em andamento',m:'Alinhamento do roadmap · 0:40'}])+`</div>`),
+ what:['Resultados por tipo: páginas, apelidos e fatos com a citação.'],acts:[['Exportação','wiki-page'],['Fato','wiki-evidence']]});
+add({id:'wiki-menu',g:'Wiki',n:'Menu do Wiki',st:'novo',file:['KnowledgeBrowserView'],
+ r:()=>phone(listBody()+`<div class="dim"></div><div class="sheet full">${wikiHome()}</div>`+menu([{l:'Atualizar',i:'refresh'},{l:'Exportar wiki',i:'share'},{l:'Ajustes do Wiki',i:'gear',go:'set-wiki'}],{right:16,top:110},'wiki-home')),
+ what:['Atualizar e Exportar, que hoje são ícones soltos no topo.'],acts:[['Ajustes do Wiki','set-wiki']]});
+add({id:'wiki-page',g:'Wiki',n:'Página do wiki',st:'muda',today:'c8-entity',file:['KnowledgeEntityPageView','KnowledgeLateArrivalsView'],
+ r:()=>phone(SB()+NB(gc('back','wiki-home'),glass([{i:'clock',go:'wiki-timeline',l:'Linha do tempo'},{i:'graph',go:'wiki-graph',l:'Relações'},{i:'ell',go:'wiki-page-menu',l:'Mais'}]))+`<div class="h1">Exportação</div><div class="ppl" style="padding-bottom:10px"><span class="typ">Projeto</span><span class="typ">3 reuniões</span><span class="typ">Atualizada hoje</span></div><p class="para">Projeto prioritário do <span class="wl">Roadmap T3</span>, liderado por <span class="wl">Sam</span>. O design deve estar pronto antes da revisão de quinta e depende do formato de importação que sai na próxima versão.</p><div class="gen">${I('spark',13)}Escrito pela IA a partir dos fatos abaixo</div>`+sect('Fatos')+`<div class="grp flat">${[['Responsável','<span class="wl">Sam</span>','Alinhamento do roadmap · 0:40'],['Status','Em andamento, desde 21 nov.','Alinhamento do roadmap · 0:40'],['Prazo','Quinta, 27 nov. <span class="tent">· proposto</span>','Alinhamento do roadmap · 10:42']].map(([k,v,q])=>`<div class="kv"${G('wiki-evidence')}><div class="k">${k}</div><div class="v">${v}</div><div class="q">${q}</div></div>`).join('')}</div>`+sect('Mencionada em')+grp([{t:'Alinhamento do roadmap',m:'Hoje · 3 fatos',tr:'chev',go:'m-wiki'},{t:'Revisão de design',m:'Hoje · 1 fato',tr:'chev'}],'flat')+`<div class="fade" style="height:110px"></div>`+askBar('Pergunte sobre Exportação','ask-library'),{paper:1}),
+ what:['Título, tipo e alcance; parágrafo da IA com ligações; fatos com rótulo, valor e fonte; "Mencionada em".','O que é proposto aparece em itálico.','Quando um fato chega depois e muda o passado, aparece a seção "Revisado depois" (como hoje).'],
+ acts:[['Fato','wiki-evidence'],['Linha do tempo','wiki-timeline'],['Relações','wiki-graph'],['⋯','wiki-page-menu'],['Mencionada em','m-wiki']]});
+add({id:'wiki-page-menu',g:'Wiki',n:'Menu da página',st:'novo',file:['KnowledgeEntityPageView','KnowledgeCompareView'],
+ r:()=>phone(SB()+NB(gc('back','wiki-home'),glass([{i:'clock'},{i:'graph'},{i:'ell'}]))+`<div class="h1">Exportação</div>`+menu([{l:'Comparar datas',i:'cal',go:'wiki-compare'},{l:'Fontes',i:'list',go:'wiki-evidence'},{l:'Perguntar sobre esta página',i:'bubble',go:'ask-library'}],{right:16,top:96},'wiki-page'),{paper:1}),
+ what:['Comparar datas e Fontes saem de abas e ícones e vêm para o menu.'],acts:[['Comparar datas','wiki-compare'],['Fontes','wiki-evidence']]});
+add({id:'wiki-evidence',g:'Wiki',n:'Trecho de origem',st:'muda',file:['KnowledgeEvidenceDetailView'],
+ r:()=>phone(SB()+NB(gc('back','wiki-page'),'','Fonte')+`<div style="padding:4px 20px 0"><div style="color:var(--sec);font-size:14px">Alinhamento do roadmap · Gravação 1</div><div style="font-size:20px;font-weight:700;margin-top:2px">Responsável: Sam</div></div><div class="grp" style="margin-top:14px;padding:14px 16px"><div style="display:flex;align-items:center;gap:10px"><span class="go" style="margin:0;width:40px;height:40px">${I('play',16)}</span><div style="flex:1"><div class="scrub"><b style="width:12%"></b></div><div style="font-size:12.5px;color:var(--sec);margin-top:6px;font-variant-numeric:tabular-nums">0:38 – 0:46</div></div></div></div><div class="tr" style="padding-top:8px">`+[['P','0:18','Combinado. Nas conversas com clientes, sincronização offline e exportação sempre aparecem.',0],['S','0:40','Eu fico com a exportação — já tenho um rascunho do design da última sprint.',1],['A','1:01','Ótimo. Priya, consegue dimensionar a sincronização offline até sexta?',0]].map(([k,t,p,h])=>`<div class="ts${h?' hl':''}"><div class="sh">${av(k)}<span style="color:${AV[k][1]}">${AV[k][2]}</span><time>${t}</time></div><p>${p}</p></div>`).join('')+`</div>`,{paper:1}),
+ what:['O fato, a gravação de origem, um player do trecho e a transcrição em volta com a fala destacada.'],acts:[['Voltar','wiki-page']]});
+add({id:'wiki-timeline',g:'Wiki',n:'Linha do tempo',st:'muda',file:['KnowledgeTimelineView'],
+ r:()=>phone(SB()+NB(gc('back','wiki-home'),glass([{i:'filter',go:'wiki-tl-filter',l:'Filtros'}]),'Linha do tempo')+`<div class="tl"><div class="m">Novembro 2026</div>${[['Status: aprovada','Sincronização offline · 21 nov.','Alinhamento do roadmap'],['Responsável: Sam','Exportação · 21 nov.','Alinhamento do roadmap'],['Prazo: 27 nov. · proposto','Exportação · planejado','Alinhamento do roadmap']].map(([a,b,c],i)=>`<div class="e"${G('wiki-evidence')}><div class="ln"><i${i==2?' style="background:var(--white);border:1.5px solid #1c1c1e"':''}></i><b></b></div><div class="x"><b style="font-weight:600">${a}</b><small>${b}</small><small>${c}</small></div></div>`).join('')}<div class="m">Sem data</div><div class="e"><div class="ln"><i style="background:var(--ter2)"></i><b></b></div><div class="x">Priya: dimensionar a sincronização<small>Pessoa · registrado hoje</small></div></div></div>`,{paper:1}),
+ what:['Meses como cabeçalhos; cada fato com a página e a reunião; o que é proposto tem ponto vazado.','"Sem data" separado, como hoje.'],acts:[['Fato','wiki-evidence'],['Filtros','wiki-tl-filter']]});
+add({id:'wiki-tl-filter',g:'Wiki',n:'Filtros da linha do tempo',st:'igual',file:['KnowledgeTimelineView'],
+ r:()=>phone(SB()+NB(gc('back','wiki-home'),'','Linha do tempo')+sheet(sect('Mostrar')+grp([{t:'Status',tr:'ton'},{t:'Prazos',tr:'ton'},{t:'Substituições',tr:'ton'},{t:'Outras relações',tr:'ton'}])+sect('Incluir')+grp([{t:'Propostas e hipóteses',tr:'ton'},{t:'Negações',tr:'tog'}]),{right:gt('OK','wiki-timeline',1),title:'Filtros',size:'med',close:'wiki-timeline'}),{paper:1}),what:['Mesmos filtros de hoje em grupos com interruptores.'],acts:[['OK','wiki-timeline']]});
+add({id:'wiki-graph',g:'Wiki',n:'Relações',st:'muda',file:['KnowledgeGraphView'],
+ r:()=>phone(SB()+NB(gc('back','wiki-page'),glass([{i:'filter',l:'Filtros'}]),'Relações')+`<div class="seg2" style="margin:2px 16px 0"><span class="on">Todas</span><span>Num dia</span><span>Comparar</span><span>Contextos</span></div><svg width="392" height="470" style="margin-top:6px"><g style="stroke:var(--ter2)" stroke-width="1.6"><line x1="196" y1="220" x2="90" y2="110"/><line x1="196" y1="220" x2="310" y2="120"/><line x1="196" y1="220" x2="300" y2="340"/><line x1="196" y1="220" x2="85" y2="350" stroke-dasharray="5 4"/></g><rect x="160" y="196" width="72" height="48" rx="12" style="fill:var(--prim)"/><text x="196" y="225" style="fill:var(--onprim)" font-size="12" text-anchor="middle" font-family="-apple-system">Exportação</text>${[[90,110,'Sam'],[310,120,'Roadmap T3'],[300,340,'Importação'],[85,350,'Prazo 27/11']].map(([x,y,t])=>`<circle cx="${x}" cy="${y}" r="22" style="fill:var(--white);stroke:var(--ink)" stroke-width="1.5"/><text x="${x}" y="${y+40}" font-size="12.5" text-anchor="middle" font-family="-apple-system" style="fill:var(--ink2)">${t}</text>`).join('')}</svg><div class="seg2" style="margin:0 16px"><span class="on">Desenho</span><span>Lista</span></div><div class="foot" style="padding:10px 20px">5 páginas · 4 relações · tracejado = proposto</div>`,{paper:1}),
+ what:['Mesmos modos de hoje; nós em branco e tinta, sem depender de cor; tracejado para proposto.','Alternativa em lista para leitores de tela.'],acts:[['Voltar','wiki-page']]});
+add({id:'wiki-compare',g:'Wiki',n:'Comparar datas',st:'igual',file:['KnowledgeCompareView'],
+ r:()=>phone(SB()+NB(gc('back','wiki-page'),'','Comparar datas')+grp([{t:'De',val:'14 nov.',tr:'chev'},{t:'Até',val:'21 nov.',tr:'chev'},{t:'Como era sabido em cada data',tr:'tog'}])+sect('Mudou')+grp([{t:'Status: planejado → em andamento',m:'Alinhamento do roadmap · 0:40'}])+sect('Começou')+grp([{t:'Responsável: Sam',m:'Alinhamento do roadmap · 0:40'}]),{paper:1}),what:['Mesmo conteúdo de hoje, em grupos.'],acts:[['Voltar','wiki-page']]});
+add({id:'wiki-review',g:'Wiki',n:'Revisar',st:'muda',file:['KnowledgeReviewInboxView','KnowledgeIdentityReviewView'],
+ r:()=>phone(SB()+NB(gc('back','wiki-home'),'','Revisar')+`<div class="seg2" style="margin:2px 16px 10px"><span class="on">Pendentes · 2</span><span>Mantidas</span><span>Histórico</span></div>`+sect('Podem ser a mesma página')+`<div class="grp" style="padding:14px 16px"><div style="display:flex;gap:10px;align-items:center"><span class="typ">Pessoa</span><b>Priya</b><span style="color:var(--gray)">e</span><b>Priya S.</b></div><div style="color:var(--sec);font-size:13.5px;margin-top:6px">Mesmo nome em 2 reuniões. Nada é juntado sem você.</div><div style="display:flex;gap:8px;margin-top:12px"><span class="cta sec" style="height:38px;font-size:14px;flex:1">Manter separadas</span><span class="cta" style="height:38px;font-size:14px;flex:1"${G('wiki-merge')}>Juntar…</span></div></div>`+sect('Para conferir')+grp([{t:'Datas só com o mês',m:'Exportação · "em dezembro"',tr:'chev',go:'wiki-evidence'}]),{paper:1}),
+ what:['Pendentes, mantidas e histórico em segmentos; cada sugestão com o motivo e as duas saídas.'],acts:[['Juntar…','wiki-merge'],['Conferir','wiki-evidence']]});
+add({id:'wiki-merge',g:'Wiki',n:'Juntar páginas',st:'igual',file:['KnowledgeIdentityReviewView'],
+ r:()=>phone(SB()+NB(gc('back','wiki-home'),'','Revisar')+alertBox('Juntar "Priya S." em "Priya"?','Os fatos das duas passam a aparecer numa página só. Dá para desfazer no histórico.',[{l:'Juntar',k:'p',go:'wiki-review'},{l:'Cancelar',go:'wiki-review'}]),{paper:1}),what:['Confirmação que diz que é reversível.'],acts:[['Juntar','wiki-review']]});
+
+/* ---------- Documentos ---------- */
+add({id:'docs',g:'Documentos',n:'Documentos',st:'muda',file:['DocumentsListView'],
+ r:()=>phone(SB()+NB(gc('back','list'),glass([{i:'plus',go:'ask-library',l:'Novo documento'}]))+`<div class="lt">Documentos</div><div class="srch">${I('search',17)}Buscar documentos</div>`+grp([{ico:'doc',t:'Ata — Alinhamento do roadmap',m:'De: Alinhamento do roadmap · hoje',tr:'chev',go:'doc'},{ico:'doc',t:'Plano de exportação',m:'De: 3 reuniões · ontem',tr:'chev'}])+foot('Documentos são criados pelo Pergunte: peça uma ata, um relatório ou um plano.')),
+ what:['Lista agrupada como o resto do app, ícone neutro e a origem numa linha.','O + abre o Pergunte para pedir um documento.'],acts:[['Abrir documento','doc'],['Novo','ask-library']]});
+add({id:'doc',g:'Documentos',n:'Documento',st:'muda',file:['DocumentDetailView','DocumentExport'],
+ r:()=>phone(SB()+NB(gc('back','docs'),glass([{i:'share',go:'doc-menu',l:'Compartilhar'},{i:'ell',go:'doc-menu',l:'Mais'}]))+`<div class="h1">Ata — Alinhamento do roadmap</div><div class="dm">Criado hoje 19:20 · Claude Sonnet 5.5 · versão 2</div><div style="padding:0 20px 6px"><span class="ghost">${I('spk',18)}Ouvir</span></div>${sum1}`,{paper:1}),
+ what:['Leitura em branco, igual ao resumo; origem e versão numa linha.'],acts:[['Compartilhar/⋯','doc-menu']]});
+add({id:'doc-menu',g:'Documentos',n:'Menu do documento',st:'igual',file:['DocumentDetailView'],
+ r:()=>phone(SB()+NB(gc('back','docs'),glass([{i:'share'},{i:'ell'}]))+`<div class="h1">Ata — Alinhamento do roadmap</div>`+menu([{l:'Copiar Markdown',i:'copy'},{l:'Exportar Markdown',i:'share'},{l:'Exportar Word',i:'share'},{l:'Exportar HTML',i:'share'},'-',{l:'Ver de onde veio',i:'info'},{l:'Excluir documento',i:'trash',dest:1,go:'doc-delete'}],{right:16,top:96},'doc'),{paper:1}),what:['Exportações e origem num menu; excluir por último.'],acts:[['Excluir documento','doc-delete']]});
+add({id:'doc-delete',g:'Documentos',n:'Excluir documento',st:'igual',file:['DocumentsListView'],
+ r:()=>phone(SB()+NB(gc('back','docs'),'')+`<div class="h1">Ata — Alinhamento do roadmap</div>`+alertBox('Excluir este documento?','A conversa que o criou continua; dá para salvar de novo a partir dela.',[{l:'Excluir',k:'d',go:'docs'},{l:'Cancelar',go:'doc'}]),{paper:1}),what:['Confirmação.'],acts:[['Excluir','docs']]});
+
+/* ---------- Ajustes ---------- */
+const setTop=(title,back='settings',right='')=>SB()+NB(gc('back',back,'Voltar'),right)+`<div class="lt" style="font-size:30px">${title}</div>`;
+const setRoot=()=>SB()+NB('',gt('OK','list'))+`<div class="lt">Ajustes</div>`+grp([{ico:'shield',icf:1,t:'Privacidade e nuvem',tr:'chev',go:'set-privacy'},{ico:'cpu',icf:1,t:'Provedores de IA',val:'2',tr:'chev',go:'set-providers'}])+sect('Captura')+grp([{ico:'mic',icf:1,t:'Gravação',tr:'chev',go:'set-recording'},{ico:'wave',icf:1,t:'Transcrição',val:'Melhor no aparelho',tr:'chev',go:'set-transcription'}])+sect('Inteligência')+grp([{ico:'spark',icf:1,t:'Resumo',tr:'chev',go:'set-summary'},{ico:'book',icf:1,t:'Wiki',val:'Ligado',tr:'chev',go:'set-wiki'},{ico:'spk',icf:1,t:'Leitura em voz alta',tr:'chev',go:'set-readaloud'}])+sect('Biblioteca')+grp([{ico:'tag',icf:1,t:'Tags',tr:'chev',go:'set-tags'},{ico:'search',icf:1,t:'Busca',tr:'chev',go:'set-search'},{ico:'disk',icf:1,t:'Armazenamento',val:'1,2 GB',tr:'chev',go:'set-storage'}])+sect('Sistema')+grp([{ico:'pulse',icf:1,t:'Saúde e recuperação',tr:'chev',go:'set-health'},{ico:'info',icf:1,t:'Diagnóstico',tr:'chev',go:'set-diagnostics'},{ico:'chart',icf:1,t:'Uso',tr:'chev',go:'set-usage'},{ico:'heart',icf:1,t:'Sobre o Kurn',tr:'chev',go:'set-about'}])+`<div style="margin-top:22px">${grp([{t:'Apagar todos os dados',dest:1,go:'delete-all'}])}</div>`;
+add({id:'settings',g:'Ajustes',n:'Ajustes',st:'muda',today:'h-settings',file:['SettingsView','SettingsSections'],
+ r:()=>phone(setRoot()),
+ what:['Título grande e ícones em quadrados cinza (hoje são azuis soltos).','Sem cabeçalho que repete o item ("Privacidade e nuvem" duas vezes).','"Knowledge" e "Wiki das Reuniões" viram uma linha só: Wiki.','Valores à direita para o que mais se consulta (motor de transcrição, espaço usado).','"Apagar todos os dados" isolado no fim, em vermelho.'],
+ acts:[['Privacidade e nuvem','set-privacy'],['Provedores de IA','set-providers'],['Gravação','set-recording'],['Transcrição','set-transcription'],['Resumo','set-summary'],['Wiki','set-wiki'],['Leitura em voz alta','set-readaloud'],['Tags','set-tags'],['Busca','set-search'],['Armazenamento','set-storage'],['Saúde e recuperação','set-health'],['Diagnóstico','set-diagnostics'],['Uso','set-usage'],['Sobre','set-about'],['Apagar todos os dados','delete-all']]});
+add({id:'set-privacy',g:'Ajustes',n:'Privacidade e nuvem',st:'muda',file:['PrivacyCloudSettingsView'],
+ r:()=>phone(setTop('Privacidade e nuvem')+sect('Bloqueio')+grp([{t:'Pedir Face ID ao abrir',tr:'ton'},{t:'Esconder título na tela bloqueada',tr:'ton'}])+sect('Para onde o conteúdo vai')+grp([{ico:'cpu',t:'Anthropic',m:'Quando você pede · resumos e chat',tr:'chev',go:'set-provider-grants'},{ico:'cpu',t:'OpenAI',m:'Automático · transcrição na nuvem',tr:'chev',go:'set-provider-grants'}])+foot('Tudo o mais fica no aparelho.')+sect('Outros envios')+grp([{t:'Sincronizar modelos de resumo (iCloud)',tr:'tog'},{t:'Relatórios de falhas',val:'Desligado',tr:'chev'}])+`<div style="margin-top:22px">${grp([{t:'Remover todas as permissões',dest:1,go:'revoke-all'}])}</div>`),
+ what:['Bloqueio, destinos com o tipo de permissão e o que é enviado, e outros envios.'],acts:[['Anthropic','set-provider-grants'],['Remover todas as permissões','revoke-all']]});
+add({id:'set-provider-grants',g:'Ajustes',n:'Permissões de um provedor',st:'igual',file:['PrivacyCloudSettingsView'],
+ r:()=>phone(setTop('Anthropic','set-privacy')+grp([{t:'Quando você pede',m:'Resumos, chat, documentos, título',tr:'ton'},{t:'Automático',m:'Wiki, correção, títulos a cada gravação',tr:'tog'}])+foot('Automático envia cada nova transcrição sem perguntar.')+sect('Usado por')+grp([{t:'Resumo'},{t:'Pergunte'}])+`<div style="margin-top:22px">${grp([{t:'Remover permissões deste provedor',dest:1}])}</div>`),what:['Detalhe por destino, como hoje.'],acts:[['Voltar','set-privacy']]});
+add({id:'revoke-all',g:'Ajustes',n:'Remover todas as permissões',st:'igual',file:['PrivacyCloudSettingsView'],
+ r:()=>phone(setTop('Privacidade e nuvem')+alertBox('Remover todas as permissões?','Resumos, Wiki e leitura voltam para o aparelho. Nada mais é enviado até você permitir de novo.',[{l:'Remover',k:'d',go:'set-privacy'},{l:'Cancelar',go:'set-privacy'}])),what:['Confirmação com o efeito.'],acts:[['Remover','set-privacy']]});
+add({id:'set-providers',g:'Ajustes',n:'Provedores de IA',st:'muda',file:['ProvidersSettingsView','SettingsProviderViews'],
+ r:()=>phone(setTop('Provedores de IA','settings',glass([{i:'plus',go:'set-provider-form',l:'Adicionar'}]))+grp([{ico:'cpu',t:'Apple Intelligence',m:'No aparelho · sem chave',tr:I('checkc',20,'var(--green)')},{ico:'cpu',t:'Anthropic',m:'Chave salva',tr:I('checkc',20,'var(--green)'),go:'set-provider-form'},{ico:'cpu',t:'OpenAI',m:'Chave salva',tr:I('checkc',20,'var(--green)')},{ico:'cpu',t:'Google Gemini',m:'Sem chave',tr:'chev'},{ico:'cpu',t:'Groq',m:'Sem chave',tr:'chev'},{ico:'cpu',t:'ElevenLabs',m:'Só transcrição · sem chave',tr:'chev'}])+foot('As chaves ficam no Keychain do aparelho.')),
+ what:['Estado de cada provedor numa linha; o + adiciona um endpoint compatível.'],acts:[['Anthropic','set-provider-form'],['Adicionar','set-provider-form']]});
+add({id:'set-provider-form',g:'Ajustes',n:'Chave do provedor',st:'igual',file:['ProvidersSettingsView'],
+ r:()=>phone(SB()+sheet(sect('Chave de API')+`<div class="field ph">sk-ant-…</div>`+foot('Fica só no Keychain. Salvar pede Face ID.')+sect('Endereço')+`<div class="field" style="color:var(--sec)">https://api.anthropic.com</div>`+`<div style="margin-top:22px">${grp([{t:'Testar conexão',link:1},{t:'Remover chave',dest:1}])}</div>`,{left:gt('Cancelar','set-providers'),right:gt('Salvar','set-providers',1),title:'Anthropic'})),what:['Chave, endereço, testar e remover.'],acts:[['Salvar','set-providers']]});
+add({id:'set-recording',g:'Ajustes',n:'Gravação',st:'igual',file:['RecordingSettingsView'],
+ r:()=>phone(setTop('Gravação')+sect('Captura')+grp([{t:'Qualidade',val:'Padrão · 22 MB/h',tr:'chev'},{t:'Sempre usar o microfone do iPhone',tr:'tog'},{t:'Captação',val:'Sala',tr:'chev'}])+sect('Transcrição ao vivo')+grp([{t:'Mostrar enquanto grava',tr:'tog'}])+foot('Prévia no aparelho; a transcrição final é feita depois.')+sect('Reprodução')+grp([{t:'Áudio melhorado',tr:'ton'}])),what:['Mesmos ajustes de hoje.'],acts:[['Voltar','settings']]});
+const presetCard=(o)=>`<div class="grp" style="margin:0 16px 10px;padding:14px 16px;${o.on?'box-shadow:inset 0 0 0 2px var(--ink)':''}"${G(o.go)}><div style="display:flex;align-items:center;gap:10px"><span class="ico">${I(o.i,17)}</span><div style="flex:1"><b style="font-size:16.5px">${o.n}</b><div style="font-size:13px;color:var(--sec)">${o.w}</div></div>${o.on?I('checkc',22,'var(--ink)'):''}</div><div style="display:grid;grid-template-columns:auto 1fr;gap:5px 10px;margin-top:10px;font-size:13px;color:var(--ink2);align-items:center">${o.m.map(([k,v])=>`<span style="color:var(--sec)">${k}</span><span>${v}</span>`).join('')}</div></div>`;
+const PRESETS=[
+ {i:'cloud',n:'Melhor qualidade',w:'Na nuvem · ElevenLabs Scribe, com quem falou do próprio provedor',m:[['Reuniões (inglês)','16% de erro de palavras'],['Quem falou','17% (o melhor medido)'],['Português','12,5–43% conforme o tipo de fala'],['Precisa','chave da ElevenLabs e permissão para enviar áudio']],go:'cloud-upload'},
+ {i:'cpu',n:'Melhor no aparelho',w:'Sem enviar áudio · Parakeet ou Nemotron, conforme o idioma, e separação de falantes no aparelho',m:[['Reuniões (inglês)','21–22% de erro de palavras'],['Quem falou','25% com Nemotron 3'],['Português','24% (Nemotron Unified, o melhor medido no aparelho)'],['Precisa','baixar os modelos uma vez, no Wi-Fi']],go:'model-consent',on:1},
+ {i:'bolt',n:'Rápido e barato na nuvem',w:'Groq · Whisper large-v3 turbo',m:[['Reuniões (inglês)','26% de erro de palavras'],['Português','20,7–40,5% conforme o tipo de fala'],['Precisa','chave da Groq e permissão para enviar áudio']],go:'cloud-upload'},
+ {i:'mic',n:'Básico, sem download',w:'Apple Speech, no aparelho, e separação simples de falantes',m:[['Qualidade','ainda não medida'],['Precisa','nada; funciona logo após instalar']],go:'set-transcription'}];
+add({id:'set-transcription',g:'Ajustes',n:'Transcrição: modo simples',st:'novo',file:['TranscriptionSettingsView'],
+ r:()=>phone(SB()+NB(gc('back','settings','Voltar'),'')+`<div class="lt" style="font-size:30px">Transcrição</div><div class="seg2" style="margin-bottom:12px"><span class="on">Simples</span><span${G('set-transcription-adv')}>Avançado</span></div>`+PRESETS.map(presetCard).join('')+foot('Erro de palavras: quanto menor, melhor. Medido pelo próprio app em áudio público (AMI, CORAA, CAMOES), nov. 2026. Português varia muito com o tipo de fala.')),
+ what:['Modo novo para quem não quer escolher motor, separação e pré-processamento.','Quatro presets, cada um com onde roda, o que precisa e a qualidade medida em reuniões, em quem falou e em português.','Escolher um preset de nuvem pede a permissão de envio de áudio; um de aparelho pede o download dos modelos.','"Avançado" mostra os ajustes de hoje, sem perder nada.'],
+ acts:[['Melhor qualidade','cloud-upload'],['Melhor no aparelho','model-consent'],['Avançado','set-transcription-adv']],
+ notes:['Números de docs/pipeline-evaluation.md (tabela "Best measured configuration, by use case") e do README, medições de 1º a 6 de novembro de 2026.','Apple Speech, o padrão de hoje, nunca foi medido; por isso aparece como "ainda não medida".','"Melhor no aparelho" escolhe Nemotron Unified para reuniões em português e Parakeet v3 para inglês e outros idiomas, a partir do idioma da reunião.','Quando o usuário muda algo no Avançado, o modo simples passa a mostrar "Personalizado".']});
+add({id:'set-transcription-adv',g:'Ajustes',n:'Transcrição: avançado',st:'muda',file:['TranscriptionSettingsView','FluidAudioSettingsControls'],
+ r:()=>phone(SB()+NB(gc('back','settings','Voltar'),'')+`<div class="lt" style="font-size:30px">Transcrição</div><div class="seg2" style="margin-bottom:6px"><span${G('set-transcription')}>Simples</span><span class="on">Avançado</span></div>`+sect('Reconhecimento')+grp([{t:'Idioma padrão',val:'Português',tr:'chev'},{t:'Motor',val:'Parakeet v3',tr:'chev',go:'set-engine'}])+sect('Quem falou')+grp([{t:'Separação de falantes',val:'Nemotron 3',tr:'chev'},{t:'Número de falantes',val:'Automático',tr:'chev'},{t:'Limpar áudio para separar',tr:'ton'}])+sect('Pipeline')+grp([{t:'Pré-processamento',val:'DSP padrão',tr:'chev'},{t:'Detecção de fala',val:'Energia',tr:'chev'},{t:'Detecção de idioma',val:'Pelo motor',tr:'chev'}])+sect('Correção com IA')+grp([{t:'Corrigir nomes e termos',tr:'tog'}])+sect('Rede')+grp([{t:'Downloads grandes',val:'Só no Wi-Fi',tr:'chev'}])),
+ what:['Tudo o que existe hoje, organizado por etapa: reconhecimento, quem falou, pipeline, correção e rede.'],acts:[['Motor','set-engine'],['Simples','set-transcription']]});
+add({id:'set-engine',g:'Ajustes',n:'Motor de transcrição',st:'muda',file:['TranscriptionSettingsView','SettingsProviderViews'],
+ r:()=>phone(SB()+NB(gc('back','set-transcription-adv','Voltar'),'')+`<div class="lt" style="font-size:30px">Motor</div>`+sect('No aparelho')+grp([{t:'Apple Speech',m:'Sem download',tr:'check'},{t:'Parakeet v3',m:'FluidAudio · 25 idiomas',go:'model-consent'},{t:'Nemotron Unified',m:'FluidAudio · melhor em português',go:'model-consent'},{t:'Phonon-2 · Bark 3.0 · Transcribe Lite',m:'FluidAudio · só inglês',tr:'chev'},{t:'Whisper (whisper.cpp)',m:'base, small ou large-v3-turbo',tr:'chev',go:'model-consent'}])+sect('Na nuvem')+grp([{t:'ElevenLabs',m:'Scribe v1, Scribe v2 · separa quem falou',tr:'chev',go:'cloud-upload'},{t:'OpenAI',m:'gpt-4o-mini-transcribe, gpt-4o-transcribe, whisper-1',tr:'chev',go:'cloud-upload'},{t:'Groq',m:'whisper-large-v3, whisper-large-v3-turbo',tr:'chev',go:'cloud-upload'},{t:'Endpoint compatível',m:'Qualquer API no formato do Whisper',tr:'chev',go:'set-provider-form'}])+foot('Na nuvem, o áudio é enviado ao provedor escolhido. Provedores sem chave aparecem com "Adicionar chave".')),
+ what:['Todos os motores de hoje em dois grupos: no aparelho (Apple Speech, os modelos FluidAudio, whisper.cpp) e na nuvem (ElevenLabs Scribe, OpenAI, Groq e endpoint compatível).','Cada linha diz os modelos e o que tem de especial (ex.: ElevenLabs separa quem falou).','Escolher um da nuvem pede permissão de envio de áudio; um do aparelho, o download.'],
+ acts:[['ElevenLabs','cloud-upload'],['Groq','cloud-upload'],['Parakeet v3','model-consent'],['Endpoint compatível','set-provider-form']]});
+add({id:'model-consent',g:'Ajustes',n:'Baixar modelo',st:'igual',file:['FluidAudioModelDownloadConsent'],
+ r:()=>phone(setTop('Motor','set-engine')+alertBox('Baixar o Parakeet?','480 MB, só no Wi-Fi. Depois disso a transcrição roda no aparelho, sem internet.',[{l:'Baixar',k:'p',go:'set-transcription'},{l:'Agora não',go:'set-engine'}])),what:['Consentimento com tamanho e rede.'],acts:[['Baixar','set-transcription']]});
+add({id:'cloud-upload',g:'Ajustes',n:'Enviar áudio para a nuvem',st:'igual',file:['TranscriptionSettingsView'],
+ r:()=>phone(setTop('Motor','set-engine')+alertBox('Enviar áudio à OpenAI?','As gravações serão enviadas para transcrição em api.openai.com. Você pode remover a permissão em Privacidade e nuvem.',[{l:'Permitir',k:'p',go:'set-transcription'},{l:'Cancelar',go:'set-engine'}])),what:['Consentimento de áudio por destino.'],acts:[['Permitir','set-transcription']]});
+add({id:'set-summary',g:'Ajustes',n:'Resumo',st:'muda',file:['SummarySettingsView'],
+ r:()=>phone(setTop('Resumo')+sect('Escrever com')+grp([{t:'Provedor',val:'Anthropic',tr:'chev'},{t:'Modelo',val:'Claude Sonnet 5.5',tr:'chev',go:'ask-model'}])+sect('Modelos de resumo','Novo','set-template-editor')+grp([{ico:'spark',t:'Reunião geral',m:'Padrão',tr:'chev',go:'set-template-editor'},{ico:'person',t:'Daily / Standup',tr:'chev'},{ico:'bubble',t:'Entrevista',tr:'chev'},{ico:'lines',t:'Outline da reunião',tr:'chev'}])+sect('Títulos')+grp([{t:'Título automático com IA na nuvem',tr:'tog'}])),
+ what:['Provedor e modelo no topo; modelos de resumo com o padrão marcado.'],acts:[['Modelo','ask-model'],['Reunião geral','set-template-editor']]});
+add({id:'set-templates',g:'Ajustes',n:'Gerenciar modelos de resumo',st:'igual',file:['SummarySettingsView'],r:()=>phone(setTop('Modelos de resumo','m-template','')+grp([{ico:'spark',t:'Reunião geral',m:'Padrão',tr:'chev',go:'set-template-editor'},{ico:'person',t:'Daily / Standup',tr:'chev'},{ico:'bubble',t:'Entrevista',tr:'chev'},{ico:'lines',t:'Outline da reunião',tr:'chev'},{t:'Novo modelo',link:1,go:'set-template-editor'}])),what:['Atalho vindo do "Novo resumo".'],acts:[['Novo modelo','set-template-editor']]});
+add({id:'set-template-editor',g:'Ajustes',n:'Editar modelo de resumo',st:'igual',file:['TemplateEditorView'],
+ r:()=>phone(SB()+sheet(sect('Nome')+grp([{t:'Comitê de produto',ts:'font-weight:500'}])+sect('Descrição curta')+`<div class="field ph">Aparece na escolha do modelo</div>`+sect('Instruções')+`<div class="field" style="height:220px;font-size:15px;line-height:1.4">Use estas seções: ## Decisões, ## Riscos, ## Próximos passos (com responsável e prazo). Seja breve e cite o horário de cada decisão.</div>`+`<div style="margin-top:22px">${grp([{t:'Excluir modelo',dest:1}])}</div>`,{left:gt('Cancelar','set-summary'),right:gt('Salvar','set-summary',1),title:'Modelo'})),what:['Nome, descrição e instruções; modelos de fábrica não podem ser apagados.'],acts:[['Salvar','set-summary']]});
+add({id:'set-wiki',g:'Ajustes',n:'Wiki',st:'muda',file:['KnowledgeSettingsView','WikiSettingsView','KnowledgeScopeSettingsView'],
+ r:()=>phone(setTop('Wiki')+grp([{t:'Wiki',tr:'ton'},{t:'Atualizar a cada nova reunião',tr:'ton'},{t:'Pausar',tr:'tog'}])+foot('A IA lê as transcrições e mantém páginas sobre pessoas, projetos e decisões, cada fato com a fala de origem.')+sect('Escrever com')+grp([{t:'Provedor',val:'No aparelho',tr:'chev'}])+sect('Quais reuniões')+grp([{t:'Reuniões',val:'Todas',tr:'chev'},{t:'Excluídas',val:'Nenhuma',tr:'chev'}])+sect('Reuniões antigas')+grp([{t:'Incluir reuniões antigas…',link:1},{t:'Reescrever páginas',link:1}])+foot('Cobertura: 412 de 430 falas lidas.')+`<div style="margin-top:22px">${grp([{t:'Exportar wiki',link:1},{t:'Apagar o wiki',dest:1}])}</div>`),
+ what:['Junta "Knowledge" e "Wiki das Reuniões" num só ajuste, com as opções de hoje das duas telas.'],acts:[['Voltar','settings']],notes:['A página de cada reunião (artigo) e o wiki compilado continuam com consentimentos separados por dentro.']});
+add({id:'set-readaloud',g:'Ajustes',n:'Leitura em voz alta',st:'muda',file:['ReadAloudSettingsView'],
+ r:()=>phone(setTop('Leitura em voz alta')+sect('Voz de')+grp([{t:'Do aparelho',m:'Grátis, sem internet'},{t:'ElevenLabs',m:'eleven_multilingual_v2, eleven_flash_v2_5, eleven_v3',tr:'check'},{t:'OpenAI',m:'gpt-4o-mini-tts, tts-1, tts-1-hd'},{t:'Google Gemini',m:'gemini-2.5-flash-preview-tts'},{t:'Groq',m:'Orpheus (canopylabs/orpheus-v1-english) · até 200 caracteres por trecho'}])+sect('ElevenLabs')+grp([{t:'Modelo',val:'Multilingual v2',tr:'chev'},{t:'Voz',val:'Rachel',tr:'chev',go:'set-readaloud-voice'},{t:'Velocidade',val:'1×',tr:'chev'}])+sect('Ouvir exemplo')+grp([{lead:`<span class="play">${I('play',14)}</span>`,t:'"Decisões: sincronização offline…"'}])+foot('Com uma voz da nuvem, o texto lido (resumo, wiki ou documento) é enviado ao provedor. O áudio não é salvo no aparelho.')),
+ what:['Vozes do aparelho e da nuvem: ElevenLabs, OpenAI, Google Gemini e Groq (Orpheus), como o app já suporta.','Cada provedor diz o modelo; a seção do provedor escolhido traz modelo, voz e velocidade.','Aviso claro de que o texto lido vai ao provedor; escolher uma voz da nuvem pede a permissão sob demanda desse provedor.'],
+ acts:[['Voz','set-readaloud-voice']],notes:['Modelos e vozes são as sugestões que o app já traz (SpeechSynthesisCatalog); a tela também aceita digitar outro modelo ou voz.']});
+add({id:'set-readaloud-voice',g:'Ajustes',n:'Escolher voz',st:'igual',file:['ReadAloudSettingsView'],
+ r:()=>phone(setTop('Voz','set-readaloud')+grp([{lead:`<span class="play">${I('play',14)}</span>`,t:'Rachel',tr:'check'},{lead:`<span class="play">${I('play',14)}</span>`,t:'George'},{lead:`<span class="play">${I('play',14)}</span>`,t:'Sarah'}])+sect('Outra voz')+`<div class="field ph">ID da voz</div>`),
+ what:['Sugestões com prévia e um campo para qualquer voz do provedor.'],acts:[['Voltar','set-readaloud']]});
+add({id:'set-tags',g:'Ajustes',n:'Tags',st:'igual',file:['TagsSettingsView','TagManagementView'],
+ r:()=>phone(setTop('Tags','settings',glass([{i:'plus',l:'Nova tag'}]))+grp([{lead:'<span class="dot" style="background:#e5484d"></span>',t:'Roadmap',val:'2'},{lead:'<span class="dot" style="background:#e5484d"></span>',t:'T3',val:'1'},{lead:'<span class="dot" style="background:#2fa55a"></span>',t:'Clientes',val:'1'},{lead:'<span class="dot" style="background:#e0882b"></span>',t:'Design',val:'1'}])+sect('Sugestão com IA')+grp([{t:'Sugerir tags depois da transcrição',tr:'tog'}])),what:['Lista com cor e uso; deslizar para excluir.'],acts:[['Voltar','settings']]});
+add({id:'set-search',g:'Ajustes',n:'Busca',st:'igual',file:['SemanticSearchSettingsView'],
+ r:()=>phone(setTop('Busca')+grp([{t:'Busca por sentido',tr:'ton'}])+foot('Encontra reuniões pelo assunto, mesmo sem a palavra exata. No aparelho.')+grp([{t:'Trechos indexados',val:'1.284'},{t:'Reindexar',link:1},{t:'Apagar índice',dest:1}])),what:['Mesmo conteúdo de hoje; nome curto.'],acts:[['Voltar','settings']]});
+add({id:'set-storage',g:'Ajustes',n:'Armazenamento',st:'igual',file:['StorageSettingsView','StorageSettingsSections'],
+ r:()=>phone(setTop('Armazenamento')+`<div class="grp" style="padding:14px 16px"><div style="display:flex;height:10px;border-radius:5px;overflow:hidden"><span style="flex:6;background:var(--prim)"></span><span style="flex:3;background:var(--gray)"></span><span style="flex:1;background:var(--ter2)"></span></div><div style="display:flex;gap:14px;margin-top:10px;font-size:13px;color:var(--sec)"><span>● Áudio 720 MB</span><span>● Modelos 480 MB</span><span>● Outros</span></div></div>`+sect('Liberar espaço')+grp([{t:'Compactar gravações antigas',val:'−210 MB',tr:'chev'},{t:'Apagar áudio melhorado',val:'64 MB'},{t:'Limpar temporários',val:'12 MB'}])+sect('Modelos baixados')+grp([{t:'Parakeet v3',val:'480 MB',tr:'chev'}])+sect('Maiores gravações')+grp([{t:'Planejamento de sprint',val:'48 MB'}])),what:['Barra de uso com legenda em texto (não só cor) e ações com o ganho.'],acts:[['Voltar','settings']]});
+add({id:'set-health',g:'Ajustes',n:'Saúde e recuperação',st:'igual',file:['HealthRecoveryView','ReliabilityEventsListView'],
+ r:()=>phone(setTop('Saúde e recuperação')+`<div class="grp" style="padding:14px 16px;display:flex;gap:10px;align-items:center">${I('checkc',24,'var(--green)')}<div><b>Tudo certo</b><div style="color:var(--sec);font-size:14px">Nenhuma gravação precisa de atenção.</div></div></div>`+sect('Verificações')+grp([{t:'Gravações a recuperar',val:'0'},{t:'Transcrições paradas',val:'0'},{t:'Transcrições com avisos',val:'1',tr:'chev'},{t:'Modelos verificados',val:'1 de 1'}])+sect('Registro')+grp([{t:'Ver eventos',tr:'chev'}])),what:['Resumo em cima e verificações em lista, como hoje.'],acts:[['Voltar','settings']]});
+add({id:'set-diagnostics',g:'Ajustes',n:'Diagnóstico',st:'igual',file:['DiagnosticsSettingsView','DiagnosticReportsListView','LogEntriesListView','ReliabilityEventsListView'],
+ r:()=>phone(setTop('Diagnóstico')+grp([{t:'Nível de log',val:'Aviso',tr:'chev'},{t:'Ver logs',tr:'chev'},{t:'Exportar logs',link:1}])+sect('Relatórios de falhas')+grp([{t:'Guardar relatórios no aparelho',tr:'tog'},{t:'Ver relatórios',tr:'chev'}])+foot('Nada é enviado sozinho; você escolhe o que compartilhar.')),what:['Mesmo conteúdo de hoje.'],acts:[['Voltar','settings']]});
+add({id:'set-usage',g:'Ajustes',n:'Uso',st:'igual',file:['UsageInsightsView'],
+ r:()=>phone(setTop('Uso')+`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px">${[['Gravações','24'],['Motor mais usado','Apple Speech']].map(([a,b])=>`<div class="grp" style="margin:0;padding:12px 14px"><div style="color:var(--sec);font-size:13px">${a}</div><div style="font-size:21px;font-weight:700">${b}</div></div>`).join('')}</div>`+sect('Modelos de resumo')+grp([{t:'Reunião geral',val:'18'},{t:'Daily / Standup',val:'6'}])+foot('Contadores locais; nunca saem do aparelho.')),what:['Mesmo conteúdo de hoje.'],acts:[['Voltar','settings']]});
+add({id:'set-about',g:'Ajustes',n:'Sobre',st:'igual',file:['AboutSettingsView','AcknowledgementsView'],
+ r:()=>phone(setTop('Sobre o Kurn')+grp([{t:'Versão',val:'1.6.0 (212)'},{t:'Agradecimentos e licenças',tr:'chev'},{t:'Apoiar o projeto',link:1}])),what:['Mesmo conteúdo de hoje.'],acts:[['Voltar','settings']]});
+add({id:'delete-all',g:'Ajustes',n:'Apagar todos os dados',st:'igual',file:['SettingsView'],
+ r:()=>phone(setRoot()+alertBox('Apagar todos os dados?','Reuniões, áudio, transcrições, resumos, wiki, conversas, documentos e cópias de recuperação serão apagados deste iPhone. Tags e pastas ficam.',[{l:'Apagar tudo',k:'d',go:'list-empty'},{l:'Cancelar',go:'settings'}])),what:['Confirmação completa; depois pede Face ID.'],acts:[['Apagar tudo','list-empty']]});
+
+/* ---------- Sistema ---------- */
+add({id:'error',g:'Sistema',n:'Erro com ação de correção',st:'igual',file:['View+ErrorAlert'],
+ r:()=>phone(meetingSummary()+alertBox('Sem chave da Anthropic','Adicione uma chave em Provedores de IA para gerar resumos com este provedor.',[{l:'Abrir ajustes',k:'p',go:'set-providers'},{l:'OK',go:'m-summary'}]),{paper:1}),
+ what:['O diálogo de erro do app oferece a correção do próprio erro (Abrir ajustes, Liberar espaço, Tentar de novo).'],acts:[['Abrir ajustes','set-providers']]});
+add({id:'store-recovery',g:'Sistema',n:'Recuperação do banco',st:'igual',file:['ModelStoreBootViews'],
+ r:()=>phone(SB()+`<div class="empty" style="margin-top:160px"><span class="ic" style="color:#c75f00">${I('warn',46)}</span><b>Não foi possível abrir suas reuniões</b><p>Os dados estão protegidos e nada foi apagado. Escolha como continuar.</p></div>`+`<div style="padding:0 0 0">${grp([{t:'Restaurar cópia de ontem 23:10',tr:'chev'},{t:'Recuperar o que for possível',tr:'chev'},{t:'Exportar diagnóstico',link:1},{t:'Começar do zero',dest:1}])}</div>`),
+ what:['Tela rara de inicialização com as saídas de hoje, em lista.'],acts:[]});
+add({id:'review-prompt',g:'Sistema',n:'Pedido de avaliação',st:'igual',file:['ReviewPromptPresenter'],
+ r:()=>phone(meetingSummary()+`<div class="dim"></div><div class="alert"><b>Está gostando do Kurn?</b><p>Toque numa estrela para avaliar na App Store.</p><div style="display:flex;justify-content:center;gap:6px;color:var(--blue);margin-bottom:12px">${I('staro',30).repeat(5)}</div><div class="ab"><span${G('m-summary')}>Agora não</span></div></div>`,{paper:1}),what:['Diálogo do sistema (StoreKit), mostrado no máximo uma vez por versão.'],acts:[['Agora não','m-summary']]});
+
+/* ---------- Widgets, Live Activity e Watch ---------- */
+const WALL='linear-gradient(165deg,#2b3a55 0%,#5a6f8f 45%,#c9a98a 100%)';
+const lockTop=(t='19:28')=>`<div style="text-align:center;color:#fff;margin-top:6px"><div style="font-size:17px;font-weight:600;opacity:.9">sexta-feira, 21 de novembro</div><div style="font-size:92px;font-weight:700;letter-spacing:-.03em;line-height:1">${t}</div></div>`;
+const recDisc=(s=56)=>`<span style="width:${s}px;height:${s}px;border-radius:50%;background:rgba(255,255,255,.16);display:grid;place-items:center;flex:none"><span style="width:${s*.46}px;height:${s*.46}px;border-radius:50%;background:#ff3b30;display:block"></span></span>`;
+const pillBtn=(i,l,dark)=>`<span style="height:40px;border-radius:99px;background:${dark?'#ff3b30':'rgba(255,255,255,.18)'};color:#fff;display:flex;align-items:center;gap:6px;padding:0 14px;font-size:14.5px;font-weight:600">${I(i,15)}${l}</span>`;
+const liveCard=(paused)=>`<div style="margin:0 10px;border-radius:26px;background:rgba(20,20,22,.78);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);color:#fff;padding:14px 16px"${G(paused?'w-live':'w-live-paused')}><div style="display:flex;align-items:center;gap:10px"><span style="width:9px;height:9px;border-radius:50%;background:${paused?'#ffcc00':'#ff3b30'}"></span><div style="flex:1"><div style="font-weight:700;font-size:15px">Kurn · ${paused?'Pausada':'Gravando'}</div><div style="font-size:13px;opacity:.65">Reunião em andamento</div></div><div style="font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em">04:13</div></div><div style="display:flex;gap:8px;margin-top:12px">${pillBtn(paused?'play':'pause',paused?'Retomar':'Pausar')}${pillBtn('flag','Destacar')}<span style="flex:1"></span>${pillBtn('stop','Parar',1)}</div></div>`;
+
+add({id:'w-home',g:'Widgets e Watch',n:'Widgets na Tela de Início',st:'muda',file:['StartRecordingWidget'],
+ r:()=>phone(SB('19:28',1)+`<div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;padding:24px 26px 0"><div style="aspect-ratio:1;border-radius:24px;background:#1c1c1e;padding:16px;display:flex;flex-direction:column;justify-content:space-between;color:#fff"${G('rec')}><div style="display:flex;justify-content:space-between;align-items:flex-start"><b style="font-size:15px;letter-spacing:.02em">Kurn</b>${recDisc(52)}</div><div><b style="font-size:17px">Gravar</b><div style="font-size:13px;opacity:.65">Nova reunião</div></div></div><div style="aspect-ratio:1;border-radius:24px;background:rgba(255,255,255,.22);backdrop-filter:blur(20px);padding:16px;display:flex;flex-direction:column;justify-content:space-between;color:#fff"${G('rec')}><div style="display:flex;justify-content:space-between;align-items:flex-start"><b style="font-size:15px">Kurn</b>${recDisc(52)}</div><div><b style="font-size:17px">Gravar</b><div style="font-size:13px;opacity:.75">Nova reunião</div></div></div></div><div style="text-align:center;color:#fff;font-size:12px;opacity:.85;display:grid;grid-template-columns:1fr 1fr;padding:6px 26px 0"><span>Padrão</span><span>Transparente (iOS 26)</span></div><div style="margin:22px 26px 0;border-radius:24px;background:#1c1c1e;padding:16px 18px;display:flex;align-items:center;gap:16px;color:#fff"${G('rec')}><div style="flex:1"><b style="font-size:15px">Kurn</b><div style="margin-top:22px"><b style="font-size:19px">Gravar</b><div style="font-size:13.5px;opacity:.65">Iniciar uma nova reunião</div></div></div>${recDisc(82)}</div><div style="margin:22px 26px 0;display:grid;grid-template-columns:repeat(4,1fr);gap:18px">${['#34c759','#0a84ff','#ff9f0a','#5e5ce6','#ff375f','#30b0c7','#a2845e','#8e8e93'].map(c=>`<span style="aspect-ratio:1;border-radius:16px;background:${c};opacity:.9"></span>`).join('')}</div>`,{bg:WALL,light:1}),
+ what:['Pequeno e médio: "Kurn", "Gravar" e um disco com o ponto vermelho; um toque começa a gravar.','Nunca mostra título, contagem ou última reunião (o widget aparece com o iPhone bloqueado e em Em Espera).','Proposta: texto "Nova reunião" mais curto e suporte conferido aos modos tingido e transparente do iOS 26, onde o vermelho vira o tom do sistema.'],
+ acts:[['Tocar no widget','rec']],notes:['O widget de hoje já é estático e sem conteúdo de reunião; a mudança é de acabamento.']});
+
+add({id:'w-lock',g:'Widgets e Watch',n:'Tela Bloqueada',st:'muda',file:['StartRecordingWidget','StartRecordingControl'],
+ r:()=>phone(SB('',1)+lockTop()+`<div style="display:flex;gap:12px;justify-content:center;margin-top:10px"><span style="width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.2);backdrop-filter:blur(12px);display:grid;place-items:center"${G('w-live')}><span style="width:26px;height:26px;border-radius:50%;border:2.5px solid #fff;display:grid;place-items:center"><span style="width:14px;height:14px;border-radius:50%;background:#fff;display:block"></span></span></span><span style="height:72px;width:170px;border-radius:20px;background:rgba(255,255,255,.2);backdrop-filter:blur(12px);display:flex;align-items:center;gap:10px;padding:0 14px;color:#fff"${G('w-live')}><span style="width:28px;height:28px;border-radius:50%;border:2.5px solid #fff;display:grid;place-items:center;flex:none"><span style="width:14px;height:14px;border-radius:50%;background:#fff;display:block"></span></span><div><b style="font-size:15px">Gravar</b><div style="font-size:12px;opacity:.85">Nova reunião</div></div></span></div><div style="position:absolute;bottom:46px;left:44px;right:44px;display:flex;justify-content:space-between"><span style="width:50px;height:50px;border-radius:50%;background:rgba(0,0,0,.3);color:#fff;display:grid;place-items:center">${I('bolt',22)}</span><span style="width:50px;height:50px;border-radius:50%;background:rgba(0,0,0,.3);color:#fff;display:grid;place-items:center"${G('w-live')}><span style="width:20px;height:20px;border-radius:50%;border:2px solid #fff;display:grid;place-items:center"><span style="width:10px;height:10px;border-radius:50%;background:#ff3b30;display:block"></span></span></span></div>`,{bg:WALL,light:1}),
+ what:['Widgets de acessório (redondo e retangular) e o controle "Iniciar gravação" no lugar da câmera, no canto inferior.','Começar a gravar não pede Face ID: o conteúdo continua protegido pela capa do app.','Nos acessórios, o símbolo de gravar é monocromático, como o sistema exige.'],
+ acts:[['Gravar pelo widget ou pelo controle','w-live']]});
+
+add({id:'w-control',g:'Widgets e Watch',n:'Central de Controle',st:'igual',file:['StartRecordingControl'],
+ r:()=>phone(SB('',1)+`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:40px 30px 0">${[0,1,2,3,4,5,6,7].map(i=>i==5?`<span style="aspect-ratio:1;border-radius:50%;background:rgba(255,255,255,.95);display:grid;place-items:center"${G('w-live')}><span style="width:26px;height:26px;border-radius:50%;border:2.5px solid #ff3b30;display:grid;place-items:center"><span style="width:13px;height:13px;border-radius:50%;background:#ff3b30;display:block"></span></span></span>`:`<span style="aspect-ratio:1;border-radius:${i<2?'22px':'50%'};background:rgba(255,255,255,.22)"></span>`).join('')}</div><div style="color:#fff;font-size:12px;text-align:center;padding-top:6px;opacity:.85">Kurn · Iniciar gravação</div>`,{bg:'linear-gradient(170deg,#34415a,#1d2333)',light:1}),
+ what:['O mesmo controle serve à Central de Controle, à Tela Bloqueada e ao Botão de Ação.'],acts:[['Gravar','w-live']]});
+
+add({id:'w-live',g:'Widgets e Watch',n:'Live Activity gravando',st:'muda',file:['RecordingLiveActivityWidget'],
+ r:()=>phone(SB('',1)+lockTop('19:32')+`<div style="margin-top:250px">${liveCard(0)}</div>`,{bg:WALL,light:1}),
+ what:['"Kurn · Gravando" em palavras (não só um ponto), cronômetro grande e o título genérico "Reunião em andamento" (o título real fica escondido por padrão).','Botões em pílula: Pausar, Destacar e Parar; Parar é o único vermelho.','Proposta: Parar separado à direita para não ser tocado por engano; hoje os três ficam juntos.'],
+ acts:[['Pausar','w-live-paused'],['Ilha Dinâmica','w-island']]});
+add({id:'w-live-paused',g:'Widgets e Watch',n:'Live Activity pausada',st:'igual',file:['RecordingLiveActivityWidget'],
+ r:()=>phone(SB('',1)+lockTop('19:33')+`<div style="margin-top:250px">${liveCard(1)}</div>`,{bg:WALL,light:1}),
+ what:['Ponto amarelo e "Pausada" em texto; o cronômetro para; Retomar no lugar de Pausar.'],acts:[['Retomar','w-live']]});
+add({id:'w-island',g:'Widgets e Watch',n:'Ilha Dinâmica',st:'igual',file:['RecordingLiveActivityWidget'],
+ r:()=>phone(SB('19:32')+`<div style="position:absolute;top:11px;left:50%;transform:translateX(-50%);width:200px;height:37px;border-radius:20px;background:#000;z-index:60;display:flex;align-items:center;justify-content:space-between;padding:0 14px;color:#fff;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums"${G('w-island-x')}><span style="width:9px;height:9px;border-radius:50%;background:#ff3b30"></span><span>04:13</span></div>`+listBody()+bottomBar()),
+ what:['Compacta: ponto vermelho à esquerda e o cronômetro à direita.','Mínima (com outra atividade): só o ícone do Kurn.','Toque longo abre a versão expandida.'],acts:[['Toque longo','w-island-x']]});
+add({id:'w-island-x',g:'Widgets e Watch',n:'Ilha Dinâmica expandida',st:'igual',file:['RecordingLiveActivityWidget'],
+ r:()=>phone(SB('19:32')+listBody()+bottomBar()+`<div class="dim light"${G('w-island')}></div><div style="position:absolute;top:10px;left:10px;right:10px;z-index:61;border-radius:40px;background:#000;color:#fff;padding:16px 18px 14px"><div style="display:flex;align-items:center;gap:10px"><span style="width:9px;height:9px;border-radius:50%;background:#ff3b30"></span><b style="flex:1">Kurn · Gravando</b><span style="font-size:26px;font-weight:600;font-variant-numeric:tabular-nums">04:13</span></div><div style="display:flex;gap:8px;margin-top:12px">${pillBtn('pause','Pausar')}${pillBtn('flag','Destacar')}<span style="flex:1"></span>${pillBtn('stop','Parar',1)}</div></div>`),
+ what:['Os mesmos controles da Live Activity, com o estado em palavras.'],acts:[['Fechar','w-island']]});
+
+/* Watch */
+const watchScreen=(inner)=>`<div class="scr" style="background:#000;color:#fff">${inner}</div>`;
+const wTop=(t='19:32')=>`<div style="display:flex;justify-content:space-between;padding:14px 22px 0;font-size:15px;font-weight:600"><span style="color:#ff453a">Kurn</span><span>${t}</span></div>`;
+const wBtn=(i,bg,go,l,s=52)=>`<span style="width:${s}px;height:${s}px;border-radius:50%;background:${bg};display:grid;place-items:center;color:#fff"${G(go)} aria-label="${l}">${I(i,22)}</span>`;
+add({id:'watch-idle',g:'Widgets e Watch',n:'Watch: sem gravação',st:'muda',device:'watch',file:['WatchRecorderView','KurnWatchApp'],
+ r:()=>watchScreen(wTop('19:28')+`<div style="text-align:center;padding:20px 16px 0"><span style="display:inline-grid;place-items:center;width:84px;height:84px;border-radius:50%;background:#2c2c2e"${G('watch-rec')}><span style="width:34px;height:34px;border-radius:50%;background:#ff3b30;display:block"></span></span><div style="font-size:17px;font-weight:600;margin-top:12px">Gravar no iPhone</div><div style="font-size:13px;color:#98989d;margin-top:2px">O iPhone grava; o relógio controla.</div></div>`),
+ what:['Hoje o relógio só diz "Abra o Kurn no iPhone para gravar".','Proposta: um botão que pede ao iPhone para começar a gravar, como o widget faz.'],acts:[['Gravar','watch-rec']],notes:['Precisa de um comando novo de iniciar no canal com o relógio; hoje ele só pausa, retoma, para e destaca.']});
+add({id:'watch-rec',g:'Widgets e Watch',n:'Watch: gravando',st:'muda',device:'watch',file:['WatchRecorderView','WatchConnectivityManager'],
+ r:()=>watchScreen(wTop()+`<div style="text-align:center;padding:6px 14px 0"><div style="font-size:13px;color:#98989d;display:flex;gap:6px;justify-content:center;align-items:center"><span style="width:7px;height:7px;border-radius:50%;background:#ff3b30"></span>Gravando · Reunião</div><div style="font-size:44px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em;margin-top:2px">04:13</div><div style="font-size:12px;color:#ff9f0a;display:flex;gap:4px;justify-content:center;align-items:center">${I('flag',12)}2 destaques</div><div style="display:flex;gap:12px;justify-content:center;margin-top:14px">${wBtn('pause','#2c2c2e','watch-paused','Pausar')}${wBtn('flag','#2c2c2e','','Destacar')}${wBtn('stop','#ff3b30','list','Parar')}</div></div>`),
+ what:['Estado em palavras, cronômetro grande, contagem de destaques.','Três botões redondos: Pausar, Destacar e Parar (vermelho).','O título fica genérico enquanto "Esconder título na tela bloqueada" estiver ligado, como hoje.'],acts:[['Pausar','watch-paused'],['Parar','list']]});
+add({id:'watch-paused',g:'Widgets e Watch',n:'Watch: pausada',st:'igual',device:'watch',file:['WatchRecorderView'],
+ r:()=>watchScreen(wTop('19:33')+`<div style="text-align:center;padding:6px 14px 0"><div style="font-size:13px;color:#98989d;display:flex;gap:6px;justify-content:center;align-items:center"><span style="width:7px;height:7px;border-radius:50%;background:#ffd60a"></span>Pausada · Reunião</div><div style="font-size:44px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px;opacity:.7">04:13</div><div style="display:flex;gap:12px;justify-content:center;margin-top:30px">${wBtn('play','#2c2c2e','watch-rec','Retomar')}${wBtn('flag','#2c2c2e','','Destacar')}${wBtn('stop','#ff3b30','list','Parar')}</div></div>`),
+ what:['Retomar no lugar de Pausar; cronômetro esmaecido.'],acts:[['Retomar','watch-rec']]});
+add({id:'watch-unreachable',g:'Widgets e Watch',n:'Watch: sem conexão',st:'igual',device:'watch',file:['WatchRecorderView','WatchConnectivityManager'],
+ r:()=>watchScreen(wTop()+`<div style="text-align:center;padding:6px 14px 0"><div style="font-size:44px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:10px;opacity:.6">04:13</div><div style="display:flex;gap:12px;justify-content:center;margin-top:14px;opacity:.5">${wBtn('pause','#2c2c2e','','Pausar')}${wBtn('flag','#2c2c2e','','Destacar')}${wBtn('stop','#ff3b30','','Parar')}</div><div style="font-size:12.5px;color:#ff6961;margin-top:10px">Sem conexão com o iPhone</div></div>`),
+ what:['Quando o comando não chega ao iPhone, aviso curto em vermelho abaixo dos botões, como hoje.'],acts:[['Voltar a gravar','watch-rec']]});
+add({id:'watch-complication',g:'Widgets e Watch',n:'Watch: complicação',st:'novo',device:'watch',file:['KurnWatchApp'],
+ r:()=>watchScreen(`<div style="text-align:center;padding-top:34px"><div style="font-size:15px;color:#98989d">sex. 21</div><div style="font-size:62px;font-weight:600;letter-spacing:-.03em;line-height:1">19:28</div></div><div style="display:flex;justify-content:center;gap:14px;margin-top:16px"><span style="width:52px;height:52px;border-radius:50%;background:#1c1c1e;display:grid;place-items:center"${G('watch-rec')}><span style="width:20px;height:20px;border-radius:50%;background:#ff3b30;display:block"></span></span><span style="width:52px;height:52px;border-radius:50%;background:#1c1c1e"></span><span style="width:52px;height:52px;border-radius:50%;background:#1c1c1e"></span></div>`),
+ what:['Ideia nova: complicação redonda de "Gravar" no mostrador, que abre o app do relógio já pedindo ao iPhone para gravar.'],acts:[['Gravar','watch-rec']],notes:['Depende do comando de iniciar e de um alvo de widgets no watchOS; não existe hoje.']});
+
+/* ---------- fluxos ---------- */
+const FLOWS=[
+ {id:'f-resumos',n:'Vários resumos e navegação entre eles',d:'Criar um segundo resumo com outro modelo, voltar ao primeiro e comparar.',s:['m-summary','m-sum-menu','m-template','m-generating','m-summary-2','m-sum-menu-2','m-compare','m-summary']},
+ {id:'f-gravar',n:'Gravar até o resumo',d:'Do botão Gravar ao resumo pronto.',s:['list','rec','rec-paused','rec-saved','m-transcribing','m-summary']},
+ {id:'f-perguntar',n:'Perguntar sobre a reunião',d:'Barra Pergunte, troca de modelo, resposta com citação e ida à transcrição.',s:['m-summary','ask-meeting','ask-model','ask-answer','ask-steps','m-transcript']},
+ {id:'f-wiki',n:'Explorar o Wiki',d:'Da aba Wiki da reunião à página, à fonte e à revisão.',s:['m-wiki','wiki-page','wiki-evidence','wiki-home','wiki-scope','wiki-timeline','wiki-review','wiki-merge']},
+ {id:'f-organizar',n:'Organizar uma reunião',d:'Tags (várias), sugestão com IA e pasta.',s:['list','list-row-menu','tag-picker','autotag','folder-picker','library','folder-form']},
+ {id:'f-lote',n:'Exportar e excluir em lote',d:'Seleção de várias reuniões.',s:['list','list-menu','list-select','bulk-export','list-select','bulk-delete']},
+ {id:'f-audio',n:'Áudio e nova transcrição',d:'Tocar, abrir o menu da gravação e refazer a transcrição.',s:['m-audio','m-audio-play','m-rec-menu','m-retranscribe','m-transcribing']},
+ {id:'f-provedor',n:'Configurar um provedor',d:'Do chat sem provedor até salvar a chave.',s:['ask-noprov','set-providers','set-provider-form','set-providers']},
+ {id:'f-semabrir',n:'Gravar sem abrir o app',d:'Controle da Tela Bloqueada, Live Activity, Ilha Dinâmica e o relógio.',s:['w-lock','w-live','w-live-paused','w-island','w-island-x','watch-idle','watch-rec','watch-paused']},
+ {id:'f-preset',n:'Escolher como transcrever',d:'Modo simples com presets medidos, consentimento da nuvem e o modo avançado.',s:['set-transcription','cloud-upload','set-transcription','set-transcription-adv','set-engine']},
+ {id:'f-inicio',n:'Primeiro uso',d:'Lista vazia, primeira gravação e Wiki desligado.',s:['list-empty','rec','rec-saved','m-transcribing','wiki-off','set-wiki']}
+];
+const ALWAYS_DARK=new Set(['rec','rec-paused','rec-discard','rec-mic','photo']);
+let flow=null,flowIdx=0;let MODE='light';try{MODE=localStorage.getItem('kurn-proto-mode')||'light';}catch(e){}
+const byId=Object.fromEntries(S.map(s=>[s.id,s]));
+const groups=[...new Set(S.map(s=>s.g))];
+const pill=st=>`<span class="st-pill ${st}">${{novo:'novo',muda:'muda',igual:'igual'}[st]}</span>`;
+function buildNav(){
+ const nav=document.getElementById('nav'),sel=document.getElementById('navsel');
+ nav.innerHTML=groups.map(g=>`<h3>${g}</h3>`+S.filter(s=>s.g===g).map(s=>`<button data-s="${s.id}"><span class="n">${s.n}</span>${pill(s.st)}</button>`).join('')).join('');
+ sel.innerHTML=groups.map(g=>`<optgroup label="${g}">`+S.filter(s=>s.g===g).map(s=>`<option value="${s.id}">${s.n}</option>`).join('')+'</optgroup>').join('');
+ nav.addEventListener('click',e=>{const b=e.target.closest('button[data-s]');if(b){flow=null;go(b.dataset.s);}});
+ sel.addEventListener('change',()=>{flow=null;go(sel.value);});
+}
+function go(id,keepHash){
+ const s=byId[id]||S[0];
+ const ph=document.getElementById('phone');
+ let html='';try{html=s.r();}catch(err){html=`<div style="padding:60px 20px;color:#c00">Erro ao desenhar: ${err.message}</div>`;console.error(err);}
+ ph.className='phone'+(s.device==='watch'?' watchdev':'')+((MODE==='dark'||ALWAYS_DARK.has(s.id))&&s.device!=='watch'?' dark':'');
+ document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===MODE?'true':'false'));ph.innerHTML=html;
+ ph.setAttribute('role','img');ph.setAttribute('aria-label','Protótipo: '+s.n);
+ document.querySelectorAll('#nav button').forEach(b=>b.setAttribute('aria-current',b.dataset.s===s.id?'true':'false'));
+ const sel=document.getElementById('navsel');if(sel.value!==s.id)sel.value=s.id;
+ const img=s.today&&TODAY[s.today];
+ const into=(arr)=>arr.map(([l,t])=>`<li>${l} → <button class="go" data-to="${t}">${byId[t]?byId[t].n:t}</button></li>`).join('');
+ document.getElementById('info').innerHTML=`<div><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2>${s.n}</h2>${pill(s.st)}</div><div class="where">${s.g} · ${s.file.map(f=>`<code>${f}</code>`).join(', ')}</div></div>
+ ${img?`<div class="today"><img src="${img}" alt="Tela atual: ${s.n}"><p><b style="color:var(--fg)">Hoje</b><br>Captura do código atual no simulador (iPhone 17, pt-BR, Knowledge ligado).</p></div>`:''}
+ <div class="panel"><h4>O que tem nesta tela</h4><ul>${s.what.map(w=>`<li>${w}</li>`).join('')}</ul></div>
+ ${s.acts&&s.acts.length?`<div class="panel"><h4>Interações</h4><ul>${into(s.acts)}</ul></div>`:''}
+ ${s.notes?`<div class="panel"><h4>Observações</h4><ul>${s.notes.map(w=>`<li>${w}</li>`).join('')}</ul></div>`:''}`;
+ const st=document.getElementById('stepper');
+ if(flow){const f=FLOWS.find(x=>x.id===flow);st.innerHTML=`<button data-step="-1" ${flowIdx<=0?'disabled':''}>‹</button><span>${f.n} · passo ${flowIdx+1} de ${f.s.length}</span><button data-step="1" ${flowIdx>=f.s.length-1?'disabled':''}>›</button><button data-step="0">Sair</button>`;}
+ else st.innerHTML='';
+ if(!keepHash){try{history.replaceState(null,'','#'+s.id);}catch(e){}}
+}
+document.addEventListener('click',e=>{
+ const t=e.target.closest('[data-go]');
+ if(t&&t.dataset.go&&document.getElementById('phone').contains(t)){e.preventDefault();if(flow){const f=FLOWS.find(x=>x.id===flow);const i=f.s.indexOf(t.dataset.go,flowIdx);if(i===flowIdx+1)flowIdx=i;else flow=null;}go(t.dataset.go);return;}
+ const b=e.target.closest('[data-to]');if(b){flow=null;go(b.dataset.to);window.scrollTo({top:0,behavior:'smooth'});return;}
+ const s=e.target.closest('[data-step]');if(s){const d=+s.dataset.step;if(d===0){flow=null;}else{const f=FLOWS.find(x=>x.id===flow);flowIdx=Math.max(0,Math.min(f.s.length-1,flowIdx+d));go(f.s[flowIdx]);return;}go(location.hash.slice(1));return;}
+ const f=e.target.closest('[data-flow]');if(f){flow=f.dataset.flow;flowIdx=0;view('proto');go(FLOWS.find(x=>x.id===flow).s[0]);window.scrollTo({top:0});return;}
+ const md=e.target.closest('[data-mode]');if(md){MODE=md.dataset.mode;try{localStorage.setItem('kurn-proto-mode',MODE);}catch(err){}go(location.hash.slice(1)||'list',true);return;}
+ const v=e.target.closest('[data-view]');if(v){view(v.dataset.view);}
+});
+function view(v){
+ ['proto','fluxos','mapa','sistema'].forEach(k=>{document.getElementById('v-'+k).hidden=k!==v;});
+ document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v?'true':'false'));
+ if(v!=='proto'){try{history.replaceState(null,'','#'+v);}catch(e){}}else go(document.getElementById('navsel').value||'list');
+}
+/* ---------- fluxos, mapa e sistema ---------- */
+function buildFlows(){
+ document.getElementById('v-fluxos').innerHTML=`<p style="color:var(--muted);margin:0 0 16px">Cada fluxo abre o protótipo no primeiro passo; use ‹ › abaixo do telefone ou toque nos próprios elementos.</p><div class="flows">${FLOWS.map(f=>`<div class="panel"><b style="font-size:16px">${f.n}</b><p style="color:var(--muted);margin:4px 0 8px">${f.d}</p><ol>${f.s.map(x=>`<li>${byId[x].n}</li>`).join('')}</ol><p style="margin:10px 0 0"><button class="go" data-flow="${f.id}">Abrir no protótipo</button></p></div>`).join('')}</div>`;
+}
+const FILES=['AcknowledgementsView','ActivityView','AttachToMeetingView','AutoTagConfirmView','ChatArtifactCard','ChatArtifactProviderNotice','ChatBranchViews','ChatChangeConfirmationSheet','ChatConversationMenu','ChatModelChip','ChatQueuedInputView','ChatRunStatusLine','ChatSessionListView','ChatSourceSheet','ChatStepTimelineView','ChatToolGroupRow','CrossMeetingSpeakerMatchView','DesignComponents','DiagnosticReportsListView','DocumentDetailView','DocumentsListView','EnhancementProgressView','FilterBarView','FolderAnalyticsView','FolderFormView','FolderPickerView','FolderSidebarView','KnowledgeBrowserView','KnowledgeCompareView','KnowledgeEntityPageView','KnowledgeEvidenceDetailView','KnowledgeGraphView','KnowledgeIdentityReviewView','KnowledgeLateArrivalsView','KnowledgeLibraryDestination','KnowledgeReviewInboxView','KnowledgeSearchResultsView','KnowledgeStyle','KnowledgeTimelineView','LanguagePickerRow','LogEntriesListView','MarkdownPresentation','MarkdownText','MeetingBulkExportView','MeetingChatTurnView','MeetingChatView','MeetingDetailActions','MeetingDetailAttachments','MeetingDetailAutoTagging','MeetingDetailCrossMeetingSpeakerMatch','MeetingDetailPhotos','MeetingDetailReadAloud','MeetingDetailTabs','MeetingDetailToolbar','MeetingDetailTranscript','MeetingDetailView','MeetingFormView','MeetingKnowledgeRefreshDriver','MeetingKnowledgeView','MeetingShareSelectionView','MeetingWikiView','MeetingsListComponents','MeetingsListSelectionMode','MeetingsListToolbar','MeetingsListView','ModelStoreBootViews','PhotoCaptureView','PhotoViewerView','PrivacyCoverView','ReadAloudControl','RecorderView','RecordingActionButton','RecordingSegmentRow','RecordingSessionPresenter','ReliabilityEventsListView','ReviewPromptPresenter','SecurityCoverView','SecurityCoverWindow','SegmentPlaybackScrubber','AboutSettingsView','DiagnosticsSettingsView','FluidAudioModelDownloadConsent','FluidAudioSettingsControls','HealthRecoveryView+Sections','HealthRecoveryView','KnowledgeScopeSettingsView','KnowledgeSettingsView','PrivacyCloudSettingsView','ProvidersSettingsView','ReadAloudSettingsView','RecordingSettingsView','SemanticSearchSettingsView','StorageSettingsSections','StorageSettingsView','SummarySettingsView','TagsSettingsView','TranscriptionSettingsView','WikiSettingsView','SettingsProviderViews','SettingsSections','SettingsView','StreamingIndicators','SummaryTemplatePicker','SummaryTranslateLanguagePicker','SummaryView','TagChipsView','TagManagementView','TagPickerView','TemplateEditorView','TranscriptView','UsageInsightsView','View+ErrorAlert','StartRecordingWidget','StartRecordingControl','RecordingLiveActivityWidget','KurnWatchApp','WatchRecorderView','WatchConnectivityManager'];
+const SHARED={DesignComponents:'Componentes do app (cartões, botões). Muda com o sistema visual.',KnowledgeStyle:'Estilo das telas do Wiki. Passa a usar os grupos e ícones neutros.',MarkdownPresentation:'Mostra o texto da IA com links desligados. Sem mudança visual.',MarkdownText:'Texto em Markdown nas telas de leitura. Fica no estilo do resumo.',StreamingIndicators:'"Pensando…" e cursor de texto em andamento. Usado em Gerando resumo e Respondendo.',TagChipsView:'Chips de tag. Viram ponto de cor + nome.',MeetingKnowledgeRefreshDriver:'Lógica de atualização da aba Wiki, sem tela.'};
+function buildMap(){
+ const used={};S.forEach(s=>s.file.forEach(f=>{(used[f]=used[f]||[]).push(s.id);}));
+ const rows=FILES.map(f=>{const ids=used[f];return `<tr><td><code>${f}.swift</code>${['StartRecordingWidget','StartRecordingControl','RecordingLiveActivityWidget'].includes(f)?' <span style="color:var(--muted)">(extensão)</span>':['KurnWatchApp','WatchRecorderView','WatchConnectivityManager'].includes(f)?' <span style="color:var(--muted)">(Watch)</span>':''}</td><td>${ids?ids.map(i=>`<button class="go" data-to="${i}">${byId[i].n}</button>`).join(', '):`<span style="color:var(--muted)">${SHARED[f]||'Componente usado dentro das telas listadas.'}</span>`}</td></tr>`;}).join('');
+ const covered=FILES.filter(f=>used[f]).length;
+ document.getElementById('v-mapa').innerHTML=`<p style="color:var(--muted);margin:0 0 6px">${S.length} telas, folhas, menus e diálogos no protótipo, cobrindo ${covered} dos ${FILES.length} arquivos de tela (<code>Kurn/Views</code>, <code>KurnLiveActivityExtension</code> e <code>KurnWatch</code>). Os demais são componentes usados dentro dessas telas.</p><p style="color:var(--muted);margin:0 0 16px">Contagem por situação: ${['novo','muda','igual'].map(k=>`${pill(k)} ${S.filter(s=>s.st===k).length}`).join(' · ')}.</p><div class="tw"><table><tr><th>Arquivo</th><th>Telas do protótipo</th></tr>${rows}</table></div>`;
+}
+function buildSys(){
+ const sw=(c,n,d)=>`<div class="sw"><i style="background:${c}"></i><div><b>${n}</b><div style="color:var(--muted);font-size:13px">${d}</div></div></div>`;
+ document.getElementById('v-sistema').innerHTML=`<div class="sys">
+ <div class="panel"><h4>Cores</h4>${sw('#1c1c1e','Tinta','Texto, seleção, botão principal')}${sw('#d70015','Vermelho','Só gravar e ações destrutivas')}${sw('#0a64d6','Azul','Links e ações em texto ("Adicionar")')}${sw('#a5a5aa','Cinza dos indicadores','Transcrição, resumo e favorito na lista')}${sw('#f2f2f7','Fundo agrupado','Listas, ajustes, folhas')}${sw('#ffffff','Fundo de leitura','Resumo, transcrição, wiki, documentos')}${sw('#f5b400','Amarelo','Favorito ativo dentro da reunião')}</div>
+ <div class="panel"><h4>Modo escuro</h4>${sw('#000000','Fundo','Listas e leitura em preto puro')}${sw('#1c1c1e','Grupos e cartões','Um degrau acima do fundo')}${sw('#2c2c2e','Preenchimentos','Chips, campos e segmentos')}${sw('#f2f2f7','Botão principal','Claro com texto preto, invertido do modo claro')}${sw('#ff453a','Vermelho','Gravar e excluir, no tom escuro do sistema')}${sw('#409cff','Azul','Links e ações em texto')}<p style="color:var(--muted);font-size:13px;margin:8px 0 0">Gravador, câmera, widgets, Tela Bloqueada e Watch já são escuros e ficam iguais nos dois modos.</p></div>
+ <div class="panel"><h4>Tipografia (tamanhos do sistema)</h4><ul><li>Título grande 34 / reunião 29: Large Title, negrito</li><li>Linha de lista 17 semibold</li><li>Metadados 14–15 em cinza secundário</li><li>Leitura 16 com entrelinha 1,45</li><li>Seções 13 em maiúsculas</li><li>Tudo com Dynamic Type; abas e Gravar viram só ícone em tamanhos de acessibilidade</li></ul></div>
+ <div class="panel"><h4>Componentes</h4><ul><li>Vidro do sistema para barras e botões soltos; grupos de botões no mesmo vidro</li><li>Listas em grupos brancos com cantos 18 e separadores finos</li><li>Folhas com Cancelar à esquerda e a ação principal em tinta à direita</li><li>Menus nativos com ícones; destrutivo por último, em vermelho</li><li>Diálogo do app (kurnDialog) para confirmar; a ação destrutiva em vermelho</li><li>Estados vazios: ícone, título, uma frase, um botão</li><li>Barra "Pergunte" flutuante em toda a reunião</li></ul></div>
+ <div class="panel"><h4>Ícones, um por conceito</h4><ul><li>✦ resumo · linhas transcrição · onda áudio · livro wiki</li><li>Livros biblioteca · balão perguntar · página documentos</li><li>Os mesmos ícones na lista (indicadores), nas abas, nos Ajustes e nos menus</li></ul></div>
+ <div class="panel"><h4>Nomes</h4><ul><li>Wiki (nunca Knowledge, Conhecimento ou Notas)</li><li>Pergunte (barra e folha); Conversas no histórico</li><li>Resumo e Modelo de resumo; Modelo de IA para o modelo do provedor</li><li>Apple Intelligence para o modelo do aparelho</li></ul></div>
+ <div class="panel"><h4>Acessibilidade mantida</h4><ul><li>Todo ícone sem texto tem rótulo para VoiceOver</li><li>Nada depende só de cor (estados e tags têm texto)</li><li>Alvos de toque de 44 pt</li><li>Contraste 4,5:1 nos nomes de falantes e metadados</li></ul></div></div>`;
+}
+buildNav();buildFlows();buildMap();buildSys();
+(function(){const h=(location.hash||'').slice(1);if(['fluxos','mapa','sistema'].includes(h)){view(h);}else go(byId[h]?h:'list',true);})();
+window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(byId[h])go(h,true);});
+</script>
+
+</body></html>
