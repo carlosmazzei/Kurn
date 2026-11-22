@@ -74,13 +74,17 @@ final class RecordingLauncher {
     /// double-invocation (e.g. tapping the control twice) doesn't create a
     /// second `Meeting` — still a legitimate "accepted" outcome, not a
     /// failure, since the request's intent (a recording being in progress)
-    /// already holds. Returns `false` only when the app genuinely couldn't
-    /// act on the request — `configure()` hasn't run yet, a cold-launch race
+    /// already holds. A second request while the first meeting is still
+    /// queued (the presenter only consumes it once the scene activates)
+    /// reuses that meeting for the same reason. Returns `false` only when
+    /// the app genuinely couldn't act on the request — `configure()` hasn't
+    /// run yet, a cold-launch race
     /// `StartRecordingIntent` needs to report truthfully rather than assume
     /// (H8 PR 20, item 8) — or the new meeting could not be saved.
     @discardableResult
     func requestAutoStart() -> Bool {
         guard !RecordingCommandRouter.shared.hasActiveSession else { return true }
+        if pendingAutoStartMeeting != nil { return true }
         guard let modelContext, let settings else {
             AppLog.recorderUI.atError.error("RecordingLauncher: auto-start requested before configure() ran")
             return false

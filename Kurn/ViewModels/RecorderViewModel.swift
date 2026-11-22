@@ -233,12 +233,19 @@ final class RecorderViewModel {
         }
     }
 
+    /// True when Settings forces the built-in microphone — the recorder's mic
+    /// button is disabled with a hint rather than opening a chooser for an
+    /// input the user is not allowed to switch away from.
+    var micPickerDisabled: Bool { alwaysUseBuiltInMic }
+
     /// Opens the mic chooser on demand (the recorder's mic button). There is
     /// only something to choose when more than one input is available — a
     /// single-input device keeps the button inert rather than showing a
-    /// one-row dialog.
+    /// one-row dialog. `alwaysUseBuiltInMic` short-circuits first so the
+    /// session category is not switched and Bluetooth inputs are not
+    /// enumerated for a choice Settings has already made.
     func presentMicChoices() {
-        guard micChoices.isEmpty else { return }
+        guard !alwaysUseBuiltInMic, micChoices.isEmpty else { return }
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(
             .playAndRecord,
@@ -291,12 +298,13 @@ final class RecorderViewModel {
     }
 
     /// Resolve the pending microphone choice (or `nil` to defer to the system
-    /// default) and unblock `prepareToRecord()`. Called from the picker UI,
-    /// including its cancel/dismiss path. The pick is also stored on the
-    /// recorder so a choice made from the mic button (outside `prepareToRecord`)
-    /// applies to the next capture start. During a live capture the pick is
-    /// also pushed to the audio session, which reroutes the engine without
-    /// losing the segment.
+    /// default) and unblock `prepareToRecord()`. Called from the picker UI's
+    /// pick path — cancelling goes through `dismissMicChoices()` instead, so a
+    /// dismissal never rewrites the stored preference or the live route. The
+    /// pick is also stored on the recorder so a choice made from the mic
+    /// button (outside `prepareToRecord`) applies to the next capture start.
+    /// During a live capture the pick is pushed to the audio session, which
+    /// reroutes the engine without losing the segment.
     func chooseMic(uid: String?) {
         micChoices = []
         recorder.preferredInputUID = uid
@@ -304,6 +312,16 @@ final class RecorderViewModel {
             recorder.applyPreferredInput(uid: uid)
         }
         micChoiceContinuation?.resume(returning: uid)
+        micChoiceContinuation = nil
+    }
+
+    /// Dismisses the mic chooser without a pick. A pending `prepareToRecord`
+    /// continuation still resolves — to `nil`, "use the system default", as
+    /// before — but the stored `preferredInputUID` and any live capture's
+    /// route are left untouched: cancelling is not a choice.
+    func dismissMicChoices() {
+        micChoices = []
+        micChoiceContinuation?.resume(returning: nil)
         micChoiceContinuation = nil
     }
 
@@ -327,7 +345,7 @@ final class RecorderViewModel {
     /// Test-only: whether a mic-choice continuation is currently pending,
     /// so a test can poll for it to actually be stored before simulating a
     /// second concurrent request, instead of guessing a fixed delay.
-    var hasPendingMicChoiceContinuationForTesting: Bool { micChoiceContinuation != nil }
+    var hasPendingMicChoiceForTesting: Bool { micChoiceContinuation != nil }
     #endif
 
     func prepareCaptureOwnership() throws -> Recording {

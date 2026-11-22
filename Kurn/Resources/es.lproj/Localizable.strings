@@ -1943,3 +1943,4 @@
 "recorder.discard.confirm.title" = "¿Descartar esta grabación?";
 "recorder.discard.confirm.message" = "El audio grabado hasta ahora se borrará de este dispositivo. Detener, en cambio, lo conserva.";
 "recorder.discard.confirm.keep" = "Seguir grabando";
+"recorder.mic.builtin_forced_hint" = "La opción Usar siempre el micrófono del iPhone está activada en Ajustes";

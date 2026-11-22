@@ -203,7 +203,7 @@ private struct RecorderContent: View {
             isPresented: Binding(
                 get: { !vm.micChoices.isEmpty },
                 set: { isPresented in
-                    if !isPresented { vm.chooseMic(uid: nil) }
+                    if !isPresented { vm.dismissMicChoices() }
                 }
             ),
             titleVisibility: .visible
@@ -212,7 +212,7 @@ private struct RecorderContent: View {
                 Button(option.name) { vm.chooseMic(uid: option.id) }
             }
             Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {
-                vm.chooseMic(uid: nil)
+                vm.dismissMicChoices()
             }
         }
         .errorAlert(Binding(
@@ -420,7 +420,7 @@ private struct RecorderContent: View {
                 Label(NSLocalizedString("recorder.stop", comment: "Stop"), systemImage: "stop.fill")
             }
 
-            controlCircle(size: 64, disabled: false) {
+            controlCircle(size: 64, disabled: vm.micPickerDisabled) {
                 vm.presentMicChoices()
             } label: {
                 Image(systemName: "mic")
@@ -428,6 +428,9 @@ private struct RecorderContent: View {
                     .foregroundStyle(.white)
             }
             .accessibilityLabel(NSLocalizedString("recorder.choose_mic.title", comment: "Choose microphone"))
+            .accessibilityHint(vm.micPickerDisabled
+                ? NSLocalizedString("recorder.mic.builtin_forced_hint", comment: "Built-in mic forced in Settings")
+                : "")
             .accessibilityShowsLargeContentViewer {
                 Label(
                     NSLocalizedString("recorder.choose_mic.title", comment: "Choose microphone"),

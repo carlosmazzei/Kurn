@@ -98,8 +98,7 @@ struct AutoTagConfirmView: View {
                         onApply(selectedSuggestion)
                         dismiss()
                     }
-                    .buttonStyle(.glassProminent)
-                    .tint(Theme.ink)
+                    .inkProminent()
                     .disabled(selectedTagIDs.isEmpty && selectedNewTagNames.isEmpty)
                 }
             }

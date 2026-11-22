@@ -73,6 +73,25 @@ struct RecordingLauncherTests {
         #expect(all.isEmpty)
     }
 
+    /// Two `.start` commands that arrive before the presenter consumes the
+    /// first queued meeting (e.g. the app is still backgrounded) must reuse
+    /// that meeting — each reply is `.queued`, and no second empty meeting
+    /// is created.
+    @Test func repeatedStartsBeforeConsumptionReuseThePendingMeeting() throws {
+        let (launcher, context) = makeLauncher()
+        defer { _ = launcher.consumePendingAutoStart() }
+        let router = RecordingCommandRouter.shared
+        router.isForeground = { false }
+
+        let first = router.handleWatchCommand(.start, commandID: "start-1")
+        let second = router.handleWatchCommand(.start, commandID: "start-2")
+
+        #expect(first.phase == .queued)
+        #expect(second.phase == .queued)
+        let all = try context.fetch(FetchDescriptor<Meeting>())
+        #expect(all.count == 1)
+    }
+
     // The "not configured yet" `requestAutoStart() == false` path (H8 PR 20,
     // item 8's cold-launch race) isn't covered here: `RecordingLauncher` is a
     // real process-wide singleton with no reset hook for `configure()`'s

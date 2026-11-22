@@ -159,12 +159,7 @@ extension AudioRecorderService {
         AppLog.recorder.atError.error("engine stopped mid-recording (\(reason, privacy: .public)); attempting restart")
 
         let current = engine.inputFormat
-        let formatUnchanged: Bool
-        if let tapFormat, let current {
-            formatUnchanged = tapFormat.sampleRate == current.sampleRate && tapFormat.channelCount == current.channelCount
-        } else {
-            formatUnchanged = false
-        }
+        let formatUnchanged = tapFormat != nil && current != nil && !inputFormatDiffers(tapFormat, current)
 
         if !formatUnchanged {
             AppLog.recorder.atNotice.notice("input format changed to \(current?.sampleRate ?? 0, privacy: .public)Hz/\(current?.channelCount ?? 0, privacy: .public)ch; rebuilding the tap")
@@ -195,6 +190,17 @@ extension AudioRecorderService {
             comment: "Recording paused because the system stopped the audio engine"
         )
         AppLog.recorder.atInfo.info("routeChangeMessage: \(self.routeChangeMessage ?? "nil", privacy: .public)")
+    }
+
+    /// Whether two readable input formats describe different layouts — the
+    /// condition that invalidates an installed tap. `nil` on either side is
+    /// NOT a difference: a missing reading can't prove the tap is stale, and
+    /// callers that need a rebuild guard on `current` being non-nil anyway.
+    /// Shared by `recoverEngineIfNeeded` and `resume`'s switch-while-paused
+    /// check so both judge "the format changed" the same way.
+    func inputFormatDiffers(_ a: AVAudioFormat?, _ b: AVAudioFormat?) -> Bool {
+        guard let a, let b else { return false }
+        return a.sampleRate != b.sampleRate || a.channelCount != b.channelCount
     }
 
     /// Re-point the tap and the sink's converter at a new input format, keeping

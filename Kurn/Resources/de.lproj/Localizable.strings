@@ -1943,3 +1943,4 @@
 "recorder.discard.confirm.title" = "Diese Aufnahme verwerfen?";
 "recorder.discard.confirm.message" = "Das bisher aufgenommene Audio wird vom Gerät gelöscht. Stoppen behält es dagegen.";
 "recorder.discard.confirm.keep" = "Weiter aufnehmen";
+"recorder.mic.builtin_forced_hint" = "Immer iPhone-Mikrofon verwenden ist in den Einstellungen aktiviert";

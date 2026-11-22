@@ -82,8 +82,7 @@ struct ChatArtifactCard: View {
                     ToolbarItem(placement: .bottomBar) {
                         saveButton
                             .labelStyle(.titleAndIcon)
-                            .buttonStyle(.glassProminent)
-                            .tint(Theme.ink)
+                            .inkProminent()
                     }
                 }
             }

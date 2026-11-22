@@ -69,8 +69,7 @@ struct LockedRecordingsView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
             }
-            .buttonStyle(.glassProminent)
-            .tint(Theme.ink)
+            .inkProminent()
             .padding(.top, 4)
             // Only when the device cannot authenticate at all; see
             // `RecordingAccessGate.offersSettingsEscapeHatch`.
@@ -100,22 +99,24 @@ struct MeetingCard: View {
     var showsDate = false
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                // One step below body so the generated default title
-                // ("Meeting – 2026-11-22 04:27 GMT-3") fits one line on an
-                // iPhone; long custom titles still wrap to a second line.
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                // The generated default title is a timestamp, not prose: it
+                // stays on one line even beside the trailing indicators,
+                // shrinking before it ever wraps. Typed and AI titles keep
+                // two lines — their words matter. VoiceOver reads the full
+                // string via the row's combined label either way.
                 Text(primaryTitle)
-                    .font(Theme.calloutEmphasized)
+                    .font(Theme.subheadlineEmphasized)
                     .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(2)
+                    .lineLimit(meeting.isDefaultTitle ? 1 : 2)
+                    .minimumScaleFactor(meeting.isDefaultTitle ? 0.85 : 1)
 
-                // The AI title is what tells meetings apart while the person
-                // has not typed one: it leads when the title is still the
-                // generated default, and reads as a second line otherwise.
+                // The AI title is the subtitle: it helps tell meetings apart
+                // without ever replacing the title the person sees elsewhere.
                 if let secondaryTitle {
                     Text(secondaryTitle)
-                        .font(Theme.subheadline)
+                        .font(Theme.footnote)
                         .foregroundStyle(Theme.textSecondary)
                         .lineLimit(2)
                 }
@@ -124,9 +125,10 @@ struct MeetingCard: View {
 
                 classifiers
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: 12)
             indicators
         }
+        .contentShape(Rectangle())
     }
 
     private var trimmedAITitle: String? {
@@ -134,17 +136,13 @@ struct MeetingCard: View {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    /// The AI title leads while the meeting still has its generated default
-    /// name; a title the person typed always leads.
-    private var primaryTitle: String {
-        if meeting.isDefaultTitle, let trimmedAITitle { return trimmedAITitle }
-        return meeting.title
-    }
+    /// The meeting's own title always leads — typed or the generated default
+    /// — so a card is identified the same way everywhere in the app.
+    private var primaryTitle: String { meeting.title }
 
-    /// The AI title as a second line under a typed title; nothing when there
-    /// is no AI title or it already leads.
+    /// The AI title is the subtitle whenever it exists and differs.
     private var secondaryTitle: String? {
-        guard let trimmedAITitle, !meeting.isDefaultTitle, trimmedAITitle != meeting.title else { return nil }
+        guard let trimmedAITitle, trimmedAITitle != meeting.title else { return nil }
         return trimmedAITitle
     }
 

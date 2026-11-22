@@ -180,6 +180,43 @@ struct AudioRecorderServiceCaptureTests {
         #expect(harness.engine.count(.start) == 1)
     }
 
+    /// Switching the mic while paused can change the negotiated input
+    /// format (built-in 48 kHz → Bluetooth HFP 16 kHz); resume must rebuild
+    /// the tap and converter for the new format — into the same open file —
+    /// instead of restarting against the stale tap.
+    @Test func resumeAfterTheInputFormatChangedWhilePausedRebuildsTheTap() async throws {
+        let harness = Harness()
+        defer { harness.cleanUp() }
+        try await harness.start()
+        harness.recorder.pause(reason: .userToggle)
+        // A mid-pause mic switch negotiates a different input format.
+        harness.engine.setInputFormats([FakeAudioCaptureEngine.bluetoothHFP])
+
+        harness.recorder.resume()
+
+        #expect(harness.recorder.state == .recording)
+        #expect(harness.engine.count(.removeTap) == 1)
+        #expect(harness.engine.count(.installTap) == 2)
+        #expect(harness.sink.convertersReplaced == 1)
+        #expect(harness.sink.openCount == 1) // same file kept open
+    }
+
+    /// The same switch-while-paused case where nothing about the format
+    /// changed: resume does not rebuild the tap.
+    @Test func resumeWithoutAnInputFormatChangeKeepsTheTap() async throws {
+        let harness = Harness()
+        defer { harness.cleanUp() }
+        try await harness.start()
+        harness.recorder.pause(reason: .userToggle)
+
+        harness.recorder.resume()
+
+        #expect(harness.recorder.state == .recording)
+        #expect(harness.engine.count(.removeTap) == 0)
+        #expect(harness.engine.count(.installTap) == 1)
+        #expect(harness.sink.convertersReplaced == 0)
+    }
+
     @Test func resumeWithAnEngineThatWillNotStartStaysPaused() async throws {
         let harness = Harness()
         defer { harness.cleanUp() }

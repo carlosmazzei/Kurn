@@ -89,9 +89,7 @@ extension MeetingDetailView {
                     } label: {
                         Text(NSLocalizedString("detail.transcript.go_to_audio", comment: "Go to Audio tab"))
                     }
-                    .buttonStyle(.glassProminent)
-                    .tint(Theme.ink)
-                    .foregroundStyle(Theme.onInk)
+                    .inkProminent()
                 }
             }
             .padding(.top, 24)
@@ -153,9 +151,7 @@ extension MeetingDetailView {
             } label: {
                 Text(NSLocalizedString("detail.try_again", comment: "Try again"))
             }
-            .buttonStyle(.glassProminent)
-            .tint(Theme.ink)
-            .foregroundStyle(Theme.onInk)
+            .inkProminent()
             Button {
                 showingNetworkSettings = true
             } label: {
@@ -205,8 +201,7 @@ extension MeetingDetailView {
                     ))
                     .font(.footnote.weight(.semibold))
                 }
-                .buttonStyle(.glassProminent)
-                .tint(Theme.ink)
+                .inkProminent()
                 .disabled(downloads.isDownloading)
             }
         }

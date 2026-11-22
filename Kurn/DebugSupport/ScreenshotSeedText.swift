@@ -38,6 +38,12 @@ struct ScreenshotSeedText {
     /// the seeded detail exercises the page dots, the pill menu and Compare.
     let roadmapSecondTemplate: String
     let roadmapSecondSections: [ScreenshotSeedSection]
+    /// The AI title for the typed-title roadmap meeting — renders as the
+    /// grey second line under "Product Roadmap Sync".
+    let roadmapAITitle: String
+    /// The AI title for the default-titled interview meeting — it leads the
+    /// card in place of the generated timestamp name.
+    let interviewAITitle: String
     let roadmapAttachmentName: String
     let roadmapAttachmentText: String
 
@@ -137,6 +143,8 @@ struct ScreenshotSeedText {
                 "None — dropping the legacy import format is decided."
             ])
         ],
+        roadmapAITitle: "Q3 priorities: offline sync and the export flow",
+        interviewAITitle: "Digging up past decisions takes too long",
         roadmapAttachmentName: "Q3 Roadmap.pdf",
         roadmapAttachmentText: "Q3 roadmap: onboarding redesign, offline sync, pricing page.",
         designFolder: "Design",

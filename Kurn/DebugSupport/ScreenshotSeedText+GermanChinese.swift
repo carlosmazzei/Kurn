@@ -58,7 +58,9 @@ extension ScreenshotSeedText {
                 "Keine — das Entfernen des alten Importformats ist entschieden."
             ])
         ],
-        roadmapAttachmentName: "Roadmap Q3.pdf",
+                roadmapAITitle: "Q3-Prioritäten: Offline-Sync und Exportablauf",
+        interviewAITitle: "Alte Entscheidungen wiederzufinden dauert zu lange",
+roadmapAttachmentName: "Roadmap Q3.pdf",
         roadmapAttachmentText: "Roadmap Q3: neues Onboarding, Offline-Sync, Preisseite.",
         designFolder: "Design",
         designTag: "UI",
@@ -157,7 +159,9 @@ extension ScreenshotSeedText {
                 "无——移除旧导入格式已确定。"
             ])
         ],
-        roadmapAttachmentName: "第三季度路线图.pdf",
+                roadmapAITitle: "第三季度重点：离线同步与导出流程",
+        interviewAITitle: "翻找历史决策耗时太长",
+roadmapAttachmentName: "第三季度路线图.pdf",
         roadmapAttachmentText: "第三季度路线图：新手引导改版、离线同步、价格页面。",
         designFolder: "设计",
         designTag: "界面",

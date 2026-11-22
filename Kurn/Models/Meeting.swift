@@ -130,8 +130,39 @@ final class Meeting {
     }
 
     /// Whether `title` is still that generated placeholder rather than a name
-    /// the user typed or the AI suggested.
-    var isDefaultTitle: Bool { title == Self.generatedTitle(for: createdAt) }
+    /// the user typed or the AI suggested. Compared against the title rendered
+    /// for `createdAt` in the current time zone AND by shape — a bundled
+    /// `meeting.default_title` prefix plus a `titleStamp` — so a meeting
+    /// recorded in another zone ("Reunião – 2026-11-02 15:10 GMT-8") or while
+    /// the device spoke another language is still recognized.
+    var isDefaultTitle: Bool {
+        if title == Self.generatedTitle(for: createdAt) { return true }
+        return Self.defaultTitleMatchers.contains {
+            $0.firstMatch(in: title, range: NSRange(title.startIndex..., in: title)) != nil
+        }
+    }
+
+    /// One `^<prefix><stamp><suffix>$` matcher per bundled localization of
+    /// `meeting.default_title`. `Bundle(for:)` (not `main`) so the app
+    /// bundle is found when this runs inside a hosted test bundle.
+    private static let defaultTitleMatchers: [NSRegularExpression] = {
+        let appBundle = Bundle(for: Meeting.self)
+        var formats = Set<String>()
+        for code in appBundle.localizations {
+            guard let path = appBundle.path(forResource: code, ofType: "lproj"),
+                  let bundle = Bundle(path: path) else { continue }
+            formats.insert(bundle.localizedString(forKey: "meeting.default_title", value: nil, table: nil))
+        }
+        formats.insert(NSLocalizedString("meeting.default_title", comment: "Default title"))
+        return formats.compactMap { format in
+            let parts = format.components(separatedBy: "%@")
+            guard parts.count == 2 else { return nil }
+            let pattern = "^" + NSRegularExpression.escapedPattern(for: parts[0])
+                + Date.titleStampPattern
+                + NSRegularExpression.escapedPattern(for: parts[1]) + "$"
+            return try? NSRegularExpression(pattern: pattern)
+        }
+    }()
 
     var summaryMapCheckpoint: SummaryMapCheckpoint? {
         get { summaryMapCheckpointOutcome.decodedValue }
@@ -261,13 +292,15 @@ final class Meeting {
     }
 
     /// Whether this meeting contains `needle` anywhere the meetings list
-    /// searches: title, notes, or any recording's transcript plain text. Cheap
-    /// string fields are checked first so the transcript JSON decode (per
-    /// `Transcript.plainText`) is skipped whenever an earlier field matches.
+    /// searches: title, AI title, notes, or any recording's transcript plain
+    /// text. Cheap string fields are checked first so the transcript JSON
+    /// decode (per `Transcript.plainText`) is skipped whenever an earlier
+    /// field matches.
     /// Match is case-insensitive and locale-aware. An empty `needle` matches.
     func matches(search needle: String) -> Bool {
         guard !needle.isEmpty else { return true }
         if title.localizedCaseInsensitiveContains(needle) { return true }
+        if let aiTitle, aiTitle.localizedCaseInsensitiveContains(needle) { return true }
         if notes.localizedCaseInsensitiveContains(needle) { return true }
         for recording in recordings {
             if let plain = recording.transcript?.plainText,

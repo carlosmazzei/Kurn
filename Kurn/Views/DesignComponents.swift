@@ -428,6 +428,16 @@ extension View {
         modifier(KurnComposerSurfaceModifier(cornerRadius: cornerRadius))
     }
 
+    /// The prominent ink action used across the app: `glassProminent` tinted
+    /// `Theme.ink` with the label forced to `Theme.onInk`. The explicit label
+    /// color is required — in dark mode the prominent style otherwise picks a
+    /// white foreground that disappears against the ink-tinted glass.
+    func inkProminent() -> some View {
+        buttonStyle(.glassProminent)
+            .tint(Theme.ink)
+            .foregroundStyle(Theme.onInk)
+    }
+
     /// Strip the default `List` row chrome (separator + background) so cards sit
     /// directly on the themed background while keeping swipe actions available.
     func clearListRow(insets: EdgeInsets? = nil) -> some View {

@@ -326,9 +326,7 @@ struct SummaryTab: View {
                 Button(NSLocalizedString("detail.summary.generate", comment: "Generate summary")) {
                     onGenerate()
                 }
-                .buttonStyle(.glassProminent)
-                .tint(Theme.ink)
-                .foregroundStyle(Theme.onInk)
+                .inkProminent()
                 Text(summaryModelNudge)
                     .font(Theme.footnote)
                     .foregroundStyle(Theme.textSecondary)

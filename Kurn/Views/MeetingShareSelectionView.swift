@@ -136,8 +136,7 @@ struct MeetingShareSelectionView: View {
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .foregroundStyle(Theme.onInk)
             }
-            .buttonStyle(.glassProminent)
-            .tint(Theme.ink)
+            .inkProminent()
             .disabled(!hasSelection || isExporting)
             .accessibilityIdentifier("share.share_button")
         }

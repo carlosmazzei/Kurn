@@ -63,8 +63,7 @@ struct CrossMeetingSpeakerMatchView: View {
                     )
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.glassProminent)
-                .tint(Theme.ink)
+                .inkProminent()
 
                 Button {
                     dismiss()

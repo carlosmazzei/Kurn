@@ -116,8 +116,7 @@ struct KnowledgeLibraryDestination: View {
                     Text(KnowledgeBrowserCopy.text("enable"))
                         .font(Theme.calloutEmphasized)
                 }
-                .buttonStyle(.glassProminent)
-                .tint(Theme.ink)
+                .inkProminent()
                 .accessibilityIdentifier("knowledge.openSettings")
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -194,8 +193,7 @@ struct KnowledgeMeetingSelectionView: View {
                     Button(String(format: NSLocalizedString("knowledge.sources.use", comment: "Use selection"), selectedIDs.count)) {
                         onDone(selectedIDs.intersection(Set(allowedIDs)))
                     }
-                    .buttonStyle(.glassProminent)
-                    .tint(Theme.ink)
+                    .inkProminent()
                     .disabled(selectedIDs.isEmpty || selectedIDs.count > 16)
                     .accessibilityIdentifier("knowledge.sources.done")
                 }

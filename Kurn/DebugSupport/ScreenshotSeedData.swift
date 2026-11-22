@@ -128,6 +128,10 @@ enum ScreenshotSeedData {
         )
         context.insert(summary)
 
+        // Typed title + AI title: the card shows the AI title as the grey
+        // second line under "Product Roadmap Sync".
+        meeting.aiTitle = text.roadmapAITitle
+
         // A second summary on the same meeting, a few minutes later, so the
         // Summary tab shows the page dots, the multi-row pill menu and the
         // "Compare side by side" entry.
@@ -217,9 +221,13 @@ enum ScreenshotSeedData {
         context.insert(tagOnboarding)
         context.insert(tagPriority)
 
+        // Kept on the generated default title with NO aiTitle (the remaining
+        // card state): the timestamp must fit one line beside the trailing
+        // transcript + summary indicators, and nothing else leads.
+        let createdAt = Date().addingTimeInterval(-3600 * 6)
         let meeting = Meeting(
-            title: text.onboardingTitle,
-            createdAt: Date().addingTimeInterval(-3600 * 6),
+            title: Meeting.generatedTitle(for: createdAt),
+            createdAt: createdAt,
             language: text.language,
             folder: folder
         )
@@ -271,14 +279,19 @@ enum ScreenshotSeedData {
     }
 
     // MARK: - "Customer Interview" — older, single speaker, prose summary,
-    // no folder/tags.
+    // no folder/tags. Keeps the generated default title AND carries an AI
+    // title, so the card shows the timestamp leading with the AI title as
+    // the grey subtitle — the case a cross-time-zone `isDefaultTitle` miss
+    // used to break.
 
     private static func seedCustomerInterviewMeeting(into context: ModelContext, text: ScreenshotSeedText) {
+        let createdAt = Date().addingTimeInterval(-3600 * 30)
         let meeting = Meeting(
-            title: text.interviewTitle,
-            createdAt: Date().addingTimeInterval(-3600 * 30),
+            title: Meeting.generatedTitle(for: createdAt),
+            createdAt: createdAt,
             language: text.language
         )
+        meeting.aiTitle = text.interviewAITitle
         context.insert(meeting)
 
         let recording = Recording(

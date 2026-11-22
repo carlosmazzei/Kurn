@@ -58,7 +58,9 @@ extension ScreenshotSeedText {
                 "Nenhum — a remoção do formato de importação antigo está decidida."
             ])
         ],
-        roadmapAttachmentName: "Roadmap T3.pdf",
+                roadmapAITitle: "Prioridades do T3: sincronização offline e exportação",
+        interviewAITitle: "Resgatar decisões antigas leva tempo demais",
+roadmapAttachmentName: "Roadmap T3.pdf",
         roadmapAttachmentText: "Roadmap T3: novo onboarding, sincronização offline, página de preços.",
         designFolder: "Design",
         designTag: "Interface",
@@ -157,7 +159,9 @@ extension ScreenshotSeedText {
                 "Ninguno — la eliminación del formato de importación antiguo está decidida."
             ])
         ],
-        roadmapAttachmentName: "Roadmap T3.pdf",
+                roadmapAITitle: "Prioridades del T3: sincronización offline y exportación",
+        interviewAITitle: "Recuperar decisiones antiguas lleva demasiado tiempo",
+roadmapAttachmentName: "Roadmap T3.pdf",
         roadmapAttachmentText: "Roadmap T3: nuevo onboarding, sincronización offline, página de precios.",
         designFolder: "Diseño",
         designTag: "Interfaz",
@@ -256,7 +260,9 @@ extension ScreenshotSeedText {
                 "Aucun — la suppression de l'ancien format d'import est décidée."
             ])
         ],
-        roadmapAttachmentName: "Roadmap T3.pdf",
+                roadmapAITitle: "Priorités du T3 : synchro hors ligne et export",
+        interviewAITitle: "Retrouver d’anciennes décisions prend trop de temps",
+roadmapAttachmentName: "Roadmap T3.pdf",
         roadmapAttachmentText: "Roadmap T3 : nouvel onboarding, synchro hors ligne, page tarifs.",
         designFolder: "Design",
         designTag: "Interface",
@@ -355,7 +361,9 @@ extension ScreenshotSeedText {
                 "Nessuno — la rimozione del vecchio formato di importazione è decisa."
             ])
         ],
-        roadmapAttachmentName: "Roadmap Q3.pdf",
+                roadmapAITitle: "Priorità del T3: sincronizzazione offline ed esportazione",
+        interviewAITitle: "Recuperare vecchie decisioni richiede troppo tempo",
+roadmapAttachmentName: "Roadmap Q3.pdf",
         roadmapAttachmentText: "Roadmap Q3: nuovo onboarding, sincronizzazione offline, pagina prezzi.",
         designFolder: "Design",
         designTag: "Interfaccia",

@@ -143,8 +143,7 @@ struct ModelStoreRecoveryView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
         }
-        .buttonStyle(.glassProminent)
-        .tint(Theme.ink)
+        .inkProminent()
         .accessibilityIdentifier("storeRecovery.retryButton")
     }
 

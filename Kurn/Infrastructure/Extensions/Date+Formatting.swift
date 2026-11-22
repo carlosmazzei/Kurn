@@ -69,6 +69,40 @@ extension Date {
     /// e.g. "2025-06-16 09:30 GMT-3".
     var titleStamp: String { Self.titleStampFormatter.string(from: self) }
 
+    /// Regex matching the `titleStamp` shape ("2025-06-16 09:30 GMT-3"),
+    /// derived from `titleStampFormatter`'s pattern so recognition and
+    /// rendering can never drift: numeric fields become `\d{<width>}` and
+    /// the zone field `O` becomes the `GMT…` forms it can emit ("GMT",
+    /// "GMT-3", "GMT+5:30"). Used by `Meeting.isDefaultTitle` to recognize
+    /// a generated title rendered in a different time zone than today's.
+    static let titleStampPattern: String = {
+        let format = titleStampFormatter.dateFormat ?? ""
+        var pattern = ""
+        var index = format.startIndex
+        while index < format.endIndex {
+            let character = format[index]
+            if character.isLetter {
+                var end = index
+                while end < format.endIndex, format[end] == character {
+                    end = format.index(after: end)
+                }
+                let field = String(format[index..<end])
+                switch field {
+                case "O", "OOOO":
+                    pattern += #"GMT(?:[+-]\d{1,2}(?::\d{2})?)?"#
+                default:
+                    // y, M, d, H, m and friends all render as fixed-width digits.
+                    pattern += "\\d{\(field.count)}"
+                }
+                index = end
+            } else {
+                pattern += NSRegularExpression.escapedPattern(for: String(character))
+                index = format.index(after: index)
+            }
+        }
+        return pattern
+    }()
+
     /// Timestamp suitable for unique file names. e.g. "20250616-093012".
     var fileTimestamp: String { Self.fileTimestampFormatter.string(from: self) }
 }

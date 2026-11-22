@@ -53,8 +53,7 @@ struct AttachToMeetingView: View {
                             guard let selectedMeeting else { return }
                             Task { await viewModel.attach(to: selectedMeeting) }
                         }
-                        .buttonStyle(.glassProminent)
-                        .tint(Theme.ink)
+                        .inkProminent()
                         .disabled(selectedMeeting == nil || viewModel.isImporting)
                     }
                 }

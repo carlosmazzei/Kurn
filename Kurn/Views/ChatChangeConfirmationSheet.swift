@@ -51,8 +51,7 @@ struct ChatChangeConfirmationSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(NSLocalizedString("chat.confirm.replace.allow", comment: "Replace")) { answer(true) }
-                        .buttonStyle(.glassProminent)
-                        .tint(Theme.ink)
+                        .inkProminent()
                         .accessibilityIdentifier("chat.confirm.replace.allow")
                 }
             }
