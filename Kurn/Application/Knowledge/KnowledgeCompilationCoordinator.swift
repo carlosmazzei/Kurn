@@ -14,6 +14,51 @@ final class KnowledgeCompilationCoordinator {
     @ObservationIgnored private let resolveProvider: ProviderFactory.LLMResolver
     @ObservationIgnored private let isProviderUsable: ProviderFactory.UsabilityCheck
     private(set) var lastFailureCode: String?
+    /// The meeting and reason of the most recent explicit compile refusal —
+    /// the tab's "Last attempt failed" row reads this so a refusal surfaces
+    /// identically whether the request came from the tab or the ⋯ menu.
+    private(set) var lastExplicitFailure: (meetingID: UUID, code: String)?
+    /// Live per-meeting progress the tab renders while a compile runs.
+    private(set) var compilationProgress: [UUID: KnowledgeCompilationProgress] = [:]
+    /// The just-finished compile's outcome per meeting — the tab shows it
+    /// briefly ("N new facts", or the empty-answer note) and it self-clears.
+    private(set) var compilationResults: [UUID: KnowledgeCompilationResult] = [:]
+
+    func progress(for meetingID: UUID) -> KnowledgeCompilationProgress? {
+        compilationProgress[meetingID]
+    }
+
+    func result(for meetingID: UUID) -> KnowledgeCompilationResult? {
+        compilationResults[meetingID]
+    }
+
+    /// The most precise public code a thrown pipeline error carries — shared
+    /// by the worker's log path and the explicit-failure row so they agree.
+    private static func failureCode(_ error: any Error) -> String {
+        (error as? AppError)?.logCode ?? (error as? KnowledgeStoreError)?.rawValue
+            ?? (error as? KnowledgeExtractionError)?.rawValue ?? (error as? KnowledgeExtractionServiceError)?.rawValue
+            ?? (error as? KnowledgeQueueError)?.rawValue ?? "compilation_failed"
+    }
+
+    private func markFailure(_ code: String, meetingID: UUID, trigger: ProviderAutomationTrigger) {
+        lastFailureCode = code
+        if trigger == .explicit { lastExplicitFailure = (meetingID, code) }
+    }
+
+    private func setProgress(_ meetingID: UUID, phase: KnowledgeCompilationPhase,
+                             provider: AIProvider, model: String) {
+        var entry = compilationProgress[meetingID]
+            ?? KnowledgeCompilationProgress(startedAt: Date(), providerLabel: provider.displayName, modelLabel: model)
+        entry.phase = phase
+        entry.fraction = phase.fractionComplete
+        compilationProgress[meetingID] = entry
+    }
+
+    private func noteExtractedFacts(_ meetingID: UUID, count: Int) {
+        guard var entry = compilationProgress[meetingID] else { return }
+        entry.factsSoFar += count
+        compilationProgress[meetingID] = entry
+    }
 
     // A stable host-owned default policy, rather than minting a policy revision
     // on every launch. Local controls narrow this policy; corporate policy
@@ -67,9 +112,14 @@ final class KnowledgeCompilationCoordinator {
     /// A rebuild's generation is an explicit operation identity retained by its
     /// caller across retries. Regular triggers never mint a new generation.
     @discardableResult
+    /// `force` skips the already-current replay shortcut; only the explicit
+    /// path may force (a deliberate "Update knowledge" tap recompiles even
+    /// when the fingerprint is unchanged).
     func compile(meetingID: UUID, scope: String = "workspace", trigger: ProviderAutomationTrigger = .automatic,
-                 rebuildGeneration: UUID? = nil, expectedSource: KnowledgeCompilationExpectation? = nil) async -> KnowledgeJobQueue.Outcome {
+                 force: Bool = false, rebuildGeneration: UUID? = nil,
+                 expectedSource: KnowledgeCompilationExpectation? = nil) async -> KnowledgeJobQueue.Outcome {
         lastFailureCode = nil
+        if trigger == .explicit { lastExplicitFailure = nil }
         do {
             try Task.checkCancellation()
             guard settings.knowledgeEnabled else { throw KnowledgeJobDeferred(reason: .featureDisabled) }
@@ -77,6 +127,7 @@ final class KnowledgeCompilationCoordinator {
             guard !controls.isPaused else { throw KnowledgeJobDeferred(reason: .paused) }
             guard trigger == .explicit || controls.automaticCompilation else { throw KnowledgeJobDeferred(reason: .automaticDisabled) }
             guard rebuildGeneration == nil || trigger == .explicit else { throw KnowledgeStoreError.invalidJob }
+            guard !force || trigger == .explicit else { throw KnowledgeStoreError.invalidJob }
             guard let provider = settings.knowledgeProvider else { throw KnowledgeJobDeferred(reason: .providerUnavailable) }
             let model = settings.summaryModel(for: provider)
             _ = try hostAuthorization(provider: provider, model: model)
@@ -91,21 +142,24 @@ final class KnowledgeCompilationCoordinator {
                       snapshot.policyRevisionKey == expectedSource.policyRevisionKey else { throw KnowledgeSettingsError.stalePreview }
             }
             guard snapshot.recordings.contains(where: { !$0.segments.isEmpty }) else {
-                lastFailureCode = "no_transcript"
+                markFailure("no_transcript", meetingID: meetingID, trigger: trigger)
                 AppLog.knowledge.atNotice.notice("knowledge compile deferred meeting=\(meetingID, privacy: .private) reason=no_transcript")
                 return .deferred
             }
+            // A forced explicit update mints a fresh generation so the queue
+            // does not join the identical completed job; it stays explicit.
+            let generation = rebuildGeneration ?? (force ? UUID() : nil)
             let work = try KnowledgeQueuedWork.extraction(snapshot: snapshot, provider: provider, model: model,
-                rebuildGeneration: rebuildGeneration?.uuidString.lowercased())
+                rebuildGeneration: generation?.uuidString.lowercased())
             // Validate completed provenance/current support before the queue's
             // terminal shortcut. A -> B -> A requires an explicit new generation.
-            if try await store.compilationReplay(work, authorization: authorize) != nil {
+            if !force, try await store.compilationReplay(work, authorization: authorize) != nil {
                 AppLog.knowledge.atInfo.info("knowledge compile skipped meeting=\(meetingID, privacy: .private) reason=already_current")
                 return .completed
             }
             AppLog.knowledge.atNotice.notice("knowledge compile submitted meeting=\(meetingID, privacy: .private) provider=\(provider.id, privacy: .public) model=\(model, privacy: .public) explicit=\(trigger == .explicit, privacy: .public)")
             let submitted = try await jobQueue.submit(work, explicit: trigger == .explicit)
-            if let code = submitted.code { lastFailureCode = code }
+            if let code = submitted.code { markFailure(code, meetingID: meetingID, trigger: trigger) }
             if submitted.outcome != .completed {
                 AppLog.knowledge.atNotice.notice("knowledge compile \(submitted.outcome == .failed ? "failed" : "deferred", privacy: .public) meeting=\(meetingID, privacy: .private) code=\(submitted.code ?? "none", privacy: .public)")
             }
@@ -113,19 +167,21 @@ final class KnowledgeCompilationCoordinator {
         } catch is CancellationError {
             return .deferred
         } catch let deferred as KnowledgeJobDeferred {
-            lastFailureCode = deferred.reason.rawValue
+            markFailure(deferred.reason.rawValue, meetingID: meetingID, trigger: trigger)
             AppLog.knowledge.atNotice.notice("knowledge compile deferred meeting=\(meetingID, privacy: .private) reason=\(deferred.reason.rawValue, privacy: .public)")
             return .deferred
         } catch KnowledgeStoreError.policyDenied {
-            lastFailureCode = "policy_denied"
+            markFailure("policy_denied", meetingID: meetingID, trigger: trigger)
             AppLog.knowledge.atNotice.notice("knowledge compile deferred meeting=\(meetingID, privacy: .private) reason=policy_denied")
             return .deferred
         } catch KnowledgeStoreError.sourceNotReady {
-            lastFailureCode = "source_not_ready"
+            markFailure("source_not_ready", meetingID: meetingID, trigger: trigger)
             AppLog.knowledge.atNotice.notice("knowledge compile deferred meeting=\(meetingID, privacy: .private) reason=source_not_ready")
             return .deferred
         } catch {
-            lastFailureCode = (error as? KnowledgeStoreError)?.rawValue ?? "compilation_failed"
+            // `submit` rethrows the worker's failure; keep its precise code
+            // (e.g. the integrity gate's `invalid_schema`) for the inline row.
+            markFailure(Self.failureCode(error), meetingID: meetingID, trigger: trigger)
             AppLog.knowledge.atError.error("knowledge compile failed meeting=\(meetingID, privacy: .private) code=\(self.lastFailureCode ?? "compilation_failed", privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             return .failed
         }
@@ -215,6 +271,10 @@ final class KnowledgeCompilationCoordinator {
     private func perform(_ handle: KnowledgeJobHandle) async throws {
         let runID = OperationID()
         let started = Date()
+        let meetingID = handle.work.meetingID
+        setProgress(meetingID, phase: .readingTranscript, provider: handle.work.provider, model: handle.work.model)
+        // Success or failure, the row leaves once the run ends.
+        defer { compilationProgress[meetingID] = nil }
         do {
             try await performCompilation(handle)
             ReliabilityLog.record(ReliabilityEvent(operationID: runID, operation: "knowledge_compilation", outcome: .succeeded,
@@ -230,9 +290,7 @@ final class KnowledgeCompilationCoordinator {
             AppLog.knowledge.atNotice.notice("knowledge compilation obsolete reason=\(obsolete.rawValue, privacy: .public)")
             throw obsolete
         } catch {
-            let code = (error as? AppError)?.logCode ?? (error as? KnowledgeStoreError)?.rawValue
-                ?? (error as? KnowledgeExtractionError)?.rawValue ?? (error as? KnowledgeExtractionServiceError)?.rawValue
-                ?? (error as? KnowledgeQueueError)?.rawValue ?? "compilation_failed"
+            let code = Self.failureCode(error)
             AppLog.knowledge.atError.error("knowledge compilation failed code=\(code, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             ReliabilityLog.record(ReliabilityEvent(operationID: runID, operation: "knowledge_compilation", outcome: .failed,
                 elapsedSeconds: Date().timeIntervalSince(started), code: code))
@@ -241,6 +299,7 @@ final class KnowledgeCompilationCoordinator {
     }
 
     private func performCompilation(_ handle: KnowledgeJobHandle) async throws {
+        let meetingID = handle.work.meetingID
         do {
             let snapshot = try await currentSource(handle)
             guard isProviderUsable(handle.work.provider) else { throw KnowledgeJobDeferred(reason: .providerUnavailable) }
@@ -253,7 +312,13 @@ final class KnowledgeCompilationCoordinator {
                 guard let self else { return KnowledgeExtractionAuthorization(featureEnabled: false, policies: [], sourceClassifications: []) }
                 return await self.liveAuthorization(handle)
             }
-            for source in snapshot.recordings where !source.segments.isEmpty && !progress.recordings.contains(where: { $0.recordingID == source.id }) {
+            let pendingSources = snapshot.recordings.filter { source in
+                !source.segments.isEmpty && !progress.recordings.contains(where: { $0.recordingID == source.id })
+            }
+            var extractedFacts = 0
+            for (index, source) in pendingSources.enumerated() {
+                setProgress(meetingID, phase: .extracting(recording: index + 1, of: pendingSources.count),
+                            provider: handle.work.provider, model: handle.work.model)
                 _ = try await currentSource(handle)
                 let context = KnowledgeExtractionContext(recordedAt: source.recordedAt.ISO8601Format(),
                     timeZone: handle.work.compilation?.timeZone ?? "UTC", kind: snapshot.contextKind)
@@ -270,17 +335,31 @@ final class KnowledgeCompilationCoordinator {
                 } else {
                     AppLog.knowledge.atInfo.info("knowledge extraction facts recording=\(source.id, privacy: .private) count=\(assertionCount, privacy: .public)")
                 }
+                extractedFacts += assertionCount
+                noteExtractedFacts(meetingID, count: assertionCount)
                 _ = try await currentSource(handle)
                 progress.recordings.append(try KnowledgeRecordingCompilation(recordingID: source.id, result: result))
                 try await jobQueue.checkpoint(KnowledgeStoreRows.authoritativeData(progress), for: handle)
             }
             // Refresh only the canonical revision at commit, while requiring the
             // same complete source/policy. Other meetings may have committed.
+            setProgress(meetingID, phase: .checking, provider: handle.work.provider, model: handle.work.model)
             let current = try await currentSource(handle)
+            setProgress(meetingID, phase: .publishing, provider: handle.work.provider, model: handle.work.model)
             let request = KnowledgeCommitRequest(snapshot: current, extractorVersion: handle.work.pipelineVersion, schemaVersion: 1,
                 provider: handle.work.provider, compilations: progress.recordings, generation: handle.work.generation, lease: handle)
             let receipt = try await store.commit(request, authorization: authorize)
             AppLog.knowledge.atInfo.info("knowledge compilation published meeting=\(handle.work.meetingID, privacy: .private) facts=\(receipt.assertionCount, privacy: .public)")
+            // The tab's transient result note; it self-clears after a few
+            // seconds unless a newer compile replaced it first.
+            let publishResult = KnowledgeCompilationResult(factCount: receipt.assertionCount,
+                                                           modelEmpty: extractedFacts == 0, finishedAt: Date())
+            compilationResults[meetingID] = publishResult
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(5))
+                guard let self, self.compilationResults[meetingID] == publishResult else { return }
+                self.compilationResults[meetingID] = nil
+            }
         } catch KnowledgeExtractionServiceError.policyDenied {
             _ = try await currentSource(handle) // Preserve the precise deferral/obsolescence reason.
             throw KnowledgeJobDeferred(reason: .policyDenied)
@@ -318,4 +397,24 @@ final class KnowledgeCompilationCoordinator {
             }
         }
     }
+}
+
+/// What the Wiki tab renders while a compile runs: the phase (with its own
+/// fraction bands), the writer labels and the facts extracted so far.
+struct KnowledgeCompilationProgress: Equatable, Sendable {
+    var phase: KnowledgeCompilationPhase = .readingTranscript
+    var fraction: Double = 0
+    let startedAt: Date
+    let providerLabel: String
+    let modelLabel: String
+    var factsSoFar: Int = 0
+}
+
+/// The finished compile's one-line outcome, shown briefly under the facts.
+struct KnowledgeCompilationResult: Equatable, Sendable {
+    /// Assertions the commit published as new.
+    let factCount: Int
+    /// The model answered cleanly but asserted nothing at all.
+    let modelEmpty: Bool
+    let finishedAt: Date
 }
