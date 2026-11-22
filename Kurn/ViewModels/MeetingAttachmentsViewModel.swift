@@ -27,6 +27,9 @@ final class MeetingAttachmentsViewModel {
     /// Set by the swipe-delete action; drives the confirmation dialog (G1).
     var pendingDelete: MeetingAttachment?
     private(set) var isImporting = false
+    /// Display name of the file currently being read, for the section footer's
+    /// "Reading \"<name>\"…" line.
+    private(set) var importingName: String?
     var error: AppError?
 
     @ObservationIgnored private let makeImporter: MakeImporter
@@ -58,8 +61,10 @@ final class MeetingAttachmentsViewModel {
         case .success(let urls):
             guard !urls.isEmpty, !isImporting else { return }
             isImporting = true
+            importingName = urls.first?.deletingPathExtension().lastPathComponent
             let report = await makeImporter(context).importPDFs(from: urls, into: meeting)
             isImporting = false
+            importingName = nil
             if let failure = report.firstFailure { error = failure }
         }
     }

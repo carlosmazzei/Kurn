@@ -2,13 +2,12 @@
 //  MeetingDetailAttachments.swift
 //  Kurn
 //
-//  The Recordings tab's "Documents" section: the PDFs attached to the
-//  meeting, each opening in Quick Look, swipe to delete, and an "Add PDF"
-//  row that opens the Files picker. Isolated here, like
-//  `MeetingDetailPhotos.swift`, so the main view file stays under
-//  SwiftLint's file-length limit. It only renders: state and actions are
-//  `MeetingAttachmentsViewModel`'s, the row's text is
-//  `MeetingAttachment.detailsText`.
+//  The Audio tab's "Attachments" section: the PDFs attached to the meeting,
+//  each opening in Quick Look, swipe to delete, and an "Add PDF" row that
+//  opens the Files picker. Isolated here, like `MeetingDetailPhotos.swift`,
+//  so the main view file stays under SwiftLint's file-length limit. It only
+//  renders: state and actions are `MeetingAttachmentsViewModel`'s, the row's
+//  text is `MeetingAttachment.detailsText`.
 //
 
 import KurnCore
@@ -16,64 +15,57 @@ import SwiftData
 import SwiftUI
 
 extension MeetingDetailView {
-    @ViewBuilder
     var attachmentsSection: some View {
-        // One row, like `photosStrip`'s: a Divider alone in a List row is an
-        // accessibility element with nothing to describe.
-        VStack(alignment: .leading, spacing: 8) {
-            Divider()
-                .padding(.top, 12)
-                .accessibilityHidden(true)
-            sectionLabel(NSLocalizedString("detail.attachments", comment: "Documents attached to the meeting"))
-                .padding(.top, 4)
-        }
-        .clearListRow(insets: EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
-        ForEach(meeting.sortedAttachments) { attachment in
-            Button { attachments.preview(attachment) } label: {
-                AttachmentRow(attachment: attachment)
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint(NSLocalizedString("detail.attachments.open_hint", comment: "Opens the document"))
-            .accessibilityIdentifier("detail.attachments.row")
-            .clearListRow(insets: EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
-            .swipeActions(edge: .trailing) {
-                Button(role: .destructive) { attachments.requestDelete(attachment) } label: {
-                    Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
+        Section {
+            ForEach(meeting.sortedAttachments) { attachment in
+                Button { attachments.preview(attachment) } label: {
+                    AttachmentRow(attachment: attachment)
                 }
-                .accessibilityIdentifier("detail.attachments.delete")
+                .buttonStyle(.plain)
+                .accessibilityHint(NSLocalizedString("detail.attachments.open_hint", comment: "Opens the document"))
+                .accessibilityIdentifier("detail.attachments.row")
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) { attachments.requestDelete(attachment) } label: {
+                        Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
+                    }
+                    .accessibilityIdentifier("detail.attachments.delete")
+                }
+            }
+            addAttachmentRow
+        } header: {
+            Text(NSLocalizedString("detail.attachments", comment: "Documents attached to the meeting"))
+        } footer: {
+            if attachments.isImporting {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.mini)
+                    Text(String(
+                        format: NSLocalizedString("detail.attachments.reading", comment: "Reading an attachment"),
+                        attachments.importingName ?? ""
+                    ))
+                }
             }
         }
-        addAttachmentButton
-            .clearListRow(insets: EdgeInsets(top: 8, leading: 20, bottom: 24, trailing: 20))
     }
 
-    private var addAttachmentButton: some View {
+    private var addAttachmentRow: some View {
         Button { attachments.requestImport() } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle().fill(Theme.info.opacity(0.12)).frame(width: 34, height: 34)
-                    if attachments.isImporting {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Image(systemName: "doc.badge.plus")
-                            .font(.system(.footnote, design: .default, weight: .bold)).foregroundStyle(Theme.info)
-                            .accessibilityHidden(true)
-                    }
+            HStack(spacing: 8) {
+                if attachments.isImporting {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "plus")
+                        .foregroundStyle(Theme.link)
+                        .accessibilityHidden(true)
                 }
                 Text(attachments.isImporting
                     ? NSLocalizedString("detail.attachments.adding", comment: "Adding PDF")
                     : NSLocalizedString("detail.attachments.add", comment: "Add PDF"))
-                    .font(Theme.subheadline)
-                    .foregroundStyle(Theme.textSecondary)
+                    .font(Theme.body)
+                    .foregroundStyle(Theme.link)
                 Spacer()
             }
-            .padding(14)
-            .frame(maxWidth: .infinity)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
-                    .foregroundStyle(Theme.decorationTertiary.opacity(0.6))
-            )
         }
         .buttonStyle(.plain)
         .disabled(attachments.isImporting)
@@ -110,18 +102,23 @@ extension View {
     }
 }
 
-/// One attached document: its name, page count and size, and a note when no
-/// text could be read from it (it then adds nothing to the summary).
+/// One attached document: a grey doc well, its name, page count and size, a
+/// chevron, and a note when no text could be read from it (it then adds
+/// nothing to the summary).
 private struct AttachmentRow: View {
     let attachment: MeetingAttachment
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "doc.richtext")
-                .font(Theme.title3)
-                .foregroundStyle(Theme.info)
-                .frame(width: 34)
-                .accessibilityHidden(true)
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Theme.fill)
+                    .frame(width: 30, height: 30)
+                Image(systemName: "doc.text")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(attachment.displayName)
                     .font(Theme.subheadlineEmphasized)
@@ -140,9 +137,11 @@ private struct AttachmentRow: View {
                 }
             }
             Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption2)
+                .foregroundStyle(Theme.textTertiary)
+                .accessibilityHidden(true)
         }
-        .padding(12)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .contentShape(Rectangle())
     }
 }

@@ -30,10 +30,10 @@ struct TranscriptView: View {
     /// photo marker entirely, so call sites that don't pass `photos` don't
     /// need to pass this either.
     var onShowPhoto: ((MeetingPhoto) -> Void)?
-    @ScaledMetric(relativeTo: .caption2) private var avatarSize: CGFloat = 26
+    @ScaledMetric(relativeTo: .caption2) private var avatarSize: CGFloat = 22
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             ForEach(segments) { segment in
                 segmentRow(segment)
             }
@@ -49,32 +49,37 @@ struct TranscriptView: View {
         let matchingHighlights = highlights.filter { $0.timestamp >= segment.startTime && $0.timestamp < segment.endTime }
         let matchingPhotos = photos.filter { $0.capturedAt >= segment.startTime && $0.capturedAt < segment.endTime }
 
-        VStack(alignment: .leading, spacing: 6) {
-            Button {
-                onSeek(segment.startTime)
-            } label: {
-                HStack(spacing: 8) {
-                    ZStack {
-                        Circle().fill(color.opacity(0.2)).frame(width: avatarSize, height: avatarSize)
-                        Text(String(name.prefix(1)).uppercased())
-                            .font(Theme.caption2Emphasized)
-                            .foregroundStyle(color)
-                    }
-                    .accessibilityHidden(true)
-                    .accessibilityIgnoresInvertColors(true)
-                    Text(name)
-                        .font(Theme.footnoteEmphasized)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                ZStack {
+                    Circle().fill(color.opacity(0.18)).frame(width: avatarSize, height: avatarSize)
+                    Text(String(name.prefix(1)).uppercased())
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(color)
-                    Text((segment.startTime + offset).clockDisplay)
-                        .font(Theme.caption2)
-                        .foregroundStyle(Theme.textTertiary)
-                    Spacer(minLength: 0)
                 }
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
+                .accessibilityHidden(true)
+                .accessibilityIgnoresInvertColors(true)
+                Text(name)
+                    .font(Theme.subheadlineEmphasized)
+                    .foregroundStyle(Theme.textPrimary)
+                Spacer(minLength: 0)
+                Button {
+                    onSeek(segment.startTime)
+                } label: {
+                    Text((segment.startTime + offset).clockDisplay)
+                        .font(Theme.footnote)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.textSecondary)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(
+                    format: NSLocalizedString("transcript.seek_to", comment: "Seek to a timestamp"),
+                    (segment.startTime + offset).clockDisplay
+                ))
             }
-            .buttonStyle(.plain)
-            .accessibilityElement(children: .combine)
+            .frame(minHeight: 28)
 
             if !matchingHighlights.isEmpty || !matchingPhotos.isEmpty {
                 FlowLayout(horizontalSpacing: 4, verticalSpacing: 4) {
@@ -105,30 +110,29 @@ struct TranscriptView: View {
                         .accessibilityLabel(NSLocalizedString("transcript.view_photo", comment: "View photo"))
                     }
                 }
-                .padding(.leading, 34)
+                .padding(.leading, 30)
             }
 
             Button {
                 onSeek(segment.startTime)
             } label: {
                 Text(segment.text)
-                    .font(Theme.subheadline)
-                    .foregroundStyle(Theme.textPrimary.opacity(0.85))
+                    .font(Theme.body)
+                    .lineSpacing(4)
+                    .foregroundStyle(Theme.textPrimary)
                     .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .padding(.leading, 34)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 30)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
-        .padding(10)
+        .padding(.horizontal, isActive ? 10 : 0)
+        .padding(.vertical, isActive ? 8 : 0)
         .background(
-            isActive ? AnyShapeStyle(color.opacity(0.12)) : AnyShapeStyle(.clear),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            isActive ? AnyShapeStyle(Theme.fill) : AnyShapeStyle(.clear),
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(isActive ? color.opacity(0.6) : .clear, lineWidth: 1.5)
-        )
+        .accessibilityElement(children: .contain)
     }
 }

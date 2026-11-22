@@ -1,0 +1,133 @@
+//
+//  ReadAloudBar.swift
+//  Kurn
+//
+//  The floating read-aloud bar that replaces the Ask bar at the bottom of a
+//  meeting's detail screen while a summary is being read: what is playing
+//  (paragraph counter + voice), prev/play/next, a progress hairline and a
+//  close button. State stays in `ReadAloudController.shared`, the same
+//  singleton `ReadAloudControl` drives on the wiki and document screens —
+//  this is only the summary's floating chrome for it.
+//
+
+import KurnCore
+import SwiftUI
+
+struct ReadAloudBar: View {
+    let item: ReadAloudItem
+
+    @Environment(AppSettings.self) private var settings
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    private var controller: ReadAloudController { .shared }
+    private var phase: ReadAloudController.Phase { controller.phase(for: item.id) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(NSLocalizedString("detail.read_aloud.title", comment: "Reading the summary"))
+                        .font(Theme.subheadlineEmphasized)
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
+                    Text(subtitle)
+                        .font(Theme.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                transportButton(icon: "backward.fill",
+                                label: NSLocalizedString("read_aloud.previous", comment: "Previous paragraph")) {
+                    controller.skip(by: -1)
+                }
+                toggleButton
+                transportButton(icon: "forward.fill",
+                                label: NSLocalizedString("read_aloud.next", comment: "Next paragraph")) {
+                    controller.skip(by: 1)
+                }
+                transportButton(icon: "xmark",
+                                label: NSLocalizedString("read_aloud.stop", comment: "Stop reading")) {
+                    controller.stop()
+                }
+            }
+
+            ProgressView(value: controller.chunkCount > 0
+                         ? Double(controller.chunkIndex + 1) / Double(controller.chunkCount)
+                         : 0)
+                .progressViewStyle(.linear)
+                .tint(Theme.ink)
+
+            if let error = controller.error(for: item.id) {
+                Text(error.errorDescription ?? "")
+                    .font(Theme.footnote)
+                    .foregroundStyle(Theme.destructive)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background {
+            if reduceTransparency {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .fill(Theme.surface)
+                    .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        .strokeBorder(Theme.separator, lineWidth: 1))
+            } else {
+                Color.clear
+                    .glassEffect(in: .rect(cornerRadius: 26))
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.bottom, 6)
+    }
+
+    /// "Paragraph N of M · <voice>" — the voice is "Device voice" for the
+    /// system synthesizer, else the provider's name.
+    private var subtitle: String {
+        let progress = String(
+            format: NSLocalizedString("read_aloud.progress_named", comment: "Paragraph N of M"),
+            controller.chunkIndex + 1, controller.chunkCount
+        )
+        let voice = settings.speechProvider.speechSynthesisAPI == .system
+            ? NSLocalizedString("read_aloud.voice.device", comment: "Device voice")
+            : settings.speechProvider.displayName
+        return "\(progress) · \(voice)"
+    }
+
+    private func transportButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(.callout, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+                .frame(minWidth: 36, minHeight: 36)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
+    private var toggleButton: some View {
+        Button {
+            controller.toggle(item, settings: settings)
+        } label: {
+            Group {
+                if phase == .preparing {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: phase == .paused ? "play.fill" : "pause.fill")
+                        .font(.system(.callout, weight: .bold))
+                }
+            }
+            .foregroundStyle(Theme.onInk)
+            .frame(width: 38, height: 38)
+            .background(Theme.ink, in: Circle())
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(phase == .paused
+            ? NSLocalizedString("read_aloud.resume", comment: "Resume reading")
+            : NSLocalizedString("read_aloud.pause", comment: "Pause reading"))
+        .accessibilityIdentifier("readAloud.toggle")
+    }
+}

@@ -1,5 +1,9 @@
 import SwiftUI
 
+/// The loaded recording's player card content: elapsed/remaining times, the
+/// scrub slider, and one transport row (speed, ±15 s, play/pause, enhanced
+/// voice). Lives on the Audio tab directly under the Recordings section;
+/// playback logic stays in `AudioPlayerService` — this only renders it.
 struct SegmentPlaybackScrubber: View {
     let currentTime: TimeInterval
     let duration: TimeInterval
@@ -9,6 +13,7 @@ struct SegmentPlaybackScrubber: View {
     let enhancementProgress: Double?
     let onSeek: (TimeInterval) -> Void
     let onSkip: (TimeInterval) -> Void
+    let onTogglePlay: () -> Void
     let onCycleRate: () -> Void
     let onToggleEnhancement: () -> Void
 
@@ -19,25 +24,22 @@ struct SegmentPlaybackScrubber: View {
     private var playableDuration: TimeInterval { layout.playableDuration }
     private var sliderUpperBound: TimeInterval { layout.sliderUpperBound }
     private var boundedCurrentTime: TimeInterval { layout.boundedCurrentTime }
+    private var remainingTime: TimeInterval { max(0, playableDuration - boundedCurrentTime) }
     private var isEnhancing: Bool { enhancementProgress != nil }
 
     /// "1×", "1.5×", "0.5×" — `%g` drops trailing zeros and the decimal point.
     private var rateLabel: String { PlaybackScrubberLayout.rateLabel(playbackRate) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            GeometryReader { proxy in
-                let markerWidth = CGFloat(PlaybackScrubberLayout.markerWidth)
-                let markerX = CGFloat(layout.markerCenterX(trackWidth: Double(proxy.size.width)))
-
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
                 Text(boundedCurrentTime.clockDisplay)
-                    .font(Theme.caption2Emphasized)
-                    .foregroundStyle(Theme.textPrimary)
-                    .frame(width: markerWidth, height: 22)
-                    .background(Theme.fill, in: Capsule())
-                    .position(x: markerX, y: 11)
+                Spacer(minLength: 8)
+                Text("-\(remainingTime.clockDisplay)")
             }
-            .frame(height: 24)
+            .font(Theme.footnote)
+            .monospacedDigit()
+            .foregroundStyle(Theme.textSecondary)
 
             Slider(
                 value: Binding(
@@ -54,37 +56,23 @@ struct SegmentPlaybackScrubber: View {
             .accessibilityLabel(NSLocalizedString("detail.playback_position", comment: "Playback position"))
             .accessibilityValue("\(boundedCurrentTime.clockDisplay) / \(playableDuration.clockDisplay)")
 
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) {
-                    leadingTimeLabel
-                    Spacer(minLength: 8)
-                    transportButtons
-                    Text(playableDuration.clockDisplay)
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        leadingTimeLabel
-                        Spacer(minLength: 8)
-                        Text(playableDuration.clockDisplay)
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
-                    }
-                    HStack(spacing: 8) {
-                        Spacer(minLength: 0)
-                        transportButtons
-                    }
-                }
+            HStack(spacing: 12) {
+                rateChip
+                skipButton(interval: -AudioPlayerService.skipInterval,
+                           icon: "gobackward.15",
+                           label: NSLocalizedString("detail.skip_backward", comment: "Skip back 15 seconds"))
+                togglePlayButton
+                skipButton(interval: AudioPlayerService.skipInterval,
+                           icon: "goforward.15",
+                           label: NSLocalizedString("detail.skip_forward", comment: "Skip forward 15 seconds"))
+                voiceChip
             }
-            .font(Theme.caption2)
-            .foregroundStyle(Theme.textTertiary)
+            .frame(maxWidth: .infinity)
 
             if let enhancementProgress {
                 EnhancementProgressView(progress: enhancementProgress)
             }
         }
-        .padding(.leading, 46)
         // `.contain` rather than `.combine`: combining flattens the children into
         // one element, which makes the speed and enhancement buttons unreachable
         // to VoiceOver.
@@ -93,64 +81,74 @@ struct SegmentPlaybackScrubber: View {
         .accessibilityValue("\(boundedCurrentTime.clockDisplay) / \(playableDuration.clockDisplay)")
     }
 
-    @ViewBuilder
-    private var leadingTimeLabel: some View {
-        HStack(spacing: 6) {
-            Image(systemName: isPlaying ? "waveform" : "timer")
-                .font(Theme.caption2Emphasized)
-                .foregroundStyle(Theme.textTertiary)
-                .accessibilityHidden(true)
-            Text("0:00")
+    private var rateChip: some View {
+        Button(action: onCycleRate) {
+            Text(rateLabel)
+                .font(Theme.footnoteEmphasized)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
+                .foregroundStyle(Theme.ink)
+                .padding(.horizontal, 10)
+                .frame(minHeight: 30)
+                .background(Theme.fill, in: Capsule())
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(NSLocalizedString("detail.playback_speed", comment: "Playback speed"))
+        .accessibilityValue(rateLabel)
     }
 
-    @ViewBuilder
-    private var transportButtons: some View {
-        Button { onSkip(-AudioPlayerService.skipInterval) } label: {
-            Image(systemName: "gobackward.15")
+    private func skipButton(interval: TimeInterval, icon: String, label: String) -> some View {
+        Button { onSkip(interval) } label: {
+            Image(systemName: icon)
                 .accessibilityHidden(true)
-                .font(Theme.captionEmphasized)
+                .font(.system(.body, weight: .semibold))
                 .foregroundStyle(Theme.ink)
-                .frame(minWidth: 34)
-                .padding(.vertical, 3)
-                .background(Theme.fill, in: Capsule())
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(NSLocalizedString("detail.skip_backward", comment: "Skip back 15 seconds"))
-        Button { onSkip(AudioPlayerService.skipInterval) } label: {
-            Image(systemName: "goforward.15")
-                .accessibilityHidden(true)
-                .font(Theme.captionEmphasized)
-                .foregroundStyle(Theme.ink)
-                .frame(minWidth: 34)
-                .padding(.vertical, 3)
-                .background(Theme.fill, in: Capsule())
-                .frame(minWidth: 44, minHeight: 44)
+        .accessibilityLabel(label)
+    }
+
+    private var togglePlayButton: some View {
+        Button(action: onTogglePlay) {
+            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                .font(.system(.title3, weight: .semibold))
+                .foregroundStyle(Theme.onInk)
+                .frame(width: 46, height: 46)
+                .background(Theme.ink, in: Circle())
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(NSLocalizedString("detail.skip_forward", comment: "Skip forward 15 seconds"))
+        .accessibilityLabel(isPlaying
+            ? NSLocalizedString("detail.pause_recording", comment: "Pause recording")
+            : NSLocalizedString("detail.play_recording", comment: "Play recording"))
+    }
+
+    /// The "Voice" chip: enhanced audio when a rendered copy exists, ink-filled
+    /// while it is on.
+    private var voiceChip: some View {
         Button(action: onToggleEnhancement) {
-            Group {
+            HStack(spacing: 5) {
                 if isEnhancing {
                     ProgressView()
                         .progressViewStyle(.circular)
-                        .scaleEffect(0.5)
+                        .controlSize(.mini)
                 } else {
                     Image(systemName: "sparkles")
+                        .font(.system(.caption, weight: .semibold))
                         .accessibilityHidden(true)
-                        .font(Theme.caption2Emphasized)
-                        .foregroundStyle(isEnhanced ? Theme.ink : Theme.textTertiary)
                 }
+                Text(NSLocalizedString("detail.voice", comment: "Voice"))
+                    .font(Theme.footnoteEmphasized)
             }
-            .frame(minWidth: 34)
-            .padding(.vertical, 3)
-            .background(Theme.fill, in: Capsule())
-            .frame(minWidth: 44, minHeight: 44)
+            .foregroundStyle(isEnhanced ? Theme.onInk : Theme.ink)
+            .padding(.horizontal, 10)
+            .frame(minHeight: 30)
+            .background(isEnhanced ? Theme.ink : Theme.fill, in: Capsule())
+            .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -163,21 +161,5 @@ struct SegmentPlaybackScrubber: View {
                     ? NSLocalizedString("common.on", comment: "On")
                     : NSLocalizedString("common.off", comment: "Off"))
         )
-        Button(action: onCycleRate) {
-            Text(rateLabel)
-                .font(Theme.caption2Emphasized)
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
-                .foregroundStyle(Theme.ink)
-                .padding(.horizontal, 6)
-                .frame(minWidth: 34)
-                .padding(.vertical, 3)
-                .background(Theme.fill, in: Capsule())
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(NSLocalizedString("detail.playback_speed", comment: "Playback speed"))
-        .accessibilityValue(rateLabel)
     }
 }

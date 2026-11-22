@@ -23,15 +23,9 @@ extension MeetingDetailView {
     }
 
     @ViewBuilder
-    var photosStrip: some View {
+    var photosSection: some View {
         if !allPhotos.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Divider()
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                sectionLabel(NSLocalizedString("detail.photos", comment: "Photos"))
-                    .padding(.horizontal, 20)
-                    .padding(.top, 4)
+            Section {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: 14) {
                         ForEach(allPhotos) { photo in
@@ -39,20 +33,22 @@ extension MeetingDetailView {
                                 presentedPhoto = photo
                             } label: {
                                 VStack(spacing: 4) {
-                                    PhotoThumbnail(photo: photo)
+                                    PhotoThumbnail(photo: photo, size: 84, cornerRadius: 14)
                                     Text(meetingRelativeTime(of: photo).clockDisplay)
-                                        .font(Theme.caption2)
-                                        .foregroundStyle(Theme.textTertiary)
+                                        .font(Theme.caption)
+                                        .foregroundStyle(Theme.textSecondary)
                                         .monospacedDigit()
                                 }
                             }
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.vertical, 4)
                 }
+                .clearListRow()
+            } header: {
+                Text(NSLocalizedString("detail.photos", comment: "Photos"))
             }
-            .clearListRow(insets: EdgeInsets(top: 8, leading: 0, bottom: 4, trailing: 0))
         }
     }
 

@@ -44,6 +44,11 @@ extension MeetingDetailView {
         meeting.summaries.first { $0.id == selectedSummaryID } ?? meeting.latestSummary
     }
 
+    /// What the floating read-aloud bar plays: the summary on screen.
+    var readAloudItem: ReadAloudItem? {
+        selectedSummary.map { .summary($0, meeting: meeting) }
+    }
+
     func togglePlay(_ recording: Recording) {
         guard recording.isReadyForConsumption else { return }
         // Offline neural rendering is intentionally exclusive with starting a

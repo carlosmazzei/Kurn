@@ -88,15 +88,24 @@ struct TranscriptTab: View {
             }
 
             if !sortedSpeakers.isEmpty {
-                Divider().overlay(Theme.separator).padding(.vertical, 4)
-                Text(NSLocalizedString("detail.speakers", comment: "Speakers").uppercased())
-                    .font(Theme.caption2Emphasized).tracking(0.8)
-                    .foregroundStyle(Theme.textTertiary)
-                ForEach(sortedSpeakers) { speaker in
-                    SpeakerRow(speaker: speaker, onCommit: onRenameCommit)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(NSLocalizedString("detail.participants", comment: "Participants").uppercased())
+                        .font(Theme.caption2Emphasized).tracking(0.8)
+                        .foregroundStyle(Theme.textTertiary)
+                    VStack(spacing: 0) {
+                        ForEach(Array(sortedSpeakers.enumerated()), id: \.element.id) { index, speaker in
+                            SpeakerRow(speaker: speaker, onCommit: onRenameCommit)
+                            if index < sortedSpeakers.count - 1 {
+                                Divider().overlay(Theme.separator)
+                                    .padding(.leading, 44)
+                            }
+                        }
+                    }
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+                    Text(NSLocalizedString("detail.speakers.note", comment: "Auto-detected note"))
+                        .font(.footnote).foregroundStyle(Theme.textSecondary)
                 }
-                Text(NSLocalizedString("detail.speakers.note", comment: "Auto-detected note"))
-                    .font(.footnote).foregroundStyle(Theme.textTertiary)
+                .padding(.top, 8)
             }
         }
         .sheet(item: $presentedPhoto) { photo in
@@ -105,18 +114,27 @@ struct TranscriptTab: View {
     }
 }
 
-/// Inline-editable speaker name with its color swatch.
+/// Inline-editable speaker name with its color avatar, inside the grouped
+/// Participants container (separators are drawn by the parent).
 private struct SpeakerRow: View {
     @Bindable var speaker: Speaker
     let onCommit: () -> Void
 
     var body: some View {
+        let color = Color(hex: speaker.color)
         HStack(spacing: 10) {
-            Circle().fill(Color(hex: speaker.color)).frame(width: 14, height: 14)
+            ZStack {
+                Circle().fill(color.opacity(0.18)).frame(width: 22, height: 22)
+                Text(String(speaker.displayName.prefix(1)).uppercased())
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(color)
+            }
+            .accessibilityHidden(true)
             TextField(speaker.label, text: $speaker.name).onSubmit(onCommit)
             Text(speaker.label).font(.caption2).foregroundStyle(Theme.textTertiary)
         }
-        .kurnCard(padding: 12, cornerRadius: 12)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
     }
 }
 
@@ -194,9 +212,6 @@ struct SummaryTab: View {
                     onCancel: onCancel,
                     onListen: listen
                 )
-                if let item = readAloudItem, controller.phase(for: item.id) != .idle {
-                    ReadAloudControl(item: item)
-                }
             }
 
             if isSummarizing {
