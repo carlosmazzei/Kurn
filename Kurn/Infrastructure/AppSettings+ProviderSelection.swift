@@ -39,14 +39,21 @@ extension AppSettings {
     }
 
     /// Repoints a selection whose provider is no longer usable. The summary
-    /// selection moves to the first usable summary provider (and stays put
-    /// when there is none, so the picker can say so). Cloud transcription
+    /// selection moves to the first usable summary provider whose permissions
+    /// were not all removed in Privacy & Cloud (CLAUDE.md, "Cloud consent"),
+    /// and stays put when there is none, so the picker can say so. Cloud transcription
     /// moves to the first usable transcription provider, or falls back to the
     /// on-device engine when none has a key.
     func ensureProviderSelectionsAreUsable() {
-        let summaryProviders = configuredSummaryProviders
+        let allowed = configuredSummaryProviders.filter { !cloudConsents.isWithdrawn(cloudConsentDestination(for: $0)) }
+        // Prefer a provider already allowed to receive per-recording sends, so a
+        // fallback keeps automation running instead of turning it off.
+        let summaryProviders = allowed.filter { allowsCloud($0, for: .automatic) }
+            + allowed.filter { !allowsCloud($0, for: .automatic) }
         if !summaryProviders.isEmpty, !summaryProviders.contains(where: { $0.id == aiProviderID }) {
+            isRepointingSelection = true
             aiProviderID = summaryProviders[0].id
+            isRepointingSelection = false
         }
 
         guard transcriptionEngine == .whisperAPI else { return }

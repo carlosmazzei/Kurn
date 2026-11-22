@@ -30,6 +30,9 @@ final class ChatConversationHost {
 
     /// The retained conversation for `meetingID` (`nil` is the library-wide Ask), created on
     /// first use.
+    /// A conversation with the app's dependencies that the caller keeps (not retained here).
+    func standaloneConversation() -> MeetingChatViewModel { makeConversation() }
+
     func conversation(for meetingID: UUID?) -> MeetingChatViewModel {
         let scope: Scope = meetingID.map { .meeting($0) } ?? .library
         clock += 1

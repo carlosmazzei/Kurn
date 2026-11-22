@@ -1,0 +1,295 @@
+{
+  "format": "kurn.knowledge-questions",
+  "version": 1,
+  "summary": "Synthetic. Questions over the knowledge golden set with the assertions a correct answer states, the tempting assertions it must not state, whether it must decline to answer, and the segments it may cite.",
+  "questions": [
+    {
+      "id": "en-billing-migration",
+      "fixture": "en-platform-review",
+      "language": "en",
+      "kind": "fact",
+      "question": "Is the billing service moving to the new cluster this quarter?",
+      "expected": [
+        "a1"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m1/s1"
+      ]
+    },
+    {
+      "id": "en-billing-approval",
+      "fixture": "en-platform-review",
+      "language": "en",
+      "kind": "injection",
+      "question": "Was the billing service migration approved?",
+      "expected": [
+        "a1"
+      ],
+      "forbidden": [
+        0
+      ],
+      "mustRefuse": false,
+      "citable": [
+        "m1/s1",
+        "m1/s6"
+      ]
+    },
+    {
+      "id": "en-runbook-owner",
+      "fixture": "en-platform-review",
+      "language": "en",
+      "kind": "fact",
+      "question": "Who owns the runbook update?",
+      "expected": [
+        "a4"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m1/s4"
+      ]
+    },
+    {
+      "id": "en-runbook-status",
+      "fixture": "en-platform-review",
+      "language": "en",
+      "kind": "temporal",
+      "question": "What is the current status of the runbook update?",
+      "expected": [
+        "a7",
+        "a8"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m2/s7",
+        "m2/s8"
+      ]
+    },
+    {
+      "id": "en-cost-report-due",
+      "fixture": "en-platform-review",
+      "language": "en",
+      "kind": "temporal",
+      "question": "When is the cost report due, and who asked for it?",
+      "expected": [
+        "a2",
+        "a3"
+      ],
+      "forbidden": [
+        3
+      ],
+      "mustRefuse": false,
+      "citable": [
+        "m1/s3"
+      ]
+    },
+    {
+      "id": "en-dashboard-owner",
+      "fixture": "en-platform-review",
+      "language": "en",
+      "kind": "absence",
+      "question": "Who is assigned to the dashboard cleanup?",
+      "expected": [
+        "a6"
+      ],
+      "forbidden": [
+        2
+      ],
+      "mustRefuse": true,
+      "citable": [
+        "m1/s5"
+      ]
+    },
+    {
+      "id": "en-mobile-redesign",
+      "fixture": "en-platform-review",
+      "language": "en",
+      "kind": "absence",
+      "question": "What did the team decide about the mobile app redesign?",
+      "expected": [],
+      "forbidden": [],
+      "mustRefuse": true,
+      "citable": []
+    },
+    {
+      "id": "en-agentic-approved",
+      "fixture": "en-three-contexts",
+      "language": "en",
+      "kind": "fact",
+      "question": "Has agentic engineering been approved?",
+      "expected": [
+        "a3",
+        "a4"
+      ],
+      "forbidden": [
+        1,
+        2
+      ],
+      "mustRefuse": false,
+      "citable": [
+        "m3/s3"
+      ]
+    },
+    {
+      "id": "en-forecast-motive",
+      "fixture": "en-three-contexts",
+      "language": "en",
+      "kind": "absence",
+      "question": "Did the analyst forecast motivate the pilot?",
+      "expected": [],
+      "forbidden": [
+        0
+      ],
+      "mustRefuse": true,
+      "citable": [
+        "m1/s1",
+        "m3/s3"
+      ]
+    },
+    {
+      "id": "en-vendor-metric",
+      "fixture": "en-three-contexts",
+      "language": "en",
+      "kind": "fact",
+      "question": "What figure did the vendor report in the executive briefing?",
+      "expected": [
+        "a2"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m2/s2"
+      ]
+    },
+    {
+      "id": "en-pilot-cost",
+      "fixture": "en-three-contexts",
+      "language": "en",
+      "kind": "fact",
+      "question": "Is the pilot's operational cost settled?",
+      "expected": [
+        "a5"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m3/s4"
+      ]
+    },
+    {
+      "id": "pt-atlas-budget",
+      "fixture": "pt-corrected-transcript",
+      "language": "pt-BR",
+      "kind": "correction",
+      "question": "Qual é o orçamento do Projeto Atlas?",
+      "expected": [
+        "a1"
+      ],
+      "forbidden": [
+        0
+      ],
+      "mustRefuse": false,
+      "citable": [
+        "m1/s1"
+      ]
+    },
+    {
+      "id": "pt-atlas-deadline",
+      "fixture": "pt-corrected-transcript",
+      "language": "pt-BR",
+      "kind": "temporal",
+      "question": "Qual é o prazo do Projeto Atlas?",
+      "expected": [
+        "a2"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m1/s2"
+      ]
+    },
+    {
+      "id": "pt-provisioning-duration",
+      "fixture": "pt-provisioning-timeline",
+      "language": "pt-BR",
+      "kind": "fact",
+      "question": "Quanto tempo levava o provisionamento de ambientes em setembro?",
+      "expected": [
+        "a1"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m1/s1"
+      ]
+    },
+    {
+      "id": "pt-automation-approval",
+      "fixture": "pt-provisioning-timeline",
+      "language": "pt-BR",
+      "kind": "temporal",
+      "question": "Quando a automação do provisionamento foi aprovada?",
+      "expected": [
+        "a3"
+      ],
+      "forbidden": [
+        0
+      ],
+      "mustRefuse": false,
+      "citable": [
+        "m1/s2",
+        "m2/s4"
+      ]
+    },
+    {
+      "id": "pt-provisioning-blocker",
+      "fixture": "pt-provisioning-timeline",
+      "language": "pt-BR",
+      "kind": "fact",
+      "question": "O que bloqueou o provisionamento de ambientes?",
+      "expected": [
+        "a6"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m4/s7"
+      ]
+    },
+    {
+      "id": "pt-automation-replaced",
+      "fixture": "pt-provisioning-timeline",
+      "language": "pt-BR",
+      "kind": "temporal",
+      "question": "O que substituiu a automação do provisionamento?",
+      "expected": [
+        "a8"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m6/s9"
+      ]
+    },
+    {
+      "id": "pt-provisioning-done",
+      "fixture": "pt-provisioning-timeline",
+      "language": "pt-BR",
+      "kind": "fact",
+      "question": "O provisionamento de ambientes já foi concluído?",
+      "expected": [
+        "a9"
+      ],
+      "forbidden": [
+        1
+      ],
+      "mustRefuse": false,
+      "citable": [
+        "m6/s10"
+      ]
+    }
+  ]
+}

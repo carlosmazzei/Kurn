@@ -105,6 +105,7 @@ struct FoundationModelsProvider: LLMProvider {
         guard !content.isEmpty else {
             throw AppError.decodingError("empty on-device response")
         }
+        if options.requiresCompleteJSON { try Self.requireCompleteJSON(content) }
         return content
     }
 
@@ -120,6 +121,34 @@ struct FoundationModelsProvider: LLMProvider {
     // Not `private`: unit-tested directly.
     static func clampedOutputTokens(_ requested: Int) -> Int {
         min(requested, maxOnDeviceOutputTokens)
+    }
+
+    /// The framework's free-text response has no finish reason. An unfinished
+    /// JSON object/array (including an open quoted string) is a bounded output
+    /// failure, not a schema repair of the same oversized prompt. Balanced but
+    /// invalid JSON remains the extractor's ordinary validation/repair path.
+    static func requireCompleteJSON(_ content: String) throws {
+        guard let first = content.utf8.first, first == 0x7B || first == 0x5B else { return }
+        var brackets: [UInt8] = []
+        var quoted = false
+        var escaped = false
+        for byte in content.utf8 {
+            if quoted {
+                if escaped { escaped = false }
+                else if byte == 0x5C { escaped = true }
+                else if byte == 0x22 { quoted = false }
+            } else {
+                switch byte {
+                case 0x22: quoted = true
+                case 0x7B, 0x5B: brackets.append(byte)
+                case 0x7D, 0x5D:
+                    guard let opening = brackets.popLast(),
+                          (opening == 0x7B && byte == 0x7D) || (opening == 0x5B && byte == 0x5D) else { return }
+                default: break
+                }
+            }
+        }
+        guard brackets.isEmpty, !quoted else { throw AppError.generationTruncated }
     }
 
     /// `LanguageModelSession` takes one prompt per turn, not an OpenAI-shaped

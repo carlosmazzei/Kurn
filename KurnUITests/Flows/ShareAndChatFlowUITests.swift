@@ -64,7 +64,7 @@ final class ShareAndChatFlowUITests: FlowUITestCase {
     // MARK: - Chat
 
     func testAskWithoutACloudProviderShowsTheNoticeAndDisablesTheComposer() {
-        let ask = app.buttons["meetings.ask"]
+        let ask = app.buttons["root.destination.ask"]
         XCTAssertTrue(ask.waitForExistence(timeout: 10))
         ask.tap()
 

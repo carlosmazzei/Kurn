@@ -46,6 +46,14 @@ struct ChatMessage: Sendable, Equatable {
 struct TextGenerationOptions: Sendable, Equatable {
     let maxOutputTokens: Int
     let timeout: TimeInterval
+    /// Structured extraction needs an intact JSON document; prose may stop naturally.
+    var requiresCompleteJSON = false
+
+    static func knowledgeExtraction(for provider: AIProvider) -> Self {
+        let output = provider.kind == .appleOnDevice
+            ? FoundationModelsProvider.clampedOutputTokens(document.maxOutputTokens) : document.maxOutputTokens
+        return Self(maxOutputTokens: output, timeout: document.timeout, requiresCompleteJSON: true)
+    }
 
     static let chat = Self(
         maxOutputTokens: LLMHTTP.chatMaxOutputTokens,

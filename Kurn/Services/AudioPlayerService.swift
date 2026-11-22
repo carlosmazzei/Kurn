@@ -72,7 +72,8 @@ final class AudioPlayerService: NSObject {
         fileName: String,
         title: String? = nil,
         subtitle: String? = nil,
-        enhanced: Bool = false
+        enhanced: Bool = false,
+        activateTransport: Bool = true
     ) async throws {
         if loadedFileName == fileName, isPlayingEnhanced == enhanced, player != nil { return }
         // Not `stop()`: that hands the audio session back to whatever was playing
@@ -108,8 +109,10 @@ final class AudioPlayerService: NSObject {
             self.isPlayingEnhanced = enhanced
             if let title { nowPlayingTitle = title }
             if let subtitle { nowPlayingSubtitle = subtitle }
-            nowPlaying.activate(handlers: makeHandlers())
-            publishNowPlaying()
+            if activateTransport {
+                nowPlaying.activate(handlers: makeHandlers())
+                publishNowPlaying()
+            }
         } catch {
             throw AppError.audioError(error.localizedDescription)
         }

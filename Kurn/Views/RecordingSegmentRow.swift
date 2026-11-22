@@ -58,6 +58,8 @@ struct RecordingSegmentRow: View {
                                 .foregroundStyle(Theme.textPrimary)
                         }
                     }
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(isEnhancing || !recording.isReadyForConsumption)
@@ -112,6 +114,8 @@ struct RecordingSegmentRow: View {
                                     .foregroundStyle(Theme.textSecondary)
                                     .frame(width: 30, height: 30)
                                     .background(Theme.fill, in: Circle())
+                                    .frame(minWidth: 44, minHeight: 44)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(NSLocalizedString("detail.cancel_transcription", comment: "Pause transcription"))
@@ -123,6 +127,8 @@ struct RecordingSegmentRow: View {
                                     .foregroundStyle(Theme.accent)
                                     .frame(width: 30, height: 30)
                                     .background(Theme.fill, in: Circle())
+                                    .frame(minWidth: 44, minHeight: 44)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(NSLocalizedString("detail.stop_transcription", comment: "Stop transcription"))
@@ -135,10 +141,12 @@ struct RecordingSegmentRow: View {
                         onStartTranscription()
                     } label: {
                         StatusBadge(status: .pending)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 } else if recording.transcriptionStatus == .done {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 4) {
                         StatusBadge(status: .done)
                         Button {
                             pendingRetranscribe = recording
@@ -148,6 +156,8 @@ struct RecordingSegmentRow: View {
                                 .foregroundStyle(Theme.textSecondary)
                                 .frame(width: 30, height: 30)
                                 .background(Theme.fill, in: Circle())
+                                .frame(minWidth: 44, minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"))
@@ -156,7 +166,7 @@ struct RecordingSegmentRow: View {
                     // Show the real "Failed" state (not a mislabeled "Transcribe")
                     // with a retry that restarts — resuming from the checkpoint if
                     // the interrupted run left one.
-                    HStack(spacing: 8) {
+                    HStack(spacing: 4) {
                         StatusBadge(status: .failed)
                         Button {
                             onStartTranscription()
@@ -166,6 +176,8 @@ struct RecordingSegmentRow: View {
                                 .foregroundStyle(Theme.textSecondary)
                                 .frame(width: 30, height: 30)
                                 .background(Theme.fill, in: Circle())
+                                .frame(minWidth: 44, minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"))
@@ -181,6 +193,8 @@ struct RecordingSegmentRow: View {
                         onStartTranscription()
                     } label: {
                         StatusBadge(status: .none)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }

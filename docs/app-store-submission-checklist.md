@@ -89,7 +89,7 @@ information this repo has no business holding):
       transcription and AI summaries are optional, off by default, and
       require the reviewer's own API key to test — on-device transcription
       covers the core flow without one. The Face ID/Touch ID prompt can be
-      disabled under Settings > Recording if inconvenient during review."*
+      disabled under Settings > Privacy & Cloud if inconvenient during review."*
 - [ ] **Advertising Identifier (IDFA)** — no, Kurn doesn't use it.
 - [ ] **License Agreement** — Apple's Standard, or paste `EULA.md` as a
       custom agreement (see that file's header for how).

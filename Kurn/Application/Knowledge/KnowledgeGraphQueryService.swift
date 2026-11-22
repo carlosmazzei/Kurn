@@ -1,0 +1,132 @@
+import Foundation
+import KurnCore
+
+/// Answers graph queries over one scoped knowledge read (K4.1, CLAUDE.md
+/// "Knowledge graph query (K4.1)"). The read is already authorized and
+/// evidence-checked; this only indexes its pages once and remembers recent
+/// answers, keyed by the canonical revision, the meetings and the policy
+/// revision the read was taken under and by the pages themselves: a read can
+/// change without a new revision (a corrected transcript drops evidence and,
+/// with it, a claim), so nothing is answered from pages other than the read's.
+@MainActor
+final class KnowledgeGraphQueryService {
+    struct GraphScope: Equatable {
+        let revision: Int
+        let meetingIDs: Set<UUID>
+        let policyRevisionKey: String
+        let pages: [KnowledgeWikiPage]
+
+        init(_ read: KnowledgeBrowserRead) {
+            revision = read.pages.first?.revision ?? -1
+            meetingIDs = read.meetingIDs
+            policyRevisionKey = read.policyRevisionKey
+            pages = read.pages
+        }
+    }
+
+    /// The most answers kept for one scope; the least recently asked goes first.
+    let capacity: Int
+    private(set) var scope: GraphScope?
+    private var index: KnowledgeGraphIndex?
+    private var answers: [KnowledgeGraph.Query: KnowledgeGraph?] = [:]
+    private var recency: [KnowledgeGraph.Query] = []
+    private var layouts: [KnowledgeGraph.Query: KnowledgeGraphLayout] = [:]
+    /// Where each node was last shown in this scope, so a neighbourhood that
+    /// grows or moves keeps the nodes already on screen where they were.
+    private(set) var shownPositions: [UUID: KnowledgeGraphLayout.Point] = [:]
+    /// The seed the cached layouts and shown positions were drawn with.
+    private(set) var layoutSeed: UInt64 = 0
+    /// Each graph opened in this reader, by the entity it was opened from (K4.3).
+    /// IDs only; a new scope keeps them, since every answer is read again.
+    private var explorations: [UUID: KnowledgeGraphPresentation.Exploration] = [:]
+    /// How many times an index was built, for tests.
+    private(set) var indexBuilds = 0
+
+    init(capacity: Int = 32) {
+        self.capacity = max(capacity, 1)
+    }
+
+    /// The neighbourhood `query` asks for in `read`, or nil when its root is
+    /// not an identity the read shows.
+    func graph(_ query: KnowledgeGraph.Query, in read: KnowledgeBrowserRead) -> KnowledgeGraph? {
+        let current = GraphScope(read)
+        if current != scope || index == nil {
+            scope = current
+            index = KnowledgeGraphIndex(pages: read.pages)
+            indexBuilds += 1
+            answers = [:]
+            recency = []
+            layouts = [:]
+            shownPositions = [:]
+        }
+        if let cached = answers[query] {
+            touch(query)
+            return cached
+        }
+        let answer = index?.query(query)
+        answers[query] = .some(answer)
+        touch(query)
+        if recency.count > capacity {
+            let evicted = recency.removeFirst()
+            answers[evicted] = nil
+            layouts[evicted] = nil
+        }
+        return answer
+    }
+
+    /// The neighbourhood `query` asks for and its positions (K4.2). A layout is
+    /// computed once per answer; nodes already shown in this scope keep their
+    /// positions, and only new ones are placed. Another seed is a new drawing:
+    /// it drops every layout and shown position before laying out.
+    func laidOut(_ query: KnowledgeGraph.Query, in read: KnowledgeBrowserRead,
+                 seed: UInt64 = 0) -> (graph: KnowledgeGraph, layout: KnowledgeGraphLayout)? {
+        guard let graph = graph(query, in: read) else { return nil }
+        if seed != layoutSeed {
+            layoutSeed = seed
+            layouts = [:]
+            shownPositions = [:]
+        }
+        if let cached = layouts[query] { return (graph, cached) }
+        let shown = Set(graph.nodes.map(\.id))
+        let layout = KnowledgeGraphLayout.layout(graph, seed: seed, fixed: shownPositions.filter { shown.contains($0.key) })
+        layouts[query] = layout
+        shownPositions.merge(layout.positions) { _, new in new }
+        return (graph, layout)
+    }
+
+    /// Where the graph opened from `entityID` was left, or a fresh one centred on it.
+    func exploration(from entityID: UUID) -> KnowledgeGraphPresentation.Exploration {
+        explorations[entityID] ?? KnowledgeGraphPresentation.Exploration(root: entityID)
+    }
+
+    /// The graph an exploration shows: centred where it was left, or on the
+    /// entity it was opened from when that centre is no longer in the read.
+    func laidOut(_ exploration: KnowledgeGraphPresentation.Exploration, from entityID: UUID,
+                 in read: KnowledgeBrowserRead) -> (graph: KnowledgeGraph, layout: KnowledgeGraphLayout)? {
+        if let shown = laidOut(exploration.options.query(root: exploration.root), in: read) { return shown }
+        guard exploration.root != entityID else { return nil }
+        return laidOut(exploration.options.query(root: entityID), in: read)
+    }
+
+    func remember(_ exploration: KnowledgeGraphPresentation.Exploration, from entityID: UUID) {
+        explorations[entityID] = exploration
+    }
+
+    /// Forgets everything, e.g. when the reader closes or its scope is revoked.
+    func clear() {
+        explorations = [:]
+        scope = nil
+        index = nil
+        answers = [:]
+        recency = []
+        layouts = [:]
+        shownPositions = [:]
+    }
+
+    var cachedAnswerCount: Int { answers.count }
+
+    private func touch(_ query: KnowledgeGraph.Query) {
+        recency.removeAll { $0 == query }
+        recency.append(query)
+    }
+}

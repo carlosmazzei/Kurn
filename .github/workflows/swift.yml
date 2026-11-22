@@ -2,10 +2,10 @@ name: iOS CI
 
 on:
   push:
-    # main gets a run of its own after every merge so Codecov has a base report to compare
-    # its PRs against (without one, every PR comment shows "?"). An integration branch that
-    # needs the same is added here while it lives and removed when it lands on main.
-    branches: [ "main" ]
+    # main and the Knowledge Engine integration branch get a run of their own after every
+    # merge so Codecov has a base report to compare their PRs against (without one, every PR
+    # comment shows "?"). Drop the integration branch from this list when it lands on main.
+    branches: [ "main", "feature/knowledge-compiler" ]
     tags: [ "v*.*.*" ]
   # Every pull request runs CI, whatever branch it targets, so work stacked on an
   # integration branch is verified before it is merged there.
@@ -119,14 +119,16 @@ jobs:
       - name: Test the coverage tools
         run: python3 -m unittest discover -s Tools/tests -t .
 
-  # Simulator-integration signal: KurnTests (Swift Testing unit/integration
-  # suite) plus KurnSwiftDataTests (split into its own test target for
-  # process isolation — see the scheme's own comment). Reports separately
-  # from ui-accessibility-tests below (H10 PR 24, item 3) so a flaky UI-test
-  # launch can never obscure a deterministic data-integrity failure in this
-  # suite, or vice versa.
-  unit-tests:
+  # Build once, test many (docs/roadmap.md): the app and every test bundle are
+  # compiled here, once, and the products plus the generated .xctestrun are
+  # handed to unit-tests and both ui-tests shards, which run
+  # `test-without-building`. Before, each of those three jobs ran its own
+  # `clean test`, so a PR compiled the app three times, and a UI shard compiled
+  # it beside a booted simulator on a 3-core runner (about 15 minutes against
+  # 8 here). No simulator is booted in this job for the same reason.
+  build-for-testing:
     runs-on: macos-26
+    timeout-minutes: 45
 
     env:
       XCODE_PROJECT: Kurn.xcodeproj
@@ -144,22 +146,107 @@ jobs:
 
       - uses: ./.github/actions/prepare-simulator
 
-      # Shared (same key) with the ui-tests shards below, since they all
-      # resolve the same packages from the same scheme.
       - uses: ./.github/actions/cache-spm-packages
 
-      - name: Build and test
+      # Coverage is compiled in here; the test jobs pass the flag again so
+      # their result bundles carry the coverage archive.
+      - name: Build for testing
         run: |
           xcodebuild \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -destination "$IOS_DESTINATION" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -enableCodeCoverage YES \
+            clean build-for-testing
+
+      # Products only: Intermediates are not needed to run or to read
+      # coverage, and would multiply the transfer. tar keeps the bundles'
+      # symlinks and permissions, which the artifact zip would not.
+      - name: Package test products
+        run: tar -C "$RUNNER_TEMP/DerivedData/Build" -cf "$RUNNER_TEMP/test-products.tar" Products
+
+      - name: Upload test products
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-products
+          path: ${{ runner.temp }}/test-products.tar
+          retention-days: 1
+          compression-level: 1
+
+  # Simulator-integration signal: KurnTests (Swift Testing unit/integration
+  # suite) plus KurnSwiftDataTests (split into its own test target for
+  # process isolation — see the scheme's own comment). Reports separately
+  # from ui-accessibility-tests below (H10 PR 24, item 3) so a flaky UI-test
+  # launch can never obscure a deterministic data-integrity failure in this
+  # suite, or vice versa.
+  unit-tests:
+    needs: build-for-testing
+    runs-on: macos-26
+    # A healthy run takes about 10 minutes; the watchdog in "Test" stops a
+    # hung one at 40, and this is the backstop if it cannot.
+    timeout-minutes: 60
+
+    env:
+      IOS_DESTINATION: platform=iOS Simulator,name=iPhone 17
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - uses: ./.github/actions/prepare-simulator
+
+      - name: Download test products
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: test-products
+          path: ${{ runner.temp }}
+
+      - name: Unpack test products
+        run: |
+          mkdir -p "$RUNNER_TEMP/DerivedData/Build"
+          tar -C "$RUNNER_TEMP/DerivedData/Build" -xf "$RUNNER_TEMP/test-products.tar"
+          xctestrun=$(find "$RUNNER_TEMP/DerivedData/Build/Products" -maxdepth 1 -name '*iphonesimulator*.xctestrun' | head -1)
+          test -n "$xctestrun" || { echo "::error::no iphonesimulator .xctestrun in the test products"; exit 1; }
+          echo "XCTESTRUN=$xctestrun" >> "$GITHUB_ENV"
+
+      # A test that never returns used to keep this step running for hours
+      # without saying which one it was: Swift Testing runs suites in
+      # parallel, so the log shows every suite still started. The watchdog
+      # samples the test host's threads after 40 minutes (the stuck call is
+      # on its stack) and then stops xcodebuild, so the job fails with that
+      # evidence and the failure diagnostics below still run.
+      - name: Test
+        run: |
+          watchdog() {
+            sleep 2400
+            echo "::error::unit-tests ran past 40 minutes; sampling the test host before stopping it"
+            for pid in $(pgrep -x Kurn); do
+              echo "::group::sample of test host $pid"
+              sample "$pid" 5 2>&1 | head -1500
+              echo "::endgroup::"
+            done
+            pkill -x xcodebuild
+          }
+          watchdog &
+          watchdog_pid=$!
+          status=0
+          xcodebuild \
+            -xctestrun "$XCTESTRUN" \
+            -destination "$IOS_DESTINATION" \
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
             -enableCodeCoverage YES \
             -only-testing:KurnTests \
             -only-testing:KurnSwiftDataTests \
-            clean test
+            test-without-building || status=$?
+          pkill -P "$watchdog_pid" 2>/dev/null || true
+          kill "$watchdog_pid" 2>/dev/null || true
+          exit "$status"
 
       - name: Collect failure diagnostics
         if: failure()
@@ -199,6 +286,7 @@ jobs:
   # flow takes under two.
   ui-tests:
     name: ui-tests (${{ matrix.shard }})
+    needs: build-for-testing
     runs-on: macos-26
     strategy:
       fail-fast: false
@@ -208,6 +296,7 @@ jobs:
             selection: >-
               -only-testing:KurnUITests
               -skip-testing:KurnUITests/ScreenshotUITests
+              -skip-testing:KurnUITests/AccessibilityBaselineUITests
               -skip-testing:KurnUITests/LibraryFlowUITests
               -skip-testing:KurnUITests/SettingsFlowUITests
           - shard: flows
@@ -216,8 +305,6 @@ jobs:
               -only-testing:KurnUITests/SettingsFlowUITests
 
     env:
-      XCODE_PROJECT: Kurn.xcodeproj
-      XCODE_SCHEME: Kurn
       IOS_DESTINATION: platform=iOS Simulator,name=iPhone 17
 
     steps:
@@ -252,26 +339,36 @@ jobs:
           xcrun simctl boot "$udid" || true
           xcrun simctl bootstatus "$udid" -b
 
-      - uses: ./.github/actions/cache-spm-packages
+      - name: Download test products
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: test-products
+          path: ${{ runner.temp }}
 
-      - name: Build and test
+      - name: Unpack test products
+        run: |
+          mkdir -p "$RUNNER_TEMP/DerivedData/Build"
+          tar -C "$RUNNER_TEMP/DerivedData/Build" -xf "$RUNNER_TEMP/test-products.tar"
+          xctestrun=$(find "$RUNNER_TEMP/DerivedData/Build/Products" -maxdepth 1 -name '*iphonesimulator*.xctestrun' | head -1)
+          test -n "$xctestrun" || { echo "::error::no iphonesimulator .xctestrun in the test products"; exit 1; }
+          echo "XCTESTRUN=$xctestrun" >> "$GITHUB_ENV"
+
+      - name: Test
         env:
           TEST_SELECTION: ${{ matrix.selection }}
         run: |
           # Word splitting is intended: the selection is a list of flags.
           # shellcheck disable=SC2086
           xcodebuild \
-            -project "$XCODE_PROJECT" \
-            -scheme "$XCODE_SCHEME" \
+            -xctestrun "$XCTESTRUN" \
             -destination "$IOS_DESTINATION" \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
             -enableCodeCoverage YES \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 240 \
             -maximum-test-execution-time-allowance 600 \
             $TEST_SELECTION \
-            clean test
+            test-without-building
 
       # Failed UI/accessibility-audit tests attach their own screenshots to
       # the .xcresult bundle automatically (XCTest's failure-screenshot
@@ -282,6 +379,23 @@ jobs:
         uses: ./.github/actions/collect-failure-diagnostics
         with:
           artifact-name: ui-tests-${{ matrix.shard }}-failure-diagnostics
+
+      - name: Export UI review previews
+        if: always() && matrix.shard == 'main'
+        run: |
+          if [ -d "$RUNNER_TEMP/TestResults.xcresult" ]; then
+            xcrun xcresulttool export attachments \
+              --path "$RUNNER_TEMP/TestResults.xcresult" \
+              --output-path "$RUNNER_TEMP/ui-review-previews"
+          fi
+
+      - name: Upload UI review previews
+        if: always() && matrix.shard == 'main'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ui-review-previews
+          path: ${{ runner.temp }}/ui-review-previews
+          retention-days: 14
 
       - name: Export and upload coverage
         if: always()

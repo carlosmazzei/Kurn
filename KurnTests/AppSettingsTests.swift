@@ -34,6 +34,7 @@ struct AppSettingsTests {
         "settings.fluidAudioNemotronModelsConsented", "settings.fluidAudioUnifiedStreamingConsented",
         "settings.allowsExpensiveNetworkTransfers", "settings.allowsConstrainedNetworkTransfers",
         "settings.cloudTranscriptionConsentKeys",
+        "settings.cloudConsents.v1",
         "settings.logLevel", "settings.meetingsSortOrder", "settings.hideLiveActivityMeetingTitle",
         AppSettingsKeys.diagnosticReportsConsented, "settings.usageStats"
     ]

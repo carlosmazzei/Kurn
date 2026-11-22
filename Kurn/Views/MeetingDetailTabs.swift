@@ -156,6 +156,8 @@ struct SummaryTab: View {
     /// Taps a section's photo reference chip; `nil` when the meeting has no
     /// photos, hiding the chip row entirely (see `SummaryView.onShowPhoto`).
     var onShowPhoto: ((TimeInterval) -> Void)?
+    @ScaledMetric(relativeTo: .footnote) private var cancelButtonMinHeight: CGFloat = 44
+    @ScaledMetric(relativeTo: .callout) private var generateButtonMinHeight: CGFloat = 54
 
     private var sortedSummaries: [Summary] {
         meeting.summaries.sorted { $0.createdAt > $1.createdAt }
@@ -273,9 +275,8 @@ struct SummaryTab: View {
                         ProgressView()
                             .controlSize(.small)
                     } else {
-                        // Fixed size to fit the fixed 42x42 well.
                         Image(systemName: "sparkles")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(Theme.bodyEmphasized)
                             .foregroundStyle(Theme.accent)
                             .accessibilityHidden(true)
                     }
@@ -314,8 +315,8 @@ struct SummaryTab: View {
                     Text(NSLocalizedString("detail.summary.cancel", comment: "Cancel summary"))
                         .font(Theme.footnoteEmphasized)
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 42)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, minHeight: cancelButtonMinHeight)
             }
             .buttonStyle(.bordered)
             .disabled(isCancellingSummary)
@@ -422,7 +423,9 @@ struct SummaryTab: View {
                     .font(Theme.calloutEmphasized)
             }
             .foregroundStyle(.white)
-            .frame(maxWidth: .infinity).frame(height: 54)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: generateButtonMinHeight)
             .background(Theme.accent, in: Capsule())
             .shadow(color: Theme.accent.opacity(0.4), radius: 18, y: 4)
         }

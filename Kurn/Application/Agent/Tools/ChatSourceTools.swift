@@ -187,6 +187,7 @@ public enum ChatSourceTools {
             case .summary: return source.hasSummary
             case .wiki: return source.hasWiki
             case .attachments: return source.hasAttachments
+            case .knowledge: return false
             }
         }
     }

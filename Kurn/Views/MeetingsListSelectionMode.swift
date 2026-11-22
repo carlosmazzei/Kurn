@@ -79,30 +79,34 @@ extension MeetingsListView {
                 .accessibilityIdentifier("meetings.selection.done")
         }
 
-        ToolbarItem(placement: .bottomBar) {
-            Button { showingBulkExport = true } label: {
-                Label(
-                    NSLocalizedString("meetings.selection.export", comment: "Export"),
-                    systemImage: "square.and.arrow.up"
-                )
-            }
-            .labelStyle(.titleAndIcon)
-            .disabled(selectedMeetings.isEmpty)
-            .accessibilityIdentifier("meetings.selection.export")
-        }
+        ToolbarItem(placement: .bottomBar) { exportSelectionButton }
         ToolbarSpacer(.flexible, placement: .bottomBar)
-        ToolbarItem(placement: .bottomBar) {
-            Button(role: .destructive) { pendingBulkDelete = true } label: {
-                Label(
-                    NSLocalizedString("common.delete", comment: "Delete"),
-                    systemImage: "trash"
-                )
-            }
-            .labelStyle(.titleAndIcon)
-            .tint(Theme.accent)
-            .disabled(selectedMeetings.isEmpty)
-            .accessibilityIdentifier("meetings.selection.delete")
+        ToolbarItem(placement: .bottomBar) { deleteSelectionButton }
+    }
+
+    private var exportSelectionButton: some View {
+        Button { showingBulkExport = true } label: {
+            Label(
+                NSLocalizedString("meetings.selection.export", comment: "Export"),
+                systemImage: "square.and.arrow.up"
+            )
         }
+        .labelStyle(.titleAndIcon)
+        .disabled(selectedMeetings.isEmpty)
+        .accessibilityIdentifier("meetings.selection.export")
+    }
+
+    private var deleteSelectionButton: some View {
+        Button(role: .destructive) { pendingBulkDelete = true } label: {
+            Label(
+                NSLocalizedString("common.delete", comment: "Delete"),
+                systemImage: "trash"
+            )
+        }
+        .labelStyle(.titleAndIcon)
+        .tint(Theme.accent)
+        .disabled(selectedMeetings.isEmpty)
+        .accessibilityIdentifier("meetings.selection.delete")
     }
 }
 

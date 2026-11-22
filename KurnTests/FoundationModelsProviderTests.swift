@@ -9,6 +9,7 @@
 //
 
 import Foundation
+import KurnCore
 import Testing
 @testable import Kurn
 
@@ -53,4 +54,17 @@ struct FoundationModelsProviderTests {
     @Test func appleOnDeviceIsUsableMatchesOnDeviceModelAvailability() {
         #expect(AIProvider.appleOnDevice.isUsable == (OnDeviceModelAvailability.unavailableReason == nil))
     }
+    @Test(arguments: [#"{"value":"unfinished"#, #"{"rows":[{"text":"done"}]"#, #"{"nested":{"value":1}"#])
+    func incompleteStructuredOutputSignalsTruncation(_ content: String) {
+        #expect(throws: AppError.self) { try FoundationModelsProvider.requireCompleteJSON(content) }
+    }
+
+    @Test func balancedJSONHandlesQuotedDelimitersAndLeavesSchemaErrorsForRepair() throws {
+        try FoundationModelsProvider.requireCompleteJSON(#"{"text":"quotes \" and } [ are data","nested":[]}"#)
+        try FoundationModelsProvider.requireCompleteJSON(#"{"invalid": }"#)
+        try FoundationModelsProvider.requireCompleteJSON("not a JSON document")
+        #expect(!TextGenerationOptions.document.requiresCompleteJSON)
+        #expect(TextGenerationOptions.knowledgeExtraction(for: .appleOnDevice).maxOutputTokens == 1_024)
+    }
+
 }

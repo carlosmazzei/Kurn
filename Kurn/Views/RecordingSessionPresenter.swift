@@ -35,7 +35,15 @@ extension View {
     /// Shows the mini bar inside this screen's safe area instead of at the
     /// root, for a screen whose bottom toolbar the root bar would cover.
     func hostsRecordingMiniBar() -> some View {
-        modifier(HostedRecordingMiniBar())
+        modifier(HostedRecordingMiniBar(closesSheetToExpand: false))
+    }
+
+    /// The mini bar inside a sheet the meetings list presents (Knowledge,
+    /// Ask), which covers the list's own. The recorder is presented from the
+    /// root, which cannot present over this sheet, so expanding closes the
+    /// sheet first.
+    func hostsRecordingMiniBarInSheet() -> some View {
+        modifier(HostedRecordingMiniBar(closesSheetToExpand: true))
     }
 }
 
@@ -52,10 +60,12 @@ final class RecordingMiniBarPlacement {
 private struct MiniBarSlot: View {
     @Environment(RecordingSessionController.self) private var session
     @Environment(RecordingMiniBarPlacement.self) private var placement
+    /// Replaces expanding in place (a sheet closes itself first).
+    var expand: (() -> Void)?
 
     var body: some View {
         if let vm = session.viewModel, !session.isExpanded, !placement.isKeyboardVisible {
-            RecordingMiniBar(vm: vm, onExpand: { session.expand() })
+            RecordingMiniBar(vm: vm, onExpand: { if let expand { expand() } else { session.expand() } })
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -64,13 +74,24 @@ private struct MiniBarSlot: View {
 }
 
 private struct HostedRecordingMiniBar: ViewModifier {
+    let closesSheetToExpand: Bool
+    @Environment(RecordingSessionController.self) private var session
     @Environment(RecordingMiniBarPlacement.self) private var placement
+    @Environment(\.dismiss) private var dismiss
     @State private var isHosting = false
+    /// Set when the bar in a sheet asked to expand: the recorder opens once
+    /// the sheet is gone, never while its dismissal is still running.
+    @State private var expandsWhenGone = false
 
     func body(content: Content) -> some View {
         content
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if isHosting { MiniBarSlot() }
+                if isHosting {
+                    MiniBarSlot(expand: closesSheetToExpand ? {
+                        expandsWhenGone = true
+                        dismiss()
+                    } : nil)
+                }
             }
             .onAppear {
                 guard !isHosting else { return }
@@ -78,6 +99,10 @@ private struct HostedRecordingMiniBar: ViewModifier {
                 placement.hostCount += 1
             }
             .onDisappear {
+                if expandsWhenGone {
+                    expandsWhenGone = false
+                    session.expand()
+                }
                 guard isHosting else { return }
                 isHosting = false
                 placement.hostCount -= 1
@@ -143,6 +168,8 @@ private struct RecordingSessionPresenter: ViewModifier {
 struct RecordingMiniBar: View {
     let vm: RecorderViewModel
     let onExpand: () -> Void
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
 
     /// The round controls are fixed geometry, so they scale from their own
     /// base and the subtree caps Dynamic Type, like `RecorderView`.
@@ -197,11 +224,21 @@ struct RecordingMiniBar: View {
                     .foregroundStyle(Theme.textPrimary)
                     .frame(width: controlSize, height: controlSize)
                     .background(Theme.fill, in: Circle())
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(isPaused
                 ? NSLocalizedString("recorder.resume", comment: "Resume")
                 : NSLocalizedString("recorder.pause", comment: "Pause"))
+            .accessibilityShowsLargeContentViewer {
+                Label(
+                    isPaused
+                        ? NSLocalizedString("recorder.resume", comment: "Resume")
+                        : NSLocalizedString("recorder.pause", comment: "Pause"),
+                    systemImage: isPaused ? "play.fill" : "pause.fill"
+                )
+            }
             .accessibilityIdentifier("recorder.mini.pause")
 
             Button {
@@ -213,16 +250,21 @@ struct RecordingMiniBar: View {
                     .foregroundStyle(.white)
                     .frame(width: controlSize, height: controlSize)
                     .background(Theme.accent, in: Circle())
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(NSLocalizedString("recorder.stop", comment: "Stop"))
+            .accessibilityShowsLargeContentViewer {
+                Label(NSLocalizedString("recorder.stop", comment: "Stop"), systemImage: "stop.fill")
+            }
             .accessibilityIdentifier("recorder.mini.stop")
         }
         .padding(.leading, 16)
         .padding(.trailing, 8)
         .padding(.vertical, 8)
         .frame(maxWidth: 560)
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .modifier(RecordingMiniBarSurfaceModifier(reduceTransparency: reduceTransparency, contrast: contrast))
         .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         .sensoryFeedback(.selection, trigger: vm.state)
     }
@@ -246,5 +288,27 @@ struct RecordingMiniBar: View {
         isPaused
             ? NSLocalizedString("recorder.mini.paused", comment: "Mini recorder bar: paused")
             : NSLocalizedString("recorder.mini.recording", comment: "Mini recorder bar: recording")
+    }
+}
+
+private struct RecordingMiniBarSurfaceModifier: ViewModifier {
+    let reduceTransparency: Bool
+    let contrast: ColorSchemeContrast
+
+    func body(content: Content) -> some View {
+        let borderColor = contrast == .increased ? Theme.textTertiary : Theme.separator
+        if reduceTransparency {
+            content
+                .background(Theme.surface, in: Capsule())
+                .overlay(Capsule().strokeBorder(borderColor, lineWidth: contrast == .increased ? 1.5 : 1))
+        } else {
+            content
+                .glassEffect(.regular.interactive(), in: .capsule)
+                .overlay {
+                    if contrast == .increased {
+                        Capsule().strokeBorder(borderColor, lineWidth: 1.5)
+                    }
+                }
+        }
     }
 }

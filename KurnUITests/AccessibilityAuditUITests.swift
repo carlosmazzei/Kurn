@@ -48,6 +48,7 @@ final class AccessibilityAuditUITests: XCTestCase {
     /// from a configured provider and so stays a manual/on-device check.
     func testMeetingDetailTabs() throws {
         openFirstMeeting()
+        XCTAssertFalse(app.buttons["tab.knowledge"].exists, "Knowledge stays hidden without its independent opt-in")
         continueAfterFailure = true
 
         for tab in ["recordings", "transcript", "summary", "chat"] {

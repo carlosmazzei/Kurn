@@ -144,22 +144,45 @@ enum KurnSchemaV5: VersionedSchema {
     }
 }
 
-/// Additive canonical harness storage; content conversion is resumable per session, after open.
+/// Frozen 1.5.0 graph: V5 plus the canonical harness session storage (content
+/// conversion is resumable per session, after open). Frozen in
+/// `KurnSchemaV6Models.swift`, `KurnSchemaV6LibraryModels.swift` and
+/// `KurnSchemaV6HarnessModels.swift`; never replace its types with live classes.
 enum KurnSchemaV6: VersionedSchema {
     static var versionIdentifier: Schema.Version { Schema.Version(1, 5, 0) }
+    static var models: [any PersistentModel.Type] {
+        [Meeting.self, Recording.self, Transcript.self, Speaker.self, Summary.self, Folder.self,
+         Tag.self, SmartFolder.self, SemanticChunk.self, WikiArticle.self, GeneratedDocument.self,
+         ChatSession.self, MeetingPhoto.self, MeetingAttachment.self,
+         HarnessSessionEntry.self, HarnessArtifactRevision.self, HarnessSessionRecord.self]
+    }
+}
+
+/// Version 1.6.0: adds the Knowledge Engine's canonical layer and what runs
+/// it (CLAUDE.md, "Knowledge Engine decisions"). Purely additive — ten new
+/// entities related by persisted UUIDs, no relationship on any existing
+/// entity — so a lightweight stage covers it. A meeting without a
+/// `SourceContextLink` is in context `unknown`, so upgrading writes nothing.
+enum KurnSchemaV7: VersionedSchema {
+    static var versionIdentifier: Schema.Version { Schema.Version(1, 6, 0) }
     static var models: [any PersistentModel.Type] {
         [Kurn.Meeting.self, Kurn.Recording.self, Kurn.Transcript.self, Kurn.Speaker.self,
          Kurn.Summary.self, Kurn.Folder.self, Kurn.Tag.self, Kurn.SmartFolder.self,
          Kurn.SemanticChunk.self, Kurn.WikiArticle.self, Kurn.GeneratedDocument.self,
          Kurn.ChatSession.self, Kurn.MeetingPhoto.self, Kurn.MeetingAttachment.self,
-         Kurn.HarnessSessionEntry.self, Kurn.HarnessArtifactRevision.self, Kurn.HarnessSessionRecord.self]
+         Kurn.HarnessSessionEntry.self, Kurn.HarnessArtifactRevision.self, Kurn.HarnessSessionRecord.self,
+         Kurn.KnowledgeEntity.self, Kurn.KnowledgeAssertion.self, Kurn.KnowledgeEvidence.self,
+         Kurn.KnowledgeEvent.self, Kurn.KnowledgeRelation.self, Kurn.KnowledgeJob.self,
+         Kurn.KnowledgeRevision.self, Kurn.KnowledgeReview.self, Kurn.KnowledgeContext.self,
+         Kurn.SourceContextLink.self]
     }
 }
 
-/// All changes through V6 are additive and use lightweight migration.
+/// All changes through V7 are additive and use lightweight migration.
 enum KurnSchemaMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [KurnSchemaV1.self, KurnSchemaV2.self, KurnSchemaV3.self, KurnSchemaV4.self, KurnSchemaV5.self, KurnSchemaV6.self]
+        [KurnSchemaV1.self, KurnSchemaV2.self, KurnSchemaV3.self, KurnSchemaV4.self, KurnSchemaV5.self,
+         KurnSchemaV6.self, KurnSchemaV7.self]
     }
 
     static var stages: [MigrationStage] {
@@ -168,7 +191,8 @@ enum KurnSchemaMigrationPlan: SchemaMigrationPlan {
             .lightweight(fromVersion: KurnSchemaV2.self, toVersion: KurnSchemaV3.self),
             .lightweight(fromVersion: KurnSchemaV3.self, toVersion: KurnSchemaV4.self),
             .lightweight(fromVersion: KurnSchemaV4.self, toVersion: KurnSchemaV5.self),
-            .lightweight(fromVersion: KurnSchemaV5.self, toVersion: KurnSchemaV6.self)
+            .lightweight(fromVersion: KurnSchemaV5.self, toVersion: KurnSchemaV6.self),
+            .lightweight(fromVersion: KurnSchemaV6.self, toVersion: KurnSchemaV7.self)
         ]
     }
 }
@@ -180,12 +204,12 @@ enum KurnModelGraph {
     /// The current model graph, for call sites that need the bare type list
     /// (e.g. an in-memory test container with no migration concerns).
     static var currentModels: [any PersistentModel.Type] {
-        KurnSchemaV6.models
+        KurnSchemaV7.models
     }
 
     /// The versioned schema production and screenshot containers should use.
     static var schema: Schema {
-        Schema(versionedSchema: KurnSchemaV6.self)
+        Schema(versionedSchema: KurnSchemaV7.self)
     }
 
     /// The version a store written by the current graph is at — what backup
@@ -193,7 +217,7 @@ enum KurnModelGraph {
     /// rather than being pinned to whichever version happened to be current
     /// when the call site was written.
     static var currentSchemaVersion: Schema.Version {
-        KurnSchemaV6.versionIdentifier
+        KurnSchemaV7.versionIdentifier
     }
 
     /// The migration plan production and screenshot containers should use.

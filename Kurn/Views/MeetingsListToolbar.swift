@@ -2,10 +2,10 @@
 //  MeetingsListToolbar.swift
 //  Kurn
 //
-//  The meetings list's native toolbar. Library scope, filters and Ask share one
-//  Liquid Glass group at the bottom; a `ToolbarSpacer` splits the record button
-//  off into a group of its own, so the primary action reads as separate from the
-//  browsing controls instead of being a floating button drawn over a fake bar.
+//  One unified meetings screen toolbar regardless of whether Knowledge is on
+//  or off. The bottom bar holds the four destinations (Library, Knowledge, Ask,
+//  Documents) beside the separate record button; the top trailing bar pairs
+//  the list-options menu (Filters, Sort, Select) with Settings.
 //
 //  This lives in its own file because `MeetingsListView.swift` is already close
 //  to the SwiftLint file-length limit. The members it reaches for are therefore
@@ -29,156 +29,115 @@ extension MeetingsListView {
 
     @ToolbarContentBuilder
     var browsingToolbar: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) { selectButton }
-        ToolbarItem(placement: .topBarTrailing) { sortMenu }
-        // Splits the shared glass background so sorting and settings read as
-        // two separate controls rather than one segmented capsule.
-        ToolbarSpacer(.fixed, placement: .topBarTrailing)
-        ToolbarItem(placement: .topBarTrailing) { settingsButton }
+        topTrailingToolbar
+        bottomDestinationsToolbar
+    }
 
-        // On iPad-regular width the same selection is always visible in
-        // `FolderSidebarView`'s persistent sidebar column (D6), so this
-        // button would just open a sheet duplicating what's already on
-        // screen — hidden there rather than left as a redundant control.
+    /// List options (Filters, Sort, Select) grouped in one menu right beside
+    /// Settings so both share one clean trailing chrome group.
+    @ToolbarContentBuilder
+    private var topTrailingToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) { listActionsMenu }
+        ToolbarItem(placement: .topBarTrailing) { settingsButton }
+    }
+
+    /// Four destinations (Library, Knowledge, Ask, Documents) in one group,
+    /// separated by a flexible spacer from the standalone Record button.
+    @ToolbarContentBuilder
+    private var bottomDestinationsToolbar: some ToolbarContent {
+        // On iPad-regular width the sidebar column already shows the library.
         if horizontalSizeClass != .regular {
-            ToolbarItem(placement: .bottomBar) { libraryButton }
+            ToolbarItem(placement: .bottomBar) { libraryButton(showsTitle: false) }
         }
-        ToolbarItem(placement: .bottomBar) { filterButton }
-        if settings.semanticSearchEnabled {
-            ToolbarItem(placement: .bottomBar) { askButton }
-        }
-        ToolbarItem(placement: .bottomBar) { documentsButton }
-        // Everything above shares one glass capsule; the flexible spacer pushes
-        // the record button to the trailing edge *and* gives it its own.
+        ToolbarItem(placement: .bottomBar) { destinationButton(.knowledge) { showingKnowledge = true } }
+        ToolbarItem(placement: .bottomBar) { destinationButton(.ask) { showingAsk = true } }
+        ToolbarItem(placement: .bottomBar) { destinationButton(.documents) { showingDocuments = true } }
         ToolbarSpacer(.flexible, placement: .bottomBar)
-        ToolbarItem(placement: .bottomBar) { recordButton }
+        // At accessibility text sizes the title would crowd the destinations
+        // out of the bar; the accessibility label still names the action.
+        ToolbarItem(placement: .bottomBar) {
+            if dynamicTypeSize.isAccessibilitySize {
+                recordButton.labelStyle(.iconOnly)
+            } else {
+                recordButton.labelStyle(.titleAndIcon)
+            }
+        }
+    }
+
+    private func destinationButton(_ destination: AppRootDestination, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(destination.title, systemImage: destination.systemImage)
+        }
+        .accessibilityIdentifier("root.destination.\(destination.rawValue)")
     }
 
     // MARK: - Primary action
 
-    /// The record button, deliberately alone in its glass group and tinted with
-    /// the brand accent so it stays the loudest thing on screen. While a
-    /// recording runs minimized it says so and re-opens it, rather than
-    /// reading "Record" over an action that cannot start a second capture.
-    var recordButton: some View {
-        Button(action: startRecording) {
-            if recordingSession.isActive {
-                Label(
-                    recordingSession.isPaused
-                        ? NSLocalizedString("recorder.mini.paused", comment: "Mini recorder bar: paused")
-                        : NSLocalizedString("recorder.mini.recording", comment: "Mini recorder bar: recording"),
-                    systemImage: recordingSession.isPaused ? "pause.circle.fill" : "waveform"
-                )
-            } else {
-                Label(
-                    NSLocalizedString("meetings.record", comment: "Record"),
-                    systemImage: "record.circle.fill"
-                )
-            }
-        }
-        .labelStyle(.titleAndIcon)
-        .tint(Theme.accent)
-        .buttonStyle(.glassProminent)
-        .accessibilityHint(recordingSession.isActive
-            ? NSLocalizedString("recorder.mini.hint", comment: "Opens the full recorder")
-            : "")
-        .accessibilityIdentifier("meetings.record")
-    }
-
-    /// Create the meeting the recorder will record into, then start the
-    /// session. While a recording is already running (minimized to the mini
-    /// bar) the button re-opens it instead of creating a second meeting. A
-    /// failed save surfaces through `saveError` and opens no recorder, since
-    /// there would be no committed meeting to record into.
-    func startRecording() {
-        guard !recordingSession.isActive else {
-            recordingSession.expand()
-            return
-        }
-        do throws(AppError) {
-            let meeting = try MeetingLibrary(context: modelContext)
-                .createMeeting(title: "", language: settings.defaultLanguage)
-            recordingSession.begin(meeting: meeting)
-        } catch {
-            saveError = error
-        }
-    }
+    /// The standalone layout and root navigation share the same recording action.
+    var recordButton: some View { RecordingActionButton() }
 
     // MARK: - Bottom bar
 
-    /// Opens `FolderSidebarView`. The label mirrors the active selection
-    /// (built-in bucket icon or folder icon + name) so the user always sees
-    /// what they're looking at.
-    var libraryButton: some View {
+    /// Opens `FolderSidebarView`. The icon mirrors the active selection
+    /// (built-in bucket or folder) and the accessibility value names it.
+    func libraryButton(showsTitle: Bool) -> some View {
         Button { showingSidebar = true } label: {
             Label(selectionTitle, systemImage: selectionSystemImage)
+                .labelStyle(LibraryLabelStyle(showsTitle: showsTitle))
         }
-        .labelStyle(.titleAndIcon)
         .accessibilityLabel(NSLocalizedString("meetings.bucket", comment: "Library"))
         .accessibilityValue(selectionTitle)
         .accessibilityIdentifier("meetings.library")
     }
 
-    /// Opens `FilterBarView`. Shows the active filter count inline so the badge
-    /// the old chip carried isn't lost.
-    var filterButton: some View {
-        Button { showingFilterBar = true } label: {
-            if filter.isActive {
-                Label("\(filter.activeCount)", systemImage: "line.3.horizontal.decrease")
-                    .labelStyle(.titleAndIcon)
-            } else {
-                Label(
-                    NSLocalizedString("filter.title", comment: "Filters"),
-                    systemImage: "line.3.horizontal.decrease"
-                )
-            }
-        }
-        .tint(filter.isActive ? Theme.accent : nil)
-        .accessibilityLabel(NSLocalizedString("filter.title", comment: "Filters"))
-    }
-
-    var askButton: some View {
-        Button { showingAsk = true } label: {
-            Label(
-                NSLocalizedString("meetings.ask", comment: "Ask"),
-                systemImage: "bubble.left.and.text.bubble.right"
-            )
-        }
-        .accessibilityIdentifier("meetings.ask")
-    }
-
-    var documentsButton: some View {
-        Button { showingDocuments = true } label: {
-            Label(
-                NSLocalizedString("documents.title", comment: "Documents"),
-                systemImage: "doc.text"
-            )
-        }
-        .accessibilityIdentifier("navigation.documents")
-    }
-
     // MARK: - Navigation bar
 
-    var sortMenu: some View {
+    /// Single overflow menu for Filters, Sort, and Select.
+    var listActionsMenu: some View {
         Menu {
-            Picker(
-                NSLocalizedString("meetings.sort", comment: "Sort"),
-                selection: Binding(
-                    get: { settings.meetingsSortOrder },
-                    set: { settings.meetingsSortOrder = $0 }
-                )
-            ) {
-                ForEach(MeetingsSortOrder.allCases) { order in
-                    Label(order.displayName, systemImage: order.systemImage).tag(order)
+            Section {
+                filterMenuButton
+                selectButton
+            }
+            Section {
+                Menu {
+                    Picker(
+                        NSLocalizedString("meetings.sort", comment: "Sort"),
+                        selection: Binding(
+                            get: { settings.meetingsSortOrder },
+                            set: { settings.meetingsSortOrder = $0 }
+                        )
+                    ) {
+                        ForEach(MeetingsSortOrder.allCases) { order in
+                            Label(order.displayName, systemImage: order.systemImage).tag(order)
+                        }
+                    }
+                } label: {
+                    Label(
+                        NSLocalizedString("meetings.sort", comment: "Sort"),
+                        systemImage: "arrow.up.arrow.down"
+                    )
                 }
             }
         } label: {
             Label(
-                NSLocalizedString("meetings.sort", comment: "Sort"),
-                systemImage: "arrow.up.arrow.down"
+                NSLocalizedString("meetings.list_actions", comment: "List options"),
+                systemImage: filter.isActive ? "ellipsis.circle.fill" : "ellipsis.circle"
             )
         }
-        .accessibilityLabel(NSLocalizedString("meetings.sort", comment: "Sort"))
+        .tint(filter.isActive ? Theme.accent : nil)
+        .accessibilityLabel(NSLocalizedString("meetings.list_actions", comment: "List options"))
+        .accessibilityValue(filter.isActive ? "\(filter.activeCount)" : "")
+        .accessibilityIdentifier("meetings.actions")
+    }
+
+    private var filterMenuButton: some View {
+        Button { showingFilterBar = true } label: {
+            let base = NSLocalizedString("filter.title", comment: "Filters")
+            let title = filter.isActive ? "\(base) (\(filter.activeCount))" : base
+            Label(title, systemImage: "line.3.horizontal.decrease")
+        }
+        .accessibilityIdentifier("meetings.filters")
     }
 
     var settingsButton: some View {
@@ -191,5 +150,19 @@ extension MeetingsListView {
         // `ScreenshotUITests.testSettings` taps this by identifier; it moved
         // here from the old hand-rolled bottom bar and must keep the name.
         .accessibilityIdentifier("nav.settings")
+    }
+}
+
+/// The library button's label: the selection's name beside its icon when
+/// requested, the icon alone in compact destination bars.
+private struct LibraryLabelStyle: LabelStyle {
+    let showsTitle: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        if showsTitle {
+            Label(configuration).labelStyle(.titleAndIcon)
+        } else {
+            Label(configuration).labelStyle(.iconOnly)
+        }
     }
 }

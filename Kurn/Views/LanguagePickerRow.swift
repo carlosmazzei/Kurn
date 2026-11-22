@@ -21,7 +21,7 @@ struct LanguagePickerRow: View {
             if !TranscriptionLanguageSupport.isSupported(language, by: engine, fluidAudioASRModel: fluidAudioASRModel) {
                 Spacer()
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.warning)
                     .accessibilityLabel(Text(NSLocalizedString("lang.unsupported_a11y", comment: "Language may not be supported")))
             }
         }

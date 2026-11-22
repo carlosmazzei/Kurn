@@ -93,11 +93,8 @@ struct FolderFormView: View {
         return LazyVGrid(columns: columns, spacing: 12) {
             ForEach(FolderIconCatalog.icons, id: \.self) { symbol in
                 Button { iconName = symbol } label: {
-                    // Fixed size to fit the fixed 40x40 grid cell — a glyph
-                    // picker grid, not reading text, so it doesn't need to
-                    // track Dynamic Type the way the rest of the app does.
                     Image(systemName: symbol)
-                        .font(.system(size: 18))
+                        .font(Theme.body)
                         .frame(width: 40, height: 40)
                         .foregroundStyle(iconName == symbol ? Color(hex: colorHex) : Theme.textSecondary)
                         .background(
@@ -106,9 +103,11 @@ struct FolderFormView: View {
                                 : Theme.fill,
                             in: RoundedRectangle(cornerRadius: 10, style: .continuous)
                         )
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(symbol)
+                .accessibilityLabel(FolderIconCatalog.accessibleName(for: symbol))
                 .accessibilityAddTraits(iconName == symbol ? .isSelected : [])
             }
         }
@@ -125,12 +124,13 @@ struct FolderFormView: View {
                             .fill(Color(hex: hex))
                             .frame(width: 30, height: 30)
                         if colorHex == hex {
-                            // Same fixed-grid reasoning as the icon grid above.
                             Image(systemName: "checkmark")
-                                .font(.system(size: 12, weight: .bold))
+                                .font(Theme.caption2Emphasized)
                                 .foregroundStyle(.white)
                         }
                     }
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(FolderColorPalette.accessibleName(for: hex))

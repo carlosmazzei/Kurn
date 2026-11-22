@@ -213,6 +213,8 @@ struct FolderSidebarView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("library.bucket.\(bucket.rawValue)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func smartFolderRow(_ smartFolder: SmartFolder) -> some View {

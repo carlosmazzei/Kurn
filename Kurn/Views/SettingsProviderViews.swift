@@ -218,6 +218,7 @@ struct AddProviderView: View {
         Form {
             Section {
                 TextField(NSLocalizedString("settings.provider_name", comment: "Provider name"), text: $name)
+                    .accessibilityIdentifier("settings.providers.add.name")
                 Picker(NSLocalizedString("settings.provider_type", comment: "Provider type"), selection: $kind) {
                     ForEach(AIProviderKind.networkCases) { Text($0.displayName).tag($0) }
                 }
@@ -260,6 +261,7 @@ struct AddProviderView: View {
                     }
                 }
                 .disabled(!canSave)
+                .accessibilityIdentifier("settings.providers.add.save")
             }
         }
         .onChange(of: kind) { _, newValue in
