@@ -230,7 +230,7 @@
 "recorder.partial_saved" = "È stata salvata una registrazione parziale dopo un errore di acquisizione audio. Controlla lo spazio disponibile prima di registrare di nuovo.";
 "recorder.recovery_failed" = "La registrazione non è ancora disponibile. L’audio è stato conservato per consentire un nuovo tentativo di recupero.";
 "recorder.title" = "Nuova Registrazione";
-"recorder.discard" = "Elimina Registrazione";
+"recorder.discard" = "Elimina";
 "recorder.title_field.accessibility_label" = "Titolo della riunione";
 "recorder.accessibility.timer_with_highlights" = "%1$@, %2$d segnalibri";
 "recorder.pause" = "Pausa";
@@ -1938,3 +1938,6 @@
 "tag.search_or_create" = "Cerca o crea un tag";
 "attach.recent" = "Recenti";
 "folder.name_section" = "Nome";
+"recorder.discard.confirm.title" = "Eliminare questa registrazione?";
+"recorder.discard.confirm.message" = "L’audio registrato finora verrà cancellato dal dispositivo. Interrompere, invece, lo conserva.";
+"recorder.discard.confirm.keep" = "Continua a registrare";
