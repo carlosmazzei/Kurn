@@ -311,6 +311,7 @@ struct MeetingKnowledgeView: View {
         KnowledgeChipButton(title: NSLocalizedString("detail.knowledge.update", comment: "Update knowledge"),
                             systemImage: "sparkles", action: updateKnowledge)
             .accessibilityIdentifier("knowledge.refresh")
+            .disabled(updateInFlight || coordinator.progress(for: meeting.id) != nil)
     }
 
     /// Same provider·model nudge the Summary empty state shows — the Wiki

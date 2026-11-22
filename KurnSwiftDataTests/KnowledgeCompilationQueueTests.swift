@@ -70,6 +70,7 @@ struct KnowledgeCompilationQueueTests {
         let queue: KnowledgeJobQueue
         let coordinator: KnowledgeCompilationCoordinator
         let policy: PolicyState
+        let breaker: ProviderCircuitBreaker
     }
 
     private func fixture(recordings: Int = 1, provider: Provider = Provider(), foreground: Bool = true) throws -> Fixture {
@@ -97,9 +98,12 @@ struct KnowledgeCompilationQueueTests {
         settings.aiProviderID = AIProvider.appleOnDevice.id
         let queue = KnowledgeJobQueue(container: container, foreground: foreground)
         let policy = PolicyState()
+        let breakerDefaults = try #require(UserDefaults(suiteName: "knowledge-circuit-tests-\(UUID().uuidString)"))
+        let breaker = ProviderCircuitBreaker(store: UserDefaultsProviderCircuitStore(defaults: breakerDefaults))
         let coordinator = KnowledgeCompilationCoordinator(queue: queue, settings: settings, authorization: { policy.authorization },
-            resolveProvider: { _, _ in provider }, isProviderUsable: { _ in true })
-        return Fixture(container: container, meeting: meeting, settings: settings, queue: queue, coordinator: coordinator, policy: policy)
+            resolveProvider: { _, _ in provider }, isProviderUsable: { _ in true }, providerCircuitBreaker: breaker)
+        return Fixture(container: container, meeting: meeting, settings: settings, queue: queue, coordinator: coordinator,
+                       policy: policy, breaker: breaker)
     }
 
     private func wait(_ gate: Gate) async throws {
@@ -316,6 +320,42 @@ struct KnowledgeCompilationQueueTests {
         #expect(await provider.calls == 2)
     }
 
+    @Test func secondForcedCompileCoalescesWhileOneRuns() async throws {
+        let gate = Gate()
+        let provider = Provider(gateAt: 1, gate: gate)
+        let f = try fixture(provider: provider)
+        let first = Task { await f.coordinator.compile(meetingID: f.meeting.id, trigger: .explicit, force: true) }
+        try await wait(gate)
+        // A second tap joins silently — no second extraction, no failure row.
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id, trigger: .explicit, force: true) == .deferred)
+        await gate.release()
+        #expect(await first.value == .completed)
+        #expect(await provider.calls == 1)
+    }
+
+    @Test func explicitCompileBypassesAndClosesABlockedProvider() async throws {
+        let provider = Provider()
+        let f = try fixture(provider: provider)
+        await f.breaker.recordFailure(providerID: AIProvider.appleOnDevice.id, failure: .configuration)
+        // A configuration failure requires an explicit retry: automatic defers.
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id) == .deferred)
+        #expect(f.coordinator.lastFailureCode == "provider_blocked")
+        #expect(await provider.calls == 0)
+        // The explicit update bypasses the open circuit, then records success.
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id, trigger: .explicit, force: true) == .completed)
+        // …and the deferred automatic row retries once the circuit closes.
+        #expect(await provider.calls == 2)
+        #expect(await f.breaker.record(for: AIProvider.appleOnDevice.id) == nil)
+    }
+
+    @Test func explicitCompileFailureRecordsOnTheBreaker() async throws {
+        let provider = Provider(failAt: 1)
+        let f = try fixture(provider: provider)
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id, trigger: .explicit, force: true) == .failed)
+        let record = await f.breaker.record(for: AIProvider.appleOnDevice.id)
+        #expect(record?.consecutiveFailures == 1)
+    }
+
     @Test func progressAndFailureStateClearConsistentlyWhenACompileFails() async throws {
         let provider = Provider(failAt: 1)
         let f = try fixture(provider: provider)
@@ -376,7 +416,9 @@ struct KnowledgeCompilationQueueTests {
         #expect(!encoded.contains("Example"))
         f.settings.knowledgeEnabled = false
         #expect(await f.coordinator.compile(meetingID: f.meeting.id) == .deferred)
-        #expect(capture.events.filter { $0.outcome == .failed }.count == 1)
+        // The circuit breaker records its own provider_circuit failure beside
+        // this one; the compile event itself stays single and content-free.
+        #expect(capture.events.filter { $0.outcome == .failed && $0.operation == "knowledge_compilation" }.count == 1)
     }
 
     @Test func oldPipelineIntentIsNotRelabeledAsTheCurrentExtractor() async throws {
