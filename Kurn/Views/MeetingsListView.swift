@@ -238,7 +238,7 @@ struct MeetingsListView: View {
                 quickChips
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
             }
 
             if filtered.isEmpty {
@@ -246,13 +246,14 @@ struct MeetingsListView: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             } else if usesDayGrouping {
-                ForEach(daySections, id: \.day) { section in
+                ForEach(Array(daySections.enumerated()), id: \.element.day) { index, section in
                     Section {
                         ForEach(section.items) { meeting in
                             meetingRow(meeting, showsDate: false)
                         }
                     } header: {
                         dayHeader(for: section.day)
+                            .padding(.top, index == 0 ? 0 : 8)
                     }
                 }
             } else {
@@ -264,6 +265,10 @@ struct MeetingsListView: View {
             }
         }
         .listStyle(.insetGrouped)
+        // Search field sits flush above the chips; sections stay a compact,
+        // uniform distance apart like the prototype's day groups.
+        .contentMargins(.top, 0, for: .scrollContent)
+        .listSectionSpacing(.compact)
         .scrollContentBackground(.hidden)
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle(listTitle)
@@ -540,6 +545,7 @@ extension MeetingsListView {
             }
         }
         .textCase(nil)
+        .padding(.bottom, 6)
         .accessibilityAddTraits(.isHeader)
     }
 

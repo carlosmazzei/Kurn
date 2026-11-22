@@ -26,12 +26,20 @@ struct MeetingDetailHeader: View {
         return formatter
     }()
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
         VStack(alignment: .leading, spacing: expanded ? 8 : 0) {
+            // The user asked for a one-line title like the prototype; AX
+            // text sizes get a second line so the label stays readable, and
+            // VoiceOver still gets the full title via accessibilityLabel.
             Text(meeting.title)
                 .font(.system(expanded ? .title : .title2, weight: .bold))
                 .foregroundStyle(Theme.textPrimary)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                .minimumScaleFactor(0.75)
+                .truncationMode(.tail)
+                .accessibilityLabel(meeting.title)
             if expanded {
                 Text(metaLine)
                     .font(Theme.subheadline)
