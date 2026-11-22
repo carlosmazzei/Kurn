@@ -37,6 +37,9 @@ enum ModelPricing {
     private static let rates: [(prefix: String, rate: Rate)] = [
         ("gpt-4o-mini", Rate(input: 0.15e-6, output: 0.6e-6, cacheRead: 0.5)),
         ("gpt-4o", Rate(input: 2.5e-6, output: 10e-6, cacheRead: 0.5)),
+        // developers.openai.com/api/docs/models/gpt-6.1-terra (2026-11-22): $1 in, $5 out, cached input 5%,
+        // 30-minute cache writes $1.25 (1.25×). Prompts over 272k input tokens cost more; not modelled.
+        ("gpt-6.1-terra", Rate(input: 1e-6, output: 5e-6, cacheRead: 0.05, cacheWrite: 1.25)),
         ("gpt-5.4", Rate(input: 1.25e-6, output: 10e-6, cacheRead: 0.1)),
         ("gpt-5", Rate(input: 1.25e-6, output: 10e-6, cacheRead: 0.1)),
         ("claude-3-5-haiku", Rate(input: 0.8e-6, output: 4e-6, cacheRead: 0.1, cacheWrite: 1.25)),
