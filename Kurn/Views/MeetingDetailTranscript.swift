@@ -96,34 +96,40 @@ extension MeetingDetailView {
         }
     }
 
-    /// A transcription running right now, with its progress and the same
-    /// pause/stop actions the Audio tab's row offers.
+    /// A transcription running right now: the phase in words as the title,
+    /// a determinate bar with its percent, the leave-screen hint, and the
+    /// same pause/stop actions the Audio tab's row offers.
     private func transcribingState(_ recording: Recording) -> some View {
         let phase = transcription?.phase(for: recording)
-        let percent = Int(((phase ?? .preparing).fractionComplete * 100).rounded())
+        let active = phase ?? .preparing
+        let percent = Int((active.fractionComplete * 100).rounded())
+        // "Separating speakers" — the phase name with the trailing ellipsis
+        // stripped; the percent lives under the bar instead.
+        let title = active.baseName.trimmingCharacters(in: CharacterSet(charactersIn: "…."))
         return ContentUnavailableView {
-            Label {
-                Text(String(
-                    format: NSLocalizedString("detail.transcript.in_progress", comment: "Transcribing with percent"),
-                    percent
-                ))
-            } icon: {
-                ProgressView()
-            }
+            Label(title, systemImage: "waveform")
         } description: {
-            Text("\(phase?.displayName ?? "")\(phase == nil ? "" : ". ")\(NSLocalizedString("detail.transcript.leave_hint", comment: "You can leave this screen"))")
+            VStack(spacing: 10) {
+                ProgressView(value: active.fractionComplete)
+                    .tint(Theme.ink)
+                    .frame(width: 200)
+                Text("\(percent)%")
+                    .font(Theme.footnote)
+                    .foregroundStyle(Theme.textSecondary)
+                Text(NSLocalizedString("detail.transcript.leave_hint", comment: "You can leave this screen"))
+            }
         } actions: {
             HStack(spacing: 12) {
                 Button {
                     cancelTranscription(recording)
                 } label: {
-                    Text(NSLocalizedString("detail.cancel_transcription", comment: "Pause transcription"))
+                    Text(NSLocalizedString("recorder.pause", comment: "Pause"))
                 }
                 .buttonStyle(.bordered)
                 Button {
                     stopTranscription(recording)
                 } label: {
-                    Text(NSLocalizedString("detail.stop_transcription", comment: "Stop transcription"))
+                    Text(NSLocalizedString("recorder.stop", comment: "Stop"))
                 }
                 .buttonStyle(.bordered)
             }

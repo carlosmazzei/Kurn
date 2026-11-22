@@ -21,6 +21,11 @@ struct KnowledgeSettingsView: View {
     @State private var resetting = false
     @State private var deleting = false
     @State private var pendingCloudProvider: AIProvider?
+    /// Which row the cloud-consent dialog is asking for — the compilation
+    /// provider or the Wiki writer pick.
+    @State private var pendingProviderTarget: PendingProviderTarget = .compilation
+
+    private enum PendingProviderTarget { case compilation, wikiWriter }
     /// Per-meeting generated articles (the old `WikiSettingsView` content,
     /// merged into this screen): count refreshes on appear and after bulk runs.
     @State private var wikiArticleCount = 0
@@ -154,9 +159,40 @@ struct KnowledgeSettingsView: View {
                     ForEach(knowledgeProviders) { Text(verbatim: $0.displayName).tag($0.id) }
                 }
                 .accessibilityIdentifier("knowledge.settings.provider")
+                Picker(KnowledgeSettingsCopy.text("wiki_writer"), selection: Binding(
+                    get: { settings.wikiProviderID ?? "" },
+                    set: { id in chooseWikiWriter(id.isEmpty ? nil : id) }
+                )) {
+                    Text(String(format: KnowledgeSettingsCopy.text("same_as_summaries"),
+                                settings.aiProvider.displayName)).tag("")
+                    ForEach(knowledgeProviders) { Text(verbatim: $0.displayName).tag($0.id) }
+                }
+                .accessibilityIdentifier("knowledge.settings.wiki_provider")
+                if let writer = wikiWriterProvider {
+                    if writer.kind == .appleOnDevice {
+                        // Exactly one on-device model, nothing to pick.
+                        LabeledContent(
+                            NSLocalizedString("settings.model", comment: "Model"),
+                            value: NSLocalizedString("settings.on_device_model_name", comment: "Apple Intelligence")
+                        )
+                    } else {
+                        SummaryModelPicker(
+                            settings: settings, provider: writer,
+                            selection: Binding(
+                                get: { settings.wikiModel(for: writer) },
+                                set: { settings.setWikiModel($0, for: writer) }
+                            )
+                        )
+                    }
+                }
             } header: {
                 Text(KnowledgeSettingsCopy.text("section_write"))
-            } footer: { Text(KnowledgeSettingsCopy.text("automatic_detail")) }
+            } footer: {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(KnowledgeSettingsCopy.text("automatic_detail"))
+                    Text(KnowledgeSettingsCopy.text("wiki_writer_detail"))
+                }
+            }
             Section {
                 NavigationLink(KnowledgeSettingsCopy.text("scope")) { KnowledgeScopeSettingsView(controls: controls) }
                     .accessibilityIdentifier("knowledge.settings.scope")
@@ -350,9 +386,14 @@ struct KnowledgeSettingsView: View {
     private func allowCloud(_ provider: AIProvider) async {
         switch await SensitiveActionAuthorizer().authorize(requireAuth: settings.requireAuthForRecordings) {
         case .authorized:
-            guard let controls = settings.knowledgeControls else { return }
             settings.grantCloudConsent(provider, for: .automatic)
-            choose(provider.id, controls: controls)
+            switch pendingProviderTarget {
+            case .compilation:
+                guard let controls = settings.knowledgeControls else { return }
+                choose(provider.id, controls: controls)
+            case .wikiWriter:
+                settings.wikiProviderID = provider.id
+            }
         case .cancelled: return
         case .denied(let error): model.error = error
         }
@@ -361,10 +402,33 @@ struct KnowledgeSettingsView: View {
     /// A cloud provider without the automatic grant asks first (CLAUDE.md, "Cloud consent").
     private func choose(_ id: String, controls: KnowledgeControls) {
         guard let provider = settings.providers.first(where: { $0.id == id }) else { return }
-        guard settings.allowsCloud(provider, for: .automatic) else { pendingCloudProvider = provider; return }
+        guard settings.allowsCloud(provider, for: .automatic) else {
+            pendingProviderTarget = .compilation
+            pendingCloudProvider = provider
+            return
+        }
         var next = controls
         next.providerID = id
         save(next)
+    }
+
+    /// The explicitly picked Wiki writer, while its provider still exists.
+    private var wikiWriterProvider: AIProvider? {
+        settings.wikiProviderID.flatMap { id in settings.providers.first { $0.id == id } }
+    }
+
+    /// Picking a cloud Wiki writer goes through the same automatic-consent
+    /// dialog as the compilation provider — automatic Wiki updates send every
+    /// new transcript to it. `nil` restores "Same as summaries".
+    private func chooseWikiWriter(_ id: String?) {
+        guard let id else { settings.wikiProviderID = nil; return }
+        guard let provider = settings.providers.first(where: { $0.id == id }) else { return }
+        guard settings.allowsCloud(provider, for: .automatic) else {
+            pendingProviderTarget = .wikiWriter
+            pendingCloudProvider = provider
+            return
+        }
+        settings.wikiProviderID = id
     }
 
     private func save(_ controls: KnowledgeControls) { do { try settings.saveKnowledgeControls(controls) } catch { model.reportError() } }

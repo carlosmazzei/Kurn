@@ -484,6 +484,7 @@
 "detail.summarizing" = "Generazione riassunto…";
 "detail.summary.needs_transcript" = "Trascrivi prima una registrazione, poi genera un riepilogo.";
 "detail.summary.model_nudge" = "Userà %1$@ · modello %2$@";
+"detail.generate.on_device" = "Apple Intelligence · su questo dispositivo";
 "detail.summary.model_missing" = "Nessun modello di riassunto selezionato";
 "detail.summary.new" = "Nuovo Riassunto";
 "detail.summary.untitled" = "Riassunto";
@@ -1618,6 +1619,9 @@
 "knowledge.settings.cloud_cost" = "L’elaborazione invia queste trascrizioni a %@; si applicano i costi del fornitore.";
 "knowledge.settings.scope" = "Ambito ed esclusioni";
 "knowledge.settings.automatic_detail" = "La compilazione automatica riguarda le future trascrizioni. Attivare Wiki non elabora le vecchie riunioni. Le attività autorizzate in attesa possono riprendere; usa Sospendi per fermarle.";
+"knowledge.settings.wiki_writer" = "Redattore del Wiki";
+"knowledge.settings.same_as_summaries" = "Come i riepiloghi (%@)";
+"knowledge.settings.wiki_writer_detail" = "Gli aggiornamenti automatici del Wiki inviano ogni nuova trascrizione a questo provider; serve il permesso Automatico in Privacy e cloud.";
 "knowledge.settings.choose" = "Scegli riunioni";
 "knowledge.settings.selected" = "Riunioni selezionate: %d";
 "knowledge.settings.recompile" = "Ricompiil Wiki esistente";
@@ -1748,8 +1752,7 @@
 "detail.summary.delete_confirm.title_named" = "Eliminare il riepilogo \"%1$@\"?";
 "transcript.seek_to" = "Vai a %@";
 "detail.participants" = "Partecipanti";
-"detail.transcript.in_progress" = "Trascrizione… %d%%";
-"detail.transcript.leave_hint" = "Puoi uscire da questa schermata; Kurn ti avvisa quando ha finito.";
+"detail.transcript.leave_hint" = "Puoi uscire da questa schermata. Kurn ti avvisa quando ha finito.";
 "detail.transcript.failed.hint" = "L'audio è salvato; riprova o cambia il motore di trascrizione.";
 "detail.transcript.go_to_audio" = "Vai ad Audio";
 "detail.transcript.open_settings" = "Impostazioni di trascrizione";

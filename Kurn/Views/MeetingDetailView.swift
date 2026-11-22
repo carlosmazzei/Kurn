@@ -387,7 +387,7 @@ struct MeetingDetailView: View {
                 MeetingKnowledgeView(meeting: meeting, state: meetingKnowledge.presentation(for: meeting.id),
                     headerText: meetingKnowledge.header(for: meeting.id),
                     isGeneratingArticle: isGeneratingWiki,
-                    canGenerateArticle: canGenerateWiki, generatesLocally: settings.aiProvider.kind == .appleOnDevice, onRefresh: {
+                    canGenerateArticle: canGenerateWiki, generatesLocally: settings.wikiGenerationProvider.kind == .appleOnDevice, onRefresh: {
                         meetingKnowledge.invalidate()
                         knowledgeRefresh += 1
                     })

@@ -484,6 +484,7 @@
 "detail.summarizing" = "Gerando resumo…";
 "detail.summary.needs_transcript" = "Transcreva uma gravação primeiro e depois gere um resumo.";
 "detail.summary.model_nudge" = "Usará %1$@ · modelo %2$@";
+"detail.generate.on_device" = "Apple Intelligence · no aparelho";
 "detail.summary.model_missing" = "Nenhum modelo de resumo selecionado";
 "detail.summary.new" = "Novo Resumo";
 "detail.summary.untitled" = "Resumo";
@@ -1618,6 +1619,9 @@
 "knowledge.settings.cloud_cost" = "O processamento envia estas transcrições a %@; há cobrança do provedor.";
 "knowledge.settings.scope" = "Escopo e exclusões";
 "knowledge.settings.automatic_detail" = "A compilação automática vale para futuras transcrições. Ativar a Wiki não processa reuniões antigas. Trabalhos pendentes já autorizados podem continuar; use Pausar para interromper a compilação.";
+"knowledge.settings.wiki_writer" = "Redator da Wiki";
+"knowledge.settings.same_as_summaries" = "Igual aos resumos (%@)";
+"knowledge.settings.wiki_writer_detail" = "As atualizações automáticas da Wiki enviam cada nova transcrição a este provedor; é necessária a permissão Automático em Privacidade e nuvem.";
 "knowledge.settings.choose" = "Escolher reuniões";
 "knowledge.settings.selected" = "Reuniões selecionadas: %d";
 "knowledge.settings.recompile" = "Recompilar a Wiki existente";
@@ -1748,8 +1752,7 @@
 "detail.summary.delete_confirm.title_named" = "Excluir o resumo \"%1$@\"?";
 "transcript.seek_to" = "Ir para %@";
 "detail.participants" = "Participantes";
-"detail.transcript.in_progress" = "Transcrevendo… %d%%";
-"detail.transcript.leave_hint" = "Você pode sair desta tela; o Kurn avisa quando terminar.";
+"detail.transcript.leave_hint" = "Você pode sair desta tela. O Kurn avisa quando terminar.";
 "detail.transcript.failed.hint" = "O áudio está salvo; tente de novo ou troque o motor de transcrição.";
 "detail.transcript.go_to_audio" = "Ir para Áudio";
 "detail.transcript.open_settings" = "Ajustes de transcrição";

@@ -484,6 +484,7 @@
 "detail.summarizing" = "正在生成摘要…";
 "detail.summary.needs_transcript" = "先转录一段录音，然后生成摘要。";
 "detail.summary.model_nudge" = "将使用 %1$@ · 模型 %2$@";
+"detail.generate.on_device" = "Apple Intelligence · 在此设备上";
 "detail.summary.model_missing" = "未选择摘要模型";
 "detail.summary.new" = "新建摘要";
 "detail.summary.untitled" = "摘要";
@@ -1618,6 +1619,9 @@
 "knowledge.settings.cloud_cost" = "处理会将这些转写发送到 %@，并产生提供商费用。";
 "knowledge.settings.scope" = "范围和排除项";
 "knowledge.settings.automatic_detail" = "自动编译适用于未来的转录。启用 维基 不会处理旧会议。已获授权的待处理任务可能继续；请使用暂停来停止编译。";
+"knowledge.settings.wiki_writer" = "Wiki 撰写器";
+"knowledge.settings.same_as_summaries" = "与摘要相同（%@）";
+"knowledge.settings.wiki_writer_detail" = "Wiki 自动更新会将每份新转写发送给此提供商；需要在“隐私与云端”中授予“自动”权限。";
 "knowledge.settings.choose" = "选择会议";
 "knowledge.settings.selected" = "已选会议：%d";
 "knowledge.settings.recompile" = "重新编译现有 维基";
@@ -1748,8 +1752,7 @@
 "detail.summary.delete_confirm.title_named" = "删除摘要“%1$@”？";
 "transcript.seek_to" = "跳转到 %@";
 "detail.participants" = "参与者";
-"detail.transcript.in_progress" = "正在转写… %d%%";
-"detail.transcript.leave_hint" = "你可以离开此页面；完成后 Kurn 会通知你。";
+"detail.transcript.leave_hint" = "你可以离开此页面。完成后 Kurn 会通知你。";
 "detail.transcript.failed.hint" = "音频已保存；请重试或更换转写引擎。";
 "detail.transcript.go_to_audio" = "前往音频";
 "detail.transcript.open_settings" = "转写设置";

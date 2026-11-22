@@ -15,6 +15,10 @@ extension AppSettings {
         static let audioQuality = "settings.audioQuality"
         static let alwaysUseBuiltInMic = "settings.alwaysUseBuiltInMic"
         static let summaryModels = "settings.summaryModels"
+        /// The picked Wiki writer provider; absent means "Same as summaries".
+        static let wikiProvider = "settings.wikiProviderID"
+        /// Per-provider chosen Wiki model (rawValue → model id).
+        static let wikiModels = "settings.wikiModels"
         /// The chat's reasoning level (`ChatReasoningPreference`); absent means the vendor's default.
         static let chatReasoningLevel = "settings.chatReasoningLevel"
         static let summaryTemplates = "settings.summaryTemplates"

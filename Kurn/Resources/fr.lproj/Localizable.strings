@@ -484,6 +484,7 @@
 "detail.summarizing" = "Génération du résumé…";
 "detail.summary.needs_transcript" = "Transcrivez d'abord un enregistrement, puis générez un résumé.";
 "detail.summary.model_nudge" = "Utilisera %1$@ · modèle %2$@";
+"detail.generate.on_device" = "Apple Intelligence · sur cet appareil";
 "detail.summary.model_missing" = "Aucun modèle de résumé sélectionné";
 "detail.summary.new" = "Nouveau Résumé";
 "detail.summary.untitled" = "Résumé";
@@ -1618,6 +1619,9 @@
 "knowledge.settings.cloud_cost" = "Le traitement envoie ces transcriptions à %@ ; des frais du fournisseur s’appliquent.";
 "knowledge.settings.scope" = "Périmètre et exclusions";
 "knowledge.settings.automatic_detail" = "La compilation automatique concerne les futures transcriptions. Activer Wiki ne traite pas les anciennes réunions. Les travaux autorisés en attente peuvent reprendre ; utilisez Suspendre pour les arrêter.";
+"knowledge.settings.wiki_writer" = "Rédaction du Wiki";
+"knowledge.settings.same_as_summaries" = "Identique aux résumés (%@)";
+"knowledge.settings.wiki_writer_detail" = "Les mises à jour automatiques du Wiki envoient chaque nouvelle transcription à ce fournisseur ; l’autorisation Automatique est requise dans Confidentialité et cloud.";
 "knowledge.settings.choose" = "Choisir les réunions";
 "knowledge.settings.selected" = "Réunions sélectionnées : %d";
 "knowledge.settings.recompile" = "Recompiler les wiki existantes";
@@ -1748,8 +1752,7 @@
 "detail.summary.delete_confirm.title_named" = "Supprimer le résumé « %1$@ » ?";
 "transcript.seek_to" = "Aller à %@";
 "detail.participants" = "Participants";
-"detail.transcript.in_progress" = "Transcription… %d %%";
-"detail.transcript.leave_hint" = "Vous pouvez quitter cet écran ; Kurn vous prévient quand c'est terminé.";
+"detail.transcript.leave_hint" = "Vous pouvez quitter cet écran. Kurn vous prévient quand c'est terminé.";
 "detail.transcript.failed.hint" = "L'audio est conservé ; réessayez ou changez de moteur de transcription.";
 "detail.transcript.go_to_audio" = "Aller à Audio";
 "detail.transcript.open_settings" = "Réglages de transcription";

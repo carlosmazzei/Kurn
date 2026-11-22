@@ -310,6 +310,17 @@ enum ScreenshotSeedData {
         let transcript = Transcript(recording: recording, segments: segments, language: text.transcriptLanguage)
         context.insert(transcript)
 
+        // A second take whose transcription failed — exercises the Audio
+        // tab's failed row (destructive status line, icon-only retry).
+        let failedTake = Recording(
+            meeting: meeting,
+            fileName: AudioFileStore.fileName(meetingID: meeting.id),
+            duration: 94,
+            transcriptionStatus: .failed
+        )
+        context.insert(failedTake)
+        writeSilentAudioFile(fileName: failedTake.fileName)
+
         let summary = Summary(
             meeting: meeting,
             sections: [SummarySection(title: text.interviewSummaryTitle, body: text.interviewSummary)],

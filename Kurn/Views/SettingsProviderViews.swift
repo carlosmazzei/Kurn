@@ -274,12 +274,15 @@ struct AddProviderView: View {
 struct SummaryModelPicker: View {
     let settings: AppSettings
     let provider: AIProvider
+    /// `nil` binds the provider's summary model; the Wiki settings row passes
+    /// the provider's Wiki model binding instead.
+    var selection: Binding<String>?
 
     var body: some View {
         ProviderModelPicker(
             provider: provider,
             credentials: settings.credentials,
-            selection: Binding(
+            selection: selection ?? Binding(
                 get: { settings.summaryModel(for: provider) },
                 set: { settings.setSummaryModel($0, for: provider) }
             ),

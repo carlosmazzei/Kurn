@@ -89,6 +89,7 @@ enum KnowledgeMeetingSeed {
             provider: .appleOnDevice, compilations: [try KnowledgeRecordingCompilation(recordingID: recording.id, result: result)])
         _ = try KnowledgeStoreRows.commit(request, auth: auth, container: container, beforeSave: {})
         try seedPagelessMeeting(auth: auth, sourceContext: sourceContext, container: container)
+        try seedEmptyMeeting(container: container)
         if ProcessInfo.processInfo.arguments.contains("UI-Testing-KnowledgeNarrativeFixture") {
             try seedNarrative(meetingID: meeting.id, auth: auth, container: container)
         }
@@ -101,10 +102,13 @@ enum KnowledgeMeetingSeed {
                                             sourceContext: ModelContext, container: ModelContainer) throws {
         let context = ModelContext(container)
         context.autosaveEnabled = false
-        let meeting = Meeting(title: "Example pageless review")
+        // A generated default title — the Wiki/Summary empty-state
+        // screenshots use this card to show both states identically.
+        let meeting = Meeting(title: "")
         // Keep the portal review the newest card: the knowledge UI tests open
         // the first card and expect its article and "Example portal" quote.
         meeting.createdAt = Date(timeIntervalSinceNow: -60)
+        meeting.title = Meeting.generatedTitle(for: meeting.createdAt)
         context.insert(meeting)
         let recording = Recording(meeting: meeting, fileName: "synthetic-pageless.m4a",
             duration: 4, transcriptionStatus: .done)
@@ -133,6 +137,28 @@ enum KnowledgeMeetingSeed {
         let request = KnowledgeCommitRequest(snapshot: snapshot, extractorVersion: "synthetic-meeting-ui-v1", schemaVersion: 1,
             provider: .appleOnDevice, compilations: [try KnowledgeRecordingCompilation(recordingID: recording.id, result: result)])
         _ = try KnowledgeStoreRows.commit(request, auth: auth, container: container, beforeSave: {})
+    }
+
+    /// A third meeting with a transcript but nothing derived — no compiled
+    /// contributions, no Wiki page, no summary — so its Summary and Wiki
+    /// tabs both reach the bare generate-empty-state (screenshots compare
+    /// them for identical layout).
+    private static func seedEmptyMeeting(container: ModelContainer) throws {
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let meeting = Meeting(title: "")
+        meeting.createdAt = Date(timeIntervalSinceNow: -120)
+        meeting.title = Meeting.generatedTitle(for: meeting.createdAt)
+        context.insert(meeting)
+        let recording = Recording(meeting: meeting, fileName: "synthetic-empty.m4a",
+            duration: 4, transcriptionStatus: .done)
+        context.insert(recording)
+        let segment = TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 4,
+            text: "An untouched transcript with nothing generated yet.")
+        let transcript = Transcript(recording: recording, segments: [segment], language: "en")
+        context.insert(transcript)
+        recording.transcript = transcript
+        try context.save()
     }
 
     private static func seedNarrative(meetingID: UUID, auth: KnowledgeExtractionAuthorization, container: ModelContainer) throws {
