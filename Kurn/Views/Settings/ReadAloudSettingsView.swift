@@ -31,20 +31,29 @@ struct ReadAloudSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Picker(
-                    NSLocalizedString("settings.provider", comment: "Provider"),
-                    selection: providerBinding
-                ) {
-                    ForEach(speakingProviders) { Text($0.displayName).tag($0.id) }
-                }
-                .accessibilityIdentifier("settings.readAloud.provider")
-                if provider.speechSynthesisAPI == .system {
-                    systemVoicePicker
-                } else {
-                    cloudVoiceRows
+                ForEach(speakingProviders) { option in
+                    Button {
+                        providerBinding.wrappedValue = option.id
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(option.displayName).foregroundStyle(Theme.textPrimary)
+                                Text(modelSubtitle(for: option))
+                                    .font(Theme.caption)
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+                            Spacer()
+                            if option.id == provider.id {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(Theme.ink)
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("settings.readAloud.provider.\(option.id)")
                 }
             } header: {
-                Text(NSLocalizedString("settings.read_aloud.voice_section", comment: "Voice"))
+                Text(NSLocalizedString("settings.read_aloud.voice_from", comment: "Voice from"))
             } footer: {
                 Text(provider.speechSynthesisAPI == .system
                     ? NSLocalizedString("settings.read_aloud.on_device_footer", comment: "On-device voice footer")
@@ -54,7 +63,12 @@ struct ReadAloudSettingsView: View {
                     ))
             }
 
-            Section(NSLocalizedString("settings.read_aloud.speed", comment: "Speed")) {
+            Section(provider.displayName) {
+                if provider.speechSynthesisAPI == .system {
+                    systemVoicePicker
+                } else {
+                    cloudVoiceRows
+                }
                 Picker(NSLocalizedString("settings.read_aloud.speed", comment: "Speed"), selection: rateBinding) {
                     ForEach(ReadAloudPreferences.rateOptions, id: \.self) { rate in
                         Text(rate.formatted(.number.precision(.fractionLength(0...2))) + "×").tag(rate)
@@ -66,7 +80,7 @@ struct ReadAloudSettingsView: View {
             Section {
                 ReadAloudControl(item: previewItem)
             } header: {
-                Text(NSLocalizedString("settings.read_aloud.preview", comment: "Preview"))
+                Text(NSLocalizedString("settings.read_aloud.sample", comment: "Hear a sample"))
             } footer: {
                 Text(NSLocalizedString("settings.read_aloud.preview_footer", comment: "Where read aloud appears"))
             }
@@ -78,6 +92,17 @@ struct ReadAloudSettingsView: View {
             guard current.speechSynthesisAPI != .system, listedSpeechModels[current.id] == nil else { return }
             listedSpeechModels[current.id] = await ProviderModelsService().speechModels(for: current)
         }
+    }
+
+    /// The subtitle under a "Voice from" row: the provider's current speech
+    /// model, or "System voice" for the on-device voice.
+    private func modelSubtitle(for provider: AIProvider) -> String {
+        if provider.speechSynthesisAPI == .system {
+            return NSLocalizedString("settings.read_aloud.system_voice", comment: "System voice")
+        }
+        let model = settings.readAloud.model(for: provider)
+        if !model.isEmpty { return model }
+        return provider.suggestedSpeechModels.first ?? ""
     }
 
     // MARK: - Voice rows

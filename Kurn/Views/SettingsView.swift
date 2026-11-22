@@ -37,21 +37,29 @@ struct SettingsView: View {
     /// surfaces instead of the wipe silently doing nothing.
     @State var dataError: AppError?
 
+    /// "N providers" is read through `settings.configuredProviders`, which
+    /// already re-derives on any key change via `credentials`.
+    private var providerCount: Int { settings.configuredProviders.count }
+
+    /// The used-space figure shown as the Storage row's value — the same
+    /// number the Storage screen computes for "Audio usage".
+    @State private var storageUsed = ""
+
     var body: some View {
         Form {
             Section {
-                link(PrivacyCloudCopy.text("title"), systemImage: "lock.shield", identifier: "settings.link.privacyCloud") {
+                link(PrivacyCloudCopy.text("title"), systemImage: "lock.shield",
+                     identifier: "settings.link.privacyCloud") {
                     PrivacyCloudSettingsView()
                 }
                 link(
                     NSLocalizedString("settings.providers", comment: "AI Providers"),
-                    systemImage: "brain",
+                    systemImage: "cpu",
+                    value: providerCount > 0 ? "\(providerCount)" : nil,
                     identifier: "settings.link.providers"
                 ) {
                     ProvidersSettingsView()
                 }
-            } header: {
-                Text(PrivacyCloudCopy.text("title"))
             }
 
             Section {
@@ -65,6 +73,8 @@ struct SettingsView: View {
                 link(
                     NSLocalizedString("settings.transcription", comment: "Transcription"),
                     systemImage: "waveform",
+                    value: TranscriptionPreset.current(settings: settings)?.title
+                        ?? NSLocalizedString("settings.preset.custom", comment: "Custom preset"),
                     identifier: "settings.link.transcription"
                 ) {
                     TranscriptionSettingsView()
@@ -81,15 +91,15 @@ struct SettingsView: View {
                 ) {
                     SummarySettingsView()
                 }
-                link(KnowledgeSettingsCopy.text("title"), systemImage: "book", identifier: "settings.link.knowledge") {
-                    KnowledgeSettingsView()
-                }
                 link(
-                    NSLocalizedString("settings.wiki_title", comment: "Meeting wiki"),
+                    KnowledgeSettingsCopy.text("title"),
                     systemImage: "book",
-                    identifier: "settings.link.wiki"
+                    value: settings.knowledgeEnabled
+                        ? NSLocalizedString("common.on", comment: "On")
+                        : NSLocalizedString("common.off", comment: "Off"),
+                    identifier: "settings.link.knowledge"
                 ) {
-                    WikiSettingsView()
+                    KnowledgeSettingsView()
                 }
                 link(
                     NSLocalizedString("settings.read_aloud.title", comment: "Read Aloud"),
@@ -111,11 +121,19 @@ struct SettingsView: View {
                     TagsSettingsView()
                 }
                 link(
-                    NSLocalizedString("settings.semantic_search_title", comment: "Search and chat"),
+                    NSLocalizedString("settings.semantic_search_title", comment: "Search"),
                     systemImage: "magnifyingglass",
                     identifier: "settings.link.search"
                 ) {
                     SemanticSearchSettingsView()
+                }
+                link(
+                    NSLocalizedString("settings.storage", comment: "Storage"),
+                    systemImage: "internaldrive",
+                    value: storageUsed.isEmpty ? nil : storageUsed,
+                    identifier: "settings.link.storage"
+                ) {
+                    StorageSettingsView()
                 }
             } header: {
                 Text(NSLocalizedString("settings.group.library", comment: "Library group"))
@@ -123,44 +141,35 @@ struct SettingsView: View {
 
             Section {
                 link(
-                    NSLocalizedString("settings.storage", comment: "Storage"),
-                    systemImage: "internaldrive",
-                    identifier: "settings.link.storage"
-                ) {
-                    StorageSettingsView()
-                }
-                link(
                     NSLocalizedString("health.title", comment: "Health & Recovery"),
-                    systemImage: "wrench.and.screwdriver",
+                    systemImage: "waveform.path.ecg",
                     identifier: "settings.link.health"
                 ) {
                     HealthRecoveryView()
                 }
                 link(
                     NSLocalizedString("settings.diagnostics", comment: "Diagnostics"),
-                    systemImage: "stethoscope",
+                    systemImage: "info.circle",
                     identifier: "settings.link.diagnostics"
                 ) {
                     DiagnosticsSettingsView()
                 }
                 link(
-                    NSLocalizedString("usage_insights.title", comment: "Usage Insights"),
+                    NSLocalizedString("usage_insights.title", comment: "Usage"),
                     systemImage: "chart.bar",
                     identifier: "settings.link.usage"
                 ) {
                     UsageInsightsView()
                 }
                 link(
-                    NSLocalizedString("settings.about", comment: "About"),
-                    systemImage: "info.circle",
+                    NSLocalizedString("settings.about", comment: "About Kurn"),
+                    systemImage: "heart",
                     identifier: "settings.link.about"
                 ) {
                     AboutSettingsView()
                 }
             } header: {
                 Text(NSLocalizedString("settings.group.system", comment: "System group"))
-            } footer: {
-                Text(NSLocalizedString("usage_insights.footer", comment: "Explains local-only usage data"))
             }
 
             Section {
@@ -170,13 +179,14 @@ struct SettingsView: View {
             }
         }
         .navigationTitle(NSLocalizedString("settings.title", comment: "Settings"))
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .environment(downloads)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
             }
         }
+        .task { storageUsed = AudioFileStore.formattedSize(AudioFileStore.totalAudioBytes()) }
         // Key writes re-apply this themselves (`AppSettings.credentials`);
         // running it on appear also catches what no write announces, such as
         // the on-device model becoming unavailable.
@@ -208,6 +218,7 @@ struct SettingsView: View {
     private func link<Destination: View>(
         _ title: String,
         systemImage: String,
+        value: String? = nil,
         identifier: String,
         @ViewBuilder destination: @escaping () -> Destination
     ) -> some View {
@@ -215,7 +226,14 @@ struct SettingsView: View {
             destination()
                 .environment(downloads)
         } label: {
-            Label(title, systemImage: systemImage)
+            HStack(spacing: 12) {
+                SettingsRowIcon(systemImage: systemImage)
+                Text(title)
+                Spacer()
+                if let value {
+                    Text(value).foregroundStyle(.secondary)
+                }
+            }
         }
         .accessibilityIdentifier(identifier)
     }

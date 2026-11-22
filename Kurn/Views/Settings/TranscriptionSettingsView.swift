@@ -11,10 +11,31 @@
 import KurnCore
 import SwiftUI
 
+enum TranscriptionSettingsMode: String, CaseIterable, Identifiable {
+    case simple
+    case advanced
+
+    var id: String { rawValue }
+
+    var title: String {
+        NSLocalizedString("settings.mode.\(rawValue)", comment: "Transcription settings mode")
+    }
+}
+
 struct TranscriptionSettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ModelDownloadController.self) private var downloads
     @State private var cloudConsent = CloudTranscriptionConsentController()
+    /// Simple shows the four named presets; Advanced shows every stage picker.
+    /// Defaults to Simple only when the current pipeline matches a preset —
+    /// anything hand-tuned opens Advanced so it isn't silently rewritten.
+    @State private var mode: TranscriptionSettingsMode = .advanced
+    /// A preset mid-application, waiting on consent dialogs: re-driven from
+    /// `advancePending` as the settings it gates actually change.
+    @State private var pendingPreset: TranscriptionPreset?
+    /// Set when a cloud preset is tapped while its provider has no key —
+    /// mirrors how the Whisper engine row greys out instead of switching.
+    @State private var missingKeyProvider: AIProvider?
 
     /// Re-derives after any key change, wherever this screen was opened from:
     /// the list reads through the observable `settings.credentials`.
@@ -30,9 +51,8 @@ struct TranscriptionSettingsView: View {
         settings.credentials.isUsable(settings.aiProvider)
     }
 
-    /// The reason the correction toggle is disabled, when it is. Names the
-    /// specific on-device unavailability reason rather than always suggesting
-    /// an API key, which would be the wrong instruction for that provider.
+    /// The reason the correction toggle is disabled, when it is — naming the
+    /// on-device unavailability reason rather than suggesting an API key.
     private var correctionUnavailableFooter: String {
         if settings.aiProvider.kind == .appleOnDevice, let reason = OnDeviceModelAvailability.unavailableReason {
             return reason
@@ -41,14 +61,56 @@ struct TranscriptionSettingsView: View {
     }
 
     var body: some View {
-        Form {
-            engineSection
-            networkTransferSection
-            pipelineSection
-            correctionSection
+        VStack(spacing: 0) {
+            Picker(
+                NSLocalizedString("settings.mode", comment: "Settings mode"),
+                selection: $mode
+            ) {
+                ForEach(TranscriptionSettingsMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .accessibilityIdentifier("settings.transcription.mode")
+
+            if mode == .simple {
+                TranscriptionPresetsView(
+                    current: TranscriptionPreset.current(settings: settings)
+                ) { preset in
+                    apply(preset)
+                }
+            } else {
+                Form {
+                    recognitionSection
+                    whoSpokeSection
+                    pipelineSection
+                    correctionSection
+                    networkTransferSection
+                }
+            }
         }
         .navigationTitle(NSLocalizedString("settings.transcription", comment: "Transcription"))
         .modelDownloadAlerts(downloads, settings: settings)
+        .alert(
+            NSLocalizedString("settings.preset.needs_key.title", comment: "Preset provider key missing"),
+            isPresented: Binding(
+                get: { missingKeyProvider != nil },
+                set: { if !$0 { missingKeyProvider = nil } }
+            ),
+            presenting: missingKeyProvider
+        ) { _ in
+            Button(NSLocalizedString("common.ok", comment: "OK")) { missingKeyProvider = nil }
+        } message: { provider in
+            Text(String(
+                format: NSLocalizedString("settings.preset.needs_key", comment: "Preset provider key missing"),
+                provider.displayName
+            ))
+        }
+        .onAppear {
+            if TranscriptionPreset.current(settings: settings) != nil { mode = .simple }
+        }
         .kurnDialog(
             isPresented: $cloudConsent.isPresented,
             iconSystemName: "icloud.and.arrow.up.fill",
@@ -67,13 +129,71 @@ struct TranscriptionSettingsView: View {
             secondaryAction: { cloudConsent.cancel() }
         )
         .onAppear { cloudConsent.presentIfNeeded(settings: settings) }
+        .onChange(of: settings.transcriptionProviderID) { _, _ in advancePending() }
+        .onChange(of: settings.transcriptionEngine) { _, _ in advancePending() }
+        .onChange(of: settings.fluidAudioASRModel) { _, _ in advancePending() }
+        .onChange(of: settings.fluidAudioDiarizationModel) { _, _ in advancePending() }
+        .onChange(of: settings.diarizationEngine) { _, _ in advancePending() }
+        .onChange(of: settings.vadEngine) { _, _ in advancePending() }
+        // The gated fields change while `isDownloading` is still true (the
+        // download applies them in its success block before clearing), so
+        // the chain would stall without a resume once the download ends.
+        .onChange(of: downloads.isDownloading) { _, downloading in
+            if !downloading { advancePending() }
+        }
+        .onChange(of: cloudConsent.isPresented) { was, presented in
+            // why: a dismissed upload-consent dialog whose field never
+            // landed means the user declined — retire the preset so an
+            // unrelated Advanced edit can't resume it later.
+            if was && !presented { clearPendingIfCloudStepUnmet() }
+        }
+        .onChange(of: anyDownloadPromptPresented) { was, presented in
+            // why: same for a download-consent prompt dismissed without a
+            // download starting — the pending preset must not stay live.
+            if was && !presented && !downloads.isDownloading { clearPendingIfDownloadStepUnmet() }
+        }
+        .onChange(of: mode) { _, new in
+            // why: switching to Advanced is an explicit "hand-tune" gesture;
+            // a preset still waiting on consent must not keep firing there.
+            if new == .advanced { pendingPreset = nil }
+        }
     }
 
-    // MARK: - Engine and language
+    /// Whether any of `ModelDownloadController`'s consent prompts is shown —
+    /// the preset chain can trigger any of them depending on which gated
+    /// step it reaches.
+    private var anyDownloadPromptPresented: Bool {
+        downloads.showingFluidAudioModelConsent || downloads.showingBatchASRConsent
+            || downloads.showingDiarizationConsent || downloads.showingSherpaOnnxConsent
+            || downloads.showingVADConsent || downloads.showingWhisperCppConsent
+            || downloads.showingWhisperCppModelChoice
+    }
+
+    // MARK: - Recognition
 
     @ViewBuilder
-    private var engineSection: some View {
+    private var recognitionSection: some View {
         Section {
+            Picker(
+                selection: Binding(
+                    get: { settings.defaultLanguage },
+                    set: { settings.defaultLanguage = $0 }
+                )
+            ) {
+                ForEach(MeetingLanguage.allCases) { lang in
+                    LanguagePickerRow(
+                        language: lang,
+                        engine: settings.transcriptionEngine,
+                        fluidAudioASRModel: settings.fluidAudioASRModel
+                    ).tag(lang)
+                }
+            } label: {
+                SettingsRowLabel(
+                    title: NSLocalizedString("settings.default_language", comment: "Default language"),
+                    detail: NSLocalizedString("settings.language_support_footer", comment: "Explains the unsupported-language warning icon")
+                )
+            }
+
             Picker(
                 NSLocalizedString("pipeline.transcription_engine", comment: "Transcription engine"),
                 selection: Binding(
@@ -164,31 +284,11 @@ struct TranscriptionSettingsView: View {
                 FluidAudioASRSettingsControls()
             }
 
-            Picker(
-                selection: Binding(
-                    get: { settings.defaultLanguage },
-                    set: { settings.defaultLanguage = $0 }
-                )
-            ) {
-                ForEach(MeetingLanguage.allCases) { lang in
-                    LanguagePickerRow(
-                        language: lang,
-                        engine: settings.transcriptionEngine,
-                        fluidAudioASRModel: settings.fluidAudioASRModel
-                    ).tag(lang)
-                }
-            } label: {
-                SettingsRowLabel(
-                    title: NSLocalizedString("settings.default_language", comment: "Default language"),
-                    detail: NSLocalizedString("settings.language_support_footer", comment: "Explains the unsupported-language warning icon")
-                )
-            }
-
             if FluidAudioModelPresentation.downloadSection(for: downloads.downloadingModel) == .transcription {
                 ModelDownloadProgressRow(progress: downloads.downloadProgress, onCancel: downloads.cancelDownload)
             }
         } header: {
-            Text(NSLocalizedString("settings.recognition_pipeline", comment: "Recognition pipeline"))
+            Text(NSLocalizedString("settings.recognition", comment: "Recognition"))
         }
     }
 
@@ -273,6 +373,16 @@ struct TranscriptionSettingsView: View {
             }
             .disabled(downloads.isDownloading)
 
+        } header: {
+            Text(NSLocalizedString("settings.pipeline", comment: "Pipeline"))
+        }
+    }
+
+    // MARK: - Who spoke
+
+    @ViewBuilder
+    private var whoSpokeSection: some View {
+        Section {
             // Speaker diarization.
             Picker(
                 selection: Binding(
@@ -294,8 +404,8 @@ struct TranscriptionSettingsView: View {
             }
 
             // Dedicated diarization cleanup. This controls only the diarization
-            // input; the ASR cleanup toggle above controls only the
-            // transcription path.
+            // input; the ASR cleanup toggle controls only the transcription
+            // path.
             Toggle(
                 NSLocalizedString("settings.diarization_preprocessing", comment: "Diarization audio cleanup"),
                 isOn: Binding(
@@ -340,7 +450,7 @@ struct TranscriptionSettingsView: View {
                 ModelDownloadProgressRow(progress: downloads.downloadProgress, onCancel: downloads.cancelDownload)
             }
         } header: {
-            Text(NSLocalizedString("settings.pipeline_advanced", comment: "Advanced pipeline"))
+            Text(NSLocalizedString("settings.who_spoke", comment: "Who spoke"))
         }
     }
 
@@ -365,4 +475,126 @@ struct TranscriptionSettingsView: View {
                 : correctionUnavailableFooter)
         }
     }
+}
+
+private extension TranscriptionSettingsView {
+    // MARK: - Preset application
+
+    /// Starts a preset. Every step the preset needs is routed through the
+    /// existing consent paths, so nothing lands until the user confirms:
+    /// a cloud provider/engine goes through `CloudTranscriptionConsentController`
+    /// (the audio-upload dialog), on-device models through
+    /// `ModelDownloadController`'s download consent, and FluidAudio/VAD
+    /// engines through their deferred-download pending state.
+    private func apply(_ preset: TranscriptionPreset) {
+        let choice = preset.choice(for: settings.defaultLanguage)
+        if let providerID = choice.cloudProviderID,
+           !transcriptionProviders.contains(where: { $0.id == providerID }) {
+            missingKeyProvider = settings.providers.first(where: { $0.id == providerID })
+            return
+        }
+        pendingPreset = preset
+        advancePending()
+    }
+
+    /// Applies the preset one gated field at a time, in an order that keeps
+    /// each consent dialog about one thing: provider first (audio-upload
+    /// consent), then the FluidAudio models (download consent), then the
+    /// engines — the FluidAudio engine interception reuses the already-set
+    /// model — then diarization and VAD. When every gated field matches, the
+    /// ungated leftovers (cloud model, preprocessing) land and the preset is
+    /// done. If a dialog was cancelled, the field never changed and the
+    /// preset stays pending-but-inert until the user picks again.
+    private func advancePending() {
+        guard let preset = pendingPreset, !downloads.isDownloading else { return }
+        let choice = preset.choice(for: settings.defaultLanguage)
+        switch TranscriptionPreset.nextUnmetStep(
+            target: choice,
+            current: currentPipelineChoice()
+        ) {
+        case .cloudProvider:
+            if let providerID = choice.cloudProviderID {
+                cloudConsent.selectProvider(providerID, settings: settings, providers: transcriptionProviders)
+            }
+        case .asrModel:
+            if let model = choice.asrModel {
+                downloads.selectFluidAudioASRModel(model, settings: settings)
+            }
+        case .diarizationModel:
+            if let model = choice.diarizationModel {
+                downloads.selectFluidAudioDiarizationModel(model, settings: settings)
+            }
+        case .engine:
+            if choice.engine == .whisperAPI {
+                cloudConsent.selectEngine(
+                    choice.engine,
+                    settings: settings,
+                    providers: transcriptionProviders,
+                    downloads: downloads
+                )
+            } else {
+                downloads.selectTranscriptionEngine(
+                    choice.engine,
+                    settings: settings,
+                    transcriptionProviders: transcriptionProviders
+                )
+            }
+        case .diarization:
+            downloads.selectDiarizationEngine(choice.diarization, settings: settings)
+        case .vad:
+            downloads.selectVADEngine(choice.vad, settings: settings)
+        case nil:
+            if let providerID = choice.cloudProviderID,
+               let model = choice.cloudModel,
+               let provider = settings.providers.first(where: { $0.id == providerID }) {
+                settings.setTranscriptionModel(model, for: provider)
+            }
+            settings.preprocessingEngine = choice.preprocessing
+            pendingPreset = nil
+        }
+    }
+
+    /// The pipeline as configured, but with the raw stored transcription
+    /// provider — `TranscriptionPipelineChoice(settings:)` masks it unless the
+    /// engine is already remote, which would keep a cloud preset stuck on the
+    /// provider step before the engine ever switches.
+    private func currentPipelineChoice() -> TranscriptionPipelineChoice {
+        var choice = TranscriptionPipelineChoice(settings: settings)
+        choice.cloudProviderID = settings.transcriptionProviderID
+        return choice
+    }
+
+    /// A dismissed audio-upload dialog means the pending cloud step was
+    /// declined when its field still differs from the preset's target.
+    private func clearPendingIfCloudStepUnmet() {
+        guard let preset = pendingPreset else { return }
+        let choice = preset.choice(for: settings.defaultLanguage)
+        let step = TranscriptionPreset.nextUnmetStep(
+            target: choice,
+            current: currentPipelineChoice()
+        )
+        if step == .cloudProvider || (step == .engine && choice.engine == .whisperAPI) {
+            pendingPreset = nil
+        }
+    }
+
+    /// A dismissed download-consent prompt means the pending step was
+    /// declined when it is the still-unmet one (every download-gated step —
+    /// models, on-device engines — maps to one of those prompts).
+    private func clearPendingIfDownloadStepUnmet() {
+        guard let preset = pendingPreset else { return }
+        let choice = preset.choice(for: settings.defaultLanguage)
+        switch TranscriptionPreset.nextUnmetStep(
+            target: choice,
+            current: currentPipelineChoice()
+        ) {
+        case .asrModel, .diarizationModel, .diarization, .vad:
+            pendingPreset = nil
+        case .engine where choice.engine != .whisperAPI:
+            pendingPreset = nil
+        default:
+            break
+        }
+    }
+
 }
