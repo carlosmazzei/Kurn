@@ -34,6 +34,10 @@ struct ScreenshotSeedText {
     /// Two lines: Alex, Sam.
     let roadmapFollowUp: [String]
     let roadmapSections: [ScreenshotSeedSection]
+    /// A second summary on the roadmap meeting (a standup-style template) so
+    /// the seeded detail exercises the page dots, the pill menu and Compare.
+    let roadmapSecondTemplate: String
+    let roadmapSecondSections: [ScreenshotSeedSection]
     let roadmapAttachmentName: String
     let roadmapAttachmentText: String
 
@@ -117,6 +121,20 @@ struct ScreenshotSeedText {
             ]),
             ScreenshotSeedSection(title: "Open Questions", items: [
                 "Should the legacy import format be removed in this release or the next?"
+            ])
+        ],
+        roadmapSecondTemplate: "Daily / Standup",
+        roadmapSecondSections: [
+            ScreenshotSeedSection(title: "Yesterday", items: [
+                "Export flow design draft shared with the team.",
+                "Offline sync scoping kicked off with mobile."
+            ]),
+            ScreenshotSeedSection(title: "Today", items: [
+                "Priya pairs with mobile on the offline sync estimate.",
+                "Sam finalizes the export mockups for Thursday's review."
+            ]),
+            ScreenshotSeedSection(title: "Blockers", items: [
+                "None — dropping the legacy import format is decided."
             ])
         ],
         roadmapAttachmentName: "Q3 Roadmap.pdf",

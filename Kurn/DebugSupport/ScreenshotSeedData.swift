@@ -128,6 +128,19 @@ enum ScreenshotSeedData {
         )
         context.insert(summary)
 
+        // A second summary on the same meeting, a few minutes later, so the
+        // Summary tab shows the page dots, the multi-row pill menu and the
+        // "Compare side by side" entry.
+        let secondSummary = Summary(
+            meeting: meeting,
+            sections: summarySections(text.roadmapSecondSections),
+            templateName: text.roadmapSecondTemplate,
+            provider: .openAI,
+            model: "gpt-4o-mini",
+            createdAt: summary.createdAt.addingTimeInterval(4 * 60)
+        )
+        context.insert(secondSummary)
+
         // Metadata only, no file: enough for the Recordings tab's Documents
         // row (and its accessibility audit), which never opens it.
         context.insert(MeetingAttachment(

@@ -44,6 +44,20 @@ extension ScreenshotSeedText {
                 "O formato de importação antigo sai nesta versão ou na próxima?"
             ])
         ],
+        roadmapSecondTemplate: "Diário / Standup",
+        roadmapSecondSections: [
+            ScreenshotSeedSection(title: "Ontem", items: [
+                "Rascunho do design da exportação compartilhado com o time.",
+                "Dimensionamento da sincronização offline iniciado com o mobile."
+            ]),
+            ScreenshotSeedSection(title: "Hoje", items: [
+                "Priya trabalha com o mobile na estimativa da sincronização offline.",
+                "Sam finaliza os mockups da exportação para a revisão de quinta."
+            ]),
+            ScreenshotSeedSection(title: "Bloqueios", items: [
+                "Nenhum — a remoção do formato de importação antigo está decidida."
+            ])
+        ],
         roadmapAttachmentName: "Roadmap T3.pdf",
         roadmapAttachmentText: "Roadmap T3: novo onboarding, sincronização offline, página de preços.",
         designFolder: "Design",
@@ -127,6 +141,20 @@ extension ScreenshotSeedText {
             ]),
             ScreenshotSeedSection(title: "Preguntas abiertas", items: [
                 "¿Retiramos el formato antiguo en esta versión o en la siguiente?"
+            ])
+        ],
+        roadmapSecondTemplate: "Diario / Standup",
+        roadmapSecondSections: [
+            ScreenshotSeedSection(title: "Ayer", items: [
+                "Borrador del diseño de exportación compartido con el equipo.",
+                "Dimensionamiento de la sincronización offline iniciado con mobile."
+            ]),
+            ScreenshotSeedSection(title: "Hoy", items: [
+                "Priya trabaja con mobile en la estimación de la sincronización offline.",
+                "Sam finaliza los mockups de exportación para la revisión del jueves."
+            ]),
+            ScreenshotSeedSection(title: "Bloqueos", items: [
+                "Ninguno — la eliminación del formato de importación antiguo está decidida."
             ])
         ],
         roadmapAttachmentName: "Roadmap T3.pdf",
@@ -214,6 +242,20 @@ extension ScreenshotSeedText {
                 "Retire-t-on l'ancien format dans cette version ou la suivante ?"
             ])
         ],
+        roadmapSecondTemplate: "Quotidien / Standup",
+        roadmapSecondSections: [
+            ScreenshotSeedSection(title: "Hier", items: [
+                "Maquette du flux d'export partagée avec l'équipe.",
+                "Chiffrage de la synchro hors ligne lancé avec le mobile."
+            ]),
+            ScreenshotSeedSection(title: "Aujourd'hui", items: [
+                "Priya travaille avec le mobile sur l'estimation de la synchro hors ligne.",
+                "Sam finalise les maquettes d'export pour la revue de jeudi."
+            ]),
+            ScreenshotSeedSection(title: "Blocages", items: [
+                "Aucun — la suppression de l'ancien format d'import est décidée."
+            ])
+        ],
         roadmapAttachmentName: "Roadmap T3.pdf",
         roadmapAttachmentText: "Roadmap T3 : nouvel onboarding, synchro hors ligne, page tarifs.",
         designFolder: "Design",
@@ -297,6 +339,20 @@ extension ScreenshotSeedText {
             ]),
             ScreenshotSeedSection(title: "Domande aperte", items: [
                 "Rimuoviamo il vecchio formato in questa versione o nella prossima?"
+            ])
+        ],
+        roadmapSecondTemplate: "Giornaliero / Standup",
+        roadmapSecondSections: [
+            ScreenshotSeedSection(title: "Ieri", items: [
+                "Bozza del design dell'export condivisa con il team.",
+                "Dimensionamento della sincronizzazione offline avviato con il mobile."
+            ]),
+            ScreenshotSeedSection(title: "Oggi", items: [
+                "Priya lavora con il mobile alla stima della sincronizzazione offline.",
+                "Sam finalizza i mockup dell'export per la revisione di giovedì."
+            ]),
+            ScreenshotSeedSection(title: "Blocchi", items: [
+                "Nessuno — la rimozione del vecchio formato di importazione è decisa."
             ])
         ],
         roadmapAttachmentName: "Roadmap Q3.pdf",

@@ -12,8 +12,12 @@ import SwiftUI
 
 struct MeetingDetailSummaryBar: View {
     let meeting: Meeting
-    /// Newest first — the order the page dots and the pill menu use.
+    /// Newest first — a STABLE order for the page dots and the pill menu;
+    /// the selection never reorders it (dots that moved under the finger
+    /// read as broken).
     let summaries: [Summary]
+    /// The summary shown; defaults to the newest when nil or missing.
+    let selectedID: UUID?
     /// Shown while a summary is being written instead of the menu.
     let isSummarizing: Bool
     /// Template name of the in-flight request, for "<template> · writing…".
@@ -31,7 +35,7 @@ struct MeetingDetailSummaryBar: View {
     @Environment(AppSettings.self) private var settings
 
     private var selected: Summary? {
-        summaries.first
+        summaries.first { $0.id == selectedID } ?? summaries.first
     }
 
     var body: some View {
