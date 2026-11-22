@@ -107,6 +107,8 @@ enum AppLog {
     private static let uiLogger = Logger(subsystem: subsystem, category: "UI")
     private static let persistenceLogger = Logger(subsystem: subsystem, category: "Persistence")
     private static let reliabilityLogger = Logger(subsystem: subsystem, category: "Reliability")
+    private static let wikiLogger = Logger(subsystem: subsystem, category: "Wiki")
+    private static let knowledgeLogger = Logger(subsystem: subsystem, category: "Knowledge")
 
     /// Audio capture lifecycle (engine, session, metering).
     static let recorder = CategoryLogger(recorderLogger)
@@ -124,6 +126,12 @@ enum AppLog {
     /// retry) reported through `KurnCore.ReliabilityLog`, independent of the
     /// per-feature categories above.
     static let reliability = CategoryLogger(reliabilityLogger)
+
+    /// Meeting wiki generation: submission, deferrals, failures.
+    static let wiki = CategoryLogger(wikiLogger)
+
+    /// Knowledge compilation: submission, deferrals, failures.
+    static let knowledge = CategoryLogger(knowledgeLogger)
 }
 
 /// Thin wrapper over `os.Logger` that gates each message by `AppLog.minimumLevel`.

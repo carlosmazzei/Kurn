@@ -297,7 +297,10 @@ struct MeetingDetailView: View {
                 }
             }
             .errorAlert($autoTagError)
-            .errorAlert(Binding(get: { wiki.lastError }, set: { wiki.lastError = $0 }))
+            .errorAlert(Binding(get: { wiki.lastError }, set: { wiki.lastError = $0 }),
+                onRetry: wiki.lastErrorMeetingID == meeting.id ? {
+                    Task { await wiki.generate(meeting, trigger: .explicit, force: true) }
+                } : nil)
             .errorAlert($actionError)
             .errorAlert(Binding(get: { summaries?.error }, set: { summaries?.error = $0 }))
             .errorAlert(Binding(get: { transcription?.error }, set: { transcription?.error = $0 }))

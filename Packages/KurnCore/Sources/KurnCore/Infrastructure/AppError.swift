@@ -40,6 +40,11 @@ public enum AppError: LocalizedError, Identifiable {
     case embeddingUnavailable(String)
     case semanticIndexFailed(String)
     case wikiGenerationFailed(String)
+    /// An explicit wiki generation request was deferred or short-circuited
+    /// before reaching the provider. The associated string is a
+    /// closed-vocabulary reason code (`KnowledgeJobDeferred.Reason` raw value,
+    /// or "no_transcript"/"last_attempt_failed"), never free text.
+    case wikiGenerationDeferred(reason: String)
     case wikiUnavailable
     case titleGenerationFailed(String)
     case summaryTranslationFailed(String)
@@ -105,6 +110,7 @@ public enum AppError: LocalizedError, Identifiable {
         case .embeddingUnavailable: return "embedding"
         case .semanticIndexFailed: return "semantic_index"
         case .wikiGenerationFailed: return "wiki_generation"
+        case .wikiGenerationDeferred: return "wiki_generation_deferred"
         case .wikiUnavailable: return "wiki_unavailable"
         case .titleGenerationFailed: return "title_generation"
         case .summaryTranslationFailed: return "summary_translation"
@@ -265,6 +271,23 @@ public enum AppError: LocalizedError, Identifiable {
                 "error.wiki_unavailable",
                 comment: "Meeting wiki is not ready yet"
             )
+        case .wikiGenerationDeferred(let reason):
+            let key: String
+            switch reason {
+            case "feature_disabled": key = "error.wiki_deferred.feature_disabled"
+            case "provider_unavailable": key = "error.wiki_deferred.provider_unavailable"
+            case "provider_blocked": key = "error.wiki_deferred.provider_blocked"
+            case "policy_denied": key = "error.wiki_deferred.policy_denied"
+            case "cloud_review_required": key = "error.wiki_deferred.cloud_review_required"
+            case "knowledge_paused": key = "error.wiki_deferred.knowledge_paused"
+            case "knowledge_automatic_disabled": key = "error.wiki_deferred.automatic_disabled"
+            case "background": key = "error.wiki_deferred.background"
+            case "recording": key = "error.wiki_deferred.recording"
+            case "no_transcript": key = "error.wiki_deferred.no_transcript"
+            case "last_attempt_failed": key = "error.wiki_deferred.last_attempt_failed"
+            default: key = "error.wiki_deferred.other"
+            }
+            return NSLocalizedString(key, comment: "Wiki generation deferred reason")
         case .titleGenerationFailed(let detail):
             return String(
                 format: NSLocalizedString("error.title_generation", comment: "AI title generation failed"),

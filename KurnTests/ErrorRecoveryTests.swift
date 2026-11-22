@@ -50,3 +50,42 @@ struct ErrorRecoveryTests {
         }
     }
 }
+
+extension ErrorRecoveryTests {
+    @Test func deferredWikiReasonsMapToTheScreenThatFixesThem() {
+        #expect(ErrorRecovery(error: .wikiGenerationDeferred(reason: "provider_unavailable"), canRetry: false)?
+            .destination == .screen(.providers))
+        #expect(ErrorRecovery(error: .wikiGenerationDeferred(reason: "policy_denied"), canRetry: false)?
+            .destination == .screen(.privacy))
+        #expect(ErrorRecovery(error: .wikiGenerationDeferred(reason: "cloud_review_required"), canRetry: false)?
+            .destination == .screen(.privacy))
+        #expect(ErrorRecovery(error: .wikiGenerationDeferred(reason: "knowledge_paused"), canRetry: false)?
+            .destination == .screen(.knowledge))
+        #expect(ErrorRecovery(error: .wikiGenerationDeferred(reason: "knowledge_automatic_disabled"), canRetry: false)?
+            .destination == .screen(.knowledge))
+        #expect(ErrorRecovery(error: .wikiGenerationDeferred(reason: "feature_disabled"), canRetry: false)?
+            .destination == .screen(.knowledge))
+    }
+
+    @Test func retryableDeferredReasonsOfferRetry() {
+        #expect(ErrorRecovery(error: .wikiGenerationDeferred(reason: "provider_blocked"), canRetry: true)?
+            .destination == .retry)
+        #expect(ErrorRecovery(error: .wikiGenerationDeferred(reason: "last_attempt_failed"), canRetry: true)?
+            .destination == .retry)
+        #expect(ErrorRecovery(error: .wikiGenerationDeferred(reason: "recording"), canRetry: true)?
+            .destination == .retry)
+        #expect(ErrorRecovery(error: .wikiGenerationDeferred(reason: "provider_blocked"), canRetry: false) == nil)
+    }
+
+    @Test func deferredReasonsWithoutAFixOfferOnlyOK() {
+        #expect(ErrorRecovery(error: .wikiGenerationDeferred(reason: "no_transcript"), canRetry: true) == nil)
+        #expect(ErrorRecovery(error: .wikiGenerationDeferred(reason: "something_new"), canRetry: true) == nil)
+        // Every deferred description must be a non-empty localized string.
+        for reason in ["feature_disabled", "provider_unavailable", "provider_blocked", "policy_denied",
+                       "cloud_review_required", "knowledge_paused", "knowledge_automatic_disabled",
+                       "background", "recording", "no_transcript", "last_attempt_failed", "unknown_code"] {
+            let description = AppError.wikiGenerationDeferred(reason: reason).errorDescription
+            #expect(description?.isEmpty == false)
+        }
+    }
+}

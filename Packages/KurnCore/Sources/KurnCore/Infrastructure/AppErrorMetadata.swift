@@ -73,8 +73,8 @@ extension AppError {
         case .modelDownloadRequired, .modelDownloadFailed, .embeddingUnavailable, .onDeviceModelUnavailable:
             return .model
         case .autoTaggingFailed, .summaryTruncated, .generationTruncated, .semanticIndexFailed,
-             .wikiGenerationFailed, .wikiUnavailable, .titleGenerationFailed,
-             .summaryTranslationFailed:
+             .wikiGenerationFailed, .wikiGenerationDeferred, .wikiUnavailable,
+             .titleGenerationFailed, .summaryTranslationFailed:
             return .generation
         case .transcriptIntegrityFailed:
             return .integrity
@@ -87,7 +87,7 @@ extension AppError {
         switch self {
         case .decodingError, .resourceUnavailable, .autoTaggingFailed, .summaryTruncated,
              .generationTruncated, .logExportFailed, .embeddingUnavailable, .semanticIndexFailed,
-             .wikiGenerationFailed, .wikiUnavailable, .titleGenerationFailed:
+             .wikiGenerationFailed, .wikiGenerationDeferred, .wikiUnavailable, .titleGenerationFailed:
             return .warning
         default:
             return .blocking
@@ -131,6 +131,16 @@ extension AppError {
             return .freeSpace
         case .transcriptionLanguageUnsupported, .summarizationUnsupported:
             return .changeProviderOrModel
+        case .wikiGenerationDeferred(let reason):
+            switch reason {
+            case "provider_blocked", "last_attempt_failed", "background", "recording":
+                return .retry
+            case "provider_unavailable", "policy_denied", "cloud_review_required",
+                 "knowledge_paused", "knowledge_automatic_disabled", "feature_disabled":
+                return .openSettings
+            default:
+                return nil
+            }
         default:
             return nil
         }
@@ -162,6 +172,7 @@ extension AppError {
              .embeddingUnavailable(let detail),
              .semanticIndexFailed(let detail),
              .wikiGenerationFailed(let detail),
+             .wikiGenerationDeferred(let detail),
              .titleGenerationFailed(let detail),
              .onDeviceModelUnavailable(let detail),
              .speechSynthesisFailed(let detail),
