@@ -300,6 +300,11 @@ final class KnowledgeJobQueue {
                 guard canRun(handle.work), epoch == executionEpoch else { throw CancellationError() }
             }
             try await store.finishJob(handle)
+            if handle.isExplicit, handle.work.kind == .extraction,
+               let superseded = try? await store.supersedeJobs(kind: .extraction, meetingID: handle.work.meetingID, keeping: handle.id),
+               superseded > 0 {
+                AppLog.knowledge.atNotice.notice("knowledge queue superseded older extraction jobs count=\(superseded, privacy: .public)")
+            }
         } catch is CancellationError where userCancelledJobIDs.contains(handle.id) {
             userCancelledJobIDs.remove(handle.id)
             try await store.discardJob(handle, code: "user_cancelled")

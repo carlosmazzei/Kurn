@@ -358,8 +358,9 @@ struct KnowledgeCompilationQueueTests {
         #expect(await provider.calls == 0)
         // The explicit update bypasses the open circuit, then records success.
         #expect(await f.coordinator.compile(meetingID: f.meeting.id, trigger: .explicit, force: true) == .completed)
-        // …and the deferred automatic row retries once the circuit closes.
-        #expect(await provider.calls == 2)
+        // …and supersedes the deferred automatic row for the same meeting, so the
+        // same paid extraction is not repeated once the circuit closes.
+        #expect(await provider.calls == 1)
         #expect(await f.breaker.record(for: AIProvider.appleOnDevice.id) == nil)
     }
 

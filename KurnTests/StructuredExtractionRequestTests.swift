@@ -86,4 +86,12 @@ struct StructuredExtractionRequestTests {
         TokenUsageRecording.record(responseBody: body(["usage": ["prompt_tokens": 100, "completion_tokens": 100]]))
         #expect(sink.total == TokenUsage(promptTokens: 3, completionTokens: 4))
     }
+
+    @Test func decodingPathNamesTheVocabularyFieldNotItsValue() throws {
+        let reply: [String: Any] = ["version": 1, "entities": [["ref": "e1", "kind": "spaceship", "name": "X", "aliases": []]],
+            "assertions": [], "events": [], "examinedSegmentIDs": []]
+        let path = try #require(KnowledgeExtractionService.decodingPath(JSONSerialization.data(withJSONObject: reply)))
+        #expect(path == "entities[0].kind: value outside the vocabulary")
+        #expect(!path.contains("spaceship"))
+    }
 }
