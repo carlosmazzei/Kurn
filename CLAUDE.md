@@ -2710,6 +2710,15 @@ follows an external specification (v1.3 with its §20 private-corporate
 extension) that is deliberately not kept in the repository. These decisions
 hold for every phase; code comments cite this section.
 
+**Naming note (design review, 2026-11-22):** the K-sections below use the
+engine's names — "Knowledge", "Knowledge reader", "Knowledge tab", "Settings →
+Knowledge" — because those are the type, identifier and localization-key names
+in the code. Every string the user sees says **Wiki** (destination, tab, reader
+title, Settings row), the Knowledge and meeting-page settings are one
+`KnowledgeSettingsView` reached from `settings.link.knowledge`, and the reader
+opens on this week's meetings with a scope chip instead of a "Choose sources"
+empty state. See "Visual system" for the rule.
+
 - **Canonical facts, projected views** (ADR-001). Attributed, evidence-backed
   assertions and events are the source of truth; the global wiki, the timeline,
   the graph and the search documents are projections of one canonical revision
@@ -3167,7 +3176,7 @@ unavailable copy without names, counts or raw errors. Disabling the flag hides
 the mode/header immediately and returns selection to Recordings.
 
 Inline article content/actions appear only after a current authorized read.
-Once that read has loaded, the Knowledge tab is the wiki's only home, as the
+Once that read has loaded, the Wiki tab (`MeetingDetailMode.knowledge`) is the wiki's only home, as the
 Transcript and Summary tabs are for theirs: the overflow menu drops "View wiki"
 and "Generate/Regenerate Wiki". It keeps them whenever no tab shows the wiki:
 Knowledge off, the meeting excluded from Knowledge, or the read unavailable. The inline chip has the menu's gate (`canGenerateWiki`). With
@@ -3367,7 +3376,8 @@ or network call; physical-device and wider-layout release checks remain open.
 
 ### Knowledge settings and explicit backfill (K2.7)
 
-Settings → Knowledge exposes the separate, off-by-default feature flag, an
+Settings → Wiki (`KnowledgeSettingsView`, which since the design review also
+holds the former `WikiSettingsView` meeting-page options) exposes the separate, off-by-default feature flag, an
 opt-in future-transcription trigger, a compilation pause, on-device provider,
 source scope/exclusions, explicit batch preview/confirmation, segment coverage
 and page rebuilding. Turning Knowledge on never enumerates older meetings or
