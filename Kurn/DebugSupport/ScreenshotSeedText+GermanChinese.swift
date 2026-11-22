@@ -44,6 +44,20 @@ extension ScreenshotSeedText {
                 "Entfällt das alte Importformat in diesem oder im nächsten Release?"
             ])
         ],
+        roadmapSecondTemplate: "Täglich / Standup",
+        roadmapSecondSections: [
+            ScreenshotSeedSection(title: "Gestern", items: [
+                "Entwurf des Export-Designs mit dem Team geteilt.",
+                "Aufwandsschätzung der Offline-Sync mit Mobile begonnen."
+            ]),
+            ScreenshotSeedSection(title: "Heute", items: [
+                "Priya arbeitet mit Mobile an der Offline-Sync-Schätzung.",
+                "Sam finalisiert die Export-Mockups für das Review am Donnerstag."
+            ]),
+            ScreenshotSeedSection(title: "Blocker", items: [
+                "Keine — das Entfernen des alten Importformats ist entschieden."
+            ])
+        ],
         roadmapAttachmentName: "Roadmap Q3.pdf",
         roadmapAttachmentText: "Roadmap Q3: neues Onboarding, Offline-Sync, Preisseite.",
         designFolder: "Design",
@@ -127,6 +141,20 @@ extension ScreenshotSeedText {
             ]),
             ScreenshotSeedSection(title: "待定问题", items: [
                 "旧导入格式在这个版本还是下个版本移除？"
+            ])
+        ],
+        roadmapSecondTemplate: "每日站会",
+        roadmapSecondSections: [
+            ScreenshotSeedSection(title: "昨天", items: [
+                "导出流程设计稿已与团队分享。",
+                "离线同步评估已与移动端团队启动。"
+            ]),
+            ScreenshotSeedSection(title: "今天", items: [
+                "Priya 与移动端团队评估离线同步的工作量。",
+                "Sam 完成导出设计稿，供周四评审使用。"
+            ]),
+            ScreenshotSeedSection(title: "阻塞", items: [
+                "无——移除旧导入格式已确定。"
             ])
         ],
         roadmapAttachmentName: "第三季度路线图.pdf",

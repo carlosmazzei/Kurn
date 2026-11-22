@@ -199,7 +199,8 @@ struct SummaryTab: View {
             if isSummarizing || selectedSummary != nil {
                 MeetingDetailSummaryBar(
                     meeting: meeting,
-                    summaries: orderedSummaries,
+                    summaries: sortedSummaries,
+                    selectedID: selectedSummary?.id,
                     isSummarizing: isSummarizing,
                     generatingTitle: generatingTitle,
                     onSelectSummary: onSelectSummary,
@@ -226,15 +227,6 @@ struct SummaryTab: View {
                 translatingRow(to: translationTargetLanguage)
             }
         }
-    }
-
-    /// The selection the bar's menu/dots show — while a new summary streams,
-    /// the previous selection stays highlighted instead of jumping.
-    private var orderedSummaries: [Summary] {
-        guard let selectedSummary else { return sortedSummaries }
-        var ordered = [selectedSummary]
-        ordered.append(contentsOf: sortedSummaries.filter { $0.id != selectedSummary.id })
-        return ordered
     }
 
     private var generatingTitle: String {
