@@ -102,6 +102,9 @@ enum KnowledgeMeetingSeed {
         let context = ModelContext(container)
         context.autosaveEnabled = false
         let meeting = Meeting(title: "Example pageless review")
+        // Keep the portal review the newest card: the knowledge UI tests open
+        // the first card and expect its article and "Example portal" quote.
+        meeting.createdAt = Date(timeIntervalSinceNow: -60)
         context.insert(meeting)
         let recording = Recording(meeting: meeting, fileName: "synthetic-pageless.m4a",
             duration: 4, transcriptionStatus: .done)

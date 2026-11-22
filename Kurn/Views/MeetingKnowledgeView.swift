@@ -20,23 +20,39 @@ struct MeetingKnowledgeView: View {
     @State private var selectedEntityID: UUID?
 
     var body: some View {
+        let hasPage = meeting.wikiArticle != nil
+        let contributionsPresent: Bool = {
+            if case let .loaded(read) = state { return !read.contributions.isEmpty }
+            return false
+        }()
+        let stateIsLoaded: Bool = {
+            if case .loaded = state { return true }
+            return false
+        }()
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // Until a page exists the tab shows only its empty state —
-                // the counters, "Meeting page" + Refresh row and the second
-                // "No contributions yet" state would just be clutter under it.
-                if meeting.wikiArticle != nil {
+                // Only a meeting with neither a page nor contributions gets
+                // the bare "No page yet" state — with contributions the
+                // counters, a compact Generate row and "Changed pages" still
+                // earn their place even while no page exists.
+                if hasPage || contributionsPresent {
                     if !headerText.isEmpty {
                         Text(headerText)
                             .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("knowledge.header")
                     }
-                    pageHeader
+                    if hasPage { pageHeader }
                 }
-                if case .loaded = state { articleSection }
-                if meeting.wikiArticle != nil {
-                    if case let .loaded(read) = state, !read.contributions.isEmpty {
+                if stateIsLoaded {
+                    if hasPage || !contributionsPresent {
+                        articleSection
+                    } else {
+                        compactPageRow
+                    }
+                }
+                if hasPage || contributionsPresent || !stateIsLoaded {
+                    if contributionsPresent, case let .loaded(read) = state {
                         contributionsHeader(read)
                     }
                     contributions
@@ -69,6 +85,23 @@ struct MeetingKnowledgeView: View {
                                   knowledgeCountText("knowledge.count.page", read.contributions.count),
                                   knowledgeCountText("knowledge.count.fact", read.contributions.reduce(0) { $0 + $1.entries.count })))
                 .font(Theme.caption).foregroundStyle(Theme.textSecondary)
+        }
+    }
+
+    /// Compact generate affordance for the no-page-with-contributions case —
+    /// the big "No page yet" empty state would bury the real content.
+    @ViewBuilder
+    private var compactPageRow: some View {
+        HStack(spacing: 10) {
+            if isGeneratingArticle {
+                ProgressView().controlSize(.small)
+                Text(NSLocalizedString("detail.wiki.generating", comment: "Generating meeting page"))
+                    .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+            } else if canGenerateArticle {
+                KnowledgeChipButton(title: NSLocalizedString("detail.wiki.generate", comment: "Generate page"),
+                                    systemImage: "sparkles", action: generate)
+                    .accessibilityIdentifier("knowledge.generateNotes")
+            }
         }
     }
 
