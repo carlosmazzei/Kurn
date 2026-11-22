@@ -47,6 +47,7 @@ struct KnowledgeExtractionService: Sendable {
         llm: any LLMProvider,
         budget: ContextBudget,
         authorization: @Sendable () async -> KnowledgeExtractionAuthorization,
+        model: String? = nil,
         onPass: (@Sendable (_ completed: Int, _ total: Int) async -> Void)? = nil
     ) async throws -> Result {
         try Task.checkCancellation()
@@ -57,7 +58,8 @@ struct KnowledgeExtractionService: Sendable {
             KnowledgeExtractionPrompt.Source(id: source.id, speaker: segment.speakerLabel,
                 startMs: source.startMs, endMs: source.endMs, text: source.text)
         }
-        let options = TextGenerationOptions.knowledgeExtraction(for: llm.provider)
+        let options = TextGenerationOptions.knowledgeExtraction(
+            for: llm.provider, modelOutputLimit: model.flatMap(ModelContextCatalog.maxOutputTokens(for:)))
         let groups = try plan(sources, context: context, budget: budget, outputTokens: options.maxOutputTokens)
         let initial = try await runGroups(groups, context: context, revision: revision, llm: llm,
             authorization: authorization, remainingPasses: 64, options: options, onPass: onPass)
@@ -113,6 +115,7 @@ struct KnowledgeExtractionService: Sendable {
             } catch AppError.generationTruncated {
                 // One split only, preserving original anchors. A single huge
                 // segment or a second truncation fails explicitly, never loops.
+                AppLog.knowledge.atNotice.notice("knowledge extraction pass truncated segments=\(group.count, privacy: .public) maxOutputTokens=\(options.maxOutputTokens, privacy: .public) splittingInto=\(group.count > 1 ? 2 : 0, privacy: .public)")
                 guard group.count > 1 else { throw AppError.generationTruncated }
                 guard result.attempts + 2 + (groups.count - index - 1) <= remainingPasses else {
                     throw KnowledgeExtractionServiceError.requestLimit
