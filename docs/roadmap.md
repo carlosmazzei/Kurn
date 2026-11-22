@@ -715,7 +715,17 @@ changes in this track:
   the list a matching bottom inset if so. The table above (U0) is the
   pre-review baseline and is kept for history.
 
-### U1 · Simplify the structure (2 sprints)
+### U1 · Simplify the structure (2 sprints) — mostly done on `feature/ui-design-review`
+
+**Status (2026-11-22):** 1 (toolbar, resolved as described in "Design review
+implementation"), 2, 3 (Chat is the Ask sheet; Wiki is the fourth segment only
+when on), 4 (hub + Wiki merge; Search/Usage/Health/Diagnostics stay separate by
+prototype choice), 5 (Simple/Advanced presets), 7 (one "Wiki actions" menu) are
+done. **Pending:** 6 (the words-pass over error messages and the Ask step
+timeline wording for the wiki tools — the vocabulary itself is done) and 8
+(Wiki settings still exceed one screen of controls at default size; group
+extraction/controls/export under collapsed sections). The exit measurement
+(taps per common task) has not been taken.
 
 Each item is a product decision first; the control/content layering and the
 existing identifiers (`nav.settings`, `meetingCard`, `settings.link.*`) must
@@ -799,7 +809,17 @@ the UI flows; nothing removed that the flows or the roadmap rely on.
    The 30-frame matrix of the specification is the manual release version of it.
 Exit: `.contrast` audit clean on every audited screen in both appearances.
 
-### U2b · Visual system and first impression (2 sprints)
+### U2b · Visual system and first impression (2 sprints) — steps 1–4 done
+
+**Status (2026-11-22):** steps 1 (colour roles), 2 (`Theme.Spacing`/`Theme.Radius`
+exist; the static-policy rule for new literals is **not** added yet and most
+literals are still in place), 3 (one surface language: grouped lists on
+`Theme.background`, paper for reading; `knowledgeCard`/`kurnCard` still both
+exist as names) and 4 (first-run empty state) are done. **Pending:** 5 (sensory
+feedback on record start/stop, copy, confirmed delete), 6 (screenshot review
+with the U0b severity scale — the per-phase captures under `/tmp/p*-shots`
+were reviewed informally, not scored), 7 (brand: icon, launch screen and store
+screenshot palette still predate the review).
 
 Goal: an app that reads as one product, explains itself in the first minute and
 looks professional without custom chrome. **Evidence limits:** the findings are
@@ -1067,11 +1087,21 @@ items here that it does not cover:
   `NavigationSplitView` on regular width is structurally complete but has never
   been checked on an iPad simulator/device: sidebar balance, collapse/expand in
   Split View and Slide Over, VoiceOver order sidebar → detail.
-- **Audit coverage.** Bring `RecorderView` (the screen with the most icon-only
-  controls) and `FolderFormView` into `AccessibilityAuditUITests`; no automated
-  check covers large accessibility text sizes; Watch VoiceOver is verified
-  manually because `KurnWatchUITests` does not run in CI; the Chat tab's live
-  conversation UI only renders against a real provider.
+- **Audit coverage.** `RecorderView` and `FolderFormView` are audited by
+  `AccessibilityBaselineUITests` (measurement, not a gate) at Default and AX5;
+  the required `AccessibilityAuditUITests` still covers only the list, the
+  detail modes + Ask sheet and Settings. Watch VoiceOver is verified manually
+  because `KurnWatchUITests` does not run in CI; the Ask sheet's live
+  conversation UI only renders against a real provider, so the seeded audit
+  sees its no-provider state.
+- **After the design review** (`feature/ui-design-review`): confirm on a device
+  that no floating/bottom bar overlaps the last list row at AX5 (the baseline
+  test had to tap the row's upper area); check the 4 new `.hitRegion` findings
+  on the Audio tab's recording-row controls; decide whether the recorder's
+  waveform should show a resting pattern when the input is silent (the
+  simulator shows a flat line); store screenshots (`fastlane/`,
+  `scripts/screenshots`) still show the pre-review UI and must be recaptured
+  before the next release.
 
 ### UI test stability and speed
 
@@ -1167,8 +1197,9 @@ stay on device and leave only through an explicit share.
 4. **F5 · Reminders and F6 · Import.** Independent of each other and of the
    rest; slot them in as room appears. F6 widens the capture surface, so it
    lands with the same fault-injection discipline as capture itself.
-5. **U0–U5 · UI simplification and accessibility.** U0 measures first and
-   needs no feature work, so it can start at any point; U1 waits for its review.
+5. **U0–U5 · UI simplification and accessibility.** U0, U0b (as a prototype
+   review), most of U1, U2 and U2b 1–4 and U3 landed with the design review on
+   `feature/ui-design-review`; what remains is U1.6/U1.8, U2b 5–7, U4 and U5.
 6. **D4's per-file measurement**, on its own clock — it is a dispatch, not code.
 7. **Reassess F7–F10.** F7 after the on-device availability number exists.
 

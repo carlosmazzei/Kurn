@@ -94,6 +94,32 @@ background-task runner both get them from there.
 
 See `CLAUDE.md`, "Architecture", for the full layer descriptions.
 
+### Screens and navigation
+
+```mermaid
+flowchart LR
+    L["Meetings list<br/>(day groups · quick chips)"] -->|push| D["Meeting detail<br/>Summary · Transcript · Audio · Wiki"]
+    L -->|sheet| LIB["Library<br/>buckets · folders · smart folders · tags"]
+    L -->|sheet| F["Filters"]
+    L -->|sheet| W["Wiki reader<br/>home · page · timeline · graph · review"]
+    L -->|sheet| A["Ask (library scope)"]
+    L -->|push| DOCS["Documents"] -->|push| DOC["Document"]
+    L -->|sheet| SET["Settings"]
+    L -->|sheet| REC["Recorder"] -.minimized.-> MB["Mini bar over any screen"]
+    D -->|floating bar → sheet| AM["Ask (this meeting)"]
+    D -->|pill menu| CMP["Compare summaries"]
+    D -->|menu| SH["Share"]
+```
+
+One rule per destination type (roadmap rule 8): a *place* you go deeper into
+(meeting, document, folder analytics) is pushed; a *task* that returns you to
+where you were (Library, Filters, Wiki reader, Ask, Settings, the recorder and
+every picker) is a sheet with an explicit Cancel/Done. The recorder is the one
+sheet that can collapse into a floating bar (`RecordingSessionPresenter`).
+The visual rules these screens share — colour roles, grouped lists, the paper
+reading surface, one word and one glyph per concept — are in `CLAUDE.md`,
+"Visual system".
+
 ## Data model
 
 ```mermaid
