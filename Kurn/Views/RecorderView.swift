@@ -138,6 +138,9 @@ private struct RecorderContent: View {
                         session.discard()
                     }
                 }
+                // Prototype: the Discard label is red inside its own glass
+                // capsule; the destructive role alone leaves it white here.
+                .tint(hasRecordingInProgress ? Theme.destructive : Theme.ink)
                 .accessibilityIdentifier("recorder.discard")
             }
             ToolbarItemGroup(placement: .topBarTrailing) {
