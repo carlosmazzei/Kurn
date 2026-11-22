@@ -59,14 +59,14 @@ struct ReadAloudControl: View {
         // needs two branches rather than a ternary on `.buttonStyle`.
         if ghost {
             Button { controller.toggle(item, settings: settings) } label: {
-                toggleLabel(phase)
+                toggleLabel(phase, spinnerTint: Theme.textPrimary)
             }
             .buttonStyle(.plain)
             .tint(Theme.textPrimary)
             .accessibilityIdentifier("readAloud.toggle")
         } else {
             Button { controller.toggle(item, settings: settings) } label: {
-                toggleLabel(phase)
+                toggleLabel(phase, spinnerTint: Theme.onInk)
             }
             .buttonStyle(.bordered)
             .tint(Theme.ink)
@@ -74,7 +74,7 @@ struct ReadAloudControl: View {
         }
     }
 
-    private func toggleLabel(_ phase: ReadAloudController.Phase) -> some View {
+    private func toggleLabel(_ phase: ReadAloudController.Phase, spinnerTint: Color) -> some View {
         HStack(spacing: 6) {
             // Fixed-size slot: a ProgressView's intrinsic size can measure
             // differently from the static icon it replaces on its first
@@ -84,6 +84,7 @@ struct ReadAloudControl: View {
                 if phase == .preparing {
                     ProgressView()
                         .controlSize(.small)
+                        .tint(spinnerTint)
                 } else {
                     Image(systemName: Self.icon(for: phase))
                 }

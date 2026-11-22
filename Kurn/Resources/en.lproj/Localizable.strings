@@ -1026,6 +1026,7 @@
 "read_aloud.stop" = "Stop reading";
 "read_aloud.dismiss_error" = "Dismiss";
 "read_aloud.start" = "Read aloud";
+"read_aloud.preparing" = "Preparing audio…";
 "read_aloud.pause" = "Pause";
 "read_aloud.resume" = "Resume";
 "read_aloud.kind.summary" = "Summary";

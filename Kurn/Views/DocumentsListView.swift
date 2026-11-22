@@ -95,7 +95,10 @@ struct DocumentsListView: View {
                 Text(NSLocalizedString("documents.footer", comment: "How documents are made"))
                     .font(Theme.footnote)
                     .foregroundStyle(Theme.textTertiary)
+                    .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
+                    // Same 20pt side margins as the list's inset groups.
+                    .padding(.horizontal, Theme.Spacing.xl)
                     .padding(.bottom, 6)
             }
         }
