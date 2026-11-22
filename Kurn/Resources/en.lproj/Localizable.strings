@@ -1943,3 +1943,4 @@
 "recorder.discard.confirm.title" = "Discard this recording?";
 "recorder.discard.confirm.message" = "Its audio so far will be deleted from this device. Stopping instead keeps it.";
 "recorder.discard.confirm.keep" = "Keep recording";
+"recorder.mic.builtin_forced_hint" = "Always Use iPhone Microphone is on in Settings";

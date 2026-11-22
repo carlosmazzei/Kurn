@@ -92,8 +92,7 @@ struct PhotoViewerView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
-                        .buttonStyle(.glassProminent)
-                        .tint(Theme.ink)
+                        .inkProminent()
                 }
             }
         }

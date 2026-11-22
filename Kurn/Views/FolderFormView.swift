@@ -86,8 +86,7 @@ struct FolderFormView: View {
                             ? NSLocalizedString("common.create", comment: "Create")
                             : NSLocalizedString("common.save", comment: "Save")
                     ) { save() }
-                        .buttonStyle(.glassProminent)
-                        .tint(Theme.ink)
+                        .inkProminent()
                         .disabled(!canSave)
                         .accessibilityIdentifier("folder.save")
                 }

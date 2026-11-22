@@ -67,8 +67,7 @@ struct KnowledgeIdentityReviewView: View {
                 Button { confirming = true } label: {
                     Text(KnowledgeReviewCopy.text("merge")).font(Theme.calloutEmphasized).frame(maxWidth: .infinity).frame(minHeight: 44)
                 }
-                .buttonStyle(.glassProminent)
-                .tint(Theme.ink)
+                .inkProminent()
                 .accessibilityIdentifier("knowledge.review.merge")
             }
         }

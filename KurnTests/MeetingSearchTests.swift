@@ -44,6 +44,13 @@ struct MeetingSearchTests {
         #expect(meeting.matches(search: "absent") == false)
     }
 
+    @Test func matchesAITitleCaseInsensitive() {
+        let meeting = makeMeeting(title: "Standup")
+        meeting.aiTitle = "Offline sync decisions"
+        #expect(meeting.matches(search: "OFFLINE") == true)
+        #expect(meeting.matches(search: "absent") == false)
+    }
+
     @Test func matchesNotesContent() {
         let meeting = makeMeeting(title: "Standup", notes: "Discuss the iceberg risk")
         #expect(meeting.matches(search: "iceberg") == true)

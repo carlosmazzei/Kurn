@@ -1943,3 +1943,4 @@
 "recorder.discard.confirm.title" = "放弃这段录音？";
 "recorder.discard.confirm.message" = "到目前为止的音频将从此设备删除。改为停止则会保留它。";
 "recorder.discard.confirm.keep" = "继续录音";
+"recorder.mic.builtin_forced_hint" = "设置中已开启“始终使用 iPhone 麦克风”";

@@ -117,8 +117,7 @@ struct FolderPickerView: View {
                 Button(NSLocalizedString("folder.move", comment: "Move")) {
                     if let selection = selected { move(to: selection) }
                 }
-                .buttonStyle(.glassProminent)
-                .tint(Theme.ink)
+                .inkProminent()
                 // Requires a deliberate pick: with a mixed selection there is
                 // no current folder to default to.
                 .disabled(selected == nil)

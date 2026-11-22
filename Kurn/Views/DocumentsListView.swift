@@ -53,8 +53,7 @@ struct DocumentsListView: View {
                             Text(NSLocalizedString("documents.new", comment: "New document"))
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.glassProminent)
-                        .tint(Theme.ink)
+                        .inkProminent()
                         .accessibilityIdentifier("documents.new")
                     }
                 }

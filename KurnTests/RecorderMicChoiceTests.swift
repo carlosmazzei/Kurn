@@ -45,11 +45,11 @@ struct RecorderMicChoiceTests {
         // Poll (bounded, no fixed sleep) until the first continuation is
         // actually stored before simulating a second concurrent request.
         var attempts = 0
-        while !viewModel.hasPendingMicChoiceContinuationForTesting, attempts < 10_000 {
+        while !viewModel.hasPendingMicChoiceForTesting, attempts < 10_000 {
             await Task.yield()
             attempts += 1
         }
-        #expect(viewModel.hasPendingMicChoiceContinuationForTesting)
+        #expect(viewModel.hasPendingMicChoiceForTesting)
 
         // A second mic-choice request arrives while the first is still
         // pending — storing it must resolve the first to `nil` rather than
@@ -78,7 +78,51 @@ struct RecorderMicChoiceTests {
         }
 
         #expect(result == "built-in")
-        #expect(!viewModel.hasPendingMicChoiceContinuationForTesting)
+        #expect(!viewModel.hasPendingMicChoiceForTesting)
+    }
+
+    /// Cancelling the chooser resolves a pending continuation but must not
+    /// rewrite the stored preference or touch a live route — dismissing is
+    /// not a choice.
+    @Test func dismissMicChoicesResolvesTheContinuationWithoutChangingThePreference() async {
+        let container = TestModelContainer.make()
+        let context = container.mainContext
+        let meeting = Meeting(title: "Mic choice")
+        context.insert(meeting)
+        try? context.save()
+        let viewModel = RecorderViewModel(meeting: meeting, modelContext: context, defaultMode: .onDevice)
+        viewModel.chooseMic(uid: "kept-choice")
+        #expect(viewModel.recorder.preferredInputUID == "kept-choice")
+
+        let result = await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
+            viewModel.storeMicChoiceContinuation(continuation)
+            viewModel.dismissMicChoices()
+        }
+
+        #expect(result == nil)
+        #expect(viewModel.recorder.preferredInputUID == "kept-choice")
+        #expect(!viewModel.hasPendingMicChoiceForTesting)
+    }
+
+    /// `alwaysUseBuiltInMic` keeps the mic button inert: the picker never
+    /// opens (and so never switches the session category or enumerates
+    /// Bluetooth inputs) and the view can disable it via `micPickerDisabled`.
+    @Test func alwaysUseBuiltInMicSkipsTheChooser() {
+        let container = TestModelContainer.make()
+        let context = container.mainContext
+        let meeting = Meeting(title: "Mic choice")
+        context.insert(meeting)
+        try? context.save()
+        let viewModel = RecorderViewModel(
+            meeting: meeting,
+            modelContext: context,
+            defaultMode: .onDevice,
+            options: RecorderOptions(alwaysUseBuiltInMic: true)
+        )
+
+        #expect(viewModel.micPickerDisabled)
+        viewModel.presentMicChoices()
+        #expect(viewModel.micChoices.isEmpty)
     }
 }
 #endif

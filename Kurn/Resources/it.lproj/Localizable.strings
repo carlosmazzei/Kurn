@@ -1943,3 +1943,4 @@
 "recorder.discard.confirm.title" = "Eliminare questa registrazione?";
 "recorder.discard.confirm.message" = "L’audio registrato finora verrà cancellato dal dispositivo. Interrompere, invece, lo conserva.";
 "recorder.discard.confirm.keep" = "Continua a registrare";
+"recorder.mic.builtin_forced_hint" = "L’opzione Usa sempre il microfono dell’iPhone è attiva in Impostazioni";

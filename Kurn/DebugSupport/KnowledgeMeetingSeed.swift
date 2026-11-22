@@ -88,9 +88,48 @@ enum KnowledgeMeetingSeed {
         let request = KnowledgeCommitRequest(snapshot: snapshot, extractorVersion: "synthetic-meeting-ui-v1", schemaVersion: 1,
             provider: .appleOnDevice, compilations: [try KnowledgeRecordingCompilation(recordingID: recording.id, result: result)])
         _ = try KnowledgeStoreRows.commit(request, auth: auth, container: container, beforeSave: {})
+        try seedPagelessMeeting(auth: auth, sourceContext: sourceContext, container: container)
         if ProcessInfo.processInfo.arguments.contains("UI-Testing-KnowledgeNarrativeFixture") {
             try seedNarrative(meetingID: meeting.id, auth: auth, container: container)
         }
+    }
+
+    /// A second meeting with compiled contributions but no wiki page: its
+    /// Wiki tab reaches `.loaded` with `wikiArticle == nil`, which is what
+    /// the "No page yet" empty state (and its Generate button) needs.
+    private static func seedPagelessMeeting(auth: KnowledgeExtractionAuthorization,
+                                            sourceContext: ModelContext, container: ModelContainer) throws {
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let meeting = Meeting(title: "Example pageless review")
+        context.insert(meeting)
+        let recording = Recording(meeting: meeting, fileName: "synthetic-pageless.m4a",
+            duration: 4, transcriptionStatus: .done)
+        context.insert(recording)
+        let segment = TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 4,
+            text: "The Example rollout moved to December.")
+        let transcript = Transcript(recording: recording, segments: [segment], language: "en")
+        context.insert(transcript)
+        recording.transcript = transcript
+        try context.save()
+        let snapshot = try KnowledgeStoreRows.readSnapshot(meetingID: meeting.id, scope: "workspace", auth: auth, in: sourceContext)
+        let anchor = segment.id.uuidString.lowercased()
+        let wire: [String: Any] = ["version": 1,
+            "entities": [["ref": "e1", "kind": "project", "name": "Example rollout", "aliases": ["Orion rollout"]]],
+            "assertions": [["ref": "a1", "subject": "e1", "predicate": "hasStatus", "value": ["type": "enum", "value": "open"],
+                "modality": "reported", "polarity": "positive", "claimKind": "internalStatusReport", "authorityStatus": "attributed",
+                "confidence": "medium", "attributedToSegmentID": anchor,
+                "evidence": [["segmentIDs": [anchor], "quote": segment.text]]]], "events": [],
+            "examinedSegmentIDs": [anchor]]
+        let document = try JSONDecoder().decode(KnowledgeExtraction.self, from: JSONSerialization.data(withJSONObject: wire))
+        guard let recordingSource = snapshot.recordings.first, let fingerprint = recordingSource.fingerprint else {
+            throw KnowledgeStoreError.sourceMissing
+        }
+        let result = KnowledgeExtractionService.Result(transcriptFingerprint: fingerprint, strategy: .fullContext,
+            passes: [document], examinedSegmentIDs: [anchor], targetedPassCount: 0)
+        let request = KnowledgeCommitRequest(snapshot: snapshot, extractorVersion: "synthetic-meeting-ui-v1", schemaVersion: 1,
+            provider: .appleOnDevice, compilations: [try KnowledgeRecordingCompilation(recordingID: recording.id, result: result)])
+        _ = try KnowledgeStoreRows.commit(request, auth: auth, container: container, beforeSave: {})
     }
 
     private static func seedNarrative(meetingID: UUID, auth: KnowledgeExtractionAuthorization, container: ModelContainer) throws {

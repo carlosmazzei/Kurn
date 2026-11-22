@@ -23,9 +23,7 @@ struct ChatArtifactProviderNotice: View {
             Button(NSLocalizedString("chat.provider.setup", comment: "Set up provider")) {
                 showingSettings = true
             }
-            .buttonStyle(.glassProminent)
-            .tint(Theme.ink)
-            .foregroundStyle(Theme.onInk)
+            .inkProminent()
             .accessibilityIdentifier("chat.artifact.provider.settings")
         }
         .accessibilityIdentifier("chat.artifact.provider.notice")

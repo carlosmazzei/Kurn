@@ -280,8 +280,17 @@ final class AudioRecorderService: NSObject {
         }
         if retryingStall {
             if engine.isRunning { engine.stop() }
-            guard let currentFormat = engine.inputFormat, rebuildTapForCurrentInput(currentFormat) else {
-                AppLog.recorder.atError.error("resume: capture watchdog retry could not rebuild the input tap")
+        }
+        // The mic may have been switched while paused (`chooseMic` →
+        // `applyPreferredInput`) to an input whose negotiated format differs
+        // from the tap's; restarting with the stale tap would fail, so the
+        // tap and the sink's converter are rebuilt for the new input — the
+        // same rebuild `recoverEngineIfNeeded` runs mid-recording. The file
+        // stays open either way (it is written at a fixed format).
+        let currentFormat = engine.inputFormat
+        if retryingStall || inputFormatDiffers(tapFormat, currentFormat) {
+            guard let currentFormat, rebuildTapForCurrentInput(currentFormat) else {
+                AppLog.recorder.atError.error("resume: could not rebuild the input tap for the current input format")
                 return
             }
             engine.reactivateSession()

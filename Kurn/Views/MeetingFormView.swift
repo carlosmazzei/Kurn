@@ -123,8 +123,7 @@ struct MeetingFormView: View {
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button(NSLocalizedString("common.save", comment: "Save")) { save() }
-                    .buttonStyle(.glassProminent)
-                    .tint(Theme.ink)
+                    .inkProminent()
             }
         }
         .onAppear(perform: setupIfNeeded)

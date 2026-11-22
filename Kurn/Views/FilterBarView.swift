@@ -71,8 +71,7 @@ struct FilterBarView: View {
                             )
                         )
                     }
-                    .buttonStyle(.glassProminent)
-                    .tint(Theme.ink)
+                    .inkProminent()
                 }
             }
             .errorAlert($saveError)

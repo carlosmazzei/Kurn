@@ -22,18 +22,25 @@ struct MeetingKnowledgeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                if !headerText.isEmpty {
-                    Text(headerText)
-                        .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("knowledge.header")
+                // Until a page exists the tab shows only its empty state —
+                // the counters, "Meeting page" + Refresh row and the second
+                // "No contributions yet" state would just be clutter under it.
+                if meeting.wikiArticle != nil {
+                    if !headerText.isEmpty {
+                        Text(headerText)
+                            .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("knowledge.header")
+                    }
+                    pageHeader
                 }
-                pageHeader
                 if case .loaded = state { articleSection }
-                if case let .loaded(read) = state, !read.contributions.isEmpty {
-                    contributionsHeader(read)
+                if meeting.wikiArticle != nil {
+                    if case let .loaded(read) = state, !read.contributions.isEmpty {
+                        contributionsHeader(read)
+                    }
+                    contributions
                 }
-                contributions
             }
             // The same insets as the Transcript and Summary tabs.
             .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
@@ -97,15 +104,17 @@ struct MeetingKnowledgeView: View {
                 ContentUnavailableView {
                     Label(NSLocalizedString("detail.knowledge.no_page", comment: "No page yet"), systemImage: "book")
                 } description: {
+                    // Carries `knowledge.header` while the counters line is
+                    // hidden — the identifier stays findable in this state.
                     Text(NSLocalizedString("detail.knowledge.no_page_detail", comment: "Generate a page"))
+                        .accessibilityIdentifier("knowledge.header")
                 } actions: {
                     if canGenerateArticle {
                         Button(action: generate) {
                             Text(NSLocalizedString("detail.wiki.generate", comment: "Generate page"))
                                 .font(Theme.calloutEmphasized)
                         }
-                        .buttonStyle(.glassProminent)
-                        .tint(Theme.ink)
+                        .inkProminent()
                         .accessibilityIdentifier("knowledge.generateNotes")
                         Text(verbatim: generatesLocally
                              ? NSLocalizedString("mode.on_device", comment: "On-device")
