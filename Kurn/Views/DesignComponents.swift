@@ -475,3 +475,25 @@ extension View {
         )
     }
 }
+
+/// The ghost "Cancel" a running generation offers (the Summary bar's
+/// writing state): ⓧ + "Cancel" in footnote/secondary, 44pt tall. Shared so
+/// every cancellable generation (summary, knowledge update) looks the same.
+struct GenerationCancelButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(role: .cancel, action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: "xmark.circle")
+                    .accessibilityHidden(true)
+                Text(NSLocalizedString("common.cancel", comment: "Cancel"))
+            }
+            .font(Theme.footnote)
+            .foregroundStyle(Theme.textSecondary)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 44)
+        }
+        .buttonStyle(.plain)
+    }
+}

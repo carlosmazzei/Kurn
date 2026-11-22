@@ -136,18 +136,7 @@ struct MeetingDetailSummaryBar: View {
     }
 
     private var cancelGhost: some View {
-        Button(role: .cancel, action: onCancel) {
-            HStack(spacing: 6) {
-                Image(systemName: "xmark.circle")
-                    .accessibilityHidden(true)
-                Text(NSLocalizedString("common.cancel", comment: "Cancel"))
-            }
-            .font(Theme.footnote)
-            .foregroundStyle(Theme.textSecondary)
-            .padding(.horizontal, 12)
-            .frame(minHeight: 44)
-        }
-        .buttonStyle(.plain)
+        GenerationCancelButton(action: onCancel)
     }
 
     /// Tappable dots: the swipe the prototype suggested was dropped because a

@@ -106,23 +106,20 @@ struct MeetingKnowledgeView: View {
             Group {
                 if hasFacts {
                     VStack(alignment: .leading, spacing: 6) {
-                        HStack(alignment: .firstTextBaseline) {
+                        HStack(alignment: .center) {
                             Text(NSLocalizedString("knowledge.update.title", comment: "Updating knowledge"))
                                 .font(Theme.subheadlineEmphasized).foregroundStyle(Theme.textPrimary)
                             Spacer(minLength: 8)
-                            Text("\(percent)%").font(Theme.footnote).monospacedDigit().foregroundStyle(Theme.textSecondary)
-                        }
-                        TimelineView(.periodic(from: .now, by: 1)) { context in
-                            Text(updateStatusLine(progress, title: title, at: context.date))
-                                .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
-                                .lineLimit(1)
-                        }
-                        HStack(spacing: 12) {
-                            ProgressView(value: progress.fraction).tint(Theme.ink)
                             stopUpdateButton
                         }
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            Text("\(percent)% · " + updateStatusLine(progress, title: title, at: context.date))
+                                .font(Theme.footnote).monospacedDigit().foregroundStyle(Theme.textSecondary)
+                                .lineLimit(1)
+                        }
+                        ProgressView(value: progress.fraction).tint(Theme.ink)
                     }
-                    .padding(16)
+                    .padding(.leading, 16).padding(.trailing, 4).padding(.bottom, 16).padding(.top, 4)
                     .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
                 } else {
                     ContentUnavailableView {
@@ -138,13 +135,7 @@ struct MeetingKnowledgeView: View {
                             Text(NSLocalizedString("detail.transcript.leave_hint", comment: "You can leave this screen"))
                         }
                     } actions: {
-                        Button {
-                            coordinator.stopUpdate(meetingID: meeting.id)
-                        } label: {
-                            Text(NSLocalizedString("recorder.stop", comment: "Stop"))
-                        }
-                        .buttonStyle(.bordered)
-                        .accessibilityIdentifier("knowledge.stop")
+                        stopUpdateButton
                     }
                     .padding(.top, 24)
                 }
@@ -154,18 +145,11 @@ struct MeetingKnowledgeView: View {
         }
     }
 
-    /// Icon-only Stop beside the card's bar (the Audio row's cancel shape).
+    /// The Summary bar's ghost Cancel — the same control for every
+    /// cancellable generation.
     private var stopUpdateButton: some View {
-        Button {
-            coordinator.stopUpdate(meetingID: meeting.id)
-        } label: {
-            Image(systemName: "stop.fill")
-                .font(Theme.footnoteEmphasized).foregroundStyle(Theme.ink)
-                .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(NSLocalizedString("recorder.stop", comment: "Stop"))
-        .accessibilityIdentifier("knowledge.stop")
+        GenerationCancelButton { coordinator.stopUpdate(meetingID: meeting.id) }
+            .accessibilityIdentifier("knowledge.stop")
     }
 
     /// "<phase> · <model> · <elapsed>s" (the phase only on the card, where it
