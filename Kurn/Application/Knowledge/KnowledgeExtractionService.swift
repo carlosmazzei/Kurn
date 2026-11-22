@@ -46,7 +46,8 @@ struct KnowledgeExtractionService: Sendable {
         context: KnowledgeExtractionContext,
         llm: any LLMProvider,
         budget: ContextBudget,
-        authorization: @Sendable () async -> KnowledgeExtractionAuthorization
+        authorization: @Sendable () async -> KnowledgeExtractionAuthorization,
+        onPass: (@Sendable (_ completed: Int, _ total: Int) async -> Void)? = nil
     ) async throws -> Result {
         try Task.checkCancellation()
         try await authorize(llm, authorization)
@@ -59,7 +60,7 @@ struct KnowledgeExtractionService: Sendable {
         let options = TextGenerationOptions.knowledgeExtraction(for: llm.provider)
         let groups = try plan(sources, context: context, budget: budget, outputTokens: options.maxOutputTokens)
         let initial = try await runGroups(groups, context: context, revision: revision, llm: llm,
-            authorization: authorization, remainingPasses: 64, options: options)
+            authorization: authorization, remainingPasses: 64, options: options, onPass: onPass)
         let examined = Set(initial.documents.flatMap(\.examinedSegmentIDs))
         // Explicit coverage of all anchors implies start/middle/end coverage.
         // Apply the same input AND output planning to the one targeted round.
@@ -100,7 +101,8 @@ struct KnowledgeExtractionService: Sendable {
     private func runGroups(
         _ groups: [[KnowledgeExtractionPrompt.Source]], context: KnowledgeExtractionContext,
         revision: KnowledgeTranscriptRevision, llm: any LLMProvider,
-        authorization: @Sendable () async -> KnowledgeExtractionAuthorization, remainingPasses: Int, options: TextGenerationOptions
+        authorization: @Sendable () async -> KnowledgeExtractionAuthorization, remainingPasses: Int, options: TextGenerationOptions,
+        onPass: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> Batch {
         guard groups.count <= remainingPasses else { throw KnowledgeExtractionServiceError.requestLimit }
         var result = Batch()
@@ -122,6 +124,7 @@ struct KnowledgeExtractionService: Sendable {
                     result.documents.append(try await run(half, context: context, revision: revision, llm: llm, authorization: authorization, options: options))
                 }
             }
+            await onPass?(index + 1, groups.count)
         }
         return result
     }

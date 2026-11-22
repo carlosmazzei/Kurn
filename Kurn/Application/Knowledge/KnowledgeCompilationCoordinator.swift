@@ -58,6 +58,16 @@ final class KnowledgeCompilationCoordinator {
         compilationProgress[meetingID] = entry
     }
 
+    /// Advances the bar inside the current recording's band as each
+    /// extraction pass (block) finishes, so a long single recording moves.
+    private func setPassProgress(_ meetingID: UUID, recording: Int, of recordings: Int, done: Int, total: Int) {
+        guard var entry = compilationProgress[meetingID], total > 0 else { return }
+        let band = 0.6 / Double(max(1, recordings))
+        let start = 0.15 + band * Double(max(0, recording - 1))
+        entry.fraction = max(entry.fraction, start + band * min(1, Double(done) / Double(total)))
+        compilationProgress[meetingID] = entry
+    }
+
     private func noteExtractedFacts(_ meetingID: UUID, count: Int) {
         guard var entry = compilationProgress[meetingID] else { return }
         entry.factsSoFar += count
@@ -352,7 +362,10 @@ final class KnowledgeCompilationCoordinator {
                 AppLog.knowledge.atInfo.info("knowledge extraction recording=\(source.id, privacy: .private) segments=\(source.segments.count, privacy: .public) provider=\(handle.work.provider.id, privacy: .public) model=\(handle.work.model, privacy: .public)")
                 let result = try await KnowledgeExtractionService().extract(segments: source.segments, language: source.language,
                     context: context, llm: llm, budget: handle.work.provider.kind == .appleOnDevice ? .onDevice : .conservative,
-                    authorization: authorize)
+                    authorization: authorize,
+                    onPass: { [weak self] done, total in
+                        await self?.setPassProgress(meetingID, recording: index + 1, of: pendingSources.count, done: done, total: total)
+                    })
                 // A clean empty answer and a gate rejection are different
                 // events: the integrity check throws before this point, so
                 // zero here means the model itself asserted nothing.
