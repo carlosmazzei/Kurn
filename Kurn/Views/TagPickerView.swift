@@ -31,9 +31,19 @@ struct TagPickerView: View {
         self.init(meetings: [meeting])
     }
 
+    /// The user's pending changes, applied on Done and dropped on Cancel:
+    /// `true` puts the tag on every meeting, `false` takes it off every one,
+    /// no entry leaves the meetings as they were.
+    @State private var draft: [UUID: Bool] = [:]
+    /// Tags created inside this sheet — they exist in the store already but
+    /// are only linked to the meetings when the draft is applied.
+    @State private var createdTags: [Tag] = []
+
     /// 2 when every meeting carries the tag, 0 when none does, 1 for a mixed
     /// selection (shown as `minus.circle`; the first tap turns it fully on).
+    /// A drafted choice wins over the stored state.
     private func tagState(_ tag: Tag) -> Int {
+        if let picked = draft[tag.id] { return picked ? 2 : 0 }
         let count = meetings.count { $0.tags.contains(where: { $0.id == tag.id }) }
         return count == meetings.count ? 2 : (count == 0 ? 0 : 1)
     }
@@ -86,6 +96,7 @@ struct TagPickerView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(NSLocalizedString("common.done", comment: "Done")) {
+                        applyDraft()
                         dismiss()
                         onApplied?()
                     }
@@ -165,24 +176,42 @@ struct TagPickerView: View {
         }
     }
 
-    /// Fully on → remove from every meeting; off or mixed → add to every
-    /// meeting that lacks it.
+    /// Records the pick in the draft: fully on → take off; off or mixed →
+    /// put on. Nothing touches the meetings until Done.
     private func toggleTag(_ tag: Tag) {
-        let wasFullyOn = tagState(tag) == 2
-        for meeting in meetings {
-            if let index = meeting.tags.firstIndex(where: { $0.id == tag.id }) {
-                if wasFullyOn { meeting.tags.remove(at: index) }
-            } else {
-                meeting.tags.append(tag)
+        draft[tag.id] = tagState(tag) != 2
+    }
+
+    /// Applies the draft — adds the picked tags, removes the unpicked ones,
+    /// links tags created here — and saves once.
+    private func applyDraft() {
+        guard !draft.isEmpty else { return }
+        let affected = allTags.filter { draft[$0.id] != nil } + createdTags.filter { draft[$0.id] != nil }
+        for tag in affected {
+            let on = draft[tag.id] == true
+            for meeting in meetings {
+                if let index = meeting.tags.firstIndex(where: { $0.id == tag.id }) {
+                    if !on { meeting.tags.remove(at: index) }
+                } else if on {
+                    meeting.tags.append(tag)
+                }
             }
         }
         saveError = modelContext.saveOrError()
+        draft = [:]
+        createdTags = []
     }
 
+    /// Creates the tag in the store right away but only drafts its link —
+    /// Cancel still drops the link, the tag itself stays in the library.
     private func createTag() {
         do throws(AppError) {
-            for meeting in meetings {
-                try MeetingLibrary(context: modelContext).attachTag(named: newTagName, to: meeting)
+            let library = MeetingLibrary(context: modelContext)
+            if let tag = try library.createTag(named: newTagName) {
+                createdTags.append(tag)
+                draft[tag.id] = true
+            } else if let existing = try library.existingTag(named: newTagName) {
+                draft[existing.id] = true
             }
         } catch {
             saveError = error
@@ -191,6 +220,8 @@ struct TagPickerView: View {
     }
 
     private func deleteTag(_ tag: Tag) {
+        draft.removeValue(forKey: tag.id)
+        createdTags.removeAll { $0.id == tag.id }
         do throws(AppError) {
             try MeetingLibrary(context: modelContext).deleteTag(tag)
         } catch {

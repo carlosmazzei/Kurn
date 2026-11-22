@@ -12,7 +12,7 @@ import SwiftUI
 
 struct MeetingDetailSummaryBar: View {
     let meeting: Meeting
-    /// Newest first — same order the page dots and the swipe gesture use.
+    /// Newest first — the order the page dots and the pill menu use.
     let summaries: [Summary]
     /// Shown while a summary is being written instead of the menu.
     let isSummarizing: Bool
@@ -158,15 +158,24 @@ struct MeetingDetailSummaryBar: View {
         .buttonStyle(.plain)
     }
 
+    /// Tappable dots: the swipe the prototype suggested was dropped because a
+    /// drag gesture on the summary body competed with the ScrollView and
+    /// stopped vertical scrolling; the dots and the pill menu switch instead.
     private func pageDots(selected: Summary) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 0) {
             ForEach(summaries) { summary in
-                Circle()
-                    .fill(summary.id == selected.id ? Theme.ink : Theme.decorationTertiary)
-                    .frame(width: 8, height: 8)
+                Button { onSelectSummary(summary) } label: {
+                    Circle()
+                        .fill(summary.id == selected.id ? Theme.ink : Theme.decorationTertiary)
+                        .frame(width: 8, height: 8)
+                        .frame(minWidth: 24, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(summaryTitle(for: summary))
+                .accessibilityAddTraits(summary.id == selected.id ? .isSelected : [])
             }
         }
-        .accessibilityHidden(true)
     }
 
     /// "<template> · <time>" — the time is short ("18:28"); the date lives in

@@ -93,40 +93,15 @@ struct TranscriptionSettingsView: View {
         }
         .navigationTitle(NSLocalizedString("settings.transcription", comment: "Transcription"))
         .modelDownloadAlerts(downloads, settings: settings)
-        .alert(
-            NSLocalizedString("settings.preset.needs_key.title", comment: "Preset provider key missing"),
-            isPresented: Binding(
-                get: { missingKeyProvider != nil },
-                set: { if !$0 { missingKeyProvider = nil } }
-            ),
-            presenting: missingKeyProvider
-        ) { _ in
-            Button(NSLocalizedString("common.ok", comment: "OK")) { missingKeyProvider = nil }
-        } message: { provider in
-            Text(String(
-                format: NSLocalizedString("settings.preset.needs_key", comment: "Preset provider key missing"),
-                provider.displayName
-            ))
-        }
+        .presetMissingKeyAlert(provider: $missingKeyProvider)
         .onAppear {
             if TranscriptionPreset.current(settings: settings) != nil { mode = .simple }
         }
-        .kurnDialog(
-            isPresented: $cloudConsent.isPresented,
-            iconSystemName: "icloud.and.arrow.up.fill",
-            iconTint: Theme.info,
-            title: NSLocalizedString("settings.cloud_upload.title", comment: "Cloud audio upload"),
-            message: cloudConsent.message(settings: settings, providers: transcriptionProviders),
-            primaryTitle: NSLocalizedString("settings.cloud_upload.allow", comment: "Allow cloud upload"),
-            primaryAction: {
-                cloudConsent.confirm(
-                    settings: settings,
-                    providers: transcriptionProviders,
-                    downloads: downloads
-                )
-            },
-            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel"),
-            secondaryAction: { cloudConsent.cancel() }
+        .cloudUploadConsentDialog(
+            consent: cloudConsent,
+            settings: settings,
+            providers: transcriptionProviders,
+            downloads: downloads
         )
         .onAppear { cloudConsent.presentIfNeeded(settings: settings) }
         .onChange(of: settings.transcriptionProviderID) { _, _ in advancePending() }

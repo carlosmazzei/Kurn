@@ -95,7 +95,11 @@ final class ReadAloudController: NSObject {
         failure?.itemID == itemID ? failure?.error : nil
     }
 
-    func clearError() { failure = nil }
+    /// Clears the recorded failure — all of it, or only when it belongs to
+    /// `itemID` when one is passed (the floating bar dismisses its own).
+    func clearError(for itemID: String? = nil) {
+        if itemID == nil || failure?.itemID == itemID { failure = nil }
+    }
 
     // MARK: - Transport
 

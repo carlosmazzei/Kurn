@@ -107,11 +107,10 @@ extension PhoneSessionController: WCSessionDelegate {
         AppLog.recorderUI.atNotice.notice("PhoneSessionController: received Watch command \(decoded.command.rawValue, privacy: .public)")
         let reply = WatchCommandReplyHandler(reply: replyHandler)
         Task {
-            let (handled, phase) = await MainActor.run {
+            let result = await MainActor.run {
                 RecordingCommandRouter.shared.handleWatchCommand(decoded.command, commandID: decoded.commandID)
             }
-            let error = await MainActor.run { RecordingCommandRouter.shared.lastCommandError }
-            reply.call(RecordingSurfacePayloads.commandReply(handled: handled, phase: phase, error: error))
+            reply.call(RecordingSurfacePayloads.commandReply(handled: result.handled, phase: result.phase, error: result.error))
         }
     }
 }

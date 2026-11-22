@@ -193,14 +193,19 @@ extension TranscriptionPreset {
 
 extension TranscriptionPipelineChoice {
     /// The pipeline as it is currently configured in `AppSettings`. Cloud
-    /// provider/model only count while the engine is remote — a stale stored
-    /// provider must not stop an on-device preset from matching.
+    /// provider/model only count while the engine is remote, and each Fluid
+    /// model only while its engine uses it — a stale stored model must not
+    /// stop a preset that ignores the field from matching.
     @MainActor
     init(settings: AppSettings) {
         engine = settings.transcriptionEngine
-        asrModel = settings.fluidAudioASRModel
+        // `asrModel` is only live while the Parakeet engine runs it; any
+        // other engine leaves the stored pick inert, so it compares as `nil`.
+        asrModel = settings.transcriptionEngine == .fluidAudioParakeet
+            ? settings.fluidAudioASRModel : nil
         diarization = settings.diarizationEngine
-        diarizationModel = settings.fluidAudioDiarizationModel
+        diarizationModel = settings.diarizationEngine == .fluidAudio
+            ? settings.fluidAudioDiarizationModel : nil
         preprocessing = settings.preprocessingEngine
         vad = settings.vadEngine
         if settings.transcriptionEngine == .whisperAPI {

@@ -227,6 +227,25 @@ final class AudioRecorderService: NSObject {
         AppLog.recorder.atNotice.notice("start: engine running, state=recording")
     }
 
+    /// Re-route a live capture to the mic the user just picked in the
+    /// recorder. `setPreferredInput` applies while the session is active and
+    /// the engine follows the route change; if the new input's format
+    /// differs, the configuration-change recovery rebuilds the tap in place
+    /// rather than losing the segment. A rejected switch is logged and
+    /// keeps the current input — it is never thrown into the UI.
+    func applyPreferredInput(uid: String?) {
+        let session = AVAudioSession.sharedInstance()
+        let input = uid.flatMap { uid in
+            session.availableInputs?.first { $0.uid == uid }
+        }
+        do {
+            try session.setPreferredInput(input)
+            AppLog.recorder.atNotice.notice("applyPreferredInput: switched live input")
+        } catch {
+            AppLog.recorder.atError.error("applyPreferredInput: setPreferredInput failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
+        }
+    }
+
     private func cleanUpFailedStart(fileName: String) {
         teardownEngine()
         AudioFileStore.delete(fileName: fileName)

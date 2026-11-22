@@ -1733,6 +1733,7 @@
 "chat.suggest.email" = "Rédigez un e-mail de synthèse pour les absents";
 "chat.provider.title" = "Connectez un fournisseur d'IA";
 "chat.provider.subtitle" = "Les réponses utilisent la transcription et citent l'heure de chaque ligne. Seules les sources que vous choisissez sont envoyées au fournisseur.";
+"chat.provider.subtitle.meeting" = "Cette conversation est limitée à « %1$@ » : les réponses utilisent sa transcription et citent l'heure de chaque ligne. Seules les sources que vous choisissez sont envoyées au fournisseur.";
 "chat.provider.setup" = "Configurer le fournisseur";
 "detail.summary.writing" = "rédaction…";
 "detail.summary.today_at" = "Aujourd'hui %1$@";
@@ -1755,6 +1756,7 @@
 "detail.try_again" = "Réessayer";
 "detail.recording.not_transcribed" = "non transcrite";
 "detail.recording.queued" = "En attente";
+"detail.recording.try_again" = "Réessayer";
 "detail.resume_transcription" = "Reprendre la transcription";
 "detail.recording.actions" = "Actions de l'enregistrement";
 "detail.recording.delete" = "Supprimer l'enregistrement";

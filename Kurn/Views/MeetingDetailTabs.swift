@@ -226,7 +226,6 @@ struct SummaryTab: View {
                 translatingRow(to: translationTargetLanguage)
             }
         }
-        .simultaneousGesture(summarySwipe)
     }
 
     /// The selection the bar's menu/dots show — while a new summary streams,
@@ -246,28 +245,6 @@ struct SummaryTab: View {
     private func listen() {
         guard let item = readAloudItem else { return }
         controller.toggle(item, settings: settings)
-    }
-
-    /// A horizontal swipe on the summary body steps through the summaries
-    /// (newest first); the pill menu already names where you land, so the dots
-    /// stay `accessibilityHidden` and this announces the change.
-    private var summarySwipe: some Gesture {
-        DragGesture(minimumDistance: 10).onEnded { value in
-            guard sortedSummaries.count > 1,
-                  let selectedSummary,
-                  let index = sortedSummaries.firstIndex(where: { $0.id == selectedSummary.id }),
-                  abs(value.translation.height) < 40,
-                  abs(value.translation.width) > 60 else { return }
-            let target = value.translation.width < 0 ? index + 1 : index - 1
-            guard sortedSummaries.indices.contains(target) else { return }
-            let summary = sortedSummaries[target]
-            onSelectSummary(summary)
-            AccessibilityNotification.Announcement(
-                summary.templateName?.isEmpty == false
-                    ? summary.templateName!
-                    : NSLocalizedString("detail.summary.untitled", comment: "Summary")
-            ).post()
-        }
     }
 
     /// Streaming replaces the finished summary in place — the pill reads

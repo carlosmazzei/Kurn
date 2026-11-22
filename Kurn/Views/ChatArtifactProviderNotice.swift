@@ -4,6 +4,9 @@ import SwiftUI
 /// cannot chat: a full empty state with a direct route into provider
 /// settings. The composer is hidden entirely wherever this renders.
 struct ChatArtifactProviderNotice: View {
+    /// The meeting this chat is scoped to; `nil` for the library-wide Ask —
+    /// the description then stays generic.
+    var meetingTitle: String?
     @State private var showingSettings = false
 
     var body: some View {
@@ -11,7 +14,11 @@ struct ChatArtifactProviderNotice: View {
             Label(NSLocalizedString("chat.provider.title", comment: "Connect an AI provider"),
                   systemImage: "icloud.slash")
         } description: {
-            Text(NSLocalizedString("chat.provider.subtitle", comment: "Provider notice description"))
+            Text(meetingTitle.map {
+                String(format: NSLocalizedString(
+                    "chat.provider.subtitle.meeting",
+                    comment: "Provider notice description for a meeting-scoped chat"), $0)
+            } ?? NSLocalizedString("chat.provider.subtitle", comment: "Provider notice description"))
         } actions: {
             Button(NSLocalizedString("chat.provider.setup", comment: "Set up provider")) {
                 showingSettings = true

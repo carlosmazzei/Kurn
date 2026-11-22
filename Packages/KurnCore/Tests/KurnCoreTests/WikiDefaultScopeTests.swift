@@ -35,4 +35,30 @@ struct WikiDefaultScopeTests {
     @Test func emptyCandidatesReturnEmpty() {
         #expect(WikiDefaultScope.select(candidates: [], now: now, calendar: calendar).isEmpty)
     }
+
+    @Test func reconcileKeepsLiveAndAllowedMeetings() {
+        let a = candidate(at: weekStart + 3_600)
+        let b = candidate(at: now - 60)
+        let gone = UUID()
+        let reconciled = WikiDefaultScope.reconcile(
+            selected: [a.id, b.id, gone],
+            candidates: [a, b], now: now, calendar: calendar)
+        #expect(reconciled == [a.id, b.id])
+    }
+
+    @Test func reconcileFallsBackToDefaultScopeWhenSelectionIsFullyStale() {
+        let a = candidate(at: weekStart + 3_600)
+        let b = candidate(at: now - 60)
+        // Every selected meeting was deleted (or lost its allowance): the
+        // default scope takes over so the reader never sits on a blocked one.
+        let reconciled = WikiDefaultScope.reconcile(
+            selected: [UUID(), UUID()],
+            candidates: [a, b], now: now, calendar: calendar)
+        #expect(reconciled == [b.id, a.id])
+    }
+
+    @Test func reconcileWithNoCandidatesReturnsEmpty() {
+        #expect(WikiDefaultScope.reconcile(
+            selected: [UUID()], candidates: [], now: now, calendar: calendar).isEmpty)
+    }
 }

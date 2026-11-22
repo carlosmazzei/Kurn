@@ -24,6 +24,10 @@ struct ReadAloudBar: View {
 
     private var controller: ReadAloudController { .shared }
     private var phase: ReadAloudController.Phase { controller.phase(for: item.id) }
+    /// A failed read leaves `phase == .idle` plus a recorded error — the bar
+    /// stays mounted in that state so the message is seen and can be closed.
+    private var readError: AppError? { controller.error(for: item.id) }
+    private var errorOnly: Bool { phase == .idle && readError != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -33,36 +37,52 @@ struct ReadAloudBar: View {
                         .font(Theme.subheadlineEmphasized)
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
-                    Text(subtitle)
-                        .font(Theme.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(1)
+                    if errorOnly, let readError {
+                        Text(readError.errorDescription ?? "")
+                            .font(Theme.caption)
+                            .foregroundStyle(Theme.destructive)
+                            .lineLimit(2)
+                    } else {
+                        Text(subtitle)
+                            .font(Theme.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(Theme.textSecondary)
+                            .lineLimit(1)
+                    }
                 }
                 Spacer(minLength: 8)
-                transportButton(icon: "backward.fill",
-                                label: NSLocalizedString("read_aloud.previous", comment: "Previous paragraph")) {
-                    controller.skip(by: -1)
-                }
-                toggleButton
-                transportButton(icon: "forward.fill",
-                                label: NSLocalizedString("read_aloud.next", comment: "Next paragraph")) {
-                    controller.skip(by: 1)
-                }
-                transportButton(icon: "xmark",
-                                label: NSLocalizedString("read_aloud.stop", comment: "Stop reading")) {
-                    controller.stop()
+                if errorOnly {
+                    transportButton(icon: "xmark",
+                                    label: NSLocalizedString("read_aloud.dismiss_error", comment: "Dismiss")) {
+                        controller.clearError(for: item.id)
+                    }
+                } else {
+                    transportButton(icon: "backward.fill",
+                                    label: NSLocalizedString("read_aloud.previous", comment: "Previous paragraph")) {
+                        controller.skip(by: -1)
+                    }
+                    toggleButton
+                    transportButton(icon: "forward.fill",
+                                    label: NSLocalizedString("read_aloud.next", comment: "Next paragraph")) {
+                        controller.skip(by: 1)
+                    }
+                    transportButton(icon: "xmark",
+                                    label: NSLocalizedString("read_aloud.stop", comment: "Stop reading")) {
+                        controller.stop()
+                    }
                 }
             }
 
-            ProgressView(value: controller.chunkCount > 0
-                         ? Double(controller.chunkIndex + 1) / Double(controller.chunkCount)
-                         : 0)
-                .progressViewStyle(.linear)
-                .tint(Theme.ink)
+            if !errorOnly {
+                ProgressView(value: controller.chunkCount > 0
+                             ? Double(controller.chunkIndex + 1) / Double(controller.chunkCount)
+                             : 0)
+                    .progressViewStyle(.linear)
+                    .tint(Theme.ink)
+            }
 
-            if let error = controller.error(for: item.id) {
-                Text(error.errorDescription ?? "")
+            if let readError, !errorOnly {
+                Text(readError.errorDescription ?? "")
                     .font(Theme.footnote)
                     .foregroundStyle(Theme.destructive)
             }
