@@ -162,7 +162,10 @@ struct MeetingDetailView: View {
     /// (CI's slower compiler timed out here).
     private var base: some View {
         VStack(spacing: 0) {
-            MeetingDetailHeader(meeting: meeting, expanded: tab == .summary, duration: totalDuration)
+            // The same full header on every mode (user decision): date, duration,
+            // language and the participant/folder/tag chips never disappear
+            // when switching to Transcript, Audio or Wiki.
+            MeetingDetailHeader(meeting: meeting, expanded: true, duration: totalDuration)
             sectionPicker
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)

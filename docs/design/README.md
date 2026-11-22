@@ -38,6 +38,7 @@ captures taken during implementation live in the PR.
 | Settings hub | Search, Usage, Health, Diagnostics as separate rows | Same as the prototype | Listed because the roadmap's U1.4 wanted them merged; the prototype's choice won. |
 | List indicators | Grey `#a5a5aa` | `Theme.indicator` = `textTertiary` (darker grey) | The prototype's grey fails the 3:1 contrast floor for glyphs. |
 | Transcript speaker name | Dark tone of the speaker colour | Primary label colour; the colour is on the avatar only | Speaker colours are not all 4.5:1 on paper. |
+| Meeting detail header | Collapsed (title only) outside the Summary tab | Full header on every tab | User decision: the context should not disappear when switching tabs. |
 | Summary tab | Swipe left/right over the text switches summaries | Page dots are tappable; the pill menu lists them | A drag gesture on the summary body competed with the ScrollView and blocked vertical scrolling. |
 | Mentioned in (wiki page) | Row opens the meeting | Row is informational (count only) | The Wiki reader is a sheet and cannot push the meeting detail safely. |
 

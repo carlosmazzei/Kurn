@@ -158,19 +158,19 @@ struct MeetingCard: View {
                     .accessibilityHidden(true)
                 Text(NSLocalizedString("meetings.status.transcribing", comment: "Transcribing"))
             }
-            .font(Theme.subheadline)
+            .font(Theme.footnote)
             .foregroundStyle(Theme.warning)
         case .pending:
             Text(NSLocalizedString("meetings.status.queued", comment: "Queued to resume"))
-                .font(Theme.subheadline)
+                .font(Theme.footnote)
                 .foregroundStyle(Theme.warning)
         case .failed:
             Text(NSLocalizedString("meetings.status.transcription_failed", comment: "Transcription failed"))
-                .font(Theme.subheadline)
+                .font(Theme.footnote)
                 .foregroundStyle(Theme.destructive)
         case .none, .done:
             Text(metadataLine)
-                .font(Theme.subheadline)
+                .font(Theme.footnote)
                 .foregroundStyle(Theme.textSecondary)
         }
     }

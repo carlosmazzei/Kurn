@@ -4130,6 +4130,9 @@ not drift:
   2026) applied one consent at a time through the existing audio-upload and
   model-download dialogs, and an Advanced mode with every control. Knowledge
   and the meeting-page settings are one Wiki screen (`KnowledgeSettingsView`).
+- **Meeting header** is the same full form (title, date · time · duration,
+  language, participant/folder/tag chips) on every mode — the prototype's
+  collapsed header for non-summary modes was dropped by user decision.
 - **Recorder** keeps Discard and the title field (user decision), with the
   prototype layout: provisional "Meeting at HH:mm" placeholder, status in
   words with the microphone name, Stop as the only red control; stopping opens
