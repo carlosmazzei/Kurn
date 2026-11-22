@@ -166,18 +166,35 @@ struct KnowledgeExtractionService: Sendable {
         for attempt in 0...1 {
             try Task.checkCancellation()
             try await authorize(llm, authorization)
-            let reply = try await llm.chat(systemPrompt: system + diagnostic,
-                messages: [ChatMessage(role: .user, content: input)], options: options)
-            try Task.checkCancellation()
+            let startedAt = Date()
+            AppLog.knowledge.atNotice.notice("knowledge extraction pass start attempt=\(attempt + 1, privacy: .public) segments=\(sources.count, privacy: .public) provider=\(llm.provider.id, privacy: .public) maxOutputTokens=\(options.maxOutputTokens, privacy: .public) timeout=\(Int(options.timeout), privacy: .public)s")
+            let reply: String
             do {
-                let document = try KnowledgeExtraction.decode(Data(reply.utf8), segments: revision.snapshot.sourceSegments)
+                reply = try await llm.chat(systemPrompt: system + diagnostic,
+                    messages: [ChatMessage(role: .user, content: input)], options: options)
+            } catch {
+                AppLog.knowledge.atError.error("knowledge extraction pass request failed attempt=\(attempt + 1, privacy: .public) elapsed=\(Int(Date().timeIntervalSince(startedAt)), privacy: .public)s code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
+                throw error
+            }
+            try Task.checkCancellation()
+            let data = KnowledgeExtraction.normalizedReply(reply)
+            let elapsed = Int(Date().timeIntervalSince(startedAt))
+            do {
+                let document = try KnowledgeExtraction.decode(data, segments: revision.snapshot.sourceSegments)
                 guard Set(document.examinedSegmentIDs).isSubset(of: Set(sources.map(\.id))) else {
                     throw KnowledgeExtractionError.invalidCoverage
                 }
+                AppLog.knowledge.atNotice.notice("knowledge extraction pass ok attempt=\(attempt + 1, privacy: .public) elapsed=\(elapsed, privacy: .public)s replyBytes=\(data.count, privacy: .public) assertions=\(document.assertions.count, privacy: .public)")
                 return document
             } catch let error as KnowledgeExtractionError {
+                // Structural path only (schema key names and indices), never
+                // model text — safe to log publicly and to send in the repair.
+                let location = KnowledgeExtractionShape.diagnose(data) ?? "content"
+                AppLog.knowledge.atError.error("knowledge extraction pass rejected attempt=\(attempt + 1, privacy: .public) elapsed=\(elapsed, privacy: .public)s replyBytes=\(data.count, privacy: .public) code=\(error.rawValue, privacy: .public) at=\(location, privacy: .public)")
                 guard attempt == 0 else { throw error }
-                diagnostic = "\nThe previous response failed host validation (\(error.rawValue)). Return a complete corrected JSON object."
+                diagnostic = "\nThe previous response failed host validation (\(error.rawValue) at \(location)). "
+                    + "Return ONLY one complete JSON object with exactly the keys described above — no Markdown, no prose, "
+                    + "every required key present (use [] for empty arrays), no extra keys."
             }
         }
         // The bounded loop either returns a validated result or throws.
