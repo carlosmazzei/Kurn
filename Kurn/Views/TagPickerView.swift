@@ -49,6 +49,21 @@ struct TagPickerView: View {
         NavigationStack {
             List {
                 Section {
+                    HStack(spacing: 12) {
+                        TextField(
+                            NSLocalizedString("tag.search_or_create", comment: "Search or create a tag"),
+                            text: $newTagName
+                        )
+                        Button {
+                            createTag()
+                        } label: {
+                            Text(NSLocalizedString("tag.add", comment: "Add"))
+                        }
+                        .disabled(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+
+                Section {
                     if allTags.isEmpty {
                         Text(NSLocalizedString("tag.empty", comment: "No tags yet"))
                             .foregroundStyle(Theme.textSecondary)
@@ -61,21 +76,6 @@ struct TagPickerView: View {
                     Text(NSLocalizedString("tag.select", comment: "Select tags"))
                 } footer: {
                     Text(NSLocalizedString("tag.delete.message", comment: "Deleting removes from all meetings"))
-                }
-
-                Section(NSLocalizedString("tag.new", comment: "New tag")) {
-                    HStack(spacing: 12) {
-                        TextField(
-                            NSLocalizedString("tag.name_placeholder", comment: "Tag name"),
-                            text: $newTagName
-                        )
-                        Button {
-                            createTag()
-                        } label: {
-                            Text(NSLocalizedString("tag.add", comment: "Add"))
-                        }
-                        .disabled(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
                 }
             }
             .navigationTitle(NSLocalizedString("tag.title", comment: "Tags"))

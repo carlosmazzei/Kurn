@@ -7,6 +7,7 @@
 //
 
 import KurnCore
+import LocalAuthentication
 import SwiftUI
 
 /// The lock screen, rendered by `SecurityCoverView` in the cover window that
@@ -19,14 +20,29 @@ struct LockedRecordingsView: View {
     let gate: RecordingAccessGate
     @Binding var showingSettings: Bool
 
+    /// The biometric the system prompt will lead with, read once — only a
+    /// `canEvaluatePolicy` check, so choosing the glyph never triggers a
+    /// prompt. Falls back to the generic open lock when there is no biometric.
+    private static let unlockGlyph: String = {
+        let context = LAContext()
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil) else {
+            return "lock.open"
+        }
+        switch context.biometryType {
+        case .faceID: return "faceid"
+        case .touchID: return "touchid"
+        default: return "lock.open"
+        }
+    }()
+
     var body: some View {
         VStack(spacing: 18) {
             Image(systemName: "lock.fill")
-                .font(.largeTitle)
+                .font(.system(size: 46))
                 .foregroundStyle(Theme.textSecondary)
                 .accessibilityHidden(true)
             Text(NSLocalizedString("recordings.locked_title", comment: "Recordings Locked"))
-                .font(.title2.weight(.semibold))
+                .font(.title2.bold())
                 .foregroundStyle(Theme.textPrimary)
             Text(NSLocalizedString("recordings.locked_subtitle", comment: "Authenticate to view"))
                 .font(.subheadline)
@@ -40,14 +56,13 @@ struct LockedRecordingsView: View {
             }
             // The one action this screen exists for — Liquid Glass primary
             // button language (Theme.swift, "Button language"), not a
-            // hand-drawn rectangle. `RecordingAccessGate` does not expose the
-            // device's biometry type, so the glyph is the generic open lock.
+            // hand-drawn rectangle.
             Button {
                 Task { await gate.authenticate() }
             } label: {
                 Label(
                     NSLocalizedString("recordings.unlock_button", comment: "Unlock"),
-                    systemImage: "lock.open"
+                    systemImage: Self.unlockGlyph
                 )
                 .font(Theme.subheadlineEmphasized)
                 .foregroundStyle(Theme.onInk)

@@ -14,6 +14,9 @@ import SwiftUI
 
 struct ReadAloudControl: View {
     let item: ReadAloudItem
+    /// `true` drops the button chrome: a plain glyph-plus-text row for surfaces
+    /// that already carry card styling, like the document page.
+    var ghost = false
 
     @Environment(AppSettings.self) private var settings
 
@@ -50,32 +53,46 @@ struct ReadAloudControl: View {
         }
     }
 
+    @ViewBuilder
     private func toggleButton(_ phase: ReadAloudController.Phase) -> some View {
-        Button {
-            controller.toggle(item, settings: settings)
-        } label: {
-            HStack(spacing: 6) {
-                // Fixed-size slot: a ProgressView's intrinsic size can measure
-                // differently from the static icon it replaces on its first
-                // layout pass, which is what let the button's width fluctuate
-                // during the `.idle` -> `.preparing` transition.
-                Group {
-                    if phase == .preparing {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Image(systemName: Self.icon(for: phase))
-                    }
-                }
-                .frame(width: 16, height: 16)
-                .accessibilityHidden(true)
-                Text(Self.title(for: phase))
+        // `PrimitiveButtonStyle`s are distinct types, so the ghost/plain swap
+        // needs two branches rather than a ternary on `.buttonStyle`.
+        if ghost {
+            Button { controller.toggle(item, settings: settings) } label: {
+                toggleLabel(phase)
             }
-            .font(Theme.subheadlineEmphasized)
+            .buttonStyle(.plain)
+            .tint(Theme.textPrimary)
+            .accessibilityIdentifier("readAloud.toggle")
+        } else {
+            Button { controller.toggle(item, settings: settings) } label: {
+                toggleLabel(phase)
+            }
+            .buttonStyle(.bordered)
+            .tint(Theme.ink)
+            .accessibilityIdentifier("readAloud.toggle")
         }
-        .buttonStyle(.bordered)
-        .tint(Theme.ink)
-        .accessibilityIdentifier("readAloud.toggle")
+    }
+
+    private func toggleLabel(_ phase: ReadAloudController.Phase) -> some View {
+        HStack(spacing: 6) {
+            // Fixed-size slot: a ProgressView's intrinsic size can measure
+            // differently from the static icon it replaces on its first
+            // layout pass, which is what let the button's width fluctuate
+            // during the `.idle` -> `.preparing` transition.
+            Group {
+                if phase == .preparing {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: Self.icon(for: phase))
+                }
+            }
+            .frame(width: 16, height: 16)
+            .accessibilityHidden(true)
+            Text(Self.title(for: phase))
+        }
+        .font(Theme.subheadlineEmphasized)
     }
 
     private var transportButtons: some View {

@@ -18,6 +18,22 @@ struct PhotoViewerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showingDeleteConfirm = false
 
+    /// "Recording N · m:ss into the meeting". N is the recording's position in
+    /// its meeting, matching the numbering the Audio tab shows; a photo whose
+    /// recording was deleted just shows the timestamp.
+    private var caption: String {
+        let offset = photo.capturedAt.clockDisplay
+        let recordings = photo.recording?.meeting?.recordings
+            .sorted(by: { $0.recordedAt < $1.recordedAt }) ?? []
+        let index = recordings.firstIndex(where: { $0.id == photo.recording?.id })
+        guard let index else { return offset }
+        return String(
+            format: NSLocalizedString("photo.caption", comment: "Recording position caption"),
+            index + 1,
+            offset
+        )
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -40,19 +56,27 @@ struct PhotoViewerView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.top, 60)
                     }
+                    Text(caption)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.textSecondary)
                     if let text = photo.recognizedText, !text.isEmpty {
-                        Text(NSLocalizedString("photo.recognized_text", comment: "Recognized text").uppercased())
-                            .font(Theme.caption2Emphasized).tracking(0.8)
-                            .foregroundStyle(Theme.textTertiary)
-                        Text(text)
-                            .font(Theme.subheadline)
-                            .foregroundStyle(Theme.textPrimary)
-                            .textSelection(.enabled)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(NSLocalizedString("photo.recognized_text", comment: "Recognized text").uppercased())
+                                .font(Theme.caption2Emphasized).tracking(0.8)
+                                .foregroundStyle(Theme.textTertiary)
+                            Text(text)
+                                .font(Theme.subheadline)
+                                .foregroundStyle(Theme.textPrimary)
+                                .textSelection(.enabled)
+                        }
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
                     }
                 }
                 .padding()
             }
-            .navigationTitle((photo.capturedAt).clockDisplay)
+            .navigationTitle(NSLocalizedString("photo.title", comment: "Photo"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if onDelete != nil {
@@ -61,12 +85,15 @@ struct PhotoViewerView: View {
                             showingDeleteConfirm = true
                         } label: {
                             Image(systemName: "trash")
+                                .foregroundStyle(Theme.destructive)
                         }
                         .accessibilityLabel(NSLocalizedString("photo.delete", comment: "Delete Photo"))
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
+                        .buttonStyle(.glassProminent)
+                        .tint(Theme.ink)
                 }
             }
         }

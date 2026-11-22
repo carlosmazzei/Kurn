@@ -22,6 +22,7 @@ struct MeetingFormView: View {
     @State private var language: MeetingLanguage = .autoDetect
     @State private var initialized = false
     @State private var showingTagPicker = false
+    @State private var showingFolderPicker = false
     /// Set when saving fails, so the failure surfaces and the form stays open.
     @State private var saveError: AppError?
 
@@ -32,14 +33,6 @@ struct MeetingFormView: View {
                     NSLocalizedString("form.title_placeholder", comment: "Title"),
                     text: $title
                 )
-            }
-            Section(NSLocalizedString("form.notes_section", comment: "Notes")) {
-                TextField(
-                    NSLocalizedString("form.notes_placeholder", comment: "Notes"),
-                    text: $notes,
-                    axis: .vertical
-                )
-                .lineLimit(3...8)
             }
             Section {
                 Picker(
@@ -58,18 +51,38 @@ struct MeetingFormView: View {
                 Text(NSLocalizedString("settings.language_support_footer", comment: "Explains the unsupported-language warning icon"))
             }
             if let meeting {
-                Section(NSLocalizedString("tag.title", comment: "Tags")) {
+                Section(NSLocalizedString("form.organisation_section", comment: "Organisation")) {
+                    Button {
+                        showingFolderPicker = true
+                    } label: {
+                        HStack {
+                            Text(NSLocalizedString("folder.title", comment: "Folder"))
+                                .foregroundStyle(Theme.textPrimary)
+                            Spacer()
+                            Text(meeting.folder?.name ?? NSLocalizedString("folder.inbox", comment: "Inbox"))
+                                .foregroundStyle(Theme.textSecondary)
+                            Image(systemName: "chevron.right")
+                                .font(.system(.footnote, weight: .semibold))
+                                .foregroundStyle(Theme.textTertiary)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .buttonStyle(.plain)
                     Button {
                         showingTagPicker = true
                     } label: {
                         HStack {
+                            Text(NSLocalizedString("tag.title", comment: "Tags"))
+                                .foregroundStyle(Theme.textPrimary)
+                            Spacer()
                             if meeting.tags.isEmpty {
                                 Text(NSLocalizedString("meetings.tag.add", comment: "Add tag"))
                                     .foregroundStyle(Theme.textSecondary)
                             } else {
-                                TagChipsView(tags: meeting.tags)
+                                Text(meeting.tags.map(\.name).sorted().joined(separator: ", "))
+                                    .foregroundStyle(Theme.textSecondary)
+                                    .lineLimit(1)
                             }
-                            Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.system(.footnote, weight: .semibold))
                                 .foregroundStyle(Theme.textTertiary)
@@ -79,10 +92,23 @@ struct MeetingFormView: View {
                     .buttonStyle(.plain)
                 }
             }
+            Section(NSLocalizedString("form.notes_section", comment: "Notes")) {
+                TextField(
+                    NSLocalizedString("form.notes_placeholder", comment: "Notes"),
+                    text: $notes,
+                    axis: .vertical
+                )
+                .lineLimit(3...8)
+            }
         }
         .sheet(isPresented: $showingTagPicker) {
             if let meeting {
                 NavigationStack { TagPickerView(meeting: meeting) }
+            }
+        }
+        .sheet(isPresented: $showingFolderPicker) {
+            if let meeting {
+                FolderPickerView(meeting: meeting)
             }
         }
         .navigationTitle(
@@ -97,6 +123,8 @@ struct MeetingFormView: View {
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button(NSLocalizedString("common.save", comment: "Save")) { save() }
+                    .buttonStyle(.glassProminent)
+                    .tint(Theme.ink)
             }
         }
         .onAppear(perform: setupIfNeeded)

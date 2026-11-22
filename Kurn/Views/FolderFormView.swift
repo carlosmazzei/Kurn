@@ -17,6 +17,11 @@ struct FolderFormView: View {
     enum Mode: Equatable {
         case create(parent: Folder?)
         case edit(Folder)
+
+        var isCreate: Bool {
+            if case .create = self { return true }
+            return false
+        }
     }
 
     @Environment(\.modelContext) private var modelContext
@@ -47,7 +52,7 @@ struct FolderFormView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section(NSLocalizedString("form.title_section", comment: "Title")) {
+                Section(NSLocalizedString("folder.name_section", comment: "Name")) {
                     HStack(spacing: 12) {
                         Image(systemName: iconName)
                             .frame(width: 32, height: 32)
@@ -76,7 +81,13 @@ struct FolderFormView: View {
                         .accessibilityIdentifier("folder.cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(NSLocalizedString("common.save", comment: "Save")) { save() }
+                    Button(
+                        mode.isCreate
+                            ? NSLocalizedString("common.create", comment: "Create")
+                            : NSLocalizedString("common.save", comment: "Save")
+                    ) { save() }
+                        .buttonStyle(.glassProminent)
+                        .tint(Theme.ink)
                         .disabled(!canSave)
                         .accessibilityIdentifier("folder.save")
                 }
@@ -89,18 +100,16 @@ struct FolderFormView: View {
     // MARK: - Subviews
 
     private var iconGrid: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 5)
-        return LazyVGrid(columns: columns, spacing: 12) {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 6)
+        return LazyVGrid(columns: columns, spacing: 8) {
             ForEach(FolderIconCatalog.icons, id: \.self) { symbol in
                 Button { iconName = symbol } label: {
                     Image(systemName: symbol)
                         .font(Theme.body)
-                        .frame(width: 40, height: 40)
-                        .foregroundStyle(iconName == symbol ? Color(hex: colorHex) : Theme.textSecondary)
+                        .frame(width: 36, height: 36)
+                        .foregroundStyle(iconName == symbol ? Theme.textPrimary : Theme.textSecondary)
                         .background(
-                            iconName == symbol
-                                ? Color(hex: colorHex).opacity(0.18)
-                                : Theme.fill,
+                            iconName == symbol ? Theme.fill : .clear,
                             in: RoundedRectangle(cornerRadius: 10, style: .continuous)
                         )
                         .frame(minWidth: 44, minHeight: 44)
@@ -119,18 +128,20 @@ struct FolderFormView: View {
         return LazyVGrid(columns: columns, spacing: 10) {
             ForEach(FolderColorPalette.colors, id: \.self) { hex in
                 Button { colorHex = hex } label: {
-                    ZStack {
-                        Circle()
-                            .fill(Color(hex: hex))
-                            .frame(width: 30, height: 30)
-                        if colorHex == hex {
-                            Image(systemName: "checkmark")
-                                .font(Theme.caption2Emphasized)
-                                .foregroundStyle(.white)
+                    Circle()
+                        .fill(Color(hex: hex))
+                        .frame(width: 34, height: 34)
+                        .overlay {
+                            if colorHex == hex {
+                                Circle()
+                                    .stroke(Theme.surface, lineWidth: 3)
+                                    .padding(2)
+                                Circle()
+                                    .stroke(Color(hex: hex), lineWidth: 2)
+                            }
                         }
-                    }
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(FolderColorPalette.accessibleName(for: hex))

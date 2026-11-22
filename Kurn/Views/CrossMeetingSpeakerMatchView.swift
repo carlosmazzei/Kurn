@@ -21,7 +21,7 @@ struct CrossMeetingSpeakerMatchView: View {
             VStack(spacing: 20) {
                 Circle()
                     .fill(Color(hex: match.matchedSpeaker.color))
-                    .frame(width: 56, height: 56)
+                    .frame(width: 44, height: 44)
                     .overlay {
                         Image(systemName: "person.fill")
                             .foregroundStyle(.white)
@@ -72,7 +72,7 @@ struct CrossMeetingSpeakerMatchView: View {
                     Text(NSLocalizedString("speaker.cross_meeting_match.dismiss", comment: "Not now"))
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.bordered)
             }
             .padding(24)
             .navigationTitle(NSLocalizedString("speaker.cross_meeting_match.title", comment: "Familiar voice"))

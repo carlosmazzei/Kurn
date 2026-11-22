@@ -13,10 +13,15 @@ struct PrivacyCoverView: View {
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
-            Image(systemName: "waveform")
-                .font(.largeTitle)
-                .foregroundStyle(Theme.textSecondary)
-                .accessibilityHidden(true)
+            VStack(spacing: 14) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 46))
+                    .foregroundStyle(Theme.textSecondary)
+                    .accessibilityHidden(true)
+                Text("Kurn")
+                    .font(.title2.bold())
+                    .foregroundStyle(Theme.textPrimary)
+            }
         }
     }
 }

@@ -80,7 +80,7 @@ struct ReadAloudSettingsView: View {
             Section {
                 ReadAloudControl(item: previewItem)
             } header: {
-                Text(NSLocalizedString("settings.read_aloud.sample", comment: "Hear a sample"))
+                Text(NSLocalizedString("settings.read_aloud.sample_row", comment: "Hear a sample"))
             } footer: {
                 Text(NSLocalizedString("settings.read_aloud.preview_footer", comment: "Where read aloud appears"))
             }

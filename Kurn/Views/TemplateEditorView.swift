@@ -90,6 +90,8 @@ struct TemplateEditor: View {
                     onSave(updated)
                     dismiss()
                 }
+                .buttonStyle(.glassProminent)
+                .tint(Theme.ink)
                 .disabled(!canSave)
             }
         }
@@ -154,6 +156,8 @@ struct AddTemplateView: View {
                     )
                     onAdd(template)
                 }
+                .buttonStyle(.glassProminent)
+                .tint(Theme.ink)
                 .disabled(!canSave)
             }
         }

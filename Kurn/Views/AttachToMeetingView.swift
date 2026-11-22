@@ -20,6 +20,7 @@ struct AttachToMeetingView: View {
 
     @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
     @State private var viewModel: AttachToMeetingViewModel
+    @State private var selectedMeeting: Meeting?
 
     init(files: [URL], modelContext: ModelContext, onFinished: @escaping () -> Void) {
         _viewModel = State(initialValue: AttachToMeetingViewModel(files: files, modelContext: modelContext))
@@ -47,6 +48,15 @@ struct AttachToMeetingView: View {
                         Button(NSLocalizedString("common.cancel", comment: "Cancel"), action: onFinished)
                             .disabled(viewModel.isImporting)
                     }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(NSLocalizedString("attach.attach", comment: "Attach")) {
+                            guard let selectedMeeting else { return }
+                            Task { await viewModel.attach(to: selectedMeeting) }
+                        }
+                        .buttonStyle(.glassProminent)
+                        .tint(Theme.ink)
+                        .disabled(selectedMeeting == nil || viewModel.isImporting)
+                    }
                 }
             }
             .overlay {
@@ -63,35 +73,42 @@ struct AttachToMeetingView: View {
 
     private var pickerList: some View {
         List {
-            Section(NSLocalizedString("attach.files", comment: "Files being added")) {
+            Section {
                 ForEach(viewModel.files, id: \.self) { file in
-                    Label(file.lastPathComponent, systemImage: "doc.richtext")
-                        .font(Theme.subheadline)
-                        .foregroundStyle(Theme.textPrimary)
+                    fileCard(file)
                 }
             }
             Section {
                 Button {
                     Task { await viewModel.attachToNewMeeting() }
                 } label: {
-                    Label(NSLocalizedString("attach.new_meeting", comment: "New meeting"), systemImage: "plus.circle.fill")
+                    Label(NSLocalizedString("attach.new_meeting", comment: "New meeting"), systemImage: "plus")
                         .foregroundStyle(Theme.link)
                 }
                 .accessibilityIdentifier("attach.new_meeting")
             }
-            Section(NSLocalizedString("attach.meetings", comment: "Meetings")) {
+            Section(NSLocalizedString("attach.recent", comment: "Recent")) {
                 ForEach(viewModel.matchingMeetings(meetings)) { meeting in
                     Button {
-                        Task { await viewModel.attach(to: meeting) }
+                        selectedMeeting = meeting
                     } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(meeting.title)
-                                .font(Theme.body)
-                                .foregroundStyle(Theme.textPrimary)
-                                .lineLimit(2)
-                            Text(meeting.createdAt.formatted(date: .abbreviated, time: .shortened))
-                                .font(Theme.caption)
-                                .foregroundStyle(Theme.textSecondary)
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(meeting.title)
+                                    .font(Theme.body)
+                                    .foregroundStyle(Theme.textPrimary)
+                                    .lineLimit(2)
+                                Text("\(meeting.createdAt.relativeDay) · \(meeting.createdAt.shortTime)")
+                                    .font(Theme.caption)
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+                            Spacer()
+                            if selectedMeeting?.persistentModelID == meeting.persistentModelID {
+                                Image(systemName: "checkmark")
+                                    .font(.system(.footnote, weight: .semibold))
+                                    .foregroundStyle(Theme.link)
+                                    .accessibilityHidden(true)
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
@@ -100,8 +117,41 @@ struct AttachToMeetingView: View {
                 }
             }
         }
-        .searchable(text: $viewModel.searchText)
+        .searchable(
+            text: $viewModel.searchText,
+            prompt: NSLocalizedString("attach.search", comment: "Search meetings")
+        )
         .disabled(viewModel.isImporting)
+    }
+
+    /// The incoming file as a card: `doc.text` on a grey well, filename, and
+    /// the file size when the sandbox copy lets us stat it.
+    private func fileCard(_ file: URL) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "doc.text")
+                .font(.title3)
+                .foregroundStyle(Theme.textSecondary)
+                .frame(width: 44, height: 52)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(file.lastPathComponent)
+                    .font(Theme.subheadlineEmphasized)
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
+                if let size = fileSizeString(file) {
+                    Text(size)
+                        .font(Theme.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func fileSizeString(_ file: URL) -> String? {
+        guard let size = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize else { return nil }
+        return ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
     }
 
     private func doneView(meetingTitle: String) -> some View {
