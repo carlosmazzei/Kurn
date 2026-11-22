@@ -49,11 +49,21 @@ struct TextGenerationOptions: Sendable, Equatable {
     /// Structured extraction needs an intact JSON document; prose may stop naturally.
     var requiresCompleteJSON = false
 
-    static func knowledgeExtraction(for provider: AIProvider) -> Self {
-        let output = provider.kind == .appleOnDevice
-            ? FoundationModelsProvider.clampedOutputTokens(document.maxOutputTokens) : document.maxOutputTokens
-        return Self(maxOutputTokens: output, timeout: document.timeout, requiresCompleteJSON: true)
+    /// The extraction's output budget follows the model's published output
+    /// limit (`modelOutputLimit`, from the model catalog) up to a 32k cap, so
+    /// a long meeting is not cut and re-split at a fixed 8k; the deadline grows
+    /// with it (300 s per 8k-equivalent, at most 600 s). On-device keeps its clamp.
+    static func knowledgeExtraction(for provider: AIProvider, modelOutputLimit: Int? = nil) -> Self {
+        if provider.kind == .appleOnDevice {
+            return Self(maxOutputTokens: FoundationModelsProvider.clampedOutputTokens(document.maxOutputTokens),
+                        timeout: document.timeout, requiresCompleteJSON: true)
+        }
+        let output = modelOutputLimit.map { min(knowledgeExtractionOutputCap, $0) } ?? document.maxOutputTokens
+        let timeout = min(600, document.timeout * max(1, Double(output) / Double(document.maxOutputTokens) / 2))
+        return Self(maxOutputTokens: output, timeout: timeout, requiresCompleteJSON: true)
     }
+
+    static let knowledgeExtractionOutputCap = 32_768
 
     static let chat = Self(
         maxOutputTokens: LLMHTTP.chatMaxOutputTokens,

@@ -363,6 +363,7 @@ final class KnowledgeCompilationCoordinator {
                 let result = try await KnowledgeExtractionService().extract(segments: source.segments, language: source.language,
                     context: context, llm: llm, budget: handle.work.provider.kind == .appleOnDevice ? .onDevice : .conservative,
                     authorization: authorize,
+                    model: handle.work.model,
                     onPass: { [weak self] done, total in
                         await self?.setPassProgress(meetingID, recording: index + 1, of: pendingSources.count, done: done, total: total)
                     })

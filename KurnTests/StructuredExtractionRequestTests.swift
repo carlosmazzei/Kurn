@@ -36,4 +36,16 @@ struct StructuredExtractionRequestTests {
         #expect(reminded[1]["content"]?.contains("JSON") == true)
         #expect(OpenAIProvider.withJSONReminder([["role": "system", "content": "s"]]).last?["role"] == "user")
     }
+
+    @Test func extractionBudgetFollowsTheModelOutputLimitWithinTheCap() {
+        let terra = TextGenerationOptions.knowledgeExtraction(for: .openAI, modelOutputLimit: 128_000)
+        #expect(terra.maxOutputTokens == TextGenerationOptions.knowledgeExtractionOutputCap)
+        #expect(terra.timeout == 600)
+        let unknown = TextGenerationOptions.knowledgeExtraction(for: .openAI, modelOutputLimit: nil)
+        #expect(unknown.maxOutputTokens == TextGenerationOptions.document.maxOutputTokens)
+        #expect(unknown.timeout == TextGenerationOptions.document.timeout)
+        let small = TextGenerationOptions.knowledgeExtraction(for: .openAI, modelOutputLimit: 4_096)
+        #expect(small.maxOutputTokens == 4_096)
+        #expect(TextGenerationOptions.knowledgeExtraction(for: .appleOnDevice, modelOutputLimit: 128_000).maxOutputTokens == 1_024)
+    }
 }
