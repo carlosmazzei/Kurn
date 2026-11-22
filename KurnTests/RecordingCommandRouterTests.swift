@@ -151,6 +151,21 @@ struct RecordingCommandRouterTests {
         #expect(starts == 1)
     }
 
+    /// When no presenter wired `requestStart` (or it refuses) the reply is
+    /// "received" with the no-active-recording error — never `.queued`.
+    @Test func startIsRefusedWhenRequestStartFails() {
+        let router = RecordingCommandRouter.shared
+        router.unregister()
+        defer { router.unregister() }
+        router.requestStart = { false }
+
+        let result = router.handleWatchCommand(.start, commandID: "start-unwired")
+
+        #expect(!result.handled)
+        #expect(result.phase == .received)
+        #expect(result.error == WatchSessionReplyError.noActiveRecording)
+    }
+
     /// `.queued` is true in practice: `RecordingSessionPresenter` consumes
     /// the queued meeting only once `scenePhase` becomes `.active`.
     @Test func startWhileBackgroundedReportsQueued() {

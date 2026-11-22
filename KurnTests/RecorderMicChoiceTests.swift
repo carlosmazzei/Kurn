@@ -16,6 +16,7 @@
 //  the simulator's single built-in mic.
 //
 
+import AVFoundation
 import Foundation
 import SwiftData
 import Testing
@@ -123,6 +124,69 @@ struct RecorderMicChoiceTests {
         #expect(viewModel.micPickerDisabled)
         viewModel.presentMicChoices()
         #expect(viewModel.micChoices.isEmpty)
+    }
+
+    @Test func dismissMicChoicesWithoutAPendingContinuationIsANoOp() {
+        let container = TestModelContainer.make()
+        let context = container.mainContext
+        let meeting = Meeting(title: "Mic choice")
+        context.insert(meeting)
+        try? context.save()
+        let viewModel = RecorderViewModel(meeting: meeting, modelContext: context, defaultMode: .onDevice)
+        viewModel.recorder.preferredInputUID = "kept-choice"
+
+        viewModel.dismissMicChoices()
+
+        #expect(viewModel.recorder.preferredInputUID == "kept-choice")
+        #expect(!viewModel.hasPendingMicChoiceForTesting)
+    }
+
+    /// Picking a mic while a capture is live routes it straight to the audio
+    /// session (`applyPreferredInput`); the pick still lands on the service's
+    /// stored preference for the next start.
+    @Test func chooseMicDuringACaptureAppliesTheLiveRoute() async throws {
+        let container = TestModelContainer.make()
+        let context = container.mainContext
+        let meeting = Meeting(title: "Mic choice")
+        context.insert(meeting)
+        try? context.save()
+        let service = AudioRecorderService(engine: FakeAudioCaptureEngine(),
+                                           sink: FakeAudioSinkWriting(), stallInterval: 3_600,
+                                           microphonePermission: { true })
+        try await service.start(fileName: "mic-live-\(UUID().uuidString).m4a")
+        let viewModel = RecorderViewModel(meeting: meeting, modelContext: context,
+                                        defaultMode: .onDevice, recorder: service)
+
+        viewModel.chooseMic(uid: "live-choice")
+
+        #expect(service.preferredInputUID == "live-choice")
+        #expect(service.state == .recording)
+        _ = service.stop()
+    }
+
+    @Test func localizedMicNameCoversEachPortType() {
+        #expect(RecorderViewModel.localizedMicName(for: .builtInMic)?.isEmpty == false)
+        #expect(RecorderViewModel.localizedMicName(for: .bluetoothHFP)?.isEmpty == false)
+        #expect(RecorderViewModel.localizedMicName(for: .bluetoothLE)?.isEmpty == false)
+        #expect(RecorderViewModel.localizedMicName(for: .headsetMic)?.isEmpty == false)
+        #expect(RecorderViewModel.localizedMicName(for: .usbAudio)?.isEmpty == false)
+        #expect(RecorderViewModel.localizedMicName(for: .lineIn) == nil)
+    }
+
+    /// Reads the routed input name off the shared session — on the simulator
+    /// that's the built-in mic, whose raw `portName` is the type id and so
+    /// falls back to the localized stand-in.
+    @Test func currentMicNameReadsTheLiveSessionRoute() {
+        let container = TestModelContainer.make()
+        let context = container.mainContext
+        let meeting = Meeting(title: "Mic choice")
+        context.insert(meeting)
+        try? context.save()
+        let viewModel = RecorderViewModel(meeting: meeting, modelContext: context, defaultMode: .onDevice)
+
+        if let name = viewModel.currentMicName {
+            #expect(!name.isEmpty)
+        }
     }
 }
 #endif

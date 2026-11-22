@@ -38,6 +38,18 @@ struct ProgressVocabularyTests {
         #expect(TranscriptionPhase.correcting(progress: -1).displayName.contains("0"))
     }
 
+    /// `baseName` strips the embedded percent from the determinate phases so
+    /// callers can show the phase text next to the overall `fractionComplete`.
+    @Test func baseNameDropsTheEmbeddedPercent() {
+        #expect(TranscriptionPhase.transcribing(progress: 0.4).baseName == TranscriptionPhase.transcribing(progress: nil).baseName)
+        #expect(TranscriptionPhase.diarizing(progress: 0.9).baseName == TranscriptionPhase.diarizing(progress: nil).baseName)
+        #expect(TranscriptionPhase.correcting(progress: 0.6).baseName == TranscriptionPhase.correcting(progress: nil).baseName)
+        #expect(!TranscriptionPhase.transcribing(progress: 0.4).baseName.contains("40"))
+        for phase: TranscriptionPhase in [.preparing, .preprocessing, .detectingLanguage, .detectingSpeech, .finalizing] {
+            #expect(phase.baseName == phase.displayName)
+        }
+    }
+
     @Test func theBarOnlyMovesForwardThroughTheStages() {
         let ordered: [TranscriptionPhase] = [
             .preparing, .preprocessing, .detectingLanguage, .detectingSpeech,

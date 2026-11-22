@@ -374,4 +374,36 @@ struct RecorderViewModelStateMachineTests {
         #expect(harness.meeting.title == "Renamed")
         #expect(harness.viewModel.meetingTitle == "Renamed")
     }
+
+    /// The title field reads empty while the meeting carries the generated
+    /// default (so the field shows the "Meeting at <time>" prompt), and
+    /// clearing it again restores the placeholder instead of a blank title.
+    @Test func meetingTitleHidesAndRestoresTheGeneratedDefault() throws {
+        let harness = try Harness()
+        harness.meeting.title = Meeting.generatedTitle(for: harness.meeting.createdAt)
+
+        #expect(harness.viewModel.meetingTitle.isEmpty)
+
+        harness.viewModel.meetingTitle = "Sprint review"
+        #expect(harness.viewModel.meetingTitle == "Sprint review")
+
+        harness.viewModel.meetingTitle = "   "
+        #expect(harness.meeting.isDefaultTitle)
+        #expect(harness.viewModel.meetingTitle.isEmpty)
+    }
+
+    /// Before the user names the meeting, the mini bar falls back to the
+    /// "Meeting at <time>" provisional title stamped with `createdAt`.
+    @Test func titleOrProvisionalFallsBackToTheStartTime() throws {
+        let harness = try Harness()
+        harness.meeting.title = Meeting.generatedTitle(for: harness.meeting.createdAt)
+
+        let provisional = harness.viewModel.provisionalTitle
+        #expect(!provisional.isEmpty)
+        #expect(harness.viewModel.titleOrProvisional == provisional)
+        #expect(harness.viewModel.recordingStartDate == harness.meeting.createdAt)
+
+        harness.viewModel.meetingTitle = "Sprint review"
+        #expect(harness.viewModel.titleOrProvisional == "Sprint review")
+    }
 }
