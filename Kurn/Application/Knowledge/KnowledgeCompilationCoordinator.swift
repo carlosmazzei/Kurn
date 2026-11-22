@@ -365,6 +365,8 @@ final class KnowledgeCompilationCoordinator {
                 !source.segments.isEmpty && !progress.recordings.contains(where: { $0.recordingID == source.id })
             }
             var extractedFacts = 0
+            var discardedFacts = 0
+            let usage = TokenUsageSink()
             for (index, source) in pendingSources.enumerated() {
                 setProgress(meetingID, phase: .extracting(recording: index + 1, of: pendingSources.count),
                             provider: handle.work.provider, model: handle.work.model)
@@ -389,6 +391,8 @@ final class KnowledgeCompilationCoordinator {
                     AppLog.knowledge.atInfo.info("knowledge extraction facts recording=\(source.id, privacy: .private) count=\(assertionCount, privacy: .public)")
                 }
                 extractedFacts += assertionCount
+                discardedFacts += result.discardedFacts
+                if let used = result.usage { usage.add(used) }
                 noteExtractedFacts(meetingID, count: assertionCount)
                 _ = try await currentSource(handle)
                 progress.recordings.append(try KnowledgeRecordingCompilation(recordingID: source.id, result: result))
@@ -405,8 +409,12 @@ final class KnowledgeCompilationCoordinator {
             AppLog.knowledge.atInfo.info("knowledge compilation published meeting=\(handle.work.meetingID, privacy: .private) facts=\(receipt.assertionCount, privacy: .public)")
             // The tab's transient result note; it self-clears after a few
             // seconds unless a newer compile replaced it first.
+            let totalUsage = usage.total
+            let cost = totalUsage.flatMap { ModelPricing.estimatedCostUSD(model: handle.work.model, usage: $0) }
+            AppLog.knowledge.atNotice.notice("knowledge compilation usage promptTokens=\(totalUsage?.promptTokens ?? 0, privacy: .public) completionTokens=\(totalUsage?.completionTokens ?? 0, privacy: .public) costUSD=\(cost.map { String(format: "%.4f", $0) } ?? "unknown", privacy: .public) discardedFacts=\(discardedFacts, privacy: .public)")
             let publishResult = KnowledgeCompilationResult(factCount: receipt.assertionCount,
-                                                           modelEmpty: extractedFacts == 0, finishedAt: Date())
+                                                           modelEmpty: extractedFacts == 0 && discardedFacts == 0, finishedAt: Date(),
+                                                           discardedFacts: discardedFacts, usage: totalUsage, costUSD: cost)
             compilationResults[meetingID] = publishResult
             Task { [weak self] in
                 try? await Task.sleep(for: .seconds(5))
@@ -470,4 +478,9 @@ struct KnowledgeCompilationResult: Equatable, Sendable {
     /// The model answered cleanly but asserted nothing at all.
     let modelEmpty: Bool
     let finishedAt: Date
+    /// Well-formed facts dropped for breaking a domain rule.
+    var discardedFacts = 0
+    /// Vendor-reported tokens and their estimated cost, when known.
+    var usage: TokenUsage?
+    var costUSD: Double?
 }

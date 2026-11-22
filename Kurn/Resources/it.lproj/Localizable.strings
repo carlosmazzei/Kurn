@@ -1983,3 +1983,5 @@
 "knowledge.update.title" = "Aggiornamento delle conoscenze";
 "knowledge.update.failed_title" = "L’aggiornamento delle conoscenze non è riuscito";
 "detail.wiki.failed_title" = "La generazione del wiki non è riuscita";
+"knowledge.updated.discarded.one" = "%d scartato";
+"knowledge.updated.discarded.other" = "%d scartati";

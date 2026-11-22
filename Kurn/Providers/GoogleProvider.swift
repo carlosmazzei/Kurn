@@ -128,6 +128,7 @@ struct GoogleProvider: LLMProvider {
         )
 
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
+        TokenUsageRecording.record(responseBody: data)
 
         return try LLMHTTP.textResult(
             from: data,

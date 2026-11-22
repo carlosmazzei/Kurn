@@ -1983,3 +1983,5 @@
 "knowledge.update.title" = "Wissen wird aktualisiert";
 "knowledge.update.failed_title" = "Wissensaktualisierung fehlgeschlagen";
 "detail.wiki.failed_title" = "Wiki-Erstellung fehlgeschlagen";
+"knowledge.updated.discarded.one" = "%d verworfen";
+"knowledge.updated.discarded.other" = "%d verworfen";

@@ -68,4 +68,22 @@ struct StructuredExtractionRequestTests {
         #expect(evidence["quote"] as? String == "s1")
         #expect((mapped["entities"] as? [[String: Any]])?.first?["ref"] as? String == "s1")
     }
+
+    @Test func usageIsParsedFromEveryVendorShapeAndOnlyRecordedInsideASink() {
+        func body(_ object: [String: Any]) -> Data { (try? JSONSerialization.data(withJSONObject: object)) ?? Data() }
+        #expect(TokenUsageRecording.parse(body(["usage": ["prompt_tokens": 10, "completion_tokens": 4]]))
+            == TokenUsage(promptTokens: 10, completionTokens: 4))
+        #expect(TokenUsageRecording.parse(body(["usage": ["input_tokens": 7, "output_tokens": 3]]))
+            == TokenUsage(promptTokens: 7, completionTokens: 3))
+        #expect(TokenUsageRecording.parse(body(["usageMetadata": ["promptTokenCount": 5, "candidatesTokenCount": 2]]))
+            == TokenUsage(promptTokens: 5, completionTokens: 2))
+        #expect(TokenUsageRecording.parse(body(["choices": []])) == nil)
+        let sink = TokenUsageSink()
+        TokenUsageRecording.$sink.withValue(sink) {
+            TokenUsageRecording.record(responseBody: body(["usage": ["prompt_tokens": 1, "completion_tokens": 1]]))
+            TokenUsageRecording.record(responseBody: body(["usage": ["input_tokens": 2, "output_tokens": 3]]))
+        }
+        TokenUsageRecording.record(responseBody: body(["usage": ["prompt_tokens": 100, "completion_tokens": 100]]))
+        #expect(sink.total == TokenUsage(promptTokens: 3, completionTokens: 4))
+    }
 }
