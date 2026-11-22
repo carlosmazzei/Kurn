@@ -174,7 +174,7 @@ struct FolderSidebarView: View {
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.headline)
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.link)
                 }
                 .accessibilityLabel(NSLocalizedString("folder.new", comment: "New folder"))
                 .accessibilityIdentifier(parent == nil ? "folders.new" : "folders.new_subfolder")
@@ -195,7 +195,7 @@ struct FolderSidebarView: View {
             HStack(spacing: 12) {
                 Image(systemName: bucket.systemImage)
                     .frame(width: 26, alignment: .center)
-                    .foregroundStyle(isSelected ? Theme.accent : Theme.textSecondary)
+                    .foregroundStyle(isSelected ? Theme.link : Theme.textSecondary)
                     .accessibilityHidden(true)
                 Text(bucket.displayName)
                     .foregroundStyle(Theme.textPrimary)
@@ -206,7 +206,7 @@ struct FolderSidebarView: View {
                 if isSelected {
                     Image(systemName: "checkmark")
                         .font(.system(.footnote, weight: .semibold))
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.link)
                         .accessibilityHidden(true)
                 }
             }
@@ -238,7 +238,7 @@ struct FolderSidebarView: View {
                 if isSelected {
                     Image(systemName: "checkmark")
                         .font(.system(.footnote, weight: .semibold))
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.link)
                         .accessibilityHidden(true)
                 }
             }
@@ -269,7 +269,7 @@ struct FolderSidebarView: View {
                     if isSelected {
                         Image(systemName: "checkmark")
                             .font(.system(.footnote, weight: .semibold))
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.link)
                             .accessibilityHidden(true)
                     }
                 }

@@ -22,7 +22,7 @@ struct KnowledgeScopeSettingsView: View {
                     Button { controls.toggleMeeting(meeting.id) } label: {
                         HStack {
                             Image(systemName: controls.allows(meeting.id) ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(controls.allows(meeting.id) ? Theme.accent : Theme.textTertiary)
+                                .foregroundStyle(controls.allows(meeting.id) ? Theme.link : Theme.textTertiary)
                                 .accessibilityHidden(true)
                             Text(verbatim: meeting.title).foregroundStyle(Theme.textPrimary)
                         }

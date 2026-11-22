@@ -97,7 +97,7 @@ struct HealthRecoveryView: View {
                 set: { if !$0 { pendingQuarantineDeletion = nil } }
             ),
             iconSystemName: "trash.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("quarantine.delete_confirm", comment: "Confirm quarantine delete"),
             message: NSLocalizedString("quarantine.delete_message", comment: "Deleting is permanent"),
             primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
@@ -116,7 +116,7 @@ struct HealthRecoveryView: View {
                 set: { if !$0 { downloads.pendingModelDeletion = nil } }
             ),
             iconSystemName: "trash.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("settings.models.delete_confirm", comment: "Confirm delete model"),
             message: NSLocalizedString("settings.models.delete_message", comment: "Re-download later"),
             primaryTitle: NSLocalizedString("settings.models.delete", comment: "Delete model"),

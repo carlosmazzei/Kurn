@@ -56,7 +56,7 @@ struct SummaryTemplatePicker: View {
                     .frame(width: 44, height: 44)
                 Image(systemName: template.iconName)
                     .font(.headline)
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.textSecondary)
                     .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 3) {
@@ -72,14 +72,14 @@ struct SummaryTemplatePicker: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             if isSelected {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.link)
                     .accessibilityHidden(true)
             }
         }
         .kurnCard()
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(isSelected ? Theme.accent : .clear, lineWidth: 1.5)
+                .stroke(isSelected ? Theme.link : .clear, lineWidth: 1.5)
         )
     }
 }

@@ -83,7 +83,7 @@ struct TagManagementView: View {
                 set: { if !$0 { pendingDelete = nil } }
             ),
             iconSystemName: "trash.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("tag.delete.confirm", comment: "Delete tag?"),
             message: NSLocalizedString("tag.delete.message", comment: "Removed from all meetings"),
             primaryTitle: NSLocalizedString("tag.delete", comment: "Delete"),
@@ -133,7 +133,7 @@ struct TagManagementView: View {
                     systemImage: "arrow.merge"
                 )
             }
-            .tint(Theme.accent)
+            .tint(Theme.ink)
         }
     }
 

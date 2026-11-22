@@ -248,7 +248,7 @@ private struct KnowledgeGraphCanvas: View {
             // Tentative claims are dashed, inferred ones dotted and negated ones crossed out: a
             // shape, not only a colour, carries each state.
             let style = StrokeStyle(lineWidth: touching.contains(edge.factID) ? 2.5 : 1.2, dash: edge.isTentative ? [6, 4] : edge.isInferred ? [1, 4] : [])
-            let shading: GraphicsContext.Shading = .color(touching.contains(edge.factID) ? Theme.accent : Theme.textSecondary)
+            let shading: GraphicsContext.Shading = .color(touching.contains(edge.factID) ? Theme.ink : Theme.textSecondary)
             context.stroke(line, with: shading, style: style)
             context.fill(arrowhead(from: from, to: to), with: shading)
             if edge.isNegated { context.stroke(cross(at: midpoint(from, to)), with: shading, lineWidth: 2) }
@@ -260,7 +260,7 @@ private struct KnowledgeGraphCanvas: View {
             // not only its colour, says which one the graph is centred on.
             let frame = CGRect(x: centre.x - radius, y: centre.y - radius, width: radius * 2, height: radius * 2)
             let mark = node.isRoot ? Path(roundedRect: frame, cornerRadius: 3) : Path(ellipseIn: frame)
-            context.fill(mark, with: .color(node.isRoot ? Theme.accent : Theme.textSecondary))
+            context.fill(mark, with: .color(node.isRoot ? Theme.ink : Theme.textSecondary))
             if node.hasMore {
                 let outer = Path(ellipseIn: CGRect(x: centre.x - radius - 5, y: centre.y - radius - 5,
                                                    width: (radius + 5) * 2, height: (radius + 5) * 2))

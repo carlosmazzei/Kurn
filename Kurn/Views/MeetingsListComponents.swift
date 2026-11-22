@@ -49,7 +49,7 @@ struct LockedRecordingsView: View {
                     .padding(.vertical, 4)
             }
             .buttonStyle(.glassProminent)
-            .tint(Theme.accent)
+            .tint(Theme.ink)
             .padding(.top, 4)
             // Only when the device cannot authenticate at all; see
             // `RecordingAccessGate.offersSettingsEscapeHatch`.
@@ -59,7 +59,7 @@ struct LockedRecordingsView: View {
                 } label: {
                     Text(NSLocalizedString("recordings.open_settings", comment: "Open Settings"))
                         .font(Theme.subheadlineEmphasized)
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.link)
                 }
                 .buttonStyle(.plain)
             }
@@ -209,7 +209,7 @@ struct MeetingCard: View {
         case .none: return Theme.textSecondary
         case .inProgress, .pending: return Theme.warning
         case .done: return Theme.success
-        case .failed: return Theme.accent
+        case .failed: return Theme.destructive
         }
     }
 }

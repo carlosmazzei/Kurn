@@ -120,7 +120,7 @@ extension MeetingDetailView {
                     .font(.footnote.weight(.semibold))
                 }
                 .buttonStyle(.glassProminent)
-                .tint(Theme.accent)
+                .tint(Theme.ink)
                 .disabled(downloads.isDownloading)
             }
         }

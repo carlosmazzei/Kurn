@@ -82,7 +82,7 @@ struct DocumentsListView: View {
                 set: { if !$0 { pendingDelete = nil } }
             ),
             iconSystemName: "trash.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("documents.delete.confirm", comment: "Delete document"),
             message: pendingDelete?.title ?? "",
             primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
@@ -107,9 +107,9 @@ struct DocumentsListView: View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: "doc.text.fill")
                 .font(.title3)
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(Theme.textSecondary)
                 .frame(width: 32, height: 32)
-                .background(Theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                .background(Theme.fill, in: RoundedRectangle(cornerRadius: 8))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 5) {
                 Text(document.title)

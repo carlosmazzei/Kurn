@@ -97,7 +97,7 @@ struct TranscriptView: View {
                         } label: {
                             Image(systemName: "camera.fill")
                                 .font(.caption2)
-                                .foregroundStyle(Theme.accent)
+                                .foregroundStyle(Theme.link)
                                 .frame(minWidth: 44, minHeight: 44)
                                 .contentShape(Rectangle())
                         }

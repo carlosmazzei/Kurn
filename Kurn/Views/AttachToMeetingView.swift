@@ -75,7 +75,7 @@ struct AttachToMeetingView: View {
                     Task { await viewModel.attachToNewMeeting() }
                 } label: {
                     Label(NSLocalizedString("attach.new_meeting", comment: "New meeting"), systemImage: "plus.circle.fill")
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.link)
                 }
                 .accessibilityIdentifier("attach.new_meeting")
             }

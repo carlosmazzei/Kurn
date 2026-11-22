@@ -39,7 +39,7 @@ struct FilterBarView: View {
                                 NSLocalizedString("smart_folder.save", comment: "Save as Smart Folder"),
                                 systemImage: "sparkles.square.fill.on.square"
                             )
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.link)
                         }
                     }
                 }
@@ -105,7 +105,7 @@ struct FilterBarView: View {
                             if isSelected {
                                 Image(systemName: "checkmark")
                                     .font(.system(.footnote, weight: .semibold))
-                                    .foregroundStyle(Theme.accent)
+                                    .foregroundStyle(Theme.link)
                                     .accessibilityHidden(true)
                             }
                         }
@@ -131,7 +131,7 @@ struct FilterBarView: View {
                         if isSelected {
                             Image(systemName: "checkmark")
                                 .font(.system(.footnote, weight: .semibold))
-                                .foregroundStyle(Theme.accent)
+                                .foregroundStyle(Theme.link)
                                 .accessibilityHidden(true)
                         }
                     }

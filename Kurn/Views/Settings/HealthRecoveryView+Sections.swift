@@ -27,7 +27,7 @@ extension HealthRecoveryView {
                                 title: meetingTitle(for: recording),
                                 subtitle: recording.recordedAt.meetingDisplay,
                                 systemImage: "exclamationmark.triangle.fill",
-                                tint: Theme.accent
+                                tint: Theme.destructive
                             )
                         }
                         .buttonStyle(.plain)
@@ -130,7 +130,7 @@ extension HealthRecoveryView {
                             title: item.reason.localizedDescription,
                             subtitle: "\(item.quarantinedAt.meetingDisplay) · \(AudioFileStore.formattedSize(item.byteSize))",
                             systemImage: "shippingbox.fill",
-                            tint: Theme.accent
+                            tint: Theme.warning
                         )
                         Spacer()
                         Button {
@@ -151,7 +151,7 @@ extension HealthRecoveryView {
                             Image(systemName: "trash")
                         }
                         .buttonStyle(.borderless)
-                        .tint(Theme.accent)
+                        .tint(Theme.destructive)
                     }
                 }
             } header: {
@@ -172,7 +172,7 @@ extension HealthRecoveryView {
                             title: model.displayName,
                             subtitle: NSLocalizedString("settings.models.corrupt", comment: "Model failed verification"),
                             systemImage: "exclamationmark.triangle.fill",
-                            tint: Theme.accent
+                            tint: Theme.destructive
                         )
                         Spacer()
                         Button {
@@ -181,7 +181,7 @@ extension HealthRecoveryView {
                             Image(systemName: "trash")
                         }
                         .buttonStyle(.borderless)
-                        .tint(Theme.accent)
+                        .tint(Theme.destructive)
                         .disabled(downloads.isDownloading)
                     }
                 }

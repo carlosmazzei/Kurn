@@ -269,7 +269,7 @@ struct SummaryTab: View {
             HStack(alignment: .top, spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(Theme.accent.opacity(0.14))
+                        .fill(Theme.fill)
                         .frame(width: 42, height: 42)
                     if isCancellingSummary {
                         ProgressView()
@@ -277,7 +277,7 @@ struct SummaryTab: View {
                     } else {
                         Image(systemName: "sparkles")
                             .font(Theme.bodyEmphasized)
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.textSecondary)
                             .accessibilityHidden(true)
                     }
                 }
@@ -297,7 +297,7 @@ struct SummaryTab: View {
             if let progressValue {
                 ProgressView(value: progressValue)
                     .progressViewStyle(.linear)
-                    .tint(Theme.accent)
+                    .tint(Theme.ink)
             } else {
                 IndeterminateSummaryProgressBar()
             }
@@ -422,12 +422,12 @@ struct SummaryTab: View {
                 Text(title)
                     .font(Theme.calloutEmphasized)
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Theme.onInk)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, minHeight: generateButtonMinHeight)
-            .background(Theme.accent, in: Capsule())
-            .shadow(color: Theme.accent.opacity(0.4), radius: 18, y: 4)
+            .background(Theme.ink, in: Capsule())
+            .shadow(color: .black.opacity(0.12), radius: 18, y: 4)
         }
         .buttonStyle(.plain)
         .disabled(isSummarizing)
@@ -447,7 +447,7 @@ private struct IndeterminateSummaryProgressBar: View {
                 Capsule()
                     .fill(Theme.fill)
                 Capsule()
-                    .fill(Theme.accent)
+                    .fill(Theme.ink)
                     .frame(width: segmentWidth)
                     .offset(x: phase ? width : -segmentWidth)
             }

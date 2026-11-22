@@ -51,7 +51,7 @@ struct AutoTagConfirmView: View {
                                 HStack(spacing: 12) {
                                     selectionIndicator(selectedNewTagNames.contains(name))
                                     Image(systemName: "sparkles")
-                                        .foregroundStyle(Theme.accent)
+                                        .foregroundStyle(Theme.textSecondary)
                                         .accessibilityHidden(true)
                                     Text(name)
                                         .foregroundStyle(Theme.textPrimary)
@@ -136,7 +136,7 @@ struct AutoTagConfirmView: View {
     private func selectionIndicator(_ selected: Bool) -> some View {
         Image(systemName: selected ? "checkmark.circle.fill" : "circle")
             .font(.title3)
-            .foregroundStyle(selected ? Theme.accent : Theme.textTertiary)
+            .foregroundStyle(selected ? Theme.link : Theme.textTertiary)
             .accessibilityHidden(true)
     }
 }

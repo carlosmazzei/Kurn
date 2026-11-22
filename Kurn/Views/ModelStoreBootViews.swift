@@ -28,7 +28,7 @@ struct ModelStoreLaunchProgressView: View {
         ZStack {
             Theme.background.ignoresSafeArea()
             ProgressView()
-                .tint(Theme.accent)
+                .tint(Theme.ink)
                 .accessibilityLabel(Text(NSLocalizedString("store_launch.opening", comment: "Opening")))
                 .accessibilityIdentifier("storeLaunch.progress")
         }
@@ -72,7 +72,7 @@ struct ModelStoreRecoveryView: View {
         .disabled(viewModel.isPerformingAction)
         .overlay {
             if viewModel.isPerformingAction {
-                ProgressView().tint(Theme.accent)
+                ProgressView().tint(Theme.ink)
             }
         }
         .sheet(item: $viewModel.shareItem) { item in ActivityView(items: item.urls) }
@@ -90,7 +90,7 @@ struct ModelStoreRecoveryView: View {
         .kurnDialog(
             isPresented: Binding(get: { confirmingRestoreOf != nil }, set: { if !$0 { confirmingRestoreOf = nil } }),
             iconSystemName: "arrow.uturn.backward",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("store_recovery.restore_confirm_title", comment: "Restore this backup?"),
             message: NSLocalizedString("store_recovery.restore_confirm_message", comment: "Current data moved aside, not deleted"),
             primaryTitle: NSLocalizedString("store_recovery.restore_button", comment: "Restore"),
@@ -144,7 +144,7 @@ struct ModelStoreRecoveryView: View {
                 .padding(.vertical, 4)
         }
         .buttonStyle(.glassProminent)
-        .tint(Theme.accent)
+        .tint(Theme.ink)
         .accessibilityIdentifier("storeRecovery.retryButton")
     }
 
@@ -217,8 +217,8 @@ struct ModelStoreRecoveryView: View {
                 .font(Theme.subheadlineEmphasized)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .foregroundStyle(Theme.accent)
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.accent, lineWidth: 1))
+                .foregroundStyle(Theme.ink)
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.ink, lineWidth: 1))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(identifier)

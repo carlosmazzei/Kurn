@@ -18,7 +18,7 @@ struct TemplateRow: View {
         HStack(spacing: 12) {
             Image(systemName: template.iconName)
                 .font(Theme.callout)
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(Theme.textSecondary)
                 .frame(width: iconWellSize, height: iconWellSize)
                 .background(Theme.fill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .accessibilityHidden(true)
@@ -101,7 +101,7 @@ struct TemplateEditor: View {
         .kurnDialog(
             isPresented: $showingDeleteConfirm,
             iconSystemName: "trash.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("settings.delete_template.confirm", comment: "Delete template?"),
             message: template.displayName,
             primaryTitle: NSLocalizedString("settings.delete_template", comment: "Delete Template"),

@@ -18,7 +18,7 @@ extension MeetingDetailView {
                 if let failure = modelContext.saveOrError() { actionError = failure }
             } label: {
                 Image(systemName: meeting.isFavorite ? "star.fill" : "star")
-                    .foregroundStyle(meeting.isFavorite ? Theme.warning : Theme.textSecondary)
+                    .foregroundStyle(meeting.isFavorite ? Theme.favorite : Theme.ink)
             }
             .accessibilityLabel(
                 meeting.isFavorite
@@ -103,6 +103,7 @@ extension MeetingDetailView {
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
+            .tint(Theme.ink)
             .accessibilityLabel(NSLocalizedString("detail.more_options", comment: "More options"))
             .accessibilityIdentifier("detail.more")
         }

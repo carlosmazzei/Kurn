@@ -156,7 +156,7 @@ struct ProviderEditor: View {
         .kurnDialog(
             isPresented: $showingDeleteConfirm,
             iconSystemName: "trash.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("settings.delete_provider.confirm", comment: "Delete provider?"),
             message: provider.displayName,
             primaryTitle: NSLocalizedString("settings.delete_provider", comment: "Delete Provider"),

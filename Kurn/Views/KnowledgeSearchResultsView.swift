@@ -37,7 +37,7 @@ struct KnowledgeSearchResultsView: View {
         KnowledgeLinkCard(route: route(document)) {
             HStack(alignment: .top, spacing: 12) {
                 KnowledgeIconWell(systemImage: document.assertionID == nil ? "book.pages" : "text.quote",
-                                  tint: document.assertionID == nil ? Theme.accent : Theme.info)
+                                  tint: document.assertionID == nil ? Theme.textSecondary : Theme.info)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(verbatim: document.title).font(Theme.headline).foregroundStyle(Theme.textPrimary)
                     Text(KnowledgeBrowserCopy.text("search_" + document.kind.rawValue))

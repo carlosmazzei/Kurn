@@ -139,10 +139,10 @@ struct StatusBadge: View {
 
     private var color: Color {
         switch status {
-        case .none: return Theme.info
+        case .none: return Theme.textSecondary
         case .inProgress, .pending: return Theme.warning
         case .done: return Theme.success
-        case .failed: return Theme.accent
+        case .failed: return Theme.destructive
         }
     }
 }
@@ -151,8 +151,8 @@ struct StatusBadge: View {
 struct FilterChip: View {
     let title: String
     let isSelected: Bool
-    /// Optional accent (e.g. a speaker color). Defaults to the primary label.
-    var tint: Color = .primary
+    /// Optional accent (e.g. a speaker color). Defaults to `Theme.ink`.
+    var tint: Color = Theme.ink
     let action: () -> Void
     @Environment(\.accessibilityShowButtonShapes) private var showButtonShapes
     @Environment(\.colorSchemeContrast) private var contrast
@@ -183,11 +183,11 @@ struct FilterChip: View {
     }
 
     private var selectedBackground: Color {
-        tint == .primary ? .primary : tint.opacity(0.18)
+        tint == Theme.ink ? Theme.ink : tint.opacity(0.18)
     }
 
     private var selectedForeground: Color {
-        tint == .primary ? Color(uiColor: .systemBackground) : tint
+        tint == Theme.ink ? Theme.onInk : tint
     }
 }
 
@@ -338,24 +338,27 @@ struct KurnDialogModifier: ViewModifier {
         action: @escaping () -> Void
     ) -> some View {
         let background = isPrimary
-            ? (role == .destructive ? Theme.accentFill : Theme.infoFill)
+            ? (role == .destructive ? Theme.accentFill : Theme.ink)
             : Theme.fill
-        let foreground = isPrimary ? Color.white : Theme.textPrimary
+        let foreground = isPrimary
+            ? (role == .destructive ? Color.white : Theme.onInk)
+            : Theme.textPrimary
 
         return Button(action: action) {
             Text(title)
-                // White text on `Theme.accentFill` (#C91F16) / `Theme.infoFill`
-                // (#0055B3) measures 5.85:1 / 7.30:1 contrast in both light and
-                // dark mode, clearing the 4.5:1 WCAG AA floor at every size.
+                // White text on `Theme.accentFill` (#D92B21) measures 4.86:1 in
+                // both appearances; `Theme.onInk` (systemBackground) on
+                // `Theme.ink` (label) is ≥ 15:1 — both clear the 4.5:1 WCAG AA
+                // floor at every size.
                 .font(isPrimary ? .system(.subheadline, design: .default, weight: .bold) : Theme.footnoteEmphasized)
                 .lineLimit(singleLine ? 1 : 2)
                 .fixedSize(horizontal: singleLine, vertical: true)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, minHeight: 42)
+                .frame(maxWidth: .infinity, minHeight: 46)
                 .foregroundStyle(foreground)
-                .background(background, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(background, in: Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -400,12 +403,12 @@ private struct KurnComposerSurfaceModifier: ViewModifier {
 
 extension View {
     /// The standard rounded card surface (#1C1C1E in dark) used across screens.
-    func kurnCard(padding: CGFloat = 16, cornerRadius: CGFloat = 18) -> some View {
+    func kurnCard(padding: CGFloat = 16, cornerRadius: CGFloat = Theme.Radius.card) -> some View {
         modifier(KurnCardModifier(padding: padding, cornerRadius: cornerRadius))
     }
 
     /// Floating composer surface that honors Reduce Transparency and Increase Contrast.
-    func kurnComposerSurface(cornerRadius: CGFloat = 26) -> some View {
+    func kurnComposerSurface(cornerRadius: CGFloat = Theme.Radius.sheet) -> some View {
         modifier(KurnComposerSurfaceModifier(cornerRadius: cornerRadius))
     }
 

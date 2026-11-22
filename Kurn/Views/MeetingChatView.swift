@@ -367,7 +367,7 @@ struct MeetingChatConversationView: View {
                 Text(NSLocalizedString("chat.retry", comment: "Retry a cancelled or failed question"))
                     .font(Theme.footnote)
             }
-            .foregroundStyle(Theme.accent)
+            .foregroundStyle(Theme.link)
             .padding(.horizontal, 12).padding(.vertical, 8)
             .background(Theme.fill, in: Capsule())
         }
@@ -504,9 +504,9 @@ struct MeetingChatConversationView: View {
             Button { send() } label: {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(canSend ? .white : Theme.textTertiary)
+                    .foregroundStyle(canSend ? Theme.onInk : Theme.textTertiary)
                     .frame(width: 36, height: 36)
-                    .background(canSend ? Theme.accent : Theme.fill, in: Circle())
+                    .background(canSend ? Theme.ink : Theme.fill, in: Circle())
                     .padding(4)
                     .contentShape(Rectangle())
             }

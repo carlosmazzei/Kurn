@@ -129,7 +129,7 @@ struct MeetingShareSelectionView: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.glassProminent)
-            .tint(Theme.accent)
+            .tint(Theme.ink)
             .disabled(!hasSelection || isExporting)
             .accessibilityIdentifier("share.share_button")
         }
@@ -189,7 +189,7 @@ struct MeetingShareSelectionView: View {
                 if isSelected {
                     Image(systemName: "checkmark")
                         .font(.system(.footnote, weight: .semibold))
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.link)
                         .accessibilityHidden(true)
                 }
             }

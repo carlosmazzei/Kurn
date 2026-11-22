@@ -30,7 +30,7 @@ struct DiagnosticReportsListView: View {
                     } label: {
                         HStack {
                             Image(systemName: entry.kind == .crash ? "exclamationmark.triangle.fill" : "hourglass")
-                                .foregroundStyle(Theme.accent)
+                                .foregroundStyle(entry.kind == .crash ? Theme.destructive : Theme.warning)
                                 .accessibilityHidden(true)
                             VStack(alignment: .leading) {
                                 Text(entry.kind == .crash

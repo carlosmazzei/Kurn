@@ -26,7 +26,7 @@ struct LogEntriesListView: View {
                         HStack {
                             Text(entry.category)
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(Theme.accent)
+                                .foregroundStyle(Theme.textSecondary)
                             Spacer()
                             Text(entry.level)
                                 .font(.caption)
@@ -71,7 +71,7 @@ struct LogEntriesListView: View {
 
     private func levelColor(_ level: String) -> Color {
         switch level {
-        case "error", "fault": return Theme.accent
+        case "error", "fault": return Theme.destructive
         case "notice": return Theme.info
         default: return Theme.textSecondary
         }

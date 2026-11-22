@@ -84,7 +84,7 @@ struct SummaryView: View {
                             }
                             .padding(.horizontal, 10).padding(.vertical, 6)
                             .background(Theme.fill, in: Capsule())
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.link)
                         }
                         .buttonStyle(.plain)
                         .disabled(onShowPhoto == nil)
@@ -112,7 +112,7 @@ struct SummaryView: View {
         } else {
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "circle.fill")
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.textTertiary)
                     .font(.system(size: 6))
                     .padding(.top, 7)
                     .accessibilityHidden(true)

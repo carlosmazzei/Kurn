@@ -25,7 +25,7 @@ struct KnowledgeIdentityReviewView: View {
         .kurnDialog(
             isPresented: $confirming,
             iconSystemName: "arrow.triangle.merge",
-            iconTint: Theme.accent,
+            iconTint: Theme.ink,
             title: KnowledgeReviewCopy.text("confirm_title"),
             message: String(format: KnowledgeReviewCopy.text("confirm_detail"), candidate.target.name),
             primaryTitle: KnowledgeReviewCopy.text("merge"),
@@ -63,7 +63,7 @@ struct KnowledgeIdentityReviewView: View {
                     Text(KnowledgeReviewCopy.text("merge")).font(Theme.calloutEmphasized).frame(maxWidth: .infinity).frame(minHeight: 44)
                 }
                 .buttonStyle(.glassProminent)
-                .tint(Theme.accent)
+                .tint(Theme.ink)
                 .accessibilityIdentifier("knowledge.review.merge")
                 Button { decide(.dismiss(candidate.id)) } label: {
                     Text(KnowledgeReviewCopy.text("dismiss")).font(Theme.calloutEmphasized).frame(maxWidth: .infinity).frame(minHeight: 44)

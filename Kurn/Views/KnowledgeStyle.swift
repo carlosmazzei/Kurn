@@ -26,7 +26,7 @@ struct KnowledgeSectionLabel: View {
 /// A rounded accent well holding an SF Symbol, as in the documents list.
 struct KnowledgeIconWell: View {
     let systemImage: String
-    var tint: Color = Theme.accent
+    var tint: Color = Theme.textSecondary
 
     var body: some View {
         Image(systemName: systemImage)

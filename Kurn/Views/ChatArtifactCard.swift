@@ -83,7 +83,7 @@ struct ChatArtifactCard: View {
                         saveButton
                             .labelStyle(.titleAndIcon)
                             .buttonStyle(.glassProminent)
-                            .tint(Theme.accent)
+                            .tint(Theme.ink)
                     }
                 }
             }

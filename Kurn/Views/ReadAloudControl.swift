@@ -74,7 +74,7 @@ struct ReadAloudControl: View {
             .font(Theme.subheadlineEmphasized)
         }
         .buttonStyle(.bordered)
-        .tint(Theme.accent)
+        .tint(Theme.ink)
         .accessibilityIdentifier("readAloud.toggle")
     }
 

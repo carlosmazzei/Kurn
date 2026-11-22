@@ -68,6 +68,7 @@ extension MeetingsListView {
         Button(action: action) {
             Label(destination.title, systemImage: destination.systemImage)
         }
+        .tint(Theme.ink)
         .accessibilityIdentifier("root.destination.\(destination.rawValue)")
     }
 
@@ -85,6 +86,7 @@ extension MeetingsListView {
             Label(selectionTitle, systemImage: selectionSystemImage)
                 .labelStyle(LibraryLabelStyle(showsTitle: showsTitle))
         }
+        .tint(Theme.ink)
         .accessibilityLabel(NSLocalizedString("meetings.bucket", comment: "Library"))
         .accessibilityValue(selectionTitle)
         .accessibilityIdentifier("meetings.library")
@@ -125,7 +127,7 @@ extension MeetingsListView {
                 systemImage: filter.isActive ? "ellipsis.circle.fill" : "ellipsis.circle"
             )
         }
-        .tint(filter.isActive ? Theme.accent : nil)
+        .tint(filter.isActive ? Theme.ink : nil)
         .accessibilityLabel(NSLocalizedString("meetings.list_actions", comment: "List options"))
         .accessibilityValue(filter.isActive ? "\(filter.activeCount)" : "")
         .accessibilityIdentifier("meetings.actions")
@@ -147,6 +149,7 @@ extension MeetingsListView {
                 systemImage: "gearshape"
             )
         }
+        .tint(Theme.ink)
         // `ScreenshotUITests.testSettings` taps this by identifier; it moved
         // here from the old hand-rolled bottom bar and must keep the name.
         .accessibilityIdentifier("nav.settings")
