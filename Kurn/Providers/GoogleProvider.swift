@@ -123,7 +123,7 @@ struct GoogleProvider: LLMProvider {
             timeout: options.timeout,
             body: [
                 "contents": contents,
-                "generationConfig": ["maxOutputTokens": options.maxOutputTokens]
+                "generationConfig": Self.generationConfig(options)
             ]
         )
 
@@ -220,4 +220,15 @@ private struct GeminiContent: Decodable {
 
 private struct GeminiPart: Decodable {
     let text: String?
+}
+
+extension GoogleProvider {
+    /// Structured extraction asks Gemini for a JSON body (`responseMimeType`),
+    /// so the reply is the object itself rather than prose around it; the
+    /// strict host validation is unchanged.
+    static func generationConfig(_ options: TextGenerationOptions) -> [String: Any] {
+        var config: [String: Any] = ["maxOutputTokens": options.maxOutputTokens]
+        if options.requiresCompleteJSON { config["responseMimeType"] = "application/json" }
+        return config
+    }
 }

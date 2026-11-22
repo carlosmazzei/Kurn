@@ -357,6 +357,7 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
            chatModel.lowercased().hasPrefix("gpt-5") {
             body["reasoning_effort"] = "low"
         }
+        if let format = Self.jsonResponseFormat(options, providerID: provider.id) { body["response_format"] = format }
         let request = try makeRequest(timeout: options.timeout, body: body)
 
         let (data, _) = try await LLMHTTP.sendValidated(
@@ -529,5 +530,16 @@ struct WhisperVerboseResponse: Decodable {
 private extension Data {
     mutating func append(_ string: String) {
         if let data = string.data(using: .utf8) { append(data) }
+    }
+}
+
+extension OpenAIProvider {
+    /// JSON mode for structured extraction on the vendors that document it
+    /// (OpenAI Chat Completions / Responses via `text.format`, Groq). Other
+    /// compatible endpoints are left unchanged — an unknown parameter can be
+    /// rejected — and rely on the reply normalisation + strict validation.
+    static func jsonResponseFormat(_ options: TextGenerationOptions, providerID: String) -> [String: Any]? {
+        guard options.requiresCompleteJSON, [AIProvider.openAI.id, AIProvider.groq.id].contains(providerID) else { return nil }
+        return ["type": "json_object"]
     }
 }
