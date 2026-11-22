@@ -113,7 +113,7 @@ struct ChatSessionListView: View {
                 Spacer()
                 if session.id == currentSessionID {
                     Image(systemName: "checkmark")
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.link)
                         .accessibilityHidden(true)
                 }
             }

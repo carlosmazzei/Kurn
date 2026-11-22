@@ -10,17 +10,33 @@
 
 import SwiftUI
 
+/// Semantic colour roles: pick a role, not a raw palette colour.
+///
+/// - `ink` — the label colour (black in light, white in dark): selected chips,
+///   primary filled buttons, active toolbar controls, progress fills.
+/// - `onInk` — text/glyph drawn on an `ink`-filled control.
+/// - `link` — blue: inline text actions ("Add…"), checkmarks in selectable
+///   lists, selection indicators, a search field's Cancel.
+/// - `record` — red: the Record action and the live recording state only.
+/// - `destructive` — red: delete/remove/reset actions and failure states only.
+/// - `indicator` — grey glyphs in list rows (favourite, transcript, summary).
+/// - `favorite` — amber: the favourited star in the meeting toolbar.
+///
+/// Red never appears outside `record`/`destructive`.
 enum Theme {
     // MARK: - Palette
 
-    /// App background (behind scroll content). Near-black in dark mode.
-    static let background = adaptive(dark: 0x0A0A0F, light: nil, lightSystem: .systemGroupedBackground)
+    /// App background (behind scroll content). Pure black in dark mode.
+    static let background = adaptive(dark: 0x000000, light: nil, lightSystem: .systemGroupedBackground)
+    /// "Paper" surface for long reading text (summary, transcript, wiki,
+    /// documents). Not applied anywhere yet.
+    static let readingBackground = Color(uiColor: .systemBackground)
     /// Elevated surface for cards / grouped rows (#1C1C1E in dark).
     static let surface = adaptive(dark: 0x1C1C1E, light: nil, lightSystem: .secondarySystemGroupedBackground)
-    /// Subtle fill (chips, icon wells) — translucent white in dark.
+    /// Subtle fill (chips, icon wells) — opaque #2C2C2E in dark.
     static let fill = Color(uiColor: UIColor { t in
         if t.userInterfaceStyle == .dark {
-            return UIColor.white.withAlphaComponent(t.accessibilityContrast == .high ? 0.14 : 0.08)
+            return UIColor(rgb: t.accessibilityContrast == .high ? 0x3A3A3C : 0x2C2C2E)
         }
         return t.accessibilityContrast == .high ? UIColor.systemGray4 : UIColor.systemGray5
     })
@@ -28,6 +44,8 @@ enum Theme {
     /// Brand / record / destructive accent. Light mode uses a deeper red
     /// (#B31912, 7.1:1 on white and >6.0:1 on tinted pills) so red text/glyphs
     /// on light cards and status badges meet WCAG AA 4.5:1 contrast.
+    ///
+    /// Deprecated in spirit: use `record` or `destructive`; no new call sites.
     static let accent = adaptive(dark: 0xFF453A, light: 0xB31912, lightSystem: .systemRed)
     /// Filled button background for destructive primary actions with white text
     /// (#D92B21 in both appearances: 4.86:1 with white text and 3.50:1 against #1C1C1E).
@@ -44,14 +62,34 @@ enum Theme {
     /// Camera viewfinder focus/zoom accent over dark live preview.
     static let cameraAccent = Color(hex: "#FFD60A")
 
-    /// Hairline separator matching the mock (rgba(84,84,88,.4) in dark; boosted under Increase Contrast).
+    /// Hairline separator matching the mock (#38383A opaque in dark; boosted under Increase Contrast).
     static let separator = Color(uiColor: UIColor { t in
         if t.userInterfaceStyle == .dark {
-            let alpha: CGFloat = t.accessibilityContrast == .high ? 0.75 : 0.4
-            return UIColor(red: 84/255, green: 84/255, blue: 88/255, alpha: alpha)
+            return UIColor(rgb: t.accessibilityContrast == .high ? 0x545458 : 0x38383A)
         }
         return t.accessibilityContrast == .high ? UIColor.opaqueSeparator : UIColor.separator
     })
+
+    // MARK: - Colour roles
+
+    /// Label colour (black in light, white in dark): selected chips, primary
+    /// filled buttons, active toolbar controls, progress fills.
+    static let ink = Color.primary
+    /// Text/glyph drawn on an `ink`-filled control.
+    static let onInk = Color(uiColor: .systemBackground)
+    /// Red: the Record action and the live recording state only.
+    static let record = accent
+    /// Red: delete/remove/reset actions and failure states only.
+    static let destructive = accent
+    /// Blue: inline text actions ("Add…", checkmarks in selectable lists,
+    /// selection indicators, a search field's Cancel).
+    static let link = info
+    /// Grey glyph indicators in list rows (favourite, transcript, summary).
+    /// The prototype's lighter grey (#A5A5AA) fails 3:1 against the dark
+    /// background, so this stays at `textTertiary`.
+    static let indicator = textTertiary
+    /// Amber star for the favourite toggle in the meeting toolbar.
+    static let favorite = warning
 
     // MARK: - Text
 
@@ -104,6 +142,24 @@ enum Theme {
     static let caption2 = Font.system(.caption2, design: .default)
     static let caption2Emphasized = Font.system(.caption2, design: .default, weight: .semibold)
 
+    // MARK: - Spacing & radius
+
+    enum Spacing {
+        static let xs: CGFloat = 4
+        static let s: CGFloat = 8
+        static let m: CGFloat = 12
+        static let l: CGFloat = 16
+        static let xl: CGFloat = 20
+        static let xxl: CGFloat = 24
+    }
+
+    enum Radius {
+        static let small: CGFloat = 8
+        static let chip: CGFloat = 12
+        static let card: CGFloat = 18
+        static let sheet: CGFloat = 26
+    }
+
     // MARK: - Button language
     //
     // Which `.buttonStyle` a control gets is a decision, not a per-file
@@ -112,7 +168,9 @@ enum Theme {
     //
     // - **Primary action of a screen** (the one thing this screen exists to
     //   let you do — Stop recording, download a model, confirm a share):
-    //   `.buttonStyle(.glassProminent)` with `.tint(Theme.accent)`. This is
+    //   `.buttonStyle(.glassProminent)` with `.tint(Theme.ink)` and the label
+    //   in `Theme.onInk`. The Record button and destructive primaries use
+    //   `Theme.record` / `Theme.destructive` instead (white label). This is
     //   the Liquid Glass default; prefer it over `.borderedProminent` (kept
     //   only where the OS itself renders the control, e.g. inside a native
     //   `.alert`).

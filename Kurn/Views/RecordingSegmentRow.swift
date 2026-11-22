@@ -43,7 +43,7 @@ struct RecordingSegmentRow: View {
                         if recording.isCaptureInProgress {
                             Image(systemName: "record.circle")
                                 .font(Theme.footnote)
-                                .foregroundStyle(Theme.accent)
+                                .foregroundStyle(Theme.record)
                         } else if !recording.isReadyForConsumption {
                             Image(systemName: "waveform.badge.exclamationmark")
                                 .font(Theme.footnote)
@@ -124,7 +124,7 @@ struct RecordingSegmentRow: View {
                             } label: {
                                 Image(systemName: "stop.fill")
                                     .font(Theme.footnoteEmphasized)
-                                    .foregroundStyle(Theme.accent)
+                                    .foregroundStyle(Theme.ink)
                                     .frame(width: 30, height: 30)
                                     .background(Theme.fill, in: Circle())
                                     .frame(minWidth: 44, minHeight: 44)
@@ -203,7 +203,7 @@ struct RecordingSegmentRow: View {
             if recording.isCaptureInProgress {
                 Text(NSLocalizedString("detail.recording_in_progress", comment: "Recording in progress"))
                     .font(.caption2)
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.record)
             } else if !recording.isReadyForConsumption {
                 Text(NSLocalizedString(
                     "detail.recording_recovery_message",
@@ -262,18 +262,18 @@ struct RecordingSegmentRow: View {
         if isCancelling {
             ProgressView()
                 .progressViewStyle(.linear)
-                .tint(Theme.accent.opacity(0.5))
+                .tint(Theme.ink.opacity(0.5))
         } else if case .some(.diarizing(progress: nil)) = phase {
             // Keep a truthful fallback for diarizers that cannot report a
             // fraction instead of leaving transcription parked at 100%.
             ProgressView()
                 .progressViewStyle(.linear)
-                .tint(Theme.accent)
+                .tint(Theme.ink)
         } else {
             let fraction = (phase ?? .preparing).fractionComplete
             ProgressView(value: fraction)
                 .progressViewStyle(.linear)
-                .tint(Theme.accent)
+                .tint(Theme.ink)
                 .kurnAnimation(.easeInOut(duration: 0.25), value: fraction)
         }
     }

@@ -73,7 +73,7 @@ struct PhotoViewerView: View {
         .kurnDialog(
             isPresented: $showingDeleteConfirm,
             iconSystemName: "trash.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("photo.delete.confirm", comment: "Delete this photo?"),
             message: NSLocalizedString(
                 "photo.delete.message",

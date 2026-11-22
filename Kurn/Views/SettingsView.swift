@@ -184,7 +184,7 @@ struct SettingsView: View {
         .kurnDialog(
             isPresented: $showingDeleteConfirm,
             iconSystemName: "exclamationmark.triangle.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("settings.delete_all.confirm", comment: "Confirm delete all"),
             message: NSLocalizedString("settings.delete_all.message", comment: ""),
             primaryTitle: NSLocalizedString("settings.delete_all", comment: "Delete All Data"),

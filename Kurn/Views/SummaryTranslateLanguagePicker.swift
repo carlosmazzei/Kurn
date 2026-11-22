@@ -61,13 +61,13 @@ struct SummaryTranslateLanguagePicker: View {
             if isSuggested {
                 Text(NSLocalizedString("detail.summary.choose_language.suggested", comment: "Suggested language badge"))
                     .font(Theme.caption2)
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.link)
             }
         }
         .kurnCard()
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(isSuggested ? Theme.accent : .clear, lineWidth: 1.5)
+                .stroke(isSuggested ? Theme.link : .clear, lineWidth: 1.5)
         )
     }
 }

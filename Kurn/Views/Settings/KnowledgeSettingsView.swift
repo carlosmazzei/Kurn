@@ -89,7 +89,7 @@ struct KnowledgeSettingsView: View {
         .kurnDialog(
             isPresented: $deleting,
             iconSystemName: "exclamationmark.triangle.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: KnowledgeSettingsCopy.text("delete"),
             message: KnowledgeSettingsCopy.text("delete_detail"),
             primaryTitle: KnowledgeSettingsCopy.text("delete"),

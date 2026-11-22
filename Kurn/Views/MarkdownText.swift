@@ -155,7 +155,7 @@ struct MarkdownTaskRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: checked ? "checkmark.square" : "square")
-                .foregroundStyle(checked ? Theme.accent : Theme.textSecondary)
+                .foregroundStyle(checked ? Theme.link : Theme.textSecondary)
                 .font(.subheadline)
                 .padding(.top, 2)
                 .accessibilityLabel(accessibilityLabel)

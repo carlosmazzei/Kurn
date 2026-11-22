@@ -189,7 +189,7 @@ struct RecordingMiniBar: View {
                             .lineLimit(1)
                         Text(statusText)
                             .font(Theme.caption)
-                            .foregroundStyle(isPaused ? Theme.warning : Theme.accent)
+                            .foregroundStyle(isPaused ? Theme.warning : Theme.record)
                     }
                     Spacer(minLength: 8)
                     Text(vm.elapsed.clockDisplay)
@@ -249,7 +249,7 @@ struct RecordingMiniBar: View {
                     .font(Theme.bodyEmphasized)
                     .foregroundStyle(.white)
                     .frame(width: controlSize, height: controlSize)
-                    .background(Theme.accent, in: Circle())
+                    .background(Theme.record, in: Circle())
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
@@ -279,7 +279,7 @@ struct RecordingMiniBar: View {
                 .foregroundStyle(Theme.warning)
                 .accessibilityHidden(true)
         } else {
-            PulsingDot(color: Theme.accent)
+            PulsingDot(color: Theme.record)
                 .accessibilityHidden(true)
         }
     }

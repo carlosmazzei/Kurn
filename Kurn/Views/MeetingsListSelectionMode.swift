@@ -31,7 +31,7 @@ extension MeetingsListView {
             HStack(spacing: 12) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title2)
-                    .foregroundStyle(isSelected ? Theme.accent : Theme.textTertiary)
+                    .foregroundStyle(isSelected ? Theme.link : Theme.textTertiary)
                     // The row carries `.isSelected` itself.
                     .accessibilityHidden(true)
                 card
@@ -104,7 +104,7 @@ extension MeetingsListView {
             )
         }
         .labelStyle(.titleAndIcon)
-        .tint(Theme.accent)
+        .tint(Theme.destructive)
         .disabled(selectedMeetings.isEmpty)
         .accessibilityIdentifier("meetings.selection.delete")
     }
@@ -120,7 +120,7 @@ extension View {
         kurnDialog(
             isPresented: isPresented,
             iconSystemName: "trash.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: String(
                 format: NSLocalizedString("meetings.bulk_delete.confirm", comment: "Delete N meetings?"),
                 count

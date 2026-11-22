@@ -86,7 +86,7 @@ struct KnowledgeSourceTranscriptView: View {
                             // The cited passage is outlined as well as tinted: not colour alone.
                             .overlay {
                                 if isCited(segment) {
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.accent, lineWidth: 1.5)
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.ink, lineWidth: 1.5)
                                 }
                             }
                             .id(segment.id)

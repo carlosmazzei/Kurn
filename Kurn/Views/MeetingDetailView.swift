@@ -235,7 +235,7 @@ struct MeetingDetailView: View {
                 set: { if !$0 { pendingRetranscribe = nil } }
             ),
             iconSystemName: "arrow.clockwise.circle.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("detail.retranscribe.confirm.title", comment: "Re-transcribe confirmation"),
             message: NSLocalizedString("detail.retranscribe.confirm.message", comment: "Re-transcribe message"),
             primaryTitle: NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"),
@@ -267,7 +267,7 @@ struct MeetingDetailView: View {
         .kurnDialog(
             isPresented: $pendingRetranscribeAll,
             iconSystemName: "arrow.triangle.2.circlepath.circle.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("detail.retranscribe_all.confirm.title", comment: "Re-transcribe all confirmation"),
             message: NSLocalizedString("detail.retranscribe_all.confirm.message", comment: "Re-transcribe all message"),
             primaryTitle: NSLocalizedString("detail.retranscribe_all.confirm.action", comment: "Re-transcribe all confirm button"),
@@ -428,14 +428,14 @@ struct MeetingDetailView: View {
         Button { recordingSession.begin(meeting: meeting) } label: {
             HStack(spacing: 12) {
                 ZStack {
-                    Circle().fill(Theme.accent.opacity(0.12)).frame(width: 34, height: 34)
+                    Circle().fill(Theme.fill).frame(width: 34, height: 34)
                     Image(systemName: recordingSession.isActive ? "waveform" : "plus")
-                        .font(.system(.footnote, design: .default, weight: .bold)).foregroundStyle(Theme.accent)
+                        .font(.system(.footnote, design: .default, weight: .bold)).foregroundStyle(Theme.ink)
                         .accessibilityHidden(true)
                 }
                 Text(addSegmentTitle)
                     .font(Theme.subheadline)
-                    .foregroundStyle(recordingSession.isActive ? Theme.accent : Theme.textSecondary)
+                    .foregroundStyle(recordingSession.isActive ? Theme.record : Theme.textSecondary)
                 Spacer()
             }
             .padding(14)

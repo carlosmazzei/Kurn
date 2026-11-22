@@ -37,7 +37,7 @@ struct UsageInsightsView: View {
             .kurnDialog(
                 isPresented: $showingClearConfirm,
                 iconSystemName: "trash.fill",
-                iconTint: Theme.accent,
+                iconTint: Theme.destructive,
                 title: NSLocalizedString("usage_insights.clear_confirm", comment: "Confirm clear usage data"),
                 message: NSLocalizedString("usage_insights.clear_message", comment: "Clear usage data message"),
                 primaryTitle: NSLocalizedString("usage_insights.clear", comment: "Clear My Data"),

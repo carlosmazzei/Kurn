@@ -63,7 +63,7 @@ struct ChatContextGaugeView: View {
                 Circle().stroke(Theme.separator, lineWidth: 2)
                 Circle()
                     .trim(from: 0, to: gauge.fraction)
-                    .stroke(gauge.fraction > 0.8 ? Theme.accent : Theme.textSecondary,
+                    .stroke(gauge.fraction > 0.8 ? Theme.warning : Theme.textSecondary,
                             style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             }
@@ -105,7 +105,7 @@ struct ChatModelSheet: View {
                                 Spacer()
                                 if candidate == model {
                                     Image(systemName: "checkmark")
-                                        .foregroundStyle(Theme.accent)
+                                        .foregroundStyle(Theme.link)
                                         .accessibilityHidden(true)
                                 }
                             }

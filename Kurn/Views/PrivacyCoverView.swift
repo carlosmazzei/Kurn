@@ -15,7 +15,7 @@ struct PrivacyCoverView: View {
             Theme.background.ignoresSafeArea()
             Image(systemName: "waveform")
                 .font(.largeTitle)
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(Theme.textSecondary)
                 .accessibilityHidden(true)
         }
     }

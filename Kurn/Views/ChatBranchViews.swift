@@ -83,7 +83,7 @@ struct ChatBranchTreeView: View {
                 } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Image(systemName: node.isShown ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(node.isShown ? Theme.accent : Theme.textTertiary)
+                            .foregroundStyle(node.isShown ? Theme.link : Theme.textTertiary)
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
                             if let label = node.label {

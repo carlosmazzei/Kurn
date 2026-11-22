@@ -124,7 +124,7 @@ struct MeetingBulkExportView: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.glassProminent)
-            .tint(Theme.accent)
+            .tint(Theme.ink)
             .disabled(!model.canShare)
             .accessibilityIdentifier("bulk_export.share_button")
         }

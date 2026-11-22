@@ -119,7 +119,7 @@ struct StorageSettingsView: View {
                 set: { if !$0 { pendingQuarantineDeletion = nil } }
             ),
             iconSystemName: "trash.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("quarantine.delete_confirm", comment: "Confirm quarantine delete"),
             message: NSLocalizedString("quarantine.delete_message", comment: "Deleting is permanent"),
             primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
@@ -146,7 +146,7 @@ struct StorageSettingsView: View {
         .kurnDialog(
             isPresented: $showingCompactConfirm,
             iconSystemName: "arrow.down.circle.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.ink,
             title: NSLocalizedString("settings.compact.confirm", comment: "Compact recordings"),
             message: String(
                 format: NSLocalizedString("settings.compact.message", comment: "Compaction is irreversible"),
@@ -163,7 +163,7 @@ struct StorageSettingsView: View {
         .kurnDialog(
             isPresented: $showingDeleteEnhancedConfirm,
             iconSystemName: "trash.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("settings.storage.enhanced_audio", comment: "Enhanced audio"),
             message: NSLocalizedString(
                 "settings.storage.enhanced_audio_message",
@@ -186,7 +186,7 @@ struct StorageSettingsView: View {
                 set: { if !$0 { compaction?.completedSavings = nil } }
             ),
             iconSystemName: "checkmark.circle.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.ink,
             title: NSLocalizedString("settings.compact.done", comment: "Recordings compacted"),
             message: String(
                 format: NSLocalizedString("settings.compact.result", comment: "Compaction result"),
@@ -201,7 +201,7 @@ struct StorageSettingsView: View {
                 set: { if !$0 { downloads.pendingModelDeletion = nil } }
             ),
             iconSystemName: "trash.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("settings.models.delete_confirm", comment: "Confirm delete model"),
             message: NSLocalizedString("settings.models.delete_message", comment: "Re-download later"),
             primaryTitle: NSLocalizedString("settings.models.delete", comment: "Delete model"),
@@ -219,7 +219,7 @@ struct StorageSettingsView: View {
                 set: { if !$0 { cacheCleanupResult = nil } }
             ),
             iconSystemName: "checkmark.circle.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.ink,
             title: NSLocalizedString("settings.clear_cache.done", comment: "Temporary files cleared"),
             message: cacheCleanupResult.map { result in
                 String(
@@ -234,7 +234,7 @@ struct StorageSettingsView: View {
         .kurnDialog(
             isPresented: $showingClearCacheConfirm,
             iconSystemName: "trash.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("settings.clear_cache.confirm", comment: "Clear temporary files"),
             message: String(
                 format: NSLocalizedString("settings.clear_cache.message", comment: "Clear cache message"),
@@ -287,7 +287,7 @@ struct StorageSettingsView: View {
                                         .accessibilityHidden(true)
                                 }
                                 .font(.caption)
-                                .foregroundStyle(Theme.accent)
+                                .foregroundStyle(Theme.destructive)
                             }
                         }
                         Spacer()
@@ -299,7 +299,7 @@ struct StorageSettingsView: View {
                             Image(systemName: "trash")
                         }
                         .buttonStyle(.borderless)
-                        .tint(Theme.accent)
+                        .tint(Theme.destructive)
                         .disabled(downloads.isDownloading)
                         .accessibilityLabel(
                             "\(model.displayName): \(NSLocalizedString("settings.models.delete", comment: "Delete model"))"

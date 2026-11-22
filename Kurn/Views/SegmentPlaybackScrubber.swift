@@ -46,7 +46,7 @@ struct SegmentPlaybackScrubber: View {
                 ),
                 in: 0...sliderUpperBound
             )
-            .tint(Theme.accent)
+            .tint(Theme.ink)
             .disabled(playableDuration <= 0)
             // VoiceOver's Adjustable rotor acts on the slider itself, so it
             // needs its own label/value — the container's `.contain` grouping
@@ -112,7 +112,7 @@ struct SegmentPlaybackScrubber: View {
             Image(systemName: "gobackward.15")
                 .accessibilityHidden(true)
                 .font(Theme.captionEmphasized)
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(Theme.ink)
                 .frame(minWidth: 34)
                 .padding(.vertical, 3)
                 .background(Theme.fill, in: Capsule())
@@ -125,7 +125,7 @@ struct SegmentPlaybackScrubber: View {
             Image(systemName: "goforward.15")
                 .accessibilityHidden(true)
                 .font(Theme.captionEmphasized)
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(Theme.ink)
                 .frame(minWidth: 34)
                 .padding(.vertical, 3)
                 .background(Theme.fill, in: Capsule())
@@ -144,7 +144,7 @@ struct SegmentPlaybackScrubber: View {
                     Image(systemName: "sparkles")
                         .accessibilityHidden(true)
                         .font(Theme.caption2Emphasized)
-                        .foregroundStyle(isEnhanced ? Theme.accent : Theme.textTertiary)
+                        .foregroundStyle(isEnhanced ? Theme.ink : Theme.textTertiary)
                 }
             }
             .frame(minWidth: 34)
@@ -168,7 +168,7 @@ struct SegmentPlaybackScrubber: View {
                 .font(Theme.caption2Emphasized)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(Theme.ink)
                 .padding(.horizontal, 6)
                 .frame(minWidth: 34)
                 .padding(.vertical, 3)

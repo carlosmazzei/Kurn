@@ -28,7 +28,7 @@ struct EnhancementProgressView: View {
             .foregroundStyle(Theme.textTertiary)
         }
         .progressViewStyle(.linear)
-        .tint(Theme.accent)
+        .tint(Theme.ink)
         .kurnAnimation(.easeInOut(duration: 0.25), value: clamped)
     }
 }

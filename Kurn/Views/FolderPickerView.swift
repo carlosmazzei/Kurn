@@ -137,7 +137,7 @@ struct FolderPickerView: View {
             if isSelected {
                 Image(systemName: "checkmark")
                     .font(.system(.footnote, weight: .semibold))
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.link)
                     .accessibilityHidden(true)
             }
         }

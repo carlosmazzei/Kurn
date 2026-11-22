@@ -76,7 +76,7 @@ struct TagPickerView: View {
                 set: { if !$0 { pendingDelete = nil } }
             ),
             iconSystemName: "trash.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("tag.delete.confirm", comment: "Delete tag?"),
             message: NSLocalizedString("tag.delete.message", comment: "Removed from all meetings"),
             primaryTitle: NSLocalizedString("tag.delete", comment: "Delete"),
@@ -109,7 +109,7 @@ struct TagPickerView: View {
                 if isSelected {
                     Image(systemName: "checkmark")
                         .font(.system(.footnote, weight: .semibold))
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.link)
                         .accessibilityHidden(true)
                 }
             }

@@ -75,7 +75,7 @@ struct KnowledgeLibraryDestination: View {
                     .font(Theme.calloutEmphasized)
                 }
                 .buttonStyle(.glassProminent)
-                .tint(Theme.accent)
+                .tint(Theme.ink)
                 .accessibilityIdentifier("knowledge.openSettings")
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -97,7 +97,7 @@ struct KnowledgeLibraryDestination: View {
                 .font(Theme.calloutEmphasized)
         }
         .buttonStyle(.glassProminent)
-        .tint(Theme.accent)
+        .tint(Theme.ink)
         .accessibilityIdentifier("knowledge.chooseSources")
     }
 }
@@ -124,7 +124,7 @@ struct KnowledgeMeetingSelectionView: View {
                             HStack(spacing: 12) {
                                 Image(systemName: selectedIDs.contains(meeting.id) ? "checkmark.circle.fill" : "circle")
                                     .font(Theme.title3)
-                                    .foregroundStyle(selectedIDs.contains(meeting.id) ? Theme.accent : Theme.textTertiary)
+                                    .foregroundStyle(selectedIDs.contains(meeting.id) ? Theme.link : Theme.textTertiary)
                                     .accessibilityHidden(true)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(verbatim: meeting.title).font(Theme.subheadline).foregroundStyle(Theme.textPrimary)

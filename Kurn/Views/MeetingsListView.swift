@@ -408,7 +408,7 @@ struct MeetingsListView: View {
                 set: { if !$0 { pendingDelete = nil } }
             ),
             iconSystemName: "trash.fill",
-            iconTint: Theme.accent,
+            iconTint: Theme.destructive,
             title: NSLocalizedString("meetings.delete.confirm", comment: "Delete confirmation"),
             message: pendingDelete?.title ?? "",
             primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
@@ -454,7 +454,7 @@ extension MeetingsListView {
                 FilterChip(
                     title: option.title,
                     isSelected: filter.dateRange == option,
-                    tint: filter.dateRange == option ? Theme.accent : .primary
+                    tint: filter.dateRange == option ? Theme.ink : .primary
                 ) {
                     filter.dateRange = option
                 }

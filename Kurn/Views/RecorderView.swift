@@ -55,7 +55,7 @@ private struct RecorderContent: View {
             // Immersive black backdrop with a soft red glow, per the design mock.
             Color.black.ignoresSafeArea()
             RadialGradient(
-                colors: [Theme.accent.opacity(0.12), .clear],
+                colors: [Theme.record.opacity(0.12), .clear],
                 center: .center, startRadius: 0, endRadius: 260
             )
             .ignoresSafeArea()
@@ -181,11 +181,11 @@ private struct RecorderContent: View {
     private var statusBadge: some View {
         HStack(spacing: 8) {
             if vm.state == .recording {
-                PulsingDot(color: Theme.accent)
+                PulsingDot(color: Theme.record)
                     .accessibilityHidden(true)
             } else {
                 Circle()
-                    .fill(vm.state == .paused ? Theme.warning : Theme.accent)
+                    .fill(vm.state == .paused ? Theme.warning : Theme.record)
                     .frame(width: 10, height: 10)
                     .accessibilityHidden(true)
             }
@@ -194,7 +194,7 @@ private struct RecorderContent: View {
                  : "REC")
                 .font(.system(.footnote, design: .default, weight: .bold))
                 .tracking(2.5)
-                .foregroundStyle(vm.state == .paused ? Theme.warning : Theme.accent)
+                .foregroundStyle(vm.state == .paused ? Theme.warning : Theme.record)
         }
     }
 
@@ -259,7 +259,7 @@ private struct RecorderContent: View {
             .multilineTextAlignment(.center)
             .font(Theme.body)
             .foregroundStyle(.white)
-            .tint(Theme.accent)
+            .tint(Theme.record)
             // Explicit, persistent label — VoiceOver stops reading the
             // placeholder as soon as the field has a value, unlike a label.
             .accessibilityLabel(NSLocalizedString(
@@ -368,7 +368,7 @@ private struct RecorderContent: View {
                 }
                 .buttonStyle(.glassProminent)
                 .buttonBorderShape(.capsule)
-                .tint(Theme.accent)
+                .tint(Theme.record)
                 .disabled(vm.state == .idle)
             }
 
@@ -434,7 +434,7 @@ private struct RecorderContent: View {
 
     private var barColor: Color {
         switch vm.state {
-        case .recording: return Theme.accent
+        case .recording: return Theme.record
         case .paused: return Theme.warning
         case .idle: return .white.opacity(0.3)
         }

@@ -98,7 +98,7 @@ extension StorageSettingsView {
                             Image(systemName: "trash")
                         }
                         .buttonStyle(.borderless)
-                        .tint(Theme.accent)
+                        .tint(Theme.destructive)
                         .accessibilityLabel(NSLocalizedString("quarantine.delete", comment: "Delete recording"))
                     }
                 }

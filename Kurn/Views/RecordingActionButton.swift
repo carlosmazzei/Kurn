@@ -24,7 +24,7 @@ struct RecordingActionButton: View {
 
     var body: some View {
         Button(action: startRecording) { Label(title, systemImage: symbol) }
-            .tint(Theme.accent)
+            .tint(Theme.record)
             .buttonStyle(.glassProminent)
             .accessibilityLabel(title)
             .accessibilityHint(session.isActive

@@ -29,9 +29,9 @@ struct MeetingChatTurnView: View {
                     Spacer(minLength: 40)
                     Text(turn.text)
                         .textSelection(.enabled)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.textPrimary)
                         .padding(.horizontal, 14).padding(.vertical, 10)
-                        .background(Theme.accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .background(Theme.fill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .contextMenu { branchMenu }
                 }
                 if branch?.isLeftOut == true {
@@ -187,7 +187,7 @@ struct MeetingChatTurnView: View {
                             }
                             .padding(.horizontal, 10).padding(.vertical, 6)
                             .background(Theme.fill, in: Capsule())
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.link)
                         }
                         .buttonStyle(.plain)
                         .disabled(onJumpToTime == nil)
