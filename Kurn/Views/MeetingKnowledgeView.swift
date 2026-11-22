@@ -160,15 +160,16 @@ struct MeetingKnowledgeView: View {
                     .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
             }
         } else if let errorText = lastCompileErrorText ?? lastAttemptErrorText {
-            HStack(spacing: 10) {
-                Text(errorText)
-                    .font(Theme.footnote).foregroundStyle(Theme.destructive)
-                    .fixedSize(horizontal: false, vertical: true)
-                if canGenerateArticle {
-                    KnowledgeChipButton(title: NSLocalizedString("detail.try_again", comment: "Try again"),
-                                        systemImage: "arrow.clockwise", action: generate)
-                }
-            }
+            // The Audio tab's failed-row shape: the reason on its own line in
+            // a grouped card and an icon-only retry. A knowledge failure
+            // retries only the knowledge update; a wiki failure retries the wiki.
+            let retriesKnowledge = lastCompileErrorText != nil
+            KnowledgeFailureRow(
+                title: NSLocalizedString(retriesKnowledge ? "knowledge.update.failed_title" : "detail.wiki.failed_title",
+                                         comment: "Failure title"),
+                reason: errorText,
+                retry: retriesKnowledge ? updateKnowledge : (canGenerateArticle ? generate : nil)
+            )
         }
     }
 
@@ -448,5 +449,37 @@ private struct MeetingFactRow: View {
             parts.append(NSLocalizedString("detail.knowledge.negated", comment: "Negated claim"))
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+}
+
+/// A failed knowledge update or wiki write: title, the reason in the
+/// destructive colour and an icon-only retry, in a grouped card — the Audio
+/// tab's failed-row shape.
+private struct KnowledgeFailureRow: View {
+    let title: String
+    let reason: String
+    let retry: (() -> Void)?
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(Theme.subheadlineEmphasized).foregroundStyle(Theme.textPrimary)
+                Text(reason).font(Theme.footnote).foregroundStyle(Theme.destructive)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let retry {
+                Button(action: retry) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(Theme.bodyEmphasized).foregroundStyle(Theme.ink)
+                        .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(NSLocalizedString("detail.try_again", comment: "Try again"))
+                .accessibilityIdentifier("knowledge.retry")
+            }
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous).fill(Theme.surface))
     }
 }

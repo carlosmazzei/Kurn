@@ -165,7 +165,10 @@ enum KnowledgeCompilationPhase: Sendable, Equatable {
         switch self {
         case .readingTranscript: return 0.1
         case .extracting(let recording, let total):
-            return 0.15 + 0.6 * min(1, Double(recording) / Double(max(1, total)))
+            // `recording` is the one being extracted now (1-based), so only
+            // the recordings before it count as done — the bar starts at 15%
+            // and advances when each recording finishes, never jumps ahead.
+            return 0.15 + 0.6 * min(1, Double(max(0, recording - 1)) / Double(max(1, total)))
         case .checking: return 0.8
         case .publishing: return 0.95
         }

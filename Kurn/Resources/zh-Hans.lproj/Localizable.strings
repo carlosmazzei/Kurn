@@ -1981,3 +1981,5 @@
 "recorder.discard.confirm.keep" = "继续录音";
 "recorder.mic.builtin_forced_hint" = "设置中已开启“始终使用 iPhone 麦克风”";
 "knowledge.update.title" = "正在更新知识";
+"knowledge.update.failed_title" = "知识更新失败";
+"detail.wiki.failed_title" = "Wiki 生成失败";
