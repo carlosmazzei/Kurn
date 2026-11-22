@@ -449,7 +449,6 @@
 "phase.knowledge.publishing" = "正在发布";
 "detail.knowledge.update" = "更新知识";
 "detail.knowledge.updating" = "知识 · 正在更新…";
-"detail.knowledge.update.stats" = "%1$@ · %2$d%% · %3$@ · %4$ds · %5$@";
 "knowledge.updated.fact.one" = "%d 条新事实";
 "knowledge.updated.fact.other" = "%d 条新事实";
 "knowledge.updated_empty" = "没有新事实——模型未找到任何陈述";
@@ -1981,3 +1980,4 @@
 "recorder.discard.confirm.message" = "到目前为止的音频将从此设备删除。改为停止则会保留它。";
 "recorder.discard.confirm.keep" = "继续录音";
 "recorder.mic.builtin_forced_hint" = "设置中已开启“始终使用 iPhone 麦克风”";
+"knowledge.update.title" = "正在更新知识";

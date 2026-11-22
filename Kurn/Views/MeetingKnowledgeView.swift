@@ -29,14 +29,14 @@ struct MeetingKnowledgeView: View {
             VStack(alignment: .leading, spacing: 16) {
                 if case let .loaded(read) = state, !read.contributions.isEmpty {
                     headerRow(read)
-                    knowledgeProgressRow
+                    knowledgeProgressRow(hasFacts: true)
                     compileResultNote
                     statusRow
                     factsSections(read)
                     pagesChips(read)
                     pageLinkRow
                 } else {
-                    knowledgeProgressRow
+                    knowledgeProgressRow(hasFacts: false)
                     compileResultNote
                     statusRow
                     if case let .loaded(read) = state {
@@ -74,39 +74,63 @@ struct MeetingKnowledgeView: View {
         }
     }
 
-    /// The compile's live progress — the same shape as the Summary bar's
-    /// generating state: a pill label, a thin determinate bar and a one-line
-    /// stat row; the facts stay visible underneath at all times.
+    /// The compile's live progress in the app's two progress idioms: with no
+    /// facts yet, the Transcript tab's centred in-progress state (phase as the
+    /// title, a 200pt determinate bar, its percent and the leave-screen hint);
+    /// with facts on screen, the Audio tab's transcribing row (title, one
+    /// status line, a thin bar) in a grouped card above the list, which stays
+    /// in place.
     @ViewBuilder
-    private var knowledgeProgressRow: some View {
+    private func knowledgeProgressRow(hasFacts: Bool) -> some View {
         if let progress = coordinator.progress(for: meeting.id) ?? (updateInFlight ? pendingProgress : nil) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(NSLocalizedString("detail.knowledge.updating", comment: "Knowledge · updating…"))
-                    .font(Theme.footnoteEmphasized).foregroundStyle(Theme.textPrimary)
-                    .padding(.horizontal, 14).frame(minHeight: 32)
-                    .background(Theme.fill, in: Capsule())
-                ProgressView(value: progress.fraction)
-                    .progressViewStyle(.linear)
-                    .tint(Theme.ink)
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(updateStats(progress, at: context.date))
-                        .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+            let percent = Int((progress.fraction * 100).rounded())
+            let title = progress.phase.displayName.trimmingCharacters(in: CharacterSet(charactersIn: "…."))
+            Group {
+                if hasFacts {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(NSLocalizedString("knowledge.update.title", comment: "Updating knowledge"))
+                                .font(Theme.subheadlineEmphasized).foregroundStyle(Theme.textPrimary)
+                            Spacer(minLength: 8)
+                            Text("\(percent)%").font(Theme.footnote).monospacedDigit().foregroundStyle(Theme.textSecondary)
+                        }
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            Text(updateStatusLine(progress, title: title, at: context.date))
+                                .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+                                .lineLimit(1)
+                        }
+                        ProgressView(value: progress.fraction).tint(Theme.ink)
+                    }
+                    .padding(16)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+                } else {
+                    ContentUnavailableView {
+                        Label(title, systemImage: "sparkles")
+                    } description: {
+                        VStack(spacing: 10) {
+                            ProgressView(value: progress.fraction).tint(Theme.ink).frame(width: 200)
+                            Text("\(percent)%").font(Theme.footnote).monospacedDigit().foregroundStyle(Theme.textSecondary)
+                            TimelineView(.periodic(from: .now, by: 1)) { context in
+                                Text(updateStatusLine(progress, title: nil, at: context.date))
+                                    .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+                            }
+                            Text(NSLocalizedString("detail.transcript.leave_hint", comment: "You can leave this screen"))
+                        }
+                    }
+                    .padding(.top, 24)
                 }
             }
+            .accessibilityElement(children: .combine)
             .accessibilityIdentifier("knowledge.progress")
         }
     }
 
-    /// The stat line "<phase> · <N%> · <model> · <elapsed>s · <N facts>" —
-    /// the summary's generating line's order, with the phase in front.
-    private func updateStats(_ progress: KnowledgeCompilationProgress, at now: Date) -> String {
+    /// "<phase> · <model> · <elapsed>s" (the phase only on the card, where it
+    /// is not already the title) — the summary's generating line, shorter.
+    private func updateStatusLine(_ progress: KnowledgeCompilationProgress, title: String?, at now: Date) -> String {
         let elapsed = Int(now.timeIntervalSince(progress.startedAt))
         let model = progress.modelLabel.isEmpty ? progress.providerLabel : progress.modelLabel
-        return String(
-            format: NSLocalizedString("detail.knowledge.update.stats", comment: "phase, percent, model, elapsed, facts"),
-            progress.phase.displayName, Int((progress.fraction * 100).rounded()), model, elapsed,
-            knowledgeCountText("knowledge.count.fact", progress.factsSoFar)
-        )
+        return ([title].compactMap { $0 } + [model, "\(elapsed)s"]).joined(separator: " · ")
     }
 
     /// What the just-finished compile published, briefly — a real count, the

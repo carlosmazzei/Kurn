@@ -449,7 +449,6 @@
 "phase.knowledge.publishing" = "Publication";
 "detail.knowledge.update" = "Mettre à jour les connaissances";
 "detail.knowledge.updating" = "Connaissances · mise à jour…";
-"detail.knowledge.update.stats" = "%1$@ · %2$d%% · %3$@ · %4$ds · %5$@";
 "knowledge.updated.fact.one" = "%d nouveau fait";
 "knowledge.updated.fact.other" = "%d nouveaux faits";
 "knowledge.updated_empty" = "Aucun nouveau fait — le modèle n’a trouvé aucune affirmation";
@@ -1981,3 +1980,4 @@
 "recorder.discard.confirm.message" = "L’audio enregistré jusqu’ici sera effacé de l’appareil. Arrêter, au contraire, le conserve.";
 "recorder.discard.confirm.keep" = "Continuer l’enregistrement";
 "recorder.mic.builtin_forced_hint" = "L’option Toujours utiliser le micro de l’iPhone est activée dans Réglages";
+"knowledge.update.title" = "Mise à jour des connaissances";
