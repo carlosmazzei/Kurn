@@ -38,6 +38,10 @@ final class KnowledgeJobQueue {
     private var pendingCancellation: CancellationRequest?
     @ObservationIgnored private let eraseJobs: Erase
     private(set) var activeJobID: UUID?
+    @ObservationIgnored private var activeMeetingID: UUID?
+    /// Jobs the person stopped: their cancellation discards the row instead of
+    /// leaving it to be retried, and nothing is published.
+    @ObservationIgnored private var userCancelledJobIDs: Set<UUID> = []
     private(set) var lastFailureCode: String?
     @ObservationIgnored private var drainTask: Task<Void, Never>?
     @ObservationIgnored private var cancellationTask: Task<Void, Never>?
@@ -69,6 +73,19 @@ final class KnowledgeJobQueue {
     func refresh(kind: KnowledgeJobKind) {
         if activeKind == kind { executionEpoch += 1; drainTask?.cancel() }
         wake()
+    }
+
+    /// Stops the running job of `kind` for `meetingID` (the person tapped
+    /// Stop): the in-flight request is cancelled, nothing is published, and the
+    /// row is discarded rather than deferred for a retry. A no-op when that
+    /// meeting's job is not the one running.
+    @discardableResult
+    func cancelRunning(kind: KnowledgeJobKind, meetingID: UUID) -> Bool {
+        guard activeKind == kind, activeMeetingID == meetingID, let jobID = activeJobID else { return false }
+        userCancelledJobIDs.insert(jobID)
+        executionEpoch += 1
+        drainTask?.cancel()
+        return true
     }
 
     func setForeground(_ active: Bool) {
@@ -264,7 +281,8 @@ final class KnowledgeJobQueue {
         runErrors[handle.id] = nil
         activeJobID = handle.id
         activeKind = handle.work.kind
-        defer { activeJobID = nil; activeKind = nil; activeEpoch = nil }
+        activeMeetingID = handle.work.meetingID
+        defer { activeJobID = nil; activeKind = nil; activeEpoch = nil; activeMeetingID = nil }
         let epoch = executionEpoch
         activeEpoch = epoch
         var began = false
@@ -282,6 +300,12 @@ final class KnowledgeJobQueue {
                 guard canRun(handle.work), epoch == executionEpoch else { throw CancellationError() }
             }
             try await store.finishJob(handle)
+        } catch is CancellationError where userCancelledJobIDs.contains(handle.id) {
+            userCancelledJobIDs.remove(handle.id)
+            try await store.discardJob(handle, code: "user_cancelled")
+            lastFailureCode = "user_cancelled"
+            wake()
+            return false
         } catch is CancellationError {
             let committed = try recovery[handle.work.kind.rawValue]?(handle.work) ?? false
             try await store.finishJob(handle, interrupted: !committed, mayHaveEgress: began)

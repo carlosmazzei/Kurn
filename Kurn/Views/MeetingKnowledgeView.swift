@@ -99,7 +99,10 @@ struct MeetingKnowledgeView: View {
                                 .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
                                 .lineLimit(1)
                         }
-                        ProgressView(value: progress.fraction).tint(Theme.ink)
+                        HStack(spacing: 12) {
+                            ProgressView(value: progress.fraction).tint(Theme.ink)
+                            stopUpdateButton
+                        }
                     }
                     .padding(16)
                     .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
@@ -116,13 +119,35 @@ struct MeetingKnowledgeView: View {
                             }
                             Text(NSLocalizedString("detail.transcript.leave_hint", comment: "You can leave this screen"))
                         }
+                    } actions: {
+                        Button {
+                            coordinator.stopUpdate(meetingID: meeting.id)
+                        } label: {
+                            Text(NSLocalizedString("recorder.stop", comment: "Stop"))
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("knowledge.stop")
                     }
                     .padding(.top, 24)
                 }
             }
-            .accessibilityElement(children: .combine)
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("knowledge.progress")
         }
+    }
+
+    /// Icon-only Stop beside the card's bar (the Audio row's cancel shape).
+    private var stopUpdateButton: some View {
+        Button {
+            coordinator.stopUpdate(meetingID: meeting.id)
+        } label: {
+            Image(systemName: "stop.fill")
+                .font(Theme.footnoteEmphasized).foregroundStyle(Theme.ink)
+                .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(NSLocalizedString("recorder.stop", comment: "Stop"))
+        .accessibilityIdentifier("knowledge.stop")
     }
 
     /// "<phase> · <model> · <elapsed>s" (the phase only on the card, where it
