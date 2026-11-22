@@ -6,7 +6,7 @@
 //  (`.contrast`, `.dynamicType`, `.hitRegion`, `.sufficientElementDescription`,
 //  `.textClipped`, `.trait`) at default text size and at AX5
 //  (`accessibilityExtraExtraExtraLarge`), covering the Meetings List, all
-//  five Meeting Detail tabs (including Knowledge), Settings, RecorderView,
+//  Meeting Detail tabs (including Knowledge) and the Ask sheet, Settings, RecorderView,
 //  FolderFormView, the Knowledge entity page with a seeded narrative ("Notes"),
 //  and the Knowledge reader toolbar with export enabled.
 //
@@ -141,14 +141,22 @@ final class AccessibilityBaselineUITests: XCTestCase {
         XCTAssertTrue(settingsDone.waitForExistence(timeout: 5), "Missing Settings Done button")
         settingsDone.tap()
 
-        // 4. Meeting Detail Tabs (Recordings, Transcript, Summary, Chat)
+        // 4. Meeting Detail Tabs (Recordings, Transcript, Summary) plus the
+        // Ask sheet — Ask is a floating bar on every tab, not a tab itself.
         openFirstMeeting(app)
-        for tab in ["recordings", "transcript", "summary", "chat"] {
+        for tab in ["recordings", "transcript", "summary"] {
             let button = app.buttons["tab.\(tab)"]
             XCTAssertTrue(button.waitForExistence(timeout: 10), "Missing tab.\(tab)")
             button.tap()
             audit(app, screen: "MeetingDetail.\(tab)", sizeLabel: sizeLabel)
         }
+        let askBar = app.buttons["detail.ask"]
+        XCTAssertTrue(askBar.waitForExistence(timeout: 10), "Missing detail.ask bar")
+        askBar.tap()
+        audit(app, screen: "MeetingAskSheet", sizeLabel: sizeLabel)
+        let askDone = app.buttons["Done"].firstMatch
+        XCTAssertTrue(askDone.waitForExistence(timeout: 5), "Missing Ask Done button")
+        askDone.tap()
 
         // 5. RecorderView (audited last so no active recording session or mini
         // bar pollutes Settings or MeetingDetail, and returning to the list is
@@ -239,6 +247,10 @@ final class AccessibilityBaselineUITests: XCTestCase {
         XCTAssertTrue(card.waitForExistence(timeout: 10))
         for _ in 0..<2 {
             card.tap()
+            if detailTab.waitForExistence(timeout: 10) { return }
+            // At AX5 the floating Ask bar covers the card's tappable centre;
+            // an upper-region tap reaches the row itself.
+            card.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
             if detailTab.waitForExistence(timeout: 10) { return }
         }
         XCTFail("Meeting detail did not open")

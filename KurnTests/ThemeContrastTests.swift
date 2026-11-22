@@ -109,8 +109,10 @@ struct ThemeContrastTests {
             #expect(sepContrastHigh > sepContrastNormal)
             #expect(decoNormal.alpha > 0)
             if style == .dark {
-                #expect(fillHigh.alpha > fillNormal.alpha)
-                #expect(sepHigh.alpha > sepNormal.alpha)
+                // Opaque chrome tokens boost under Increase Contrast by going
+                // lighter, not by raising alpha.
+                #expect(relativeLuminance(fillHigh) > relativeLuminance(fillNormal))
+                #expect(relativeLuminance(sepHigh) > relativeLuminance(sepNormal))
             }
         }
     }

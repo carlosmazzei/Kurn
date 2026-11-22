@@ -2599,9 +2599,10 @@ framework (`NLContextualEmbedding`, multilingual, loaded once via the
   summaries, wiki articles and attachments and search with
   `SemanticSearchService.hybridSearch` (dense `NLContextualEmbedding` cosine + BM25,
   fused with Reciprocal Rank Fusion). Replies cite `[m:ss]` and answer in the
-  question's language. It is surfaced as a per-meeting Chat tab (`MeetingDetailView`)
-  and a library-wide "Ask" sheet (`MeetingsListView`); cited timestamps are tappable and
-  seek the transcript. Conversations are saved as `ChatSession`
+  question's language. It is surfaced as the "Ask" sheet (`MeetingAskSheet`): per
+  meeting from the floating bar at the bottom of `MeetingDetailView`, and
+  library-wide from the bottom bar of `MeetingsListView`; cited timestamps are
+  tappable and seek the transcript (the sheet closes first). Conversations are saved as `ChatSession`
   (`Models/ChatSession.swift`) — the same "reopen a past chat, start a new one,
   delete one" affordances Claude's own mobile app offers, via the history/new
   toolbar buttons on `MeetingChatView` and `Views/ChatSessionListView.swift`'s
@@ -3136,9 +3137,9 @@ new navigation or maintenance UI; the latter remains K2.6–K2.7.
 
 ### Meeting detail Knowledge mode (K2.3)
 
-`MeetingDetailMode` is the meeting-local mode catalog. Recordings / Transcript /
-Summary / Chat remain available; the disabled-by-default `knowledgeEnabled`
-flag adds Knowledge between Summary and Chat. This does not change root
+`MeetingDetailMode` is the meeting-local mode catalog. Summary / Transcript /
+Audio remain available; the disabled-by-default `knowledgeEnabled` flag adds the
+Wiki mode after Audio (Chat is the Ask sheet, see "Visual system"). This does not change root
 navigation; the global navigation prototype/review gate remains K0.5.
 `MeetingWikiContent` is shared by the old sheet shortcut and the inline notes
 section, so article viewing/read-aloud remains one presentation path.
@@ -3984,7 +3985,8 @@ Settings is a **hub, not one long form**. `SettingsView` is a short list of
 `NavigationLink` rows grouped into Intelligence / Capture / Library / System,
 each pushing a focused screen in `Views/Settings/` (`ProvidersSettingsView`,
 `SummarySettingsView`, `SemanticSearchSettingsView`, `RecordingSettingsView`,
-`TranscriptionSettingsView`, `TagsSettingsView`, `WikiSettingsView`,
+`TranscriptionSettingsView`, `TagsSettingsView`, `KnowledgeSettingsView` (the
+one Wiki screen; the former `WikiSettingsView` merged into it),
 `StorageSettingsView`, `DiagnosticsSettingsView`, `AboutSettingsView`). Only
 the destructive "Delete all data" reset stays on the root.
 
@@ -4066,6 +4068,62 @@ carries symbolicated-if-available frames and thread state, instead of walking
 the call stack by hand and risking silent information loss.
 `DiagnosticReportStore` owns the on-disk side.
 
+### Visual system (design review, prototype revision 10)
+
+The interface follows the "Kurn Revisão de Interface" prototype (revision 10,
+2026-11-21). The decisions it fixed, so a new screen does not drift:
+
+- **Colour roles, not raw colours** (`Theme.swift`, top-of-file table). `ink`
+  (the label colour) fills primary buttons, selected chips and segments, the
+  active toolbar control and progress; `onInk` is the text on it. `link`
+  (blue; also the asset-catalog `AccentColor`) is for inline text actions
+  ("Add…", "New"), ✓ checkmarks and selection circles, a search field's
+  Cancel. **Red appears only as `Theme.record`** (the Record button, the live
+  recording state) **and `Theme.destructive`** (delete/remove/reset and
+  failure badges). `indicator` is the grey of list-row glyphs and stays at
+  `textTertiary` (the prototype's lighter grey fails 3:1). `favorite` is the
+  amber star. `Theme.accent` is kept only as the red both roles alias; add no
+  new call site. Dark mode is pure black (`background`) with `#1C1C1E` groups
+  and opaque `#2C2C2E` fills; reading screens (summary, transcript, wiki,
+  documents) sit on `Theme.readingBackground` (system background), lists and
+  settings on the grouped background. `Theme.Spacing`/`Theme.Radius` hold the
+  spacing and radius tokens (card 18, sheet 26).
+- **Primary action** = `.buttonStyle(.glassProminent)` + `.tint(Theme.ink)` with
+  the label in `Theme.onInk` (Record and destructive primaries keep red);
+  `kurnDialog` primaries are ink capsules, destructive ones red. Sheets: Cancel
+  leading, the one primary action trailing in ink; short pickers at
+  `.medium/.large`.
+- **Lists are inset-grouped** (`Theme.surface` rows, hairline separators), not
+  cards. The meetings list groups by day (`DaySections`, KurnCore) under
+  Today/Yesterday/date headers for date sorts, shows time · duration, folder
+  and tag dots, and grey indicators (favourite, transcript, summary count) on
+  the right; status appears in words only when it needs attention. Quick chips
+  are All / Favorites / No summary; the period moved into Filters
+  (`MeetingDateFilter` gained last 7/30 days).
+- **One word per idea.** *Wiki* for every knowledge surface (destination, tab,
+  settings, reader; never "Knowledge", "Notes" or "Conhecimento" in a visible
+  string — code identifiers and localization keys keep `knowledge`); *Ask* for
+  every conversation (never "Chat"); *Summary* and *summary template*; *AI
+  model* for a provider's model; *Attachments* for a meeting's PDFs,
+  *Documents* only for generated documents. One glyph per concept: `sparkles`
+  summary, `text.alignleft` transcript, `waveform` audio, `book` wiki,
+  `books.vertical` library, `bubble.left.and.bubble.right` ask, `doc.text`
+  document. Menus are named by their content ("Meeting actions", "Wiki
+  actions"), never "More"; destructive items last, in red.
+- **Settings** hub rows carry a grey icon well and the current value
+  (providers configured, transcription preset, Wiki on/off, storage used).
+  Transcription has a Simple mode of four measured presets
+  (`TranscriptionPreset`; numbers from `docs/pipeline-evaluation.md`, November
+  2026) applied one consent at a time through the existing audio-upload and
+  model-download dialogs, and an Advanced mode with every control. Knowledge
+  and the meeting-page settings are one Wiki screen (`KnowledgeSettingsView`).
+- **Recorder** keeps Discard and the title field (user decision), with the
+  prototype layout: provisional "Meeting at HH:mm" placeholder, status in
+  words with the microphone name, Stop as the only red control; stopping opens
+  the meeting on Audio. The Watch can ask the phone to start
+  (`WatchCommand.start`; the phone queues it when backgrounded and replies
+  `.queued`).
+
 ### Navigation chrome (Liquid Glass)
 
 The app used to hide the navigation bar on every main screen and hand-draw its
@@ -4096,10 +4154,16 @@ toolbar would be the wrong control**:
   over the transcript with `.overlay(alignment: .bottom)` rather than a
   `.safeAreaBar`, so the conversation keeps scrolling beneath both the card
   and the keyboard instead of stopping above them).
-- `MeetingDetailView` uses four sections, plus Knowledge when its independent
-  flag is enabled, in a segmented `Picker`, not a bottom
-  bar: they're view modes of one meeting rather than top-level destinations, and
-  a bottom bar there would collide with the Chat tab's composer.
+- `MeetingDetailView` uses three sections — Summary, Transcript, Audio
+  (`MeetingDetailMode`, in that order) — plus Wiki when the independent
+  `knowledgeEnabled` flag is on, in an icon-only segmented `Picker`, not a
+  bottom bar: they're view modes of one meeting rather than top-level
+  destinations. Chat is not a mode any more: a floating "Ask about this
+  meeting" bar (`MeetingAskSheet`, identifier `detail.ask`) at the bottom of
+  every mode opens the conversation as a full-height sheet, and the library's
+  Ask uses the same sheet with `meeting: nil`. The detail opens on Summary when
+  one exists, else Transcript, else Audio, and remembers the last mode per
+  meeting for the process lifetime (`MeetingDetailTabMemory`).
 - Do not reintroduce `.background(.bar)`, hand-drawn `Divider` bar tops, or
   `.toolbar(.hidden, for: .navigationBar)` on a main screen. The lock screen
   used to be the one exception; it no longer needs to be, because it is not in
@@ -4204,8 +4268,9 @@ enforced by lint and by a CI audit test, not just convention:
 - **`KurnUITests/AccessibilityAuditUITests.swift`** — runs
   `XCUIApplication.performAccessibilityAudit(for: [.sufficientElementDescription,
   .trait])` over six screens in three tests: the meetings list
-  (`testMeetingsList`), the Meeting Detail Recordings, Transcript, Summary and
-  Chat tabs (`testMeetingDetailTabs`, one launch with one activity per tab —
+  (`testMeetingsList`), the Meeting Detail Summary, Transcript and Audio modes
+  plus the Ask sheet opened through `detail.ask` (`testMeetingDetailTabs`, one
+  launch with one activity per mode —
   each UI test relaunches the app, and that launch was most of each audit's
   CI time), and the Settings root (`testSettings`). It reuses the same seeded
   `"UI-Testing-Screenshots"` launch state and identifiers as the screenshot
@@ -4256,8 +4321,8 @@ enforced by lint and by a CI audit test, not just convention:
   **`RecorderView` and `FolderFormView` are not audited either** — worth
   knowing before trusting the audit as a safety net, since the recorder is the
   screen with the most icon-only controls. `testMeetingDetailTabs` audits the
-  Chat tab's structural chrome only: seeded data carries no semantic index, so
-  the run never leaves the empty/disabled state and composer — the actual
+  Ask sheet's structural chrome only: seeded data carries no provider, so
+  the run never leaves the no-provider empty state (the composer is hidden) — the actual
   conversation UI (the "thinking" reasoning row, a streaming reply, the retry
   affordance, citation and timestamp chips) only renders once a configured
   provider returns a real answer, so it stays a manual/on-device check. Adding
