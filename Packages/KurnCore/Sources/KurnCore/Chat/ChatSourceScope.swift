@@ -2,11 +2,13 @@ import Foundation
 
 public enum ChatSourcePart: String, Codable, Sendable, CaseIterable {
     case transcript, summary, wiki, attachments
+    /// The meeting's compiled knowledge, read through the Ask knowledge tools (K5.3).
+    case knowledge
 }
 
 public struct ChatSourceScope: Codable, Sendable, Equatable {
     public enum Kind: String, Codable, Sendable { case meetings, tags, folders, library }
-    public static let defaultParts: Set<ChatSourcePart> = [.transcript, .summary, .attachments]
+    public static let defaultParts: Set<ChatSourcePart> = [.transcript, .summary, .attachments, .knowledge]
 
     public var kind: Kind
     public var selectedIDs: Set<UUID>
@@ -39,7 +41,7 @@ public struct ChatSourceScope: Codable, Sendable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case kind, selectedIDs, parts, partOverrides, includeWikis
+        case kind, selectedIDs, parts, partOverrides, includeWikis, knowledgeSelectable
     }
 
     public init(from decoder: any Decoder) throws {
@@ -53,6 +55,12 @@ public struct ChatSourceScope: Codable, Sendable, Equatable {
             parts = wiki ? Self.defaultParts.union([.wiki]) : Self.defaultParts
         }
         partOverrides = try values.decodeIfPresent([UUID: Set<ChatSourcePart>].self, forKey: .partOverrides) ?? [:]
+        // Scopes saved before knowledge was a part offered knowledge wherever it was authorized;
+        // an empty selection (an excluded meeting, or no parts) stays empty.
+        if try values.decodeIfPresent(Bool.self, forKey: .knowledgeSelectable) != true {
+            if !parts.isEmpty { parts.insert(.knowledge) }
+            partOverrides = partOverrides.mapValues { $0.isEmpty ? $0 : $0.union([.knowledge]) }
+        }
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -61,5 +69,6 @@ public struct ChatSourceScope: Codable, Sendable, Equatable {
         try values.encode(selectedIDs, forKey: .selectedIDs)
         try values.encode(parts, forKey: .parts)
         try values.encode(partOverrides, forKey: .partOverrides)
+        try values.encode(true, forKey: .knowledgeSelectable)
     }
 }

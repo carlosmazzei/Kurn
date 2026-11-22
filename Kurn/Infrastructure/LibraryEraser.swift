@@ -9,6 +9,8 @@
 //
 //  - library-wide `ChatSession`s (`meeting == nil`, so no cascade reaches
 //    them) and every `GeneratedDocument` (snapshots its sources by design);
+//  - the Knowledge Engine's rows, which relate to meetings by ID and quote
+//    their transcripts;
 //  - `Recordings/Trash`, `Recordings/Quarantine` and `Recordings/Journal`,
 //    which hold audio (and references to it) for recovery;
 //  - `StoreRecovery/Backups` and `StoreRecovery/Quarantine`, which are whole
@@ -90,6 +92,18 @@ enum LibraryEraser {
         try deleteAll(WikiArticle.self, in: context)
         try deleteAll(MeetingPhoto.self, in: context)
         try deleteAll(MeetingAttachment.self, in: context)
+        // Knowledge relates to meetings by ID, so no cascade reaches it, and
+        // its evidence quotes the transcripts.
+        try deleteAll(KnowledgeEntity.self, in: context)
+        try deleteAll(KnowledgeAssertion.self, in: context)
+        try deleteAll(KnowledgeEvidence.self, in: context)
+        try deleteAll(KnowledgeEvent.self, in: context)
+        try deleteAll(KnowledgeRelation.self, in: context)
+        try deleteAll(KnowledgeJob.self, in: context)
+        try deleteAll(KnowledgeRevision.self, in: context)
+        try deleteAll(KnowledgeReview.self, in: context)
+        try deleteAll(KnowledgeContext.self, in: context)
+        try deleteAll(SourceContextLink.self, in: context)
         try context.save()
     }
 

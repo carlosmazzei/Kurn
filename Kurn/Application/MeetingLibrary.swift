@@ -96,7 +96,13 @@ struct MeetingLibrary {
         let fileNames = meeting.recordings.map(\.fileName)
             + meeting.recordings.flatMap { $0.photos.map(\.fileName) }
             + meeting.attachments.map(\.fileName)
-        try journaledDelete(fileNames: fileNames) { context.delete(meeting) }
+        let jobs = try derivedJobs(for: [meeting.id])
+        let tombstones = try knowledgeTombstones(for: [meeting.id], scope: .meeting)
+        try journaledDelete(fileNames: fileNames) {
+            for job in jobs { context.delete(job) }
+            for tombstone in tombstones { context.insert(tombstone) }
+            context.delete(meeting)
+        }
     }
 
     /// Deletes several meetings as one journaled operation: one save commits
@@ -109,17 +115,54 @@ struct MeetingLibrary {
         let fileNames = recordings.map(\.fileName)
             + recordings.flatMap { $0.photos.map(\.fileName) }
             + meetings.flatMap { $0.attachments.map(\.fileName) }
+        let jobs = try derivedJobs(for: Set(meetings.map(\.id)))
+        let tombstones = try knowledgeTombstones(for: Set(meetings.map(\.id)), scope: .meeting)
         try journaledDelete(fileNames: fileNames) {
+            for job in jobs { context.delete(job) }
+            for tombstone in tombstones { context.insert(tombstone) }
             for meeting in meetings { context.delete(meeting) }
         }
     }
 
+    /// Operational checkpoints do not cascade from Meeting. Unfinished
+    /// extraction is purged in the same commit; canonical history goes through
+    /// the tombstone below. Fetch before moving any files; deletion shares the
+    /// journal's model commit.
+    private func derivedJobs(for meetingIDs: Set<UUID>) throws(AppError) -> [KnowledgeJob] {
+        let article = KnowledgeJobKind.meetingArticle.rawValue
+        let extraction = KnowledgeJobKind.extraction.rawValue
+        let succeeded = KnowledgeJobState.succeeded.rawValue
+        do {
+            return try context.fetch(FetchDescriptor<KnowledgeJob>(predicate: #Predicate {
+                $0.kindRaw == article || ($0.kindRaw == extraction && $0.stateRaw != succeeded)
+            }))
+                .filter { $0.meetingID.map(meetingIDs.contains) ?? false }
+        } catch { throw .persistenceFailed(error.localizedDescription) }
+    }
+
+    /// Knowledge relates to meetings by ID, so no cascade reaches it. A
+    /// tombstone committed with the deletion makes `KnowledgeDeletionCoordinator`
+    /// purge what the source supported, even after a process death (K2.8).
+    private func knowledgeTombstones(for meetingIDs: Set<UUID>, scope: KnowledgeDeletionScope) throws(AppError) -> [KnowledgeJob] {
+        do { return try KnowledgeDeletionRows.tombstones(for: meetingIDs, scope: scope, in: context) }
+        catch { throw .persistenceFailed(error.localizedDescription) }
+    }
+
     /// Deletes one recording segment, its audio and the photos taken during
-    /// it, through the same journaled path as `deleteMeeting`.
+    /// it, through the same journaled path as `deleteMeeting`. Knowledge
+    /// compiled from the meeting quoted it, so that is purged too and can be
+    /// recompiled from the recordings that remain.
     func deleteRecording(_ recording: Recording) throws(AppError) {
         try requireNoCaptureInProgress([recording])
         let fileNames = [recording.fileName] + recording.photos.map(\.fileName)
-        try journaledDelete(fileNames: fileNames) { context.delete(recording) }
+        var tombstones: [KnowledgeJob] = []
+        if let meeting = recording.meeting, recording.transcript != nil {
+            tombstones = try knowledgeTombstones(for: [meeting.id], scope: .source)
+        }
+        try journaledDelete(fileNames: fileNames) {
+            for tombstone in tombstones { context.insert(tombstone) }
+            context.delete(recording)
+        }
     }
 
     /// Refuses to delete a recording the live recorder is still writing. A

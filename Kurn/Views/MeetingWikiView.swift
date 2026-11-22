@@ -16,27 +16,8 @@ struct MeetingWikiView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Label {
-                    Text(
-                        String(
-                            format: NSLocalizedString("detail.wiki.updated", comment: "Wiki last updated date"),
-                            article.updatedAt.formatted(date: .abbreviated, time: .shortened)
-                        )
-                    )
-                } icon: {
-                    Image(systemName: "clock")
-                }
-                .font(.caption)
-                .foregroundStyle(Theme.textSecondary)
-
-                ReadAloudControl(item: .wiki(article))
-
-                MarkdownText(article.bodyMarkdown)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
-            }
-            .padding(20)
+            MeetingWikiContent(article: article)
+                .padding(20)
         }
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle(NSLocalizedString("detail.wiki.title", comment: "Meeting wiki title"))
@@ -45,6 +26,34 @@ struct MeetingWikiView: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
             }
+        }
+    }
+}
+
+/// The same article content works inline and in the existing sheet shortcut.
+struct MeetingWikiContent: View {
+    let article: WikiArticle
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label {
+                Text(
+                    String(
+                        format: NSLocalizedString("detail.wiki.updated", comment: "Wiki last updated date"),
+                        article.updatedAt.formatted(date: .abbreviated, time: .shortened)
+                    )
+                )
+            } icon: {
+                Image(systemName: "clock")
+            }
+            .font(.caption)
+            .foregroundStyle(Theme.textSecondary)
+
+            ReadAloudControl(item: .wiki(article))
+
+            MarkdownText(article.bodyMarkdown)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
         }
     }
 }

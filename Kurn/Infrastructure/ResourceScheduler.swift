@@ -45,6 +45,8 @@ enum ResourceWorkKind: Sendable, Equatable {
     case diarization(DiarizationEngine)
     case enhancement
     case modelLoading
+    /// Bounded generation sharing the transcription/model budget.
+    case knowledgeGeneration(onDevice: Bool)
     /// On-device Vision OCR over a captured meeting photo
     /// (`PhotoTextRecognizer`), and text extraction from a PDF attached to a
     /// meeting (`PDFTextExtractor`, which OCRs scanned pages the same way).
@@ -93,6 +95,8 @@ enum ResourceWorkKind: Sendable, Equatable {
             return 30
         case .modelLoading:
             return 40
+        case .knowledgeGeneration(let onDevice):
+            return onDevice ? 50 : 5
         case .photoTextRecognition:
             return 10
         }

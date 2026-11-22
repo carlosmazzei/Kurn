@@ -80,7 +80,7 @@ production with awaited barriers (NH05) and canonical tool replay (NH06) are des
 contract-version, JSONStorage-envelope, SwiftData-schema and pi-JSONL versions distinct.
 
 `ChatSourceScope` persists meeting/tag/folder/library selection,
-global transcript/summary/wiki/attachment parts and optional per-meeting overrides
+global transcript/summary/wiki/attachment/knowledge parts and optional per-meeting overrides
 (including an empty selection). Legacy `includeWikis` payloads decode to the old defaults.
 `ChatSourceTools` exposes bounded, paginated read-only source tools, validating
 arguments and enforcing a fixed allowed-meeting/part snapshot on reads and search results.
@@ -653,7 +653,11 @@ store-metadata checks), `static-policy` (`Tools/check_static_policy.py`, Linux),
 `ui-accessibility-tests` (`KurnUITests` minus the screenshot suite, run as two
 `ui-tests` shards — `main` and `flows` — on separate runners and reported as
 this one check) and `kurncore-linux` (a matrix running `swift test` and exporting
-coverage separately for `Packages/KurnCore` and `Packages/AgentHarness`). The `release` job
+coverage separately for `Packages/KurnCore` and `Packages/AgentHarness`). `unit-tests` and both `ui-tests` shards compile nothing: they `needs:` the
+`build-for-testing` job, which builds once and uploads the products and
+`.xctestrun` (artifact `test-products`), and run `test-without-building`, so a
+compile error shows up in `build-for-testing`. A cancelled or timed-out shard still fails
+`ui-accessibility-tests`. The `release` job
 needs all six. The weekly/on-demand `reliability-hardening.yml` adds a Thread
 Sanitizer run over the concurrency-sensitive suites, a Release-configuration
 test run and a UI-test flake measurement. The test jobs also upload
@@ -2627,8 +2631,12 @@ framework (`NLContextualEmbedding`, multilingual, loaded once via the
   V5 (1.4.0) adds optional session scope/artifacts and generated-document artifact
   provenance, with V4 frozen in `KurnSchemaV4Models.swift` and
   `KurnSchemaV4LibraryModels.swift`. `SchemaV4MigrationTests` writes every V4 entity
-  and verifies migration and persisted harness state. The next model change means:
-  edit the live class, add a new schema listing live classes, freeze V5, add the stage, and bump
+  and verifies migration and persisted harness state. V6 (1.5.0) adds the canonical
+  harness session storage and V7 (1.6.0) the Knowledge Engine's canonical layer, with V6
+  frozen in `KurnSchemaV6Models.swift`, `KurnSchemaV6LibraryModels.swift` and
+  `KurnSchemaV6HarnessModels.swift`; `SchemaV6MigrationTests` writes every V6 entity to
+  disk and opens it through the plan. The next model change means: edit the live class,
+  add a new schema listing live classes, freeze V7, add the stage, and bump
   `KurnModelGraph.currentSchemaVersion` (which backup metadata records). When
   `wikiEnabled` is on, the agent can also read the condensed per-meeting articles
   (`read_wiki`) — see "Derived artifacts" below.
@@ -2764,6 +2772,235 @@ hold for every phase; code comments cite this section.
   inside a cited segment (it may cross a pause between them, never sit in one)
   — and returns a fixed `KnowledgeEvidenceRejection`.
   Quote hashing needs CryptoKit and is the app's job.
+- **The canonical store (K1.2, `KurnSchemaV7`).** Ten models in
+  `Models/KnowledgeCanonicalModels.swift` (`KnowledgeEntity`, `KnowledgeAssertion`,
+  `KnowledgeEvidence`, `KnowledgeEvent`, `KnowledgeRelation`) and
+  `Models/KnowledgeOperationalModels.swift` (`KnowledgeJob`, `KnowledgeRevision`,
+  `KnowledgeReview`, `KnowledgeContext`, `SourceContextLink`). They relate by persisted
+  UUIDs, never by a relationship to `Meeting` or to each other, and store every closed
+  vocabulary as its KurnCore raw value (`KnowledgeStoreVocabulary.swift` adds the job,
+  review-item and event vocabularies). An assertion keeps valid time as stated
+  (`validFromText`/`validToText` at their precision, half-open) apart from transaction
+  time (`recordedAt`, `retractedAt`) and records the predicate registry version it was
+  checked under; a merged entity is a redirect (`mergedIntoID`); evidence carries the
+  transcript fingerprint it cites and `isAvailable` for when that revision is gone.
+  `KnowledgeJob.idempotencyKey` and `KnowledgeRevision.number` are unique, and a
+  revision is the projection outbox while `projectionPending`. A meeting without a
+  `SourceContextLink` is in context `unknown`, so the V6 → V7 stage is lightweight and
+  writes nothing. `LibraryEraser` deletes all ten. `KnowledgeStore` (K1.5) is
+  their canonical writer. K1.6 wires the shared queue, meeting articles and
+  disabled-by-default, local-only canonical extraction.
+- **Transcript revisions and anchors (K1.3).** KurnCore's
+  `KnowledgeTranscriptSnapshot` freezes transcript array order and UUID anchors
+  (lowercase strings), and produces versioned, length-prefixed UTF-8 canonical
+  bytes over language and every segment's ID, speaker label, exact IEEE time
+  and confidence bits, and unnormalized text. Creation dates, pipeline reports
+  and speaker display names are not revision inputs. Duplicate IDs, non-finite
+  values, inverted/negative or unrepresentable times fail closed; millisecond
+  anchors round start down/end up without dropping sub-millisecond spans.
+  The app's `KnowledgeTranscriptRevision` hashes those bytes with SHA-256
+  (lowercase hex) and resolves evidence only when its fingerprint matches;
+  preserving a quote or UUID after an edit never makes an old revision valid.
+  `Transcript.knowledgeRevision()` decodes authoritative bytes directly and
+  rejects corruption rather than fingerprinting the presentation getter's empty
+  fallback. There is no transcript history or new persisted field/migration.
+  `KnowledgeStore` recaptures the revision at commit and marks replaced
+  evidence unavailable when its source revision is gone. Readers must still
+  resolve against the current fingerprint: an edit may precede recompilation.
+- **Extraction contract (K1.4).** KurnCore's `KnowledgeExtraction.decode`
+  validates the complete version-1 Codable document before it can leave a pass:
+  known fields/vocabularies only, local unique references, predicate/object rules,
+  stated dates, original contiguous verbatim evidence, cited attribution anchors
+  and explicit examined-segment coverage. Models cannot set review state, confer
+  human confirmation, or emit merge/context-link operations. Events require a
+  supporting assertion with a compatible predicate; a superseded event belongs
+  to the object of `supersedes` (the replaced entity). Replies are capped at 2 MB;
+  decoding errors expose fixed codes rather than content.
+  `Application/Knowledge/KnowledgeExtractionService` is value-in/value-out: K1.6b
+  composes it through `KnowledgeCompilationCoordinator`. It accepts an injected `LLMProvider`, `ContextBudget` and live
+  authorization callback. Full context goes first when it fits; otherwise
+  segment-aligned blocks retain every anchor. Planning reserves half the response
+  allowance for assertions/evidence and budgets the UUID coverage list against
+  the other half. Both initial and targeted input use the full allowance when
+  possible. Provider-reported output truncation permits one split of a pass
+  into two smaller passes, never recursive, within the same 64-pass ceiling.
+  The effective output allowance follows the provider: Apple extraction reserves
+  from its 1,024-token ceiling, including coverage planning and repair/split calls.
+  Structured calls ask the Apple adapter to reject unfinished JSON as truncation,
+  enabling the bounded split rather than repeating an oversized repair; balanced
+  schema errors still use the normal single repair. Prose calls are unaffected.
+  Oversized individual segments fail explicitly. One targeted round requests unexamined anchors; a remaining gap
+  fails the run. At most 64 extraction passes, each with one fresh repair on a
+  schema/validation error (never on transport failure); repair sends only the
+  original input and a fixed diagnostic, never echoes the bad reply. Validation
+  uses the full original transcript order even for noncontiguous targeted input,
+  preventing stitched evidence across omitted segments. Pass-local references
+  stay separate for K1.7 entity resolution. Policy/consent is re-evaluated before
+  constructing prompts and before each provider call, including repairs; output
+  records source fingerprint, strategy, examined anchors and targeted pass count.
+  This does not enable cloud processing, write canonical rows, or establish
+  semantic extraction accuracy: K0.4 benchmarking remains.
+- **Canonical writer and projection outbox (K1.5).** `KnowledgeStore` is a
+  `@ModelActor` over the existing protected container. The host must own one
+  writer per container; K1.6a's `KnowledgeStoreHost` constructs it off-main,
+  lazily and once for its queue; UI
+  continues to read through its own context. Only Sendable source snapshots,
+  encoded extraction documents and receipts cross its boundary. Each operation
+  opens a fresh context, avoiding cached source bytes across commits.
+  A source token covers the meeting's complete, UUID-ordered recording set
+  (including missing transcripts), transcript identities/fingerprints, recording
+  dates and capture state, meeting metadata and the persisted context. Missing,
+  corrupt, unready or ambiguously contextualized sources fail closed. Compilation
+  must cover every nonempty transcript; each pass is decoded and evidence-checked
+  again against persisted source order. Local refs remain separate per pass and
+  recording. K1.7 emits lexical review candidates while retaining distinct IDs;
+  neither people nor shared names are auto-linked.
+  A live authorization callback is awaited immediately before the synchronous
+  transaction; persisted context classification cannot lower the host's source
+  classification, and a named context policy must be present. Source, policy
+  revision and canonical revision are rechecked before mutation. The canonical
+  graph, succeeded job, retained attribution/ref-map provenance, coverage and
+  `KnowledgeRevision.projectionPending` outbox are saved together; failures roll
+  back all rows and retractions. Authoritative JSON (provenance, coverage, aliases,
+  typed values and evidence anchors) uses `JSONStorage` envelopes with checksums; unreadable/future job data is refused
+  without overwriting its bytes. The injected `beforeSave` seam proves rollback.
+  KurnCore's `KnowledgeCompilationIdentity` encodes an unambiguous, reversible
+  job key over scope, meeting ID, meeting source fingerprint, extractor version
+  and extraction schema version (independent of SwiftData's schema version).
+  Completed retries return the original receipt even after an unrelated
+  canonical commit or writer recreation. A later compilation in the same scope
+  makes the earlier job obsolete: restoring A after A → B cannot replay retracted
+  A as current knowledge; it fails explicitly and requires a new generation.
+  Replay also requires the original assertions to remain unretracted and
+  supported, covering invalidation caused by a compilation in another scope. Changed source or policy is never a replay;
+  a completed key under an earlier policy revision is refused and requires an
+  explicit rebuild/generation change. Cancelled jobs cannot be committed.
+  Recompilation retracts previous machine assertions in its own scope, retaining
+  history and human-confirmed assertions whose evidence still resolves. Evidence
+  from changed/removed recordings is marked unavailable across scopes and
+  unsupported assertions are invalidated. Relations and events remain historical
+  records tied to their assertion/revision; readers must filter through them.
+  The latest pending projection is durable across reopening. K2.1 publishes
+  pages and acknowledges covered revisions in the same transaction, requiring
+  the exact current canonical/source/policy snapshot. There is no standalone
+  acknowledgement API; a stale worker cannot erase newer work.
+  No schema migration or cloud processing is enabled by this boundary.
+- **Durable article scheduling (K1.6a).** `KnowledgeJobQueue` is owned by
+  `AppEnvironment`, shared by the wiki facade and future canonical producer.
+  Typed host intents and lease-checked, versioned checkpoints live in
+  `KnowledgeJob`, written through the environment's one `KnowledgeStoreHost`.
+  A stale worker cannot checkpoint or resurrect erased work. A failed clear keeps
+  its original cutoff and publication barrier, retrying on later opportunities.
+  Obsolete source/provider cancellations allow a fresh coalesced generation,
+  while deliberate cancellations remain final. Deferrals do not
+  consume the failure limit; three genuine failures require manual retry.
+  `ResourceWorkKind.knowledgeGeneration` reserves 50 units locally or 5 remotely
+  (initial estimates); the reservation is released before completion is observed.
+  Recording-session start cancels admission/in-flight work before capture starts;
+  ending the session permits resume. Backgrounding pauses, foreground activation
+  resumes, and automatic admission is capped at five jobs per activation. Direct
+  user requests do not silently grant another automatic quota. Deferred original
+  user requests remain distinct from fresh permission to override a circuit.
+  A launched provider call interrupted remotely requires explicit retry; crashes
+  before resource admission can resume. Recovery checks for an already committed
+  article before repeating a call; forced rebuilds must differ from their captured
+  prior article revision (independent of wall-clock order), covering a crash between article save and job
+  completion. Foreground resume remains authoritative. The optional
+  `ai.kurn.knowledge.processing` BG window admits on-device work only, checks
+  protected-data/store availability and expires cooperatively without late
+  publication or a model download. It never grants cloud background processing.
+  `WikiCoordinator` keeps its observable/menu/bulk API, consent and provider
+  circuit; it is now the queue's `meetingArticle` producer. Source and provider
+  configuration are rechecked before publication, failed article saves propagate,
+  and staged notes belong to the job checkpoint. The legacy meeting summary
+  checkpoint may seed a compatible wiki run but is never overwritten or cleared
+  by it. Clear Wiki erases article-job checkpoints; meeting deletion includes
+  article jobs in its journaled model commit. Late replies refetch the meeting
+  and cannot recreate deleted articles/jobs. Repeated forced requests coalesce
+  while unfinished; a completed rebuild allows a new generation.
+  Canonical extraction is a separate producer (K1.6b, below). The independent
+  `knowledgeEnabled` flag remains off by default, and existing wiki consent
+  never authorizes compiling knowledge across meetings.
+- **Canonical extraction producer (K1.6b).** `KnowledgeCompilationCoordinator`
+  is retained by `AppEnvironment` and shares the article queue/writer. Successful
+  transcription submits canonical work only while `knowledgeEnabled`; there is
+  no implicit library backfill or new Settings/navigation UI. The selected
+  Knowledge provider/model is captured. A cloud provider is admitted only under
+  its automatic grant in the cloud-consent ledger (see "Cloud consent"), checked
+  at submission, before every request and in the queue's eligibility, even if an
+  injected policy permits more; on-device needs no grant. A cloud run uses the
+  `.conservative` context budget, on-device keeps `.onDevice`. No model download
+  is triggered. The stable host-owned workspace policy (`localPolicy`) names every
+  provider with a grant for `.internal` sources and keeps the default's revision
+  (a new grant must not hide Knowledge compiled before it; egress is re-checked
+  live against the ledger), and is default-deny without one; named context
+  policies must be supplied explicitly, never silently replaced by that default.
+  Local scope/control preferences and backfill UI are described in K2.7 below;
+  corporate-policy editing remains gated.
+  `KnowledgeCompilationIdentity` retains exact v1 keys and adds reversible v2
+  keys with a generation digest covering provider configuration, model, policy
+  revisions and an explicit rebuild operation UUID. Retries keep their operation
+  identity; restoring an obsolete/cancelled compilation requires an explicit
+  new rebuild identity rather than silently minting a generation.
+  Recording dates are UTC instants; the host does not invent a historical
+  capture timezone. Persisted context kind is supplied to extraction.
+  Completed recording passes are checkpointed in the protected job, bound to
+  its exact source/policy identity and revalidated on restore. An interrupted
+  recording restarts; earlier complete recordings do not. Source/context and
+  live authorization are rechecked before retrieval, prompts, every call/repair,
+  each checkpoint and commit. A changed source/provider/policy discards the old
+  intent; disabling the feature defers it. Deleting a meeting purges unfinished
+  extraction jobs, preventing late publication; its canonical history is then
+  purged through a deletion tombstone ("Knowledge deletion (K2.8)" below).
+  Canonical commit requires the running queue lease and saves that same job's
+  succeeded state, graph, provenance and projection outbox atomically. Expired
+  or erased leases cannot publish or recreate jobs. Generic queue completion
+  cannot mark extraction successful, and operational erasure retains succeeded
+  canonical provenance. Completed submissions validate replay/current support
+  before the terminal shortcut. No schema migration or cloud activation is
+  introduced by this integration. Genuine producer failures emit content-free
+  `knowledge_compilation` reliability events with operation ID, elapsed time and
+  fixed error code; expected deferrals/obsolete intents are not failures.
+- **Review-only entity resolution and reversible redirects (K1.7).**
+  KurnCore's `KnowledgeEntityResolver` normalizes case/diacritics and whitespace,
+  preserves punctuation for exact matching, and records exact-name, alias and
+  token-Jaccard features. Different kinds and generic shared words alone are
+  excluded. Ties sort by UUID. The external specification's numeric weights
+  were unavailable; `experimental-v1` is an explicit, configurable STARTING
+  profile, not a reproduction of those numbers or a calibrated probability:
+  0.60 exact name + 0.15 alias + 0.25 token similarity, minimum 0.15, top five.
+  Every match requires human review, including every person/homonym. No threshold
+  or flag enables automatic linking before the K0.4 holdout gate is met.
+  Canonical commit retains separate UUIDs and stages `mergeCandidate` reviews in
+  the same graph/provenance transaction. Candidate origins are restricted to the
+  already-authorized meeting, compilation scope and current policy revision.
+  Up to 128 historical jobs, 1,024 entities and 128 suggestions are considered;
+  truncation and the profile are retained in optional provenance metadata.
+  Cross-meeting reads require the host's explicit authorized meeting-ID set
+  (up to 16), never just a scope label. Each current source/context passes live
+  local policy before origin-bound provenance, names or aliases are returned.
+  Unauthorized redirect targets are omitted, with incomplete resolution marked;
+  alias unions are scoped views, never destructive writes to the target row.
+  `KnowledgeStore.mergeEntities` / `undoEntityMerge` are host-only seams for an
+  explicit human decision, not model tools. They check fresh source/policy and
+  canonical revision, kind, visible state, all affected inbound origins, cycles
+  and depth. Redirects are not path-compressed. Assertions, relations, events,
+  evidence and original names/aliases are never reassigned or rewritten.
+  Mutation proofs are separate from discovery limits: fresh write snapshots
+  contain source tokens only, origin discovery pages through matching jobs, and
+  audits pin exact origin job IDs for all affected identities. Undo verifies
+  those specific jobs even after 128 newer compilations or 1,024 other entities.
+  The edge, versioned/checksummed review audit, candidate state and a new
+  projection-outbox revision commit atomically. Operation UUIDs are idempotent;
+  undo records its own receipt and reopens its candidate. An undone operation
+  cannot accidentally reapply itself. Undo may prove historical origins under
+  CURRENT live policy without exposing old-policy names as fresh candidates.
+  Unknown/corrupt audit data is refused without overwriting its bytes. The
+  extraction pipeline is `knowledge-extractor-v2`; queued older versions are
+  discarded rather than relabelled as current work. Existing provenance remains
+  readable; no schema migration, navigation or cloud activation is introduced.
+  Review UI, broader authorized candidate browsing and holdout calibration stay
+  in K2.6/K0.4; numeric/semantic matching accuracy has not been established.
 - **Public material is synthetic.** The golden set
   (`Packages/KurnCore/Tests/KurnCoreTests/Fixtures/knowledge/`, format
   `kurn.knowledge-fixture` v1) holds fictional meetings in Portuguese and
@@ -2795,13 +3032,808 @@ Where the checkout makes the specification bend:
 | Full-context-first extraction for meetings up to 2–3 h | `ContextBudget` already fits a whole transcript per model window, with `SummaryService`'s map/reduce as the overflow path; the on-device model's window is far too small for a full transcript | Reuse `ContextBudget` for the full-vs-blocks decision; the on-device model may run only the blocks strategy, and only once the K1 evaluation shows it meets the gates. No silent truncation: the strategy and coverage are recorded on the job |
 | `transcriptRevisionID`, evidence pointing at a transcript revision | `Transcript` has no revision identity and keeps no history; `TranscriptSegment.id` is a UUID that a re-transcription regenerates | K1 adds a revision fingerprint (SHA-256 over the canonical segment encoding, as `WikiCoordinator.contentHash` does today) and segment IDs as evidence anchors. With no retained history, evidence from a superseded revision is marked unavailable (spec §12.1 permits this) rather than pretending to be verifiable |
 | Single writer `ModelActor` for commits | Coordinators are `@MainActor` over the app's main `ModelContext`; services run off-main on value types | ADR: a `KnowledgeStore` `@ModelActor` on the same container for canonical commits and the projection outbox, with Sendable DTOs at its boundary; UI reads stay on the main context. Measure main-thread fetch cost before adding any second store |
-| New models alongside existing ones | `KurnSchemaV6` (1.5.0, the harness session storage) lists the live classes; V5 is frozen in `KurnSchemaV5Models.swift` | K1 is `KurnSchemaV7` (1.6.0): freeze V6, add the knowledge models additively, a lightweight stage, `SchemaV6MigrationTests` writing every V6 entity, and bump `KurnModelGraph.currentSchemaVersion` |
-| Graph as SwiftData relations | `Meeting` cascades its derived artifacts; there is no shared-entity model yet | Entities, assertions and evidence relate by persisted UUIDs, never by `@Relationship` to `Meeting` (no blind cascade across shared entities, spec §13). Deletion is explicit through a `KnowledgeDeletionCoordinator` called by `MeetingLibrary.deleteMeetings`, recording deletion and `LibraryEraser` |
+| New models alongside existing ones | `KurnSchemaV6` (1.5.0, the harness session storage) listed the live classes | Done in K1.2: `KurnSchemaV7` (1.6.0) freezes V6, adds the ten knowledge models additively through a lightweight stage, and `SchemaV6MigrationTests` writes every V6 entity |
+| Graph as SwiftData relations | `Meeting` cascades its derived artifacts; there is no shared-entity model yet | Entities, assertions and evidence relate by persisted UUIDs, never by `@Relationship` to `Meeting` (no blind cascade across shared entities, spec §13). Deletion is explicit: `MeetingLibrary` commits a tombstone with each meeting or transcribed-recording deletion, `KnowledgeDeletionCoordinator` purges it, and `LibraryEraser` removes every knowledge row ("Knowledge deletion (K2.8)") |
 | Typed `AppRoute` and `kurn://entity/…` deep links | The app deliberately declares no URL scheme (any app could open one, see "Cross-device control") | Typed in-process routes only; Markdown links in generated pages resolve through a router that accepts `entity:`/`evidence:` IDs and nothing else, consistent with `MarkdownPresentation` disabling links. No registered URL scheme |
 | Embeddings and hybrid retrieval | `SemanticSearchService.hybridSearch` (on-device `NLContextualEmbedding` + BM25 + RRF) over `SemanticChunk` | Extend the same index with typed documents (page, assertion, event, alias) carrying `modelIdentifier`; no cloud embeddings, so no extra consent for indexing |
-| Export bundle (JSONL, Markdown, GraphML) | Meeting export via share sheet (`MeetingExport`, `DocumentExport`) | Knowledge export is disabled by default, has no generic share sheet in the corporate mode, and lands last (K6) after the egress audit |
+| Export bundle (JSONL, Markdown, GraphML) | Meeting export via share sheet (`MeetingExport`, `DocumentExport`) | Knowledge export (K6.2) is off by default (`AppSettings.knowledgeExportEnabled`, which sets the local policy's `exportAllowed` and `.export`); the browser saves a `kurn.knowledge-export` JSON bundle through `fileExporter`, with no generic share sheet |
 | Settings → Knowledge with provider, scope, backfill | Settings → Wiki (`WikiSettingsView`) with `wikiEnabled` and bulk missing/rebuild | Settings → Wiki becomes Settings → Knowledge: the meeting wiki keeps its own toggle and consent, Knowledge adds its own; neither implies the other |
 | `ProcessingPolicy`, `KnowledgeWorkspace`, `KnowledgeContext` (§20.1) | Provider consent is per feature (`wikiEnabled`, `correctionEnabled`, …); the provider circuit breaker gates automatic calls | One workspace in `mode=privateCorporate`; `KnowledgeProcessingPolicy` (KurnCore, pure) evaluates destination × operation × classification and is checked before retrieval, prompt assembly, egress and export. Folders are not ACLs |
+
+### Global wiki projection (K2.1)
+
+`KnowledgeWikiProjector` in KurnCore builds deterministic structured entity
+pages from host-checked assertions. Redirects group views without rewriting
+fact or evidence IDs; incoming relationships preserve their direction. Every
+claim retains modality, negation, authority, confidence, review state,
+attribution, valid-time precision and transaction time. It makes no temporal
+state inference or last-mention-wins choice; that remains K3. Sections and
+entries have stable ordering. Markdown escapes all untrusted text and emits
+only host-owned `entity:`/`evidence:` links, with no registered URL scheme.
+
+`KnowledgeStore.wikiProjectionSnapshot` requires an explicit allowed meeting-ID
+set (currently at most 16), live feature/policy authorization for local page
+processing, and every persisted context policy. It binds assertions to exact
+succeeded compilation provenance in the requested scope/current policy,
+revalidates evidence against current transcript bytes, and resolves attribution
+through the original segment. Retracted/rejected/unsupported claims and
+redirects outside the selected origins do not contribute pages, names or IDs.
+Scope strings are not ACLs. Candidate-discovery caps are not projection caps:
+entity origin proofs traverse authorized history. Projection bounds are 2,048
+entities, 4,096 active source assertions, 16,384 evidence items and an 8 MiB
+stored envelope; exceeding them is an explicit refusal, never silent truncation.
+
+`publishWikiProjection` re-reads and compares all inputs, rebuilds pages, and
+atomically saves a versioned checksummed projection in a succeeded `.projection`
+job's `checkpointData` in the existing protected store. Its stable key covers
+scope and selected source IDs. Only revisions whose complete source/scope
+dependencies are covered are acknowledged; unrelated and unrecognized work
+stays pending. Old-policy work is retired only when a newer succeeded
+compilation in the same scope/current policy covers every affected source and
+its current fingerprint; no historical canonical rows are deleted. Human
+merge/undo coverage is checked against its retained audit.
+Invalid output or save failure preserves the previous valid pages and outbox;
+unreadable/future payloads are never overwritten. Reads recheck authorization,
+policy, source tokens, canonical revision and canonical content before returning
+a cached page; stale caches return nil. No provider is needed to build/read.
+
+Optional local narrative output is a versioned list of plain-text paragraphs
+with assertion IDs. Each paragraph needs unique citations belonging to that
+page; the host renders their evidence links. Missing/foreign/future/oversized
+output is refused for the whole publication. This checks citation integrity,
+not semantic entailment. Narratives stay visibly separate from attributed
+claims and never become canonical evidence. "Rebuild pages" generates them
+(`KnowledgeSettingsCoordinator.pageNarratives`): KurnCore's
+`KnowledgeNarrativePrompt` shows the model a page's claims (up to 40) as `[c1]`
+references and keeps only paragraphs citing them, within the projector limits.
+Narratives go to the 24 pages with the most claims, from the Knowledge provider
+under the extraction host checks (`narrativeModel`: a cloud provider only with its
+automatic grant, `.pageNarrative` evaluated over the meetings' classifications,
+checked once at the start). Generation is best effort: a failed or uncited page
+keeps its claims alone. The browser read loads the published narratives and drops
+any that no longer validate; the entity page shows them under "Notes", labelled
+as generated, above the claims, and Ask reads them with `get_wiki_page`.
+
+### Knowledge maintenance lint (K2.2)
+
+`KnowledgeMaintenanceLinter` in KurnCore returns the v1 Codable maintenance
+schema: stable deduplicated finding IDs, closed codes/recommendations, canonical
+revision, completeness and per-recording segment examination counts. These are
+measured coverage counts, not semantic recall/precision. Broken entity/evidence
+links identify only the readable source page; unknown targets never appear in
+reports. Stale caches are not inspected for old IDs or counts. Duplicate identity
+candidates stay suggestions for human review, with reversed/repeated pairs folded
+into one finding. Recommendations never execute merges, deletion or repairs.
+
+`KnowledgeStore.maintenanceReport` is a host-only read API with fresh contexts and
+no awaits after authorization. The shared `KnowledgeSourceAuthorization` (also
+available as `KnowledgeWikiAuthorization`) checks the local `.semanticLint`
+operation independently of `.pageNarrative`, plus the explicit source-ID ACL,
+feature flag, inherited classification and persisted context policies. It reads
+only the requested scope's source-bound compilations. The latest canonical job
+in that scope determines coverage; an old policy/fingerprint is an explicit gap.
+Invalid/duplicate/unknown examined anchors cannot count as complete coverage.
+Only current visible, unmerged entities without a readable evidence-backed claim
+are orphan candidates; historical identities retained by recompilation are not
+reported as garbage. Selected candidate subject envelopes and current source/
+policy/entity bindings are verified before reading review payloads.
+
+The report contains no names, quotes, prompts, Markdown or free-form error text.
+Canonical corruption produces an incomplete report and suppresses speculative
+identity/page details; unrecognized future selected schemas are refused without
+rewriting bytes. Unselected review subjects disclose no IDs, payloads or counts
+and cannot block this scope on their schema. Well-formed but broken projection
+pages can be diagnosed through the envelope-only reader; normal wiki reads still
+require full validation. No job/review/page/canonical/outbox state changes during
+inspection. Reports are freshly computed, never a cached authority for later
+reads or repair. The JSON maintenance contract does not change SwiftData schema.
+
+Limits fail explicitly rather than returning a clean truncated report: 16 source
+meetings, 4,096 succeeded jobs examined per source, existing wiki entity/fact/
+evidence limits, 1,024 recording coverage entries and 8,192 review rows/findings.
+This step enables no model calls, semantic LLM lint, egress, automatic scheduling,
+new navigation or maintenance UI; the latter remains K2.6–K2.7.
+
+### Meeting detail Knowledge mode (K2.3)
+
+`MeetingDetailMode` is the meeting-local mode catalog. Recordings / Transcript /
+Summary / Chat remain available; the disabled-by-default `knowledgeEnabled`
+flag adds Knowledge between Summary and Chat. This does not change root
+navigation; the global navigation prototype/review gate remains K0.5.
+`MeetingWikiContent` is shared by the old sheet shortcut and the inline notes
+section, so article viewing/read-aloud remains one presentation path.
+
+`KnowledgeCompilationCoordinator.readMeetingKnowledge` authorizes exactly the
+route's meeting ID under live host/local page policy and persisted context
+policy, reads the canonical snapshot and computes contributions without a
+provider, extraction, projection publication, outbox acknowledgement or writes.
+The DTO rejects foreign-meeting assertions; redirect-aware entity contributions
+retain original claim IDs, evidence, attribution, modality and negation. Header
+counts deduplicate claims by assertion ID and passages by recording, ordered
+anchors, time bounds and normalized quote. Distinct evidence-link UUIDs for the
+same passage do not inflate its count; identical passages in different recordings
+remain distinct. Structured claims show subject, localized predicate and object/
+value in their original direction, separately from the quoted evidence. Generated episodic notes are separate from those
+source-backed contributions and never become evidence.
+
+`MeetingKnowledgeViewModel` clears old data before each read, rejects stale
+request completions, cancellation, feature revocation and foreign meeting
+results. Presentation is keyed to the current route even before its next task
+starts. `MeetingKnowledgeRefreshDriver` treats store saves as invalidation
+signals only (no models/notification payloads are read), debounces repeated saves,
+and refetches on foreground activation. Access denial/corruption shows generic
+unavailable copy without names, counts or raw errors. Disabling the flag hides
+the mode/header immediately and returns selection to Recordings.
+
+Inline article content/actions appear only after a current authorized read.
+Once that read has loaded, the Knowledge tab is the wiki's only home, as the
+Transcript and Summary tabs are for theirs: the overflow menu drops "View wiki"
+and "Generate/Regenerate Wiki". It keeps them whenever no tab shows the wiki:
+Knowledge off, the meeting excluded from Knowledge, or the read unavailable. The inline chip has the menu's gate (`canGenerateWiki`). With
+Apple on-device it revalidates the meeting and calls the existing wiki queue with
+`localOnly: true`; that admission checks the selected provider before
+assembling/queuing work, whose immutable provider remains local on recovery.
+With another provider it runs the menu's explicit, forced episodic generation.
+Provider changes obsolete the work rather than switching destinations. Existing
+episodic wiki consent/legacy shortcuts remain independent. This step enables no
+canonical cloud processing or automatic generation.
+
+UI tests opt in through the ephemeral UserDefaults argument domain, seed a
+synthetic meeting through the real canonical commit boundary in an in-memory
+store, audit the new mode, and retain compact / inline-notes / accessibility-size
+screenshots. `ui-tests (main)` exports attachments as `ui-review-previews` for PR
+review. All seven app languages include the new labels; the existing default-off
+four-mode accessibility audit remains in place. Entity/evidence destinations,
+review/settings UI and the global Knowledge Home remain later K2 work.
+
+### Scoped Knowledge reader and navigation prototype (K2.4 / K0.5)
+
+Meeting contribution names open `KnowledgeBrowserView`, a separate scoped
+reading stack behind `knowledgeEnabled`. Knowledge Home lists entities from
+exactly the selected source IDs (currently 1–16); each entity has Overview and
+Sources, then evidence detail and a source transcript with the cited anchors
+highlighted. Routes hold UUIDs only. No model output or arbitrary URL creates
+a destination. Structured claims keep original relation direction, modality,
+negation and stated valid-time precision; quotations and source attribution
+remain separate. This is a current supported-assertion view, not a temporal
+state reducer (K3). The production meeting entry selects that meeting only;
+it never expands access to the rest of the library.
+
+`KnowledgeStore.browserRead` awaits live host authorization, then uses one fresh
+context with no intervening suspension: existing source/context policy checks,
+canonical provenance/evidence validation and redirect-origin proofs precede
+source titles and the selected recording's transcript/file reference. A missing,
+foreign, stale, rejected or unavailable citation refuses the destination. Home
+and pages do not preload transcript DTOs; only an explicitly selected evidence
+route receives its source transcript. Reads neither queue work, call a provider,
+publish/repair projections nor acknowledge the outbox. No new schema is needed.
+
+`KnowledgeBrowserViewModel` masks results for another source set or evidence
+selection, clears on reload and ignores invalidated/cancelled/superseded reads.
+Store saves are invalidation signals only, debounced before refetch. Route
+changes, closing the reader, feature revocation and scene deactivation stop
+playback and clear content; returning active revalidates. Audio is explicit,
+recording-relative, and checked against fresh evidence before setup and again
+after asynchronous player loading. Pending setup cannot resurrect revoked audio
+or overlap a newer setup. Setup defers remote transport registration until
+authorized playback. The adapter only releases an audio session it has acquired;
+opening/refreshing an idle reader cannot stop another consumer's shared session.
+Source names are not passed into setup's Now Playing metadata. The reader offers
+no native text-copy/export actions that would bypass the corporate export policy.
+The fake audio adapter tests these boundaries without opening the
+simulator's audio session; real playback remains a physical-device check.
+
+Whether `knowledgeEnabled` is on or off, there is one main screen — the
+meetings list in its original stack (the compact stack, or the regular-width
+sidebar) — with one unified toolbar (`MeetingsListToolbar`). The bottom bar
+holds the four destinations — Library (hidden on regular width where the
+persistent sidebar is already visible), Knowledge, Ask and Documents — in one
+glass group and, after a flexible `ToolbarSpacer`, the red Record button in its
+own (its title gives way to its icon at accessibility text sizes). The
+navigation bar pairs a single 3-dot list-options `Menu` (`meetings.actions`:
+Filters, Sort and Select) with Settings (`nav.settings`) in one trailing glass
+group. Selection mode keeps its bottom Export/Delete, as before. The navigation
+review first chose a `TabView` with a custom root bar; it was replaced by this
+single screen, so there is no tab bar to hide.
+
+Knowledge opens `KnowledgeLibraryDestination` as a sheet with a Done button:
+when `knowledgeEnabled` is off, it explains that Knowledge must be turned on in
+Settings and offers an Open Settings button presenting `KnowledgeSettingsView`
+directly; when on, it opens the source picker or reader. Ask opens the library
+conversation in its existing sheet (`MeetingChatView(meeting: nil)`, the
+app-owned conversation; provider/source validation, history, draft and artifact
+behaviour are unchanged, and it is offered even with semantic search off, while
+a provider without agent support still disables the composer); Documents pushes
+`DocumentsListView` with its artifact detail/create flows. No chat/provider
+capability is enabled by navigation. The list hosts the recording mini bar as
+before, and so do the Knowledge and Ask sheets that cover it
+(`hostsRecordingMiniBarInSheet`): there, expanding the recorder closes the
+sheet and opens the recorder once the sheet has disappeared, since the recorder
+is presented from the root and cannot present over it or during its dismissal.
+The Knowledge sheet's source selection belongs to the list
+(`knowledgeSourceIDs`), so closing and reopening the sheet keeps it; turning
+Knowledge off forgets the selection and shows the disabled-state prompt instead
+of dismissing the sheet.
+
+`KnowledgeLibraryDestination` starts without an inferred library source scope.
+Its picker requires an explicit selection of up to 16 meetings and disables
+additional unchecked rows at that bound. Done applies the draft; Cancel keeps
+the current scope. Changing scope recreates the reader and clears old routes,
+content and playback. Every read still uses the existing live host/context
+policy checks; the picker never turns an accessible meeting title into a grant
+for canonical knowledge. Scope is session-local, not a persisted authorization.
+
+`KnowledgeNavigationPrototype` is a DEBUG-only deterministic launch of that same
+screen, opened on the Knowledge sheet with the synthetic meeting preselected for
+captures (`MeetingsListView.initialKnowledgeSourceIDs`). Ask and Documents are
+the real screens rather than preview placeholders. `MeetingKnowledgeUITests`
+checks the four places and the record button on one bottom row, artifact access,
+the open top controls with Settings apart, retained filters/bucket after Ask,
+and explicit Knowledge source selection kept across closing the sheet.
+CI exports the captures as `ui-review-previews`; copy is localized in seven
+languages. Wider-layout and physical-device recording/audio checks remain part
+of release validation.
+
+### Knowledge local search (K2.5)
+
+Knowledge Home has an offline search field over the explicitly selected meetings.
+`KnowledgeSearchIndex` projects typed page, alias and assertion documents from the
+same freshly authorized, evidence-validated pages used by the reader. IDs retain
+those types; assertion documents are per canonical evidence ID, so the matching
+snippet and opened passage always agree even for multi-citation claims. A pure
+`KnowledgeSearchCorpus` DTO keeps Services independent of the Application reader.
+No fabricated recording IDs/timestamps are inserted into transcript
+`SemanticChunk`s. Canonical event indexing waits for K3's validated temporal read.
+The corpus is disposable memory, not a second persisted canonical/embedding store,
+so this stage changes no schema or migration. Limits are explicit: 16 meetings,
+8,192 documents, 8 MiB corpus, 256 query characters/1,024 UTF-8 bytes and 40 results.
+Oversized input fails closed, never silently indexes only a prefix.
+
+`HybridSearchRanking` in KurnCore supplies the same BM25/RRF engine to transcript
+retrieval and typed knowledge retrieval, with stable ties. Knowledge additionally
+folds case/accents and ranks literal/name matches, including Chinese substrings.
+Names, aliases, structured qualifiers and source quotes are searchable. Snippets
+are literal, bounded source quotes/aliases; they are not generated summaries or
+Markdown links, and offer no copy/export bypass. Pages/aliases open the scoped
+entity reader; assertions open freshly resolved evidence by canonical IDs.
+
+Lexical search works with semantic search disabled and without OS assets. Dense
+ranking requires the existing semantic-search opt-in, a separate `.embedding`
+policy grant and fresh authorization after resource admission. It uses only
+already installed NLContextualEmbedding assets (never `requestAssets`), on-device,
+under the shared scheduler. Dense work is all-or-nothing for corpora up to 128
+documents/128 KiB; larger corpora and unavailable/invalid vectors keep the entire
+lexical corpus. Vectors carry their document/revision and model identifier and
+are released with the request; no cloud or model-download path is introduced.
+
+`KnowledgeSearchViewModel` checks source scope, full content/revision and policy
+before work, again before embedding, and after asynchronous ranking before
+publication. It validates returned document bytes/IDs against the fresh corpus.
+Presentation always observes the state even when a different query/scope masks
+its content, so publication triggers a SwiftUI redraw. Epochs and cancellation
+prevent old queries replacing newer results; query,
+source/store/policy, route, feature, semantic-setting and scene changes clear old
+results. The search controller stays installed across canonical loading states;
+a query revision advances after invalidation so lifecycle/onChange ordering
+cannot leave the results permanently loading. Submission dismisses the keyboard
+while retaining the query. Seven
+languages cover the search prompt and result types; synthetic UI coverage checks
+alias → page and quote → evidence with semantic search off.
+
+### Knowledge review inbox (K2.6)
+
+The scoped Knowledge reader opens Review from its native toolbar. It shares
+that explicit 1–16 meeting selection, and never enumerates a library-wide inbox.
+`KnowledgeReviewRows` authorizes `.semanticLint`, proves entity origin bindings
+before showing candidate names/history, and validates canonical passages in a
+fresh context. Discovery pages through reviews in batches of 256, caps open, dismissed and merge-history
+results independently at 128 each, and labels incomplete scans (16,384-row budget) rather than
+blocking a selection on unrelated history. Reads
+never insert reviews, acknowledge jobs, repair citations or mutate identities.
+Unknown schemas fail closed. Missing, changed or invalid evidence produces an
+inspection notice with no unvalidated quote or payload.
+
+Candidates offer **Keep separate**, **Review again**, and a confirmed merge into
+the displayed target identity. History exposes the existing audited merge/undo
+boundary. `KnowledgeStore.reviewDecision` refetches the inbox, compares the exact
+source fingerprints, policy key and canonical revision, checks a separate local
+extraction-policy grant, and derives merge endpoints from the authorized review
+rather than accepting UI-supplied names/IDs. Merge and undo retain the K1.7 origin,
+redirect-graph, incoming-member and audit validation. Dismiss/reopen updates only the existing review state within a freshly
+validated transaction; a failed save rolls it back. These metadata-only decisions
+preserve the canonical revision, published pages and projection outbox. The
+command checks the current review state as well as source/policy/canonical proof;
+merges and undo still advance the canonical revision through their audited path.
+The view never changes SwiftData directly. No model/provider or automatic identity
+linking path is added, including for people; experimental match weights are not
+presented as calibrated confidence.
+
+`KnowledgeReviewProjection` generates deterministic inspection hints for exact
+opposing polarities with matching entity/predicate/value/modality/claim kind and
+compatible stated intervals, and for dates stated at month precision. It does
+not select a current truth, infer a day, or rewrite assertions. Dates absent from
+the source remain absent. Temporal/event reasoning and resolution follow K3.
+Source warning passages open an ID-only evidence route through the fresh reader.
+Expanded warning rows bound displayed claims/passages and label truncation.
+
+`KnowledgeReviewViewModel` refetches before publication and before a decision,
+rejects mismatched scopes/stale content, prevents duplicate decisions, and guards
+late completions with epochs/cancellation. Feature, store, source and scene changes
+invalidate visible content and cancel pending work. Seven languages cover the
+inbox, native merge confirmation and recoverable errors. Synthetic UI fixtures
+exercise keep-separate/reopen, merge/undo and warning → evidence without a model
+or network call; physical-device and wider-layout release checks remain open.
+
+### Knowledge settings and explicit backfill (K2.7)
+
+Settings → Knowledge exposes the separate, off-by-default feature flag, an
+opt-in future-transcription trigger, a compilation pause, on-device provider,
+source scope/exclusions, explicit batch preview/confirmation, segment coverage
+and page rebuilding. Turning Knowledge on never enumerates older meetings or
+starts a backfill. The summary provider remains independent; canonical cloud
+processing is still refused even under an injected permissive policy. Its UI
+control and corporate-policy administration remain future reviewed work.
+
+`KnowledgeControls` is a versioned, bounded value stored through observable
+`AppSettings` accessors. Missing controls use safe local defaults; wrong types,
+corrupt bytes and future versions remain unreadable. Draft revisions and reset
+generations prevent stale/ABA writes. Reset turns the feature off, preserves
+meeting/canonical data and never falls back to a wider scope silently. All vs
+explicitly selected meetings (including an empty selection) are distinct;
+exclusions win. Preferences contain IDs/configuration only, not source content.
+They narrow the live source ACL without changing corporate policy revisions or
+invalidating still-authorized canonical evidence. Reader, search, playback,
+review and source-picker lifecycles invalidate on control changes.
+
+`KnowledgeJobQueue` has per-producer live eligibility and refresh. Pausing or
+revoking canonical extraction cannot cancel an active meeting article. Execution
+invalidation is separate from the durable cancellation-request epoch, preventing
+one producer's settings update from stranding another producer's cancellation
+barrier. Publication checks the active execution epoch and live source/provider
+permissions. The automatic toggle governs new transcription triggers; already
+approved pending jobs may resume, with Pause as the explicit execution stop.
+
+`KnowledgeStore.backfillRead` authorizes an explicit 1–16-meeting selection
+before metadata/coverage reads and bounds input to 8 MiB. Preview never enqueues,
+repairs, loads a model or calls a provider. It distinguishes current, missing,
+no-transcript and explicit-rebuild cases, including a restored source whose normal
+identity was already cancelled. `KnowledgeSettingsCoordinator` retains
+the confirmed operation beyond the Settings view, refetches scope/fingerprints
+and policy before each item, and binds compilation admission to the previewed
+source expectation. Regular work keeps normal idempotency; explicit recompiles
+retain the plan's generation across retries. Current sources are skipped in
+missing-only mode. On-device provider fees are zero; runtime is not estimated as
+a guarantee. Unavailable Apple models remain unavailable, with no asset download
+or cloud fallback. Old progress counts are hidden when the control/source scope
+changes. Source content is never written to preference storage.
+
+`KnowledgeSettingsViewModel` owns asynchronous presentation, request epochs,
+source/control checks and recoverable errors; stale/cancelled responses cannot
+restore metadata after invalidation. The native view only binds controls and
+forwards user actions. Scope-edit transformations live in tested KurnCore values.
+
+Page rebuilding uses the existing fresh projection snapshot/publication boundary
+without an LLM. Coverage reports examined segments, not accuracy or semantic
+recall. Seven languages cover the controls, safe-reset notice, scope editor,
+preview, local-cost confirmation and progress. Synthetic UI captures use a
+separate in-memory store; no real sources or paid calls are involved. "Delete
+Knowledge" goes through K2.8's resumable purge (below). No canonical schema
+migration is introduced.
+
+### Knowledge deletion (K2.8)
+
+Knowledge relates to meetings by UUID, so no cascade reaches it; deletion is a
+durable **tombstone** plus a purge. A tombstone is a `KnowledgeJob` of the
+existing `.deletion` kind (no schema change): `KnowledgeDeletionRows` keys it
+`knowledge.deletion.v1:<scope>:<id>` and stores its `KnowledgeDeletionScope` in
+`strategyRaw` (raw values never change). `MeetingLibrary` inserts it in the SAME
+journaled commit that deletes a meeting (`.meeting`) or a recording that had a
+transcript (`.source`), so a process death between the two cannot leave rows
+quoting a deleted transcript. "Delete Knowledge" in Settings → Knowledge saves a
+`.corpus` tombstone first, re-authenticates through `SensitiveActionAuthorizer`
+like "Delete all data", and interrupts only an active canonical extraction
+(`KnowledgeJobQueue.refresh(kind:)` is producer-scoped, so a wiki article being
+generated is not cut off).
+
+`KnowledgeDeletionCoordinator` (built by `AppComposition`) drains tombstones at
+launch, on activation and after any store save (the save notification is only a
+signal), coalescing requests. `KnowledgeStore.purgeNextDeletion` handles the
+oldest tombstone in one transaction: the canonical rows, the cache removals, a
+revision bump and the tombstone's own deletion commit in one save, and a failed
+save (fault seam `beforeSave`) or a process death leaves all of it for the next
+drain. Failures record a content-free `knowledge_deletion` reliability event once
+per code per process; an unknown scope or pipeline is refused, never dropped.
+
+- **Ask question set and scorer (K0.4/K5.4).** `Fixtures/knowledge-questions/questions.json`
+  (format `kurn.knowledge-questions` v1, synthetic, Portuguese and English) asks questions over
+  the golden fixtures. For each one it lists the assertion refs a correct answer states, the
+  `mustNotAssert` entries it must not state, whether it must decline, and the `source/segment` IDs
+  it may cite. KurnCore's `KnowledgeAnswerScorer` scores an answer for precision, recall, tempting
+  claims stated, refusal honoured and resolvable citations, and summarizes a run so Ask variants
+  can be compared. `KnowledgeQuestionFixtureTests` checks every reference against its fixture, that
+  an oracle answer scores perfectly and that declining everything does not. Running variants A–F
+  on a device to produce observations is still to do.
+- **Meeting/source:** every assertion, event and evidence row of that meeting,
+  their relations and all its extraction jobs (provenance included). Entities
+  named by its provenance, assertions or events are removed unless another
+  source's assertion or event still names them. A survivor merged into a
+  removed identity has its redirect cleared; its own name, aliases and claims
+  are untouched. Reviews whose subjects include a removed entity, or whose
+  candidate/merge audit names the meeting, are removed. Page caches whose source
+  set includes it are removed, as is any cache that cannot be decoded (it cannot
+  prove it excludes the source). `.meeting` also removes the meeting's
+  `SourceContextLink`; `.source` keeps it, because the meeting remains and can be
+  recompiled from its other recordings (passes are per recording, but
+  provenance and entity origins are per compilation, so the whole meeting is
+  purged rather than a partial job rewritten).
+- **Corpus:** all entities, assertions, evidence, events, relations, reviews and
+  every non-article job; meetings, their episodic `WikiArticle` work, contexts
+  and links are kept. Other tombstones are kept and purged after it, since only
+  a meeting's own purge removes its context link.
+- **Revisions** are content-free and kept: a revision whose job or merge audit
+  was removed stops waiting for projection (it could never be acknowledged),
+  and a new revision (`policyRevisionKey` = `knowledge-deletion-v1`, not
+  pending) makes every page, search or review snapshot taken before the purge
+  stale. The search index is in-memory only, so the bump is its purge.
+
+`LibraryEraser` still deletes every knowledge row, tombstones included.
+
+### Temporal reducer (K3.1)
+
+KurnCore's `KnowledgeTemporalReducer.state(of:validAt:knownAt:claims:)` answers
+"what held for this entity at valid time T, as known at transaction time K". It
+is pure, Foundation-only and not yet wired to the store or any reader; the host
+will supply `KnowledgeTemporalClaim`s that already passed source authorization
+and evidence checks.
+
+- **Two clocks, never mixed.** A claim is known when `recordedAt <= knownAt` and
+  `knownAt` is before `retractedAt` (half-open). Valid time is the stated
+  `validFrom`/`validTo` at its precision, read as a half-open UTC interval
+  (`KnowledgeTemporalValue.bounds`: an instant covers its second, a day 24 hours,
+  a month the whole month). A meeting imported late changes what is known only
+  from its import.
+- **Precision is certainty.** A moment inside a bound's stated period gets
+  `possible` ("in October" asked about Oct 15), past it `definite`. A claim with
+  no `validFrom` is always `possible` and never displaces or conflicts.
+- **No last meeting wins.** Single-valued predicates (`singleValued`: `hasStatus`,
+  `dueOn`, outgoing only) are reduced by stated start alone: a different
+  statement (value or polarity) whose start is wholly after a claim's start
+  displaces it — definitely once that start has definitely passed, to
+  `possible` while it may have. `recordedAt` and input order decide nothing.
+  Other predicates and incoming relations (e.g. being `blocks`'s object) are
+  kept per other entity/value, with negation displacing the same way.
+- **Tentative claims never establish state.** `tentative` modalities
+  (`proposed`, `hypothetical`, `disputed`) are shown as their own holdings
+  (`isTentative`, with every supporting `modalities`), never displace or
+  conflict with anything, and never merge into an established claim of the
+  same value; a later established statement still displaces them (an approval
+  ends a proposal).
+- **Conflicts are surfaced, not resolved.** Different established statements
+  whose stated starts overlap both stay as holdings and add a `Conflict` per
+  reason, classified pair by pair (`unordered_values` for different values,
+  `contradictory_polarity` for a statement and its negation), so three
+  overlapping claims can yield both. Same statements from several meetings
+  fold into one holding with every claim ID.
+- Output is sorted (predicate, direction, detail, polarity, claim IDs), so it is
+  identical for any input order. Known gap: an explicit `validTo` on a later
+  status does not end an earlier status by itself. `KnowledgeTemporalReducerTests`
+  checks it against the `pt-provisioning-timeline` fixture.
+
+### Lifecycle state machines (K3.2)
+
+KurnCore's `KnowledgeLifecycle` (`decision` for `decisionThread`, `action` for
+`actionItem`, `risk`) projects an entity's status history from the claims known
+at a transaction time (`project(entityID:knownAt:claims:)`); a status is never
+the latest mention. The machines follow `KnowledgeStatus`: a decision is
+proposed → approved/rejected/deferred → revised → superseded/revoked (a rejected
+or deferred one may be proposed again); an action is proposed → committed →
+inProgress → completed/cancelled, reopened explicitly; a risk is identified →
+mitigated/accepted/closed, reopened explicitly. A decision is also superseded by
+a `supersedes` claim naming it as the replaced entity. Pure and Foundation-only;
+like the reducer it is not yet wired to the store or a reader.
+
+- **Transitions come from stated valid time**, ordered by their stated period.
+  A group of changes whose periods overlap (directly or through each other) is
+  ordered as a whole by the machine: every order that keeps disjoint periods in
+  date order and is a valid path from the status before the group is tried
+  (groups above `maximumSearchedGroup`, 6, are not searched). One valid order is
+  `lifecycle` (a reopening on the 12th puts "completed in November" first);
+  several are `ambiguous` and none is `unresolved`, both reported as anomalies
+  and never `definite`. Inside the search a statement of the status already in
+  force is a restatement, not a transition, and orders that differ only in
+  where a restatement falls count as one; overlapping statements of one status
+  are therefore never an order question, while a reopening between two
+  completions in one month keeps both cycles.
+- **Nothing is dropped.** A forbidden transition is kept and reported
+  (`invalid_transition`), as is a status outside the machine
+  (`out_of_vocabulary`) and an ambiguous or unresolved order. Hypothetical, disputed or
+  proposed claims (except a proposal that something is `proposed`), negated
+  claims and undated ones are listed in `setAside` with their reason. A status
+  restated right after itself joins the transition it repeats, keeping its
+  earliest date.
+- `state(at:)` returns the status in force at a valid time: `definite` only when
+  its transition has definitely started, the next has definitely not, and
+  neither was ordered `ambiguous` or `unresolved`. A transition ordered by the lifecycle is bounded
+  by its neighbours. `KnowledgeLifecycleTests` checks the provisioning decision
+  (proposed → approved → revised → superseded) and the runbook action
+  (completed in November, reopened on the 12th) from the golden fixtures.
+
+### Knowledge timeline (K3.3)
+
+The scoped Knowledge reader opens a Timeline from Knowledge Home
+(`KnowledgeBrowserRoute.timeline`, `KnowledgeTimelineView`). It is a projection of
+the same authorized, evidence-checked pages the reader shows (KurnCore's
+`KnowledgeTimeline.build(pages:filter:)`), never a second store, and reads offline
+with no provider.
+
+- **Placed by stated time, shown with recorded time.** Each claim sits in the UTC
+  month its stated `validFrom` falls in, shown at its own precision (a month stays
+  a month); the meeting it came from and the date it was recorded (the
+  assertion's transaction time, `recordedAt`, set when its meeting was compiled
+  into knowledge, not the meeting's own date) are shown beside it and never move
+  it. Within a month, the earlier stated start comes first, a narrower period
+  first when two start together. A stated date after it was recorded is marked
+  "planned ahead" (`isAhead`).
+- **Unknown dates are kept apart.** A claim with no stated date is listed under
+  "No stated date" in recorded order instead of being given one.
+- **One entry per claim.** A relation on both entities' pages is shown once.
+  Kinds: status, due date, supersession, other relation, other value.
+- **Filters** keep chosen kinds (`Filter.showing` never hides the last one) and
+  can hide tentative (proposed, hypothetical, disputed) or negated claims;
+  filter state is per view and never persisted.
+- **Lifecycle findings reach their claims.** K3.2's projection runs per stated
+  identity over the claims shown (filters apply afterwards), and each
+  `invalid_transition`, `ambiguous_order`, `unresolved_order` or
+  `out_of_vocabulary` finding is shown on every claim it names. Nothing is
+  resolved or rewritten.
+- Rows open the claim's first cited passage through the existing ID-only evidence
+  route. `KnowledgeTimelinePresentation` (Application) holds the wording and is
+  tested; the view only binds it.
+- Not yet: context lanes on iPad (the read carries no context per claim yet),
+  canonical `KnowledgeEvent` rows and known-at ("as of") navigation.
+
+### Knowledge comparison (K3.4)
+
+An entity page opens "Compare dates" (`KnowledgeBrowserRoute.compare`,
+`KnowledgeCompareView`): the entity's state at the end of two days the person
+picks, from the same authorized pages the reader shows, offline.
+
+- KurnCore's `KnowledgeStateComparison.compare(entityID:earlier:later:claims:)`
+  runs the K3.1 reducer at two `Point`s (a valid time and a transaction time
+  each) and lines up their holdings: the same statement at both is
+  `unchanged` (with `certaintyChanged` when it is definite at one point and only
+  possible at the other); one statement replaced by exactly one other in the
+  same slot (another status, a negation) is `changed`; anything else is
+  `started` or `ended`, so two conflicting values are never paired into a
+  change. Conflicts stay on their side. Output is sorted and independent of
+  claim order.
+- `Point.endOfDay` is the last second of a stated day (UTC): a claim stated for
+  that day is `possible` there, since a day's precision cannot say whether it
+  had already happened. The app reads the picked days in the person's calendar
+  (`KnowledgeComparePresentation.day`) and orders them.
+- "As known on each date" sets each point's transaction time to its own moment,
+  so a meeting imported later does not change what was known then; otherwise
+  both days are read with everything recorded so far. A page fact's
+  `recordedAt` is its assertion's transaction time (when its meeting was
+  compiled into knowledge), so "known" means "compiled by then", not "said in a
+  meeting by then".
+- `KnowledgeStateComparison.claims(from:)` turns pages into temporal claims that
+  name the identities the pages show, so a merged identity compares as one.
+- Rows read like the reader's claims, in their own direction (an incoming
+  `blocks` names the other side first), mark tentative and uncertain holdings,
+  show what a change replaced, and open the first cited passage through the
+  ID-only evidence route.
+
+### Knowledge late arrivals (K3.5)
+
+An entity page's overview ends with "Revised later" when knowledge recorded after
+the fact changed what held on earlier days (`KnowledgeLateArrivalsView`,
+`KnowledgeLateArrivalPresentation`). Nothing derived is stored, so there is no
+cache to invalidate: "recomputing the affected interval" is computing, on read,
+only the stretch of valid time an arrival changed.
+
+- KurnCore's `KnowledgeLateArrival.recompute(entityID:arrivedAt:claims:)` takes
+  the claims recorded at one transaction time that name the entity. It needs
+  earlier knowledge of the entity and starts at the earliest moment the new
+  claims could hold (an undated one reaches back to the entity's earliest stated
+  bound). From there it compares the K3.1 state as known just before the arrival
+  with the state as known at it (two K3.4 `Point`s on the same valid time) at
+  every stated bound that could change it, and keeps the stretches that differ,
+  merging neighbours whose differences name the same claims (so a change that
+  only grows certain stays one stretch; the last one is open while it lasts).
+- An arrival is late only when what it changed starts before the UTC day it was
+  recorded on: a status stated for its own recording day revises nothing past.
+  `revisions(of:claims:)` lists every late arrival for an entity, oldest first,
+  independent of claim order.
+- A page holds every claim about its entity in both directions, so the page
+  alone is the input. `recordedAt` is the assertion's transaction time (when its
+  meeting was compiled into knowledge), so "late" means "compiled after the days
+  it changed". Stated days are shown in UTC, the recording date in the person's
+  time zone; a stretch's rows are the K3.4 change rows (every change, and an
+  unchanged statement only when it grew or lost certainty).
+- Not yet: `KnowledgeEvent` rows written from these reductions, and a marker on
+  the timeline for late claims.
+
+### Knowledge graph query (K4.1)
+
+The relationship graph of a scoped knowledge read, queried a neighbourhood at a
+time. Positions come from K4.2 below and the drawing from the Graph Explorer (K4.3).
+
+- KurnCore's `KnowledgeGraphIndex(pages:)` indexes the reader's authorized,
+  evidence-checked pages once; it is a projection, never a second store. A node
+  is an identity a page shows (a merged identity is the one it was merged into)
+  and an edge is one claim between two entities, in its stated direction, with
+  its predicate, polarity, modality and first cited passage (for the ID-only
+  evidence route). Value claims are not edges, a claim shown on both ends'
+  pages is one edge, and a claim whose two ends a merge made one identity is
+  not drawn.
+- `query(_:)` walks breadth first from a root within `KnowledgeGraph.Query`'s
+  bounds (default depth 1, 40 nodes, 80 edges; clamped to depth 0–2, 1–40
+  nodes, 0–80 edges), optionally following only chosen predicates and leaving
+  out tentative or negated claims. Nodes come root first, then by depth and
+  name; edges nearest first (the deeper end's depth), so an edge bound drops
+  the farthest. `isTruncated` says a node or edge bound cut the walk short (the
+  depth bound alone does not), and `frontier` lists shown nodes with a followed
+  claim the graph does not show: where to expand next. It returns nil for a
+  root the pages do not show. Output is identical for any page order.
+- `supersessionCycles` reports each set of identities whose established,
+  positive `supersedes` claims form a cycle (Tarjan, over every page, a
+  self-supersession after a merge included) and that touches a shown node. A
+  cycle is surfaced, never ordered through.
+- The app's `KnowledgeGraphQueryService` (`Application/Knowledge`,
+  `@MainActor`) keeps one index and up to 32 recent answers (least recently
+  asked evicted) per scope: the canonical revision, the meetings, the policy
+  revision and the pages of the read themselves, since a read can change
+  without a new revision (a corrected transcript drops a claim's evidence).
+  Any other scope rebuilds the index and drops every answer, so nothing is
+  answered from an older read; `clear()` forgets everything.
+
+### Knowledge graph layout (K4.2)
+
+Positions for a graph neighbourhood, computed in KurnCore and cached by the
+app; the Graph Explorer (K4.3) draws them.
+
+- `KnowledgeGraphLayout.layout(_:seed:fixed:iterations:)` is a force-directed
+  (Fruchterman-Reingold) layout in the unit square, every position kept
+  `margin` (0.06) inside its edges. It is deterministic by node ID and seed:
+  nodes are visited in ID order, start on rings by depth at angles drawn from a
+  SplitMix64 hash of the seed and the ID (stable across processes, unlike
+  `Hasher`), and move for a fixed number of steps (150) under a cooling step
+  budget. The same graph, seed and fixed positions give the same layout
+  whatever the order of the graph's nodes and edges; several claims between one
+  pair pull harder.
+- Nodes in `fixed` keep exactly that position (clamped inside the margins); the
+  root sits at the centre unless it is fixed elsewhere; the forces place every
+  other node. Coincident nodes are pushed apart in a direction drawn from their
+  IDs, never by chance.
+- The app's `KnowledgeGraphQueryService.laidOut(_:in:seed:)` computes one layout
+  per cached answer and remembers where each node was last shown in the scope
+  (`shownPositions`): a neighbourhood that grows, or is re-rooted on a shown
+  node, keeps the nodes already on screen where they were and places only the
+  new ones. A new scope or `clear()` forgets the positions with the answers,
+  and another seed is a new drawing that drops every layout and shown position.
+
+### Knowledge graph explorer (K4.3)
+
+An entity page opens "Relationships" (`KnowledgeBrowserRoute.graph`, `KnowledgeGraphView`): the
+neighbourhood K4.1 answers, at the positions K4.2 gives, from the same authorized read as the page,
+offline. Four modes share one neighbourhood and its positions: All (every claim the query shows),
+On a day (evolution), Compare and Contexts (lanes).
+
+- **Drawn on a `Canvas`, touched through an overlay.** The canvas is hidden from assistive
+  technologies. Each node has a 44-point button laid over it, whose label carries its name, how many
+  relationships are shown, and whether it is the centre or has more. That button is also what
+  VoiceOver reads. The centre is a square and other nodes circles; a selected node is ringed and its edges drawn thicker. Edges have an arrowhead in
+  their stated direction. A tentative claim is dashed, an inferred one dotted and a negated one
+  crossed out. A dotted ring marks a node on the query's frontier. No state is shown by colour alone.
+- **The list alternative.** A segmented control switches between the drawing and a list of every
+  node with the claims that touch it. While VoiceOver runs, the list is the default until the reader
+  chooses. Claims read like the reader's, in their stated direction, and open their first cited
+  passage through the ID-only evidence route.
+- **Selection and recentring.** The selected node's section offers "Open page" (the entity route)
+  and "Centre the graph here". `KnowledgeGraphPresentation.Exploration` holds the centre, the
+  selection, the filters and the chosen view. `KnowledgeGraphQueryService` keeps it per entity the
+  graph was opened from, because the reader re-reads, and so rebuilds its destinations, on every
+  navigation. A page opened from the graph therefore comes back to the graph as it was left. It
+  holds IDs only. A centre no longer in the read falls back to the entity the graph was opened from.
+  The reader clears the service on disappearing and when the scene leaves the foreground.
+- **Filters** (per view, never persisted): distance 1 or 2, and tentative, negated and inferred
+  claims. Inferred claims (`KnowledgeModality.inferred`) are off by default
+  (`KnowledgeGraph.Query.includesInferred`, which defaults to on for other callers).
+- The footer says how much is shown. It also says when a bound truncated the walk and names each
+  supersession loop by every member, named from the whole read even beyond the bounds. Words, labels and links are `KnowledgeGraphPresentation` (Application,
+  tested); the view only binds them. The UI fixture's graph variant
+  (`UI-Testing-KnowledgeGraphFixture`) adds a team that blocks the portal.
+- **On a day and Compare** ask KurnCore's `KnowledgeGraphTimeline`, which runs the K3.1 reducer for
+  each edge's source: `holdings(of:at:claims:)` gives how certainly each edge held at a point
+  (`KnowledgeStateComparison.Point`, the end of a picked day in the person's calendar, as known now or,
+  with "As known on each date", as known then), and `compare(_:from:to:claims:)` whether it started,
+  ended or held at both. Nothing orders claims by recording date, and an edge keeps its own claim's
+  certainty: a holding folds equivalent claims and is definite when any of them is, so each edge is
+  capped by `KnowledgeTemporalReducer.holds` for its claim alone. An edge that did not hold is not
+  drawn, while its nodes keep their places. The drawing marks a relationship that started with a
+  plus and one that ended with a square, and rings one that may not have held on a day it is shown
+  for (`EdgeState` keeps each day's certainty, compare included); each mode's footer and every row
+  say so in words. The days default to today and, for Compare's earlier day, the first
+  stated start on the opened entity's page; they are part of the kept exploration. Day reading, states
+  and wording are `KnowledgeGraphPresentation+Timeline` (tested).
+- **Contexts** lays the same neighbourhood out in one horizontal lane per context its relationships were
+  said in (`KnowledgeGraphPresentation+Lanes`). The read carries each meeting's context
+  (`KnowledgeBrowserRead.meetingContexts`, from its `SourceContextLink`, read in the same authorized
+  context as the pages; a meeting with no link is in context `unknown`). A relationship belongs to its
+  meeting's context; lanes are ordered by `KnowledgeContextKind` (unknown last), then by title, which is
+  the context's name or else its kind in words. A node sits in the lane most of its shown relationships
+  belong to (the earlier lane on a tie), keeps its x and keeps its order within the lane's middle 70%.
+  Each lane is named at its top left, and every relationship row and node label names its context in
+  words, so lanes are never told apart by position or colour alone. Nothing is filtered: Contexts shows
+  what All shows.
+- Not yet: graph performance targets measured on a physical device.
+
+### Knowledge tools for Ask (K5.1)
+
+Ask can read canonical knowledge through ten read-only tools (`Application/Agent/Tools/ChatKnowledgeTools`):
+`search_knowledge`, `get_entity` (an entity's page), `get_timeline` (claims by stated time, undated last),
+`get_evidence` (one cited passage) and the structure tools of `ChatKnowledgeTools+Structure`: `resolve_entity`,
+`get_graph`, `compare_state`, `list_open_actions`, `list_contexts` and `get_context`. They read through `ChatKnowledgeSource`, the same authorized,
+evidence-checked read the Knowledge reader shows (`KnowledgeCompilationCoordinator.readKnowledgeBrowser`),
+never a second store, and answer in `ChatSourceToolText`'s compact form (`ChatKnowledgeToolText`): one line per
+item with the IDs the model passes back, vocabulary raw values (modality, polarity as a leading `NOT`, review
+state, stated validity), each name and quote clipped to one line, a `page:` line and a final `revision:` line.
+
+- **Sending knowledge to the model that answers is `answerSynthesis`** under the default-deny policy
+  (ADR-008). `ChatKnowledgeGate` offers the tools only when the feature is on, the source controls allow
+  1–16 of the run's meetings, and `KnowledgePolicyEvaluator` allows the operation for the run's provider: for a
+  cloud provider the policy must name it, cover the sources' classification and have the person's consent.
+  `ChatKnowledgeSource(coordinator:)` reads that consent from the provider's on-request grant in the
+  cloud-consent ledger ("Cloud consent"); a policy alone never stands in for consent.
+- **Every call is authorized again**: before the read, and after it with the read's own source
+  classifications (`KnowledgeBrowserRead.sourceClassifications`, from each meeting's context), so a context
+  reclassified or consent withdrawn since the run started sends nothing. A refused or failed read is a
+  recoverable tool error with a fixed message, never source text.
+- **The structure tools are projections of that same read** (KurnCore, no new store query).
+  `resolve_entity` folds case and accents (`KnowledgeEntityResolver.normalizedName`) and ranks exact name,
+  alias, prefix, then every query word in the name, optionally of one kind. `get_graph` is a
+  `KnowledgeGraphIndex` query (depth 0–2, default 1, the K4.3 node/edge bounds; inferred relations hidden unless
+  asked for, as in the Graph Explorer): nodes, then one edge per claim in its stated direction with its
+  endpoint node IDs and evidence ID, the truncation, frontier and `supersedes` cycles in the header. `compare_state` is
+  `KnowledgeStateComparison` at the end of two `yyyy-MM-dd` days, as known now or, with `asKnownThen`, as known
+  on each day; certainty shifts and conflicts are listed, never resolved. `list_open_actions` projects each
+  action item's lifecycle (`KnowledgeLifecycle.action`) at the tool clock (`make(now:)`) and leaves out only a
+  definite `completed` or `cancelled`, with the assignees (`assignedTo`, or `owns` pointing at it) and due dates
+  that hold at that moment (`KnowledgeTemporalReducer`, proposals marked tentative) and lifecycle anomalies; an entity filter keeps actions with a claim naming it. `list_contexts`/`get_context`
+  group the selected meetings by `KnowledgeBrowserContext` in the Graph Explorer's lane order, meetings with
+  none under context `unknown`.
+- **`get_coverage` is the K2.2 coverage measure**, not a projection of the browser read: `ChatKnowledgeSource.coverage`
+  reads `KnowledgeStore.coverageRead` (the maintenance report's per-recording examined/total segment counts and
+  state, grouped by meeting, under the same `.semanticLint` source authorization, without the wiki, catalog or
+  review reads). It is authorized like the other tools before and after its read, with each meeting's context
+  classification, and carries no names or quotes. The counts say how much the latest compilation read, not how
+  accurate it was; the description tells the model to check it before saying something was not discussed.
+- **Knowledge is a chat source part (K5.3)**: `ChatSourcePart.knowledge` is in `ChatSourceScope.defaultParts`, and
+  `HarnessChatService` offers the knowledge tools only for meetings whose effective parts select it, before
+  `ChatKnowledgeGate` authorizes them; the part is removed with the feature off (`effectiveScope(knowledgeEnabled:)`)
+  and hidden from `ChatSourceSheet`. It is never a readable part of the source tools. A scope saved without the
+  `knowledgeSelectable` marker (before K5.3) gains it wherever parts were selected, so old chats keep offering
+  knowledge; an empty selection stays empty. An entity page's Ask button opens a separate library conversation
+  scoped to the meetings its facts come from, with a drafted question.
+- `get_wiki_page` returns a page's generated narrative (`KnowledgeWikiNarrative` paragraphs with the assertion IDs
+  each summarizes), labelled as not evidence, or says the page has none. `trace_influence` (KurnCore `KnowledgeInfluenceTrace`) lists, in stated order, every claim about
+  or naming an entity, the earlier claims on the same subject and predicate each replaces, its meeting, speakers and
+  evidence IDs.
+- **Knowledge-first query policy (K5.2)**: when a run offers the knowledge tools, `HarnessChatService.system(knowledge:)`
+  adds a `knowledge_policy` section last, where a patch adding or removing it replays it
+  (`HarnessChatService.knowledgePolicy`): query knowledge first, keep modality/negation, cite through evidence, call
+  `get_coverage` for the meetings it answers from and use the offered source tools for meetings not compiled, stale,
+  not fully examined or without knowledge; a missing fact is reported as absent from the compiled knowledge, never as
+  never said; the transcript wins a disagreement.
+- **Knowledge egress (K6.1)**: the `knowledge-network` rule in `Tools/check_static_policy.py` rejects `URLSession`,
+  `URLRequest`, `LLMHTTP`, `ProviderHTTPTransport`, `NWConnection` and CloudKit/iCloud key-value stores in Knowledge
+  code (`Application/Knowledge/`, `ChatKnowledgeTools*`, `Views/Knowledge*`, `Views/MeetingKnowledge*`, KurnCore
+  `Knowledge/`); its only egress is the provider call admitted by the policy and the consent ledger.
+- **Knowledge export (K6.2)**: `KnowledgeCompilationCoordinator.exportKnowledge` authorizes `.export` before the
+  browser read and again with the read's classifications, then encodes KurnCore `KnowledgeExportBundle` (format
+  `kurn.knowledge-export`, schema 1: meetings, entities, claims with qualifiers and evidence, sorted by ID). The browser
+  writes it with `fileExporter` (a save to a chosen location), never the generic share sheet. Runs without knowledge tools keep the old prompt.
 
 ### Attached documents (PDFs)
 
@@ -2898,6 +3930,45 @@ control whose text failed — an alert could land behind the wiki sheet).
   session under the player, and leaving a meeting or document stops what it
   owns. This is also why `NowPlayingController` removes only the command
   targets it added — `removeTarget(nil)` would detach the other owner.
+
+### Cloud consent
+
+One rule covers every feature that sends content to a cloud provider: content
+leaves the device only under a grant for that provider's destination
+(`provider.id|baseURLString`) and purpose. KurnCore's `CloudConsentLedger`
+(`Consent/CloudConsentLedger.swift`, stored by `AppSettings+CloudConsent.swift`
+under `settings.cloudConsents.v1`) holds the grants. There are two purposes:
+`onRequest` (summaries, chat, documents, regenerating a title) and `automatic`
+(per-recording: cloud transcription, automatic titles, wiki, correction, Knowledge
+extraction). An automatic grant also covers on-request use. A changed endpoint is
+a new destination, and the on-device provider never needs a grant. Feature
+toggles still choose which features run, and `wikiEnabled`, `correctionEnabled`
+and `aiTitleCloudEnabled` mean "send to my summary provider": turning one on, or
+choosing a summary provider while one is on, records that provider's automatic
+grant, so the ledger always shows where they send. Audio keeps its own
+per-destination upload consent (`hasCloudTranscriptionConsent`, the cloud-upload
+dialog): audio and text consent never authorize each other.
+`revokeAutomaticCloudConsent` withdraws the grant, clears the legacy transcription
+consent key and turns off the summary provider's per-recording features. Choosing a cloud summary provider
+records its on-request grant, and `revokeAllCloudConsent` (Privacy & Cloud's "Remove
+all permissions") also moves the summary and Knowledge providers on that
+destination, and Read Aloud on it, to on-device. A summary-provider fallback
+(`ensureProviderSelectionsAreUsable`) never picks a destination marked withdrawn
+(`CloudConsentLedger.withdrawn`, set by removing all permissions, cleared by a new grant). The
+first launch with no stored ledger migrates what was already allowed (a keyed
+cloud summary provider and its enabled per-recording features; audio consent is
+kept as it was), so an upgrade asks nothing again. Settings → Privacy & Cloud
+(`PrivacyCloudSettingsView`) lists each destination's grants, its audio upload
+consent and the features using it, plus the non-AI sharing (template sync, diagnostic reports).
+Consent is enforced when work starts: work already running (a multi-chunk upload,
+a staged summary, a conversation's earlier tool results) finishes under the
+consent it started with.
+Knowledge uses the same grants: Settings → Knowledge lists on-device and every
+keyed cloud provider, and choosing a cloud provider without the automatic grant
+asks first (`knowledge.settings.cloud_message`). Extraction needs the automatic
+grant and Ask the on-request one.
+On-device model downloads keep their own per-model consent because none of
+the user's content is sent.
 
 ### Settings & secrets
 
@@ -3008,7 +4079,8 @@ toolbar would be the wrong control**:
   `MeetingsListView`'s members are non-private — a `private` member is invisible
   to an extension in another file.
 - **`ToolbarSpacer` is how glass groups are split.** In `listToolbar`, the
-  library/filter/Ask items share one glass capsule and
+  bottom items (library/filter/Ask/Documents, or with Knowledge on the four
+  places) share one glass capsule and
   `ToolbarSpacer(.flexible, placement: .bottomBar)` gives the record button
   (`.buttonStyle(.glassProminent)`, `.tint(Theme.accent)`) a capsule of its own.
   `MeetingDetailView`'s `toolbarContent` uses `ToolbarSpacer(.fixed,
@@ -3019,12 +4091,13 @@ toolbar would be the wrong control**:
   `.buttonStyle(.glass)`/`.glassProminent` but are not toolbar items), the
   minimized recorder's mini bar (`RecordingMiniBar`, a `.glassEffect` capsule in
   a root `.safeAreaInset`, since it has to float over every screen's own
-  toolbar rather than belong to one), and
+  toolbar rather than belong to one),
   `MeetingChatView`'s composer (an input surface: an inset glass card laid
   over the transcript with `.overlay(alignment: .bottom)` rather than a
   `.safeAreaBar`, so the conversation keeps scrolling beneath both the card
   and the keyboard instead of stopping above them).
-- `MeetingDetailView`'s four sections are a segmented `Picker`, not a bottom
+- `MeetingDetailView` uses four sections, plus Knowledge when its independent
+  flag is enabled, in a segmented `Picker`, not a bottom
   bar: they're view modes of one meeting rather than top-level destinations, and
   a bottom bar there would collide with the Chat tab's composer.
 - Do not reintroduce `.background(.bar)`, hand-drawn `Divider` bar tops, or
@@ -3063,6 +4136,16 @@ toolbar would be the wrong control**:
   `.subheadline` because white
   on `Theme.accent`/`Theme.info` measures ~3.55:1 / ~3.65:1 — under AA for
   normal text, above the 3:1 large-text floor that ≥14 pt bold qualifies for.
+- **Knowledge screens share one look** (`Views/KnowledgeStyle.swift`), taken from the screens before
+  them: content on `Theme.background` with 20-point insets; section titles as
+  `KnowledgeSectionLabel` (the meeting tabs' uppercase, tracked `caption2Emphasized` label in the
+  tertiary colour); content in `knowledgeCard()` (`kurnCard` with 16-point corners); tappable rows
+  as `KnowledgeLinkCard` (an accent `KnowledgeIconWell`, primary text, secondary detail and a
+  chevron, like `DocumentsListView`); quotes as `KnowledgeQuote`; and secondary actions as
+  `KnowledgeChipButton` (the summary tab's grey `Theme.fill` capsule). No action is a bare tinted
+  text link; a screen's one decision (merging two identities, choosing sources) takes
+  `.glassProminent` + `Theme.accent`, and confirmations use `kurnDialog`. Settings keep the native
+  `Form`, like every other settings screen.
 - **Error dialogs offer the error's recovery action.** `errorAlert` reads
   `AppError.recoveryAction` (through `Application/ErrorRecovery.swift`) and
   makes it the primary button beside OK: Try Again only when the caller passes

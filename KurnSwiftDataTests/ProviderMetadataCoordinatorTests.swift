@@ -32,6 +32,10 @@ private actor MetadataGate {
     }
 }
 
+// Scheduling-sensitive gates run in the isolated serial test process, so
+// the one-minute deadline measures coordinator progress rather than starvation
+// behind thousands of general-suite tasks. Child lookups remain concurrent.
+extension SwiftDataConcurrencySensitiveTests {
 struct ProviderMetadataCoordinatorTests {
     @Test(.timeLimit(.minutes(1))) func concurrentLookupsAreBoundedWithoutBlockingTheExecutor() async {
         let coordinator = ProviderMetadataCoordinator()
@@ -71,4 +75,5 @@ struct ProviderMetadataCoordinatorTests {
         time.withLock { $0 = $0.addingTimeInterval(-1_000) }
         #expect(store.refreshIsDue(for: .anthropic, model: "alias"))
     }
+}
 }

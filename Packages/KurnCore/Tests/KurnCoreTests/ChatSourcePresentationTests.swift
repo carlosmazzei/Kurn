@@ -41,8 +41,10 @@ struct ChatSourcePresentationTests {
         #expect(ChatSourcePresentation.summary(single, resolvedMeetingIDs: [], wikiEnabled: false,
                                                 localize: localize) == "0 meetings · No parts")
         let all = ChatSourceScope(kind: .library, parts: Set(ChatSourcePart.allCases))
-        #expect(ChatSourcePresentation.summary(all, resolvedMeetingIDs: [first], wikiEnabled: true,
+        #expect(ChatSourcePresentation.summary(all, resolvedMeetingIDs: [first], wikiEnabled: true, knowledgeEnabled: false,
                                                 localize: localize) == "1 meeting · Transcript, Summary, Wiki, Attachments")
+        #expect(ChatSourcePresentation.summary(all, resolvedMeetingIDs: [first], wikiEnabled: true,
+                                                localize: localize).hasSuffix("Attachments, chat.sources.part.knowledge"))
     }
 
     @Test func partModeKeysAndMeetingSearch() {

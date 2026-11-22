@@ -34,8 +34,6 @@ struct MeetingsListView: View {
     // not visible to an extension declared in another file.
     @Environment(\.modelContext) var modelContext
     @Environment(AppSettings.self) var settings
-    /// The app-wide recording session the record button starts or re-opens.
-    @Environment(RecordingSessionController.self) var recordingSession
     @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
     @Query private var folders: [Folder]
     @Query(sort: \SmartFolder.name) private var smartFolders: [SmartFolder]
@@ -65,7 +63,15 @@ struct MeetingsListView: View {
     /// there updates this list without a sheet round-trip. On compact width
     /// `ContentView` still owns the state, just with no sidebar column reading it.
     @Binding var selection: LibrarySelection
+    /// Meetings the Knowledge sheet opens on, for deterministic UI-test
+    /// captures; empty in the app, where the person chooses them.
+    var initialKnowledgeSourceIDs: Set<UUID> = []
+    /// With Knowledge on, the library's Knowledge reader (a sheet) and the
+    /// meetings it reads. The selection lives here so it outlasts the sheet.
+    @State var showingKnowledge = false
+    @State var knowledgeSourceIDs: Set<UUID> = []
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @State var showingSidebar = false
     @State var showingFilterBar = false
     /// Set when the context-menu "Move to folder…" action is invoked; presents
@@ -382,6 +388,18 @@ struct MeetingsListView: View {
                     }
                 }
             }
+            .hostsRecordingMiniBarInSheet()
+        }
+        .sheet(isPresented: $showingKnowledge) {
+            KnowledgeLibraryDestination(meetingIDs: $knowledgeSourceIDs).hostsRecordingMiniBarInSheet()
+        }
+        .task(id: initialKnowledgeSourceIDs) {
+            guard !initialKnowledgeSourceIDs.isEmpty else { return }
+            knowledgeSourceIDs = initialKnowledgeSourceIDs
+            showingKnowledge = true
+        }
+        .onChange(of: settings.knowledgeEnabled) { _, enabled in
+            if !enabled { knowledgeSourceIDs = [] }
         }
         .task(id: searchText) { await runSemanticSearch() }
         .kurnDialog(

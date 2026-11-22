@@ -87,7 +87,7 @@ struct MeetingCard: View {
                     Text(meeting.title)
                         .font(Theme.calloutEmphasized)
                         .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
 
                 metadata
@@ -164,11 +164,10 @@ struct MeetingCard: View {
                 .font(.system(.caption2, design: .default, weight: .medium))
                 .accessibilityHidden(true)
             Text(text)
-                .lineLimit(1)
+                .lineLimit(2)
         }
         .font(Theme.footnote)
         .foregroundStyle(tint)
-        .fixedSize(horizontal: true, vertical: false)
     }
 
     private func folderChip(_ folder: Folder) -> some View {
@@ -178,10 +177,9 @@ struct MeetingCard: View {
                 .accessibilityHidden(true)
             Text(folder.name)
                 .font(.system(.caption2, design: .default, weight: .medium))
-                .lineLimit(1)
+                .lineLimit(2)
         }
         .foregroundStyle(Color(hex: folder.colorHex))
-        .fixedSize(horizontal: true, vertical: false)
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
         .background(Color(hex: folder.colorHex).opacity(0.12), in: Capsule())

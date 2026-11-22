@@ -24,6 +24,8 @@ final class MeetingAttachmentsViewModel {
     var isShowingImporter = false
     /// The file Quick Look shows; `nil` when no preview is open.
     var previewURL: URL?
+    /// Set by the swipe-delete action; drives the confirmation dialog (G1).
+    var pendingDelete: MeetingAttachment?
     private(set) var isImporting = false
     var error: AppError?
 
@@ -60,6 +62,20 @@ final class MeetingAttachmentsViewModel {
             isImporting = false
             if let failure = report.firstFailure { error = failure }
         }
+    }
+
+    func requestDelete(_ attachment: MeetingAttachment) {
+        pendingDelete = attachment
+    }
+
+    func cancelDelete() {
+        pendingDelete = nil
+    }
+
+    func confirmDelete(context: ModelContext) {
+        guard let attachment = pendingDelete else { return }
+        pendingDelete = nil
+        delete(attachment, context: context)
     }
 
     /// Deletes `attachment`, closing its preview first when it is the one open.

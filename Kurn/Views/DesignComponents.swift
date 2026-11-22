@@ -39,7 +39,7 @@ struct FlowLayout: Layout {
         var rowHeight: CGFloat = 0
 
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            let size = measuredSize(of: subview, maxWidth: bounds.width)
             if x > bounds.minX, x + size.width > bounds.maxX {
                 x = bounds.minX
                 y += rowHeight + verticalSpacing
@@ -62,7 +62,7 @@ struct FlowLayout: Layout {
         var contentWidth: CGFloat = 0
 
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            let size = measuredSize(of: subview, maxWidth: width)
             if x > 0, x + size.width > width {
                 x = 0
                 y += rowHeight + verticalSpacing
@@ -75,23 +75,55 @@ struct FlowLayout: Layout {
 
         return (contentWidth, subviews.isEmpty ? 0 : y + rowHeight)
     }
+
+    private func measuredSize(of subview: LayoutSubview, maxWidth: CGFloat) -> CGSize {
+        let natural = subview.sizeThatFits(.unspecified)
+        guard maxWidth.isFinite, maxWidth > 0, natural.width > maxWidth else {
+            return natural
+        }
+        let constrained = subview.sizeThatFits(ProposedViewSize(width: maxWidth, height: nil))
+        return CGSize(width: min(natural.width, max(constrained.width, maxWidth)), height: constrained.height)
+    }
 }
 
-/// Small colored pill showing a transcription status (dot + label).
+/// Small colored pill showing a transcription status (dot/symbol + label).
 struct StatusBadge: View {
     let status: TranscriptionStatus
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         if let label {
             HStack(spacing: 4) {
-                Circle().fill(color).frame(width: 5, height: 5)
+                if differentiateWithoutColor {
+                    Image(systemName: symbolName)
+                        .font(.caption2.weight(.semibold))
+                        .accessibilityHidden(true)
+                } else {
+                    Circle().fill(color).frame(width: 5, height: 5)
+                }
                 Text(label)
                     .font(.caption2.weight(.semibold))
             }
             .padding(.horizontal, 9)
             .padding(.vertical, 3)
-            .background(color.opacity(0.16), in: Capsule())
+            .background(color.opacity(contrast == .increased ? 0.10 : 0.12), in: Capsule())
+            .overlay {
+                if contrast == .increased {
+                    Capsule().strokeBorder(color.opacity(0.75), lineWidth: 1)
+                }
+            }
             .foregroundStyle(color)
+        }
+    }
+
+    private var symbolName: String {
+        switch status {
+        case .none: return "circle.dashed"
+        case .inProgress: return "waveform"
+        case .pending: return "clock.fill"
+        case .done: return "checkmark.circle.fill"
+        case .failed: return "exclamationmark.triangle.fill"
         }
     }
 
@@ -122,12 +154,15 @@ struct FilterChip: View {
     /// Optional accent (e.g. a speaker color). Defaults to the primary label.
     var tint: Color = .primary
     let action: () -> Void
+    @Environment(\.accessibilityShowButtonShapes) private var showButtonShapes
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         Button(action: action) {
             Text(title)
                 .font(.system(.footnote, design: .default, weight: isSelected ? .semibold : .regular))
-                .lineLimit(1)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 6)
                 .foregroundStyle(isSelected ? selectedForeground : Theme.textSecondary)
@@ -135,6 +170,14 @@ struct FilterChip: View {
                     isSelected ? AnyShapeStyle(selectedBackground) : AnyShapeStyle(Theme.fill),
                     in: Capsule()
                 )
+                .overlay {
+                    if showButtonShapes || contrast == .increased {
+                        Capsule()
+                            .strokeBorder(isSelected ? selectedForeground.opacity(0.4) : Theme.separator, lineWidth: 1)
+                    }
+                }
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -210,9 +253,8 @@ struct KurnDialogModifier: ViewModifier {
                     Circle()
                         .fill(iconTint.opacity(0.14))
                         .frame(width: 36, height: 36)
-                    // Fixed size to fit the fixed 36x36 icon well.
                     Image(systemName: iconSystemName)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(Theme.calloutEmphasized)
                         .foregroundStyle(iconTint)
                 }
 
@@ -296,17 +338,15 @@ struct KurnDialogModifier: ViewModifier {
         action: @escaping () -> Void
     ) -> some View {
         let background = isPrimary
-            ? (role == .destructive ? Theme.accent : Theme.info)
+            ? (role == .destructive ? Theme.accentFill : Theme.infoFill)
             : Theme.fill
         let foreground = isPrimary ? Color.white : Theme.textPrimary
 
         return Button(action: action) {
             Text(title)
-                // White text on `Theme.accent`/`Theme.info` measures ~3.55:1 /
-                // ~3.65:1 contrast — below the 4.5:1 WCAG AA floor for normal
-                // text, but above the 3:1 floor for "large text" (>=14pt
-                // bold). Bold `.subheadline` (15pt) clears that bar without
-                // touching the brand colors used identically elsewhere.
+                // White text on `Theme.accentFill` (#C91F16) / `Theme.infoFill`
+                // (#0055B3) measures 5.85:1 / 7.30:1 contrast in both light and
+                // dark mode, clearing the 4.5:1 WCAG AA floor at every size.
                 .font(isPrimary ? .system(.subheadline, design: .default, weight: .bold) : Theme.footnoteEmphasized)
                 .lineLimit(singleLine ? 1 : 2)
                 .fixedSize(horizontal: singleLine, vertical: true)
@@ -321,13 +361,52 @@ struct KurnDialogModifier: ViewModifier {
     }
 }
 
-extension View {
-    /// The standard rounded card surface (#1C1C1E in dark) used across screens.
-    func kurnCard(padding: CGFloat = 16, cornerRadius: CGFloat = 18) -> some View {
-        self
+private struct KurnCardModifier: ViewModifier {
+    let padding: CGFloat
+    let cornerRadius: CGFloat
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay {
+                if contrast == .increased {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(Theme.separator, lineWidth: 1)
+                }
+            }
+    }
+}
+
+private struct KurnComposerSurfaceModifier: ViewModifier {
+    let cornerRadius: CGFloat
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                reduceTransparency ? AnyShapeStyle(Theme.surface) : AnyShapeStyle(.ultraThinMaterial),
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Theme.separator, lineWidth: contrast == .increased ? 1.5 : 1)
+            )
+    }
+}
+
+extension View {
+    /// The standard rounded card surface (#1C1C1E in dark) used across screens.
+    func kurnCard(padding: CGFloat = 16, cornerRadius: CGFloat = 18) -> some View {
+        modifier(KurnCardModifier(padding: padding, cornerRadius: cornerRadius))
+    }
+
+    /// Floating composer surface that honors Reduce Transparency and Increase Contrast.
+    func kurnComposerSurface(cornerRadius: CGFloat = 26) -> some View {
+        modifier(KurnComposerSurfaceModifier(cornerRadius: cornerRadius))
     }
 
     /// Strip the default `List` row chrome (separator + background) so cards sit

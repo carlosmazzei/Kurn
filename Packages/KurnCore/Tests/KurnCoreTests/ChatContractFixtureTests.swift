@@ -27,8 +27,9 @@ struct ChatContractFixtureTests {
         let excluded = try #require(UUID(uuidString: "00000000-0000-0000-0000-000000000102"))
         let scope = fixture.scopes[0]
         #expect(scope.selectedIDs == [selected, excluded])
-        #expect(scope.parts == [.summary, .attachments])
-        #expect(scope.parts(for: selected) == [.transcript])
+        // Saved before knowledge was a part: knowledge stays offered where parts were selected.
+        #expect(scope.parts == [.summary, .attachments, .knowledge])
+        #expect(scope.parts(for: selected) == [.transcript, .knowledge])
         #expect(scope.parts(for: excluded).isEmpty)
         #expect(fixture.legacyWikiScope.parts == ChatSourceScope.defaultParts.union([.wiki]))
         #expect(try JSONDecoder().decode([ChatSourceScope].self, from: JSONEncoder().encode(fixture.scopes)) == fixture.scopes)

@@ -31,6 +31,11 @@ struct AppEnvironment {
     let playbackEnhancement: PlaybackEnhancementViewModel
     let semanticIndex: SemanticIndexCoordinator
     let wiki: WikiCoordinator
+    let knowledgeJobs: KnowledgeJobQueue
+    let knowledge: KnowledgeCompilationCoordinator
+    let knowledgeSettings: KnowledgeSettingsCoordinator
+    /// Purges what deleted meetings and recordings supported (K2.8).
+    let knowledgeDeletion: KnowledgeDeletionCoordinator
     /// The live recording session, app-wide so the recorder can be minimized
     /// while the rest of the app stays usable.
     let recordingSession: RecordingSessionController
@@ -67,8 +72,12 @@ final class AppComposition {
         if let environment, environment.modelContainer === container {
             return environment
         }
+        environment?.knowledgeJobs.setForeground(false)
         let built = Self.makeEnvironment(container: container, settings: settings)
         Self.runLaunchSweeps(container: container, settings: settings)
+        // A tombstone left by a process that died before its purge resumes now.
+        built.knowledgeDeletion.observeStoreSaves()
+        built.knowledgeDeletion.drain()
         environment = built
         return built
     }
@@ -79,13 +88,17 @@ final class AppComposition {
     static func makeEnvironment(container: ModelContainer, settings: AppSettings) -> AppEnvironment {
         let context = container.mainContext
         let semanticIndex = SemanticIndexCoordinator(modelContext: context, appSettings: settings)
-        let wiki = WikiCoordinator(modelContext: context, appSettings: settings)
+        let jobs = KnowledgeJobQueue(container: container, foreground: false)
+        let wiki = WikiCoordinator(modelContext: context, appSettings: settings, jobQueue: jobs)
+        let knowledge = KnowledgeCompilationCoordinator(queue: jobs, settings: settings)
+        let knowledgeSettings = KnowledgeSettingsCoordinator(compilation: knowledge)
         let reviewPrompt = ReviewPromptCoordinator()
         let transcription = TranscriptionCoordinator(
             modelContext: context,
             appSettings: settings,
             semanticIndexCoordinator: semanticIndex,
             wikiCoordinator: wiki,
+            knowledgeCoordinator: knowledge,
             reviewPrompt: reviewPrompt
         )
         return AppEnvironment(
@@ -95,9 +108,15 @@ final class AppComposition {
             playbackEnhancement: PlaybackEnhancementViewModel(modelContext: context),
             semanticIndex: semanticIndex,
             wiki: wiki,
-            recordingSession: RecordingSessionController(modelContext: context, settings: settings),
+            knowledgeJobs: jobs,
+            knowledge: knowledge,
+            knowledgeSettings: knowledgeSettings,
+            knowledgeDeletion: KnowledgeDeletionCoordinator(queue: jobs),
+            recordingSession: RecordingSessionController(modelContext: context, settings: settings, onActivityChanged: { jobs.setRecording($0) }),
             reviewPrompt: reviewPrompt,
-            chatConversations: ChatConversationHost()
+            chatConversations: ChatConversationHost(makeConversation: {
+                MeetingChatViewModel(harnessService: HarnessChatService(knowledge: ChatKnowledgeSource(coordinator: knowledge)))
+            })
         )
     }
 

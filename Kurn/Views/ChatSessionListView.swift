@@ -99,7 +99,7 @@ struct ChatSessionListView: View {
                     Text(session.title)
                         .font(Theme.subheadline)
                         .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                     if let excerpt {
                         Text(excerpt)
                             .font(Theme.caption)

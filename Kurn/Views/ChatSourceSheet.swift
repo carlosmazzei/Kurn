@@ -17,7 +17,8 @@ struct ChatSourceSheet: View {
     }
 
     private var validation: ChatSourceScopeEditor.Validation? {
-        ChatSourcePresentation.validation(scope, resolvedMeetingIDs: Set(resolved.map(\.id)), wikiEnabled: settings.wikiEnabled)
+        ChatSourcePresentation.validation(scope, resolvedMeetingIDs: Set(resolved.map(\.id)), wikiEnabled: settings.wikiEnabled,
+            knowledgeEnabled: settings.knowledgeEnabled)
     }
 
     var body: some View {
@@ -41,7 +42,8 @@ struct ChatSourceSheet: View {
                     }
                 }
                 Section(NSLocalizedString("chat.sources.parts", comment: "Global parts")) {
-                    ChatPartToggles(parts: partsBinding(), wikiEnabled: settings.wikiEnabled, identifier: "chat.sources.global")
+                    ChatPartToggles(parts: partsBinding(), wikiEnabled: settings.wikiEnabled, knowledgeEnabled: settings.knowledgeEnabled,
+                                    identifier: "chat.sources.global")
                 }
                 if meeting == nil {
                     Section(NSLocalizedString("chat.sources.overrides", comment: "Per-meeting parts")) {
@@ -125,7 +127,7 @@ struct ChatSourceSheet: View {
             ))
             .accessibilityIdentifier("chat.sources.use_global.\(item.id.uuidString)")
             if scope.partOverrides[item.id] != nil {
-                ChatPartToggles(parts: partsBinding(for: item.id), wikiEnabled: settings.wikiEnabled,
+                ChatPartToggles(parts: partsBinding(for: item.id), wikiEnabled: settings.wikiEnabled, knowledgeEnabled: settings.knowledgeEnabled,
                                 identifier: "chat.sources.override.\(item.id.uuidString)")
             }
         } label: {
@@ -151,10 +153,12 @@ struct ChatSourceSheet: View {
 private struct ChatPartToggles: View {
     @Binding var parts: Set<ChatSourcePart>
     let wikiEnabled: Bool
+    /// Knowledge is offered as a part only while the feature is on (K5.3).
+    let knowledgeEnabled: Bool
     let identifier: String
 
     var body: some View {
-        ForEach(ChatSourcePart.allCases, id: \.self) { part in
+        ForEach(ChatSourcePart.allCases.filter { $0 != .knowledge || knowledgeEnabled }, id: \.self) { part in
             Toggle(NSLocalizedString(ChatSourcePresentation.partKey(part), comment: "Source part"), isOn: Binding(
                 get: { (part != .wiki || wikiEnabled) && parts.contains(part) },
                 set: { enabled in
