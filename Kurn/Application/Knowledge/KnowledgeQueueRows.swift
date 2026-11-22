@@ -199,4 +199,30 @@ enum KnowledgeQueueRows {
         }
         try context.save()
     }
+
+    /// After an explicit update of `meetingID` succeeds, older queued work of
+    /// the same kind for that meeting (e.g. earlier taps that failed and were
+    /// deferred for an explicit retry) is superseded: it would repeat the same
+    /// paid extraction once the provider recovered. Running and terminal rows
+    /// are untouched.
+    static func supersede(kind: KnowledgeJobKind, meetingID: UUID, keeping id: UUID, container: ModelContainer) throws -> Int {
+        let context = context(container)
+        let kindRaw = kind.rawValue
+        let rows = try context.fetch(FetchDescriptor<KnowledgeJob>(predicate: #Predicate {
+            $0.kindRaw == kindRaw && $0.meetingID == meetingID
+        }))
+        let open = [KnowledgeJobState.pending.rawValue, KnowledgeJobState.deferred.rawValue]
+        var count = 0
+        for job in rows where job.id != id && open.contains(job.stateRaw) {
+            var payload = try envelope(job)
+            payload.leaseID = nil
+            job.checkpointData = try KnowledgeStoreRows.authoritativeData(payload)
+            job.stateRaw = KnowledgeJobState.cancelled.rawValue
+            job.lastErrorCode = "superseded"
+            job.updatedAt = Date()
+            count += 1
+        }
+        if count > 0 { try context.save() }
+        return count
+    }
 }

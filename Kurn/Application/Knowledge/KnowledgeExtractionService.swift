@@ -243,7 +243,7 @@ struct KnowledgeExtractionService: Sendable {
             } catch let error as KnowledgeExtractionError {
                 // Structural path only (schema key names and indices), never
                 // model text — safe to log publicly and to send in the repair.
-                let location = KnowledgeExtractionShape.diagnose(data) ?? "content"
+                let location = KnowledgeExtractionShape.diagnose(data) ?? Self.decodingPath(data) ?? "content"
                 AppLog.knowledge.atError.error("knowledge extraction pass rejected attempt=\(attempt + 1, privacy: .public) elapsed=\(elapsed, privacy: .public)s replyBytes=\(data.count, privacy: .public) code=\(error.rawValue, privacy: .public) at=\(location, privacy: .public)")
                 guard attempt == 0 else { throw error }
                 diagnostic = "\nThe previous response failed host validation (\(error.rawValue) at \(location)). "
@@ -296,5 +296,28 @@ struct KnowledgeExtractionService: Sendable {
             }
         }
         return (try? JSONSerialization.data(withJSONObject: root)) ?? data
+    }
+
+    /// Where Codable rejected a shape-valid reply — typically a value outside
+    /// a vocabulary (an unknown predicate or kind). Only coding-path keys
+    /// (schema names) and indices are reported, never the offending value.
+    static func decodingPath(_ data: Data) -> String? {
+        do {
+            _ = try JSONDecoder().decode(KnowledgeExtraction.self, from: data)
+            return nil
+        } catch let DecodingError.dataCorrupted(context) {
+            return path(context.codingPath) + ": value outside the vocabulary"
+        } catch let DecodingError.typeMismatch(_, context) {
+            return path(context.codingPath) + ": wrong type"
+        } catch let DecodingError.valueNotFound(_, context) {
+            return path(context.codingPath) + ": null value"
+        } catch {
+            return nil
+        }
+    }
+
+    private static func path(_ keys: [any CodingKey]) -> String {
+        keys.map { $0.intValue.map { "[\($0)]" } ?? ".\($0.stringValue)" }.joined()
+            .trimmingCharacters(in: CharacterSet(charactersIn: "."))
     }
 }

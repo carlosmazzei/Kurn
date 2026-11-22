@@ -72,6 +72,10 @@ extension KnowledgeStore {
         try KnowledgeQueueRows.recover(id: id, outputCommitted: outputCommitted, container: modelContainer)
     }
 
+    func supersedeJobs(kind: KnowledgeJobKind, meetingID: UUID, keeping id: UUID) throws -> Int {
+        try KnowledgeQueueRows.supersede(kind: kind, meetingID: meetingID, keeping: id, container: modelContainer)
+    }
+
     func cancelJobs(kind: KnowledgeJobKind, createdBefore: Date) throws {
         try KnowledgeQueueRows.cancel(kind: kind, createdBefore: createdBefore, container: modelContainer)
     }
