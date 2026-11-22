@@ -1,6 +1,11 @@
-"watch.open_iphone" = "Open Kurn on your iPhone to record";
 "watch.unreachable" = "Couldn't reach iPhone";
 "watch.pause" = "Pause";
 "watch.resume" = "Resume";
 "watch.stop" = "Stop";
 "watch.highlight" = "Highlight";
+
+"watch.start.title" = "Record on iPhone";
+"watch.start.subtitle" = "The iPhone records; the watch controls.";
+"watch.start.queued" = "Open Kurn on iPhone to start";
+"watch.state.recording" = "Recording";
+"watch.state.paused" = "Paused";

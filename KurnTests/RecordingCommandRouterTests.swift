@@ -116,6 +116,55 @@ struct RecordingCommandRouterTests {
         #expect(highlightCount == 2)
     }
 
+    // MARK: - Watch .start
+
+    @Test func startWhileARecordingIsActiveIsRefused() {
+        let router = RecordingCommandRouter.shared
+        defer { router.unregister() }
+        var starts = 0
+        router.requestStart = { starts += 1; return true }
+        router.register(
+            onTogglePause: {}, onPause: {}, onResume: {},
+            onStop: { true }, onHighlight: {}
+        )
+
+        let result = router.handleWatchCommand(.start, commandID: "start-busy")
+
+        #expect(!result.handled)
+        #expect(result.phase == .received)
+        #expect(router.lastCommandError == WatchSessionReplyError.recordingAlreadyActive)
+        #expect(starts == 0)
+    }
+
+    @Test func startInTheForegroundQueuesARecordingImmediately() {
+        let router = RecordingCommandRouter.shared
+        router.unregister()
+        defer { router.unregister() }
+        var starts = 0
+        router.isForeground = { true }
+        router.requestStart = { starts += 1; return true }
+
+        let result = router.handleWatchCommand(.start, commandID: "start-fg")
+
+        #expect(result.handled)
+        #expect(result.phase == .stateChanged)
+        #expect(starts == 1)
+    }
+
+    @Test func startWhileBackgroundedReportsQueued() {
+        let router = RecordingCommandRouter.shared
+        router.unregister()
+        defer { router.unregister() }
+        router.isForeground = { false }
+        router.requestStart = { true }
+
+        let result = router.handleWatchCommand(.start, commandID: "start-bg")
+
+        #expect(result.handled)
+        #expect(result.phase == .queued)
+        #expect(router.lastCommandError == nil)
+    }
+
     // MARK: - Live Activity buttons
 
     @Test func liveActivityActionsReachTheMatchingHandler() {

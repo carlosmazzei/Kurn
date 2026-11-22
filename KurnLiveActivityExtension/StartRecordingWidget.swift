@@ -54,6 +54,9 @@ struct StartRecordingWidgetProvider: TimelineProvider {
 
 private struct StartRecordingWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    /// `.accented`/`.vibrant` rendering asks the system to tint the disc —
+    /// the fixed red would fight it, so the whole disc goes accentable.
+    @Environment(\.widgetRenderingMode) private var renderingMode
 
     var body: some View {
         Button(intent: StartRecordingIntent()) {
@@ -98,7 +101,7 @@ private struct StartRecordingWidgetView: View {
                     titleStack
                 }
                 Spacer(minLength: 0)
-                RecordButtonDisc()
+                RecordButtonDisc(useFixedColor: renderingMode == .fullColor)
                     .frame(width: 88, height: 88)
             }
         default:
@@ -106,7 +109,7 @@ private struct StartRecordingWidgetView: View {
                 HStack(alignment: .top) {
                     KurnLogo(size: 26)
                     Spacer(minLength: 0)
-                    RecordButtonDisc()
+                    RecordButtonDisc(useFixedColor: renderingMode == .fullColor)
                         .frame(width: 56, height: 56)
                 }
                 Spacer(minLength: 0)
@@ -131,20 +134,25 @@ private struct StartRecordingWidgetView: View {
 
 /// The red record disc on the Home Screen families. Tinted and clear
 /// rendering modes keep only the accented part, so the inner dot is the
-/// element marked accentable.
+/// element marked accentable; in `.accented`/`.vibrant` every part is
+/// accentable so the fixed red can't fight the system tint.
 private struct RecordButtonDisc: View {
+    var useFixedColor = true
+
+    private var discColor: Color { useFixedColor ? .kurnAccent : .primary }
+
     var body: some View {
         ZStack {
             Circle()
-                .fill(Color.kurnAccent.opacity(0.18))
+                .fill(discColor.opacity(0.18))
             Circle()
-                .stroke(Color.kurnAccent, lineWidth: 3)
+                .stroke(discColor, lineWidth: 3)
                 .padding(4)
             Circle()
-                .fill(Color.kurnAccent)
+                .fill(discColor)
                 .padding(14)
-                .widgetAccentable()
         }
+        .widgetAccentable()
         .accessibilityHidden(true)
     }
 }

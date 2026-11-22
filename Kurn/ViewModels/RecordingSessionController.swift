@@ -26,6 +26,11 @@ import SwiftData
 final class RecordingSessionController {
     /// The meeting being recorded into, `nil` when no session exists.
     private(set) var meeting: Meeting?
+    /// The meeting a just-finished recording was saved into, held for the
+    /// meetings list to open on the Audio tab (P5). `nil` until a recording
+    /// is durably kept — the too-short auto-discard never sets it, since
+    /// there is nothing to navigate to.
+    private(set) var lastSavedMeeting: Meeting?
     /// The live session's view model, `nil` when no session exists.
     private(set) var viewModel: RecorderViewModel?
     /// Whether the full-screen recorder is presented. `false` with a live
@@ -148,7 +153,16 @@ final class RecordingSessionController {
     /// `RecorderViewModel.didSaveRecording`).
     func finishIfSaved() {
         guard viewModel?.didSaveRecording == true else { return }
+        if viewModel?.savedRecordingKept == true {
+            lastSavedMeeting = meeting
+        }
         end()
+    }
+
+    /// Hands the saved meeting to whoever asked for it exactly once.
+    func consumeLastSavedMeeting() -> Meeting? {
+        defer { lastSavedMeeting = nil }
+        return lastSavedMeeting
     }
 
     private func end() {

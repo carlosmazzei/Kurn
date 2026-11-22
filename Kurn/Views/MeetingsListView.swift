@@ -35,6 +35,9 @@ struct MeetingsListView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(AppSettings.self) var settings
     @Environment(RecordingSessionController.self) var session
+    /// Optional so test hosts without the environment object still work —
+    /// same pattern `MeetingDetailView` uses.
+    @Environment(MeetingDetailTabMemory.self) private var tabMemory: MeetingDetailTabMemory?
     @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
     @Query private var folders: [Folder]
     @Query(sort: \SmartFolder.name) private var smartFolders: [SmartFolder]
@@ -326,6 +329,19 @@ struct MeetingsListView: View {
         }
         .onChange(of: settings.knowledgeEnabled) { _, enabled in
             if !enabled { knowledgeSourceIDs = [] }
+        }
+        // A stopped-and-kept recording opens its meeting on the Audio tab:
+        // pushed from here when the detail isn't already on screen, and
+        // switched live through the tab memory when it is.
+        .onChange(of: session.lastSavedMeeting?.id) { _, _ in
+            guard let meeting = session.consumeLastSavedMeeting() else { return }
+            tabMemory?.set(.recordings, for: meeting.id)
+            if selectedMeeting?.id != meeting.id {
+                selectedMeeting = meeting
+            }
+            AccessibilityNotification.Announcement(
+                NSLocalizedString("recorder.saved_announcement", comment: "Announced when a recording finishes saving")
+            ).post()
         }
         .task(id: searchText) { await runSemanticSearch() }
         .kurnDialog(

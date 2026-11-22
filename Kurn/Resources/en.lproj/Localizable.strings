@@ -233,7 +233,6 @@
 "recorder.discard" = "Discard Recording";
 "recorder.title_field.accessibility_label" = "Meeting title";
 "recorder.accessibility.timer_with_highlights" = "%1$@, %2$d highlights";
-"recorder.add_title" = "Add title…";
 "recorder.pause" = "Pause";
 "recorder.resume" = "Resume";
 "recorder.stop" = "Stop";
@@ -259,8 +258,8 @@
 "photo.delete.confirm" = "Delete this photo?";
 "photo.delete.message" = "Its recognized text and any summary references to it are removed too.";
 "recorder.paused" = "PAUSED";
-"recorder.permission.title" = "Microphone Access Needed";
-"recorder.permission.message" = "Kurn needs microphone access to record meetings. Enable it in Settings.";
+"recorder.permission.title" = "Kurn needs the microphone";
+"recorder.permission.message" = "Allow microphone access in the iPhone Settings to record meetings.";
 "recorder.live_listening" = "Listening…";
 "recorder.live_loading" = "Preparing live transcription…";
 "recorder.live_unavailable" = "Live transcription unavailable.";
@@ -268,6 +267,10 @@
 "recorder.choose_mic.title" = "Choose Microphone";
 "recorder.minimize" = "Minimize Recorder";
 "recorder.mini.recording" = "Recording";
+"recorder.mic.builtin" = "iPhone Microphone";
+"recorder.mic.bluetooth" = "Bluetooth";
+"recorder.mic.headset" = "Headset";
+"recorder.mic.usb" = "USB microphone";
 "recorder.mini.paused" = "Paused";
 "recorder.mini.accessibility_label" = "%1$@, %2$@, %3$@";
 "recorder.mini.hint" = "Opens the recorder.";
@@ -1884,3 +1887,14 @@
 "health.needs_attention" = "Needs attention";
 "health.all_clear_detail" = "Every check passed.";
 "health.issues_count" = "%d items to look at";
+
+"common.close" = "Close";
+"recorder.header" = "New meeting · %@";
+"recorder.provisional_title" = "Meeting at %@";
+"recorder.status.recording_with_mic" = "Recording · %@";
+"recorder.status.paused_with_mic" = "Paused · %@";
+"recorder.mini.recording_elapsed" = "Recording · %@";
+"recorder.mini.paused_elapsed" = "Paused · %@";
+"recorder.live_caption" = "Live";
+"recorder.permission.open_settings" = "Open Settings";
+"recorder.saved_announcement" = "Recording saved";

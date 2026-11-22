@@ -15,7 +15,7 @@
 "widget.startRecording.displayName" = "Avvia registrazione";
 "widget.startRecording.description" = "Avvia una nuova registrazione Kurn dalla schermata Home, dalla schermata di blocco o da StandBy. Il widget non mostra mai il contenuto delle riunioni.";
 "widget.startRecording.title" = "Registra";
-"widget.startRecording.subtitle" = "Avvia una nuova riunione";
+"widget.startRecording.subtitle" = "Nuova riunione";
 
 /* Live Activity button intent (hidden from Shortcuts) */
 "intent.recordingControl.title" = "Controlla Registrazione";

@@ -233,7 +233,6 @@
 "recorder.discard" = "放弃录音";
 "recorder.title_field.accessibility_label" = "会议标题";
 "recorder.accessibility.timer_with_highlights" = "%1$@，%2$d 个标记";
-"recorder.add_title" = "添加标题…";
 "recorder.pause" = "暂停";
 "recorder.resume" = "恢复";
 "recorder.stop" = "停止";
@@ -259,8 +258,8 @@
 "photo.delete.confirm" = "删除这张照片？";
 "photo.delete.message" = "其识别的文字以及摘要中对它的引用也将一并删除。";
 "recorder.paused" = "已暂停";
-"recorder.permission.title" = "需要麦克风权限";
-"recorder.permission.message" = "Kurn 需要麦克风权限来录制会议。请在设置中启用。";
+"recorder.permission.title" = "Kurn 需要使用麦克风";
+"recorder.permission.message" = "请在 iPhone 设置中允许访问麦克风以录制会议。";
 "recorder.live_listening" = "正在聆听…";
 "recorder.live_loading" = "正在准备实时转录…";
 "recorder.live_unavailable" = "实时转录不可用。";
@@ -268,6 +267,10 @@
 "recorder.choose_mic.title" = "选择麦克风";
 "recorder.minimize" = "最小化录音器";
 "recorder.mini.recording" = "正在录音";
+"recorder.mic.builtin" = "iPhone 麦克风";
+"recorder.mic.bluetooth" = "蓝牙";
+"recorder.mic.headset" = "耳机";
+"recorder.mic.usb" = "USB 麦克风";
 "recorder.mini.paused" = "已暂停";
 "recorder.mini.accessibility_label" = "%1$@，%2$@，%3$@";
 "recorder.mini.hint" = "打开录音器。";
@@ -1884,3 +1887,14 @@
 "health.needs_attention" = "需要注意";
 "health.all_clear_detail" = "所有检查均已通过。";
 "health.issues_count" = "%d 个待处理项";
+
+"common.close" = "关闭";
+"recorder.header" = "新会议 · %@";
+"recorder.provisional_title" = "%@ 的会议";
+"recorder.status.recording_with_mic" = "录制中 · %@";
+"recorder.status.paused_with_mic" = "已暂停 · %@";
+"recorder.mini.recording_elapsed" = "录制中 · %@";
+"recorder.mini.paused_elapsed" = "已暂停 · %@";
+"recorder.live_caption" = "实时";
+"recorder.permission.open_settings" = "打开设置";
+"recorder.saved_announcement" = "录音已保存";

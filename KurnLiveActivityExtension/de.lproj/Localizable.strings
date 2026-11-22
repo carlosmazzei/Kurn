@@ -15,7 +15,7 @@
 "widget.startRecording.displayName" = "Aufnahme starten";
 "widget.startRecording.description" = "Startet eine neue Kurn-Aufnahme über den Home-Bildschirm, den Sperrbildschirm oder den Standby-Modus. Das Widget zeigt nie Besprechungsinhalte an.";
 "widget.startRecording.title" = "Aufnehmen";
-"widget.startRecording.subtitle" = "Neue Besprechung starten";
+"widget.startRecording.subtitle" = "Neues Meeting";
 
 /* Live Activity button intent (hidden from Shortcuts) */
 "intent.recordingControl.title" = "Aufnahme steuern";

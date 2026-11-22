@@ -1,6 +1,11 @@
-"watch.open_iphone" = "在 iPhone 上打开 Kurn 以开始录音";
 "watch.unreachable" = "无法连接到 iPhone";
 "watch.pause" = "暂停";
 "watch.resume" = "恢复";
 "watch.stop" = "停止";
 "watch.highlight" = "标记高亮";
+
+"watch.start.title" = "在 iPhone 上录制";
+"watch.start.subtitle" = "iPhone 负责录制；手表负责控制。";
+"watch.start.queued" = "在 iPhone 上打开 Kurn 以开始";
+"watch.state.recording" = "录制中";
+"watch.state.paused" = "已暂停";

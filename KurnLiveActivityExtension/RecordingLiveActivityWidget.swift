@@ -171,14 +171,31 @@ private func commandButtons(
     _ context: ActivityViewContext<RecordingActivityAttributes>,
     height: CGFloat
 ) -> some View {
+    // Pause and Highlight grouped on the left; Stop alone on the right, the
+    // only red element.
     HStack(spacing: 10) {
-        commandLink(
-            systemImage: context.state.isPaused ? "play.fill" : "pause.fill",
-            label: context.state.isPaused ? "live_activity.resume" : "live_activity.pause",
-            intent: RecordingControlIntent(.togglePause),
-            style: .prominent,
-            height: height
-        )
+        HStack(spacing: 10) {
+            commandLink(
+                systemImage: context.state.isPaused ? "play.fill" : "pause.fill",
+                label: context.state.isPaused ? "live_activity.resume" : "live_activity.pause",
+                intent: RecordingControlIntent(.togglePause),
+                style: .prominent,
+                height: height
+            )
+            if !context.state.isPaused {
+                Button(intent: RecordingControlIntent(.highlight)) {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: height < 40 ? 13 : 15, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: height, height: height)
+                        .background(Color.white.opacity(0.12), in: Circle())
+                        .overlay(Circle().stroke(.white.opacity(0.1), lineWidth: 0.5))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("live_activity.highlight"))
+            }
+        }
+        Spacer(minLength: 10)
         commandLink(
             systemImage: "stop.fill",
             label: "live_activity.stop",
@@ -186,20 +203,7 @@ private func commandButtons(
             style: .destructive,
             height: height
         )
-        // Icon-only, fixed width rather than a third full-width text pill,
-        // which would crowd "Pause"/"Stop" labels in longer languages.
-        if !context.state.isPaused {
-            Button(intent: RecordingControlIntent(.highlight)) {
-                Image(systemName: "bookmark.fill")
-                    .font(.system(size: height < 40 ? 13 : 15, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: height, height: height)
-                    .background(Color.white.opacity(0.12), in: Circle())
-                    .overlay(Circle().stroke(.white.opacity(0.1), lineWidth: 0.5))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text("live_activity.highlight"))
-        }
+        .fixedSize()
     }
 }
 
@@ -247,8 +251,8 @@ private func commandLink(
                 .minimumScaleFactor(0.8)
                 .foregroundStyle(.white)
         }
-        .frame(maxWidth: .infinity)
         .frame(height: height)
+        .padding(.horizontal, height * 0.4)
         .background(style.background, in: Capsule())
         .overlay(Capsule().stroke(.white.opacity(style.borderOpacity), lineWidth: 0.5))
     }
