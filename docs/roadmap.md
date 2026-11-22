@@ -656,7 +656,8 @@ tour.
 
 ### Design review implementation (prototype revision 10, 2026-11-21 → `feature/ui-design-review`)
 
-The "Kurn Revisão de Interface" prototype (revision 10) was implemented on
+The "Kurn Revisão de Interface" prototype (revision 10,
+`docs/design/kurn-interface-review-r10.html`; deviations in `docs/design/README.md`) was implemented on
 `feature/ui-design-review` in seven commits (theme roles, meetings list,
 meeting detail ×2, Wiki, Settings, recorder/Watch, documents and sheets); the
 decisions are recorded in `CLAUDE.md` → "Visual system". What it settles or
