@@ -164,7 +164,11 @@ struct KnowledgeExtractionService: Sendable {
     ) async throws -> KnowledgeExtraction {
         try Task.checkCancellation()
         try await authorize(llm, authorization)
-        let input = try KnowledgeExtractionPrompt.input(sources, context: context)
+        // Short per-pass aliases ("s1"…"sN") instead of 36-character UUIDs: a
+        // long meeting asked the model to copy hundreds of UUIDs back, and one
+        // mistyped ID rejected the whole pass. Mapped back before validation.
+        let aliases = Self.aliases(for: sources)
+        let input = try KnowledgeExtractionPrompt.input(Self.aliased(sources, aliases), context: context)
         let system = KnowledgeExtractionPrompt.system + "\n" + KnowledgeExtractionPrompt.vocabulary
         // A repair is a fresh request with a fixed diagnostic and the original
         // input. Never echo an untrusted/oversized model reply into a new prompt.
@@ -183,7 +187,7 @@ struct KnowledgeExtractionService: Sendable {
                 throw error
             }
             try Task.checkCancellation()
-            let data = KnowledgeExtraction.normalizedReply(reply)
+            let data = Self.dealiased(KnowledgeExtraction.normalizedReply(reply), aliases: aliases)
             let elapsed = Int(Date().timeIntervalSince(startedAt))
             do {
                 let document = try KnowledgeExtraction.decode(data, segments: revision.snapshot.sourceSegments)
@@ -211,5 +215,42 @@ struct KnowledgeExtractionService: Sendable {
         _ llm: any LLMProvider, _ authorization: @Sendable () async -> KnowledgeExtractionAuthorization
     ) async throws {
         guard await authorization().decision(for: llm.provider).isAllowed else { throw KnowledgeExtractionServiceError.policyDenied }
+    }
+
+    static func aliases(for sources: [KnowledgeExtractionPrompt.Source]) -> [String: String] {
+        Dictionary(uniqueKeysWithValues: sources.enumerated().map { ("s\($0.offset + 1)", $0.element.id) })
+    }
+
+    static func aliased(_ sources: [KnowledgeExtractionPrompt.Source], _ aliases: [String: String]) -> [KnowledgeExtractionPrompt.Source] {
+        let byID = Dictionary(uniqueKeysWithValues: aliases.map { ($0.value, $0.key) })
+        return sources.map { .init(id: byID[$0.id] ?? $0.id, speaker: $0.speaker, startMs: $0.startMs, endMs: $0.endMs, text: $0.text) }
+    }
+
+    /// Replaces aliases with the real segment IDs in exactly the three
+    /// segment-reference fields; anything else (and any unknown alias) is left
+    /// untouched for the strict validator to judge. Non-JSON passes through.
+    static func dealiased(_ data: Data, aliases: [String: String]) -> Data {
+        guard var root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return data }
+        func map(_ value: Any?) -> Any? {
+            if let id = value as? String { return aliases[id] ?? id }
+            if let ids = value as? [Any] { return ids.map { ($0 as? String).map { aliases[$0] ?? $0 } ?? $0 } }
+            return value
+        }
+        if let ids = root["examinedSegmentIDs"] { root["examinedSegmentIDs"] = map(ids) }
+        if let assertions = root["assertions"] as? [[String: Any]] {
+            root["assertions"] = assertions.map { item -> [String: Any] in
+                var item = item
+                if let id = item["attributedToSegmentID"] { item["attributedToSegmentID"] = map(id) }
+                if let evidence = item["evidence"] as? [[String: Any]] {
+                    item["evidence"] = evidence.map { entry -> [String: Any] in
+                        var entry = entry
+                        if let ids = entry["segmentIDs"] { entry["segmentIDs"] = map(ids) }
+                        return entry
+                    }
+                }
+                return item
+            }
+        }
+        return (try? JSONSerialization.data(withJSONObject: root)) ?? data
     }
 }

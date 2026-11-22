@@ -19,6 +19,14 @@ struct KnowledgeExtractionServiceTests {
         return sources.compactMap { $0["id"] as? String }
     }
 
+    /// Prompts carry per-pass aliases ("s1"…), so anchors are compared by text.
+    private static func inputTexts(_ call: ScriptedLLMProvider.ChatCall) throws -> [String] {
+        let content = try #require(call.messages.first?.content)
+        let root = try #require(JSONSerialization.jsonObject(with: Data(content.utf8)) as? [String: Any])
+        let sources = try #require(root["segments"] as? [[String: Any]])
+        return sources.compactMap { $0["text"] as? String }
+    }
+
     private static func emptyReply(ids: [String]) throws -> String {
         let data = try JSONSerialization.data(withJSONObject: ["version": 1, "entities": [], "assertions": [], "events": [], "examinedSegmentIDs": ids])
         return String(decoding: data, as: UTF8.self)
@@ -58,7 +66,8 @@ struct KnowledgeExtractionServiceTests {
             llm: llm, budget: budget, authorization: { Self.allowed() })
         #expect(result.targetedPassCount == 1)
         #expect(result.examinedSegmentIDs.count == 3)
-        #expect(try Self.inputIDs(llm.chatCalls[1]) == [source[1].id.uuidString.lowercased()])
+        #expect(try Self.inputTexts(llm.chatCalls[1]) == [source[1].text])
+        #expect(try Self.inputIDs(llm.chatCalls[1]) == ["s1"])
     }
 
     @Test func stillMissingCoverageFailsAfterOneTargetedRound() async {
@@ -112,8 +121,8 @@ struct KnowledgeExtractionServiceTests {
         #expect(result.strategy == .blocks)
         #expect(result.passes.count > 1)
         #expect(result.targetedPassCount == 0)
-        let supplied = try llm.chatCalls.flatMap { try Self.inputIDs($0) }
-        #expect(supplied == source.map { $0.id.uuidString.lowercased() })
+        let supplied = try llm.chatCalls.flatMap { try Self.inputTexts($0) }
+        #expect(supplied == source.map(\.text))
         #expect(llm.chatCalls.allSatisfy { ContextBudget(inputTokens: 400, mapBlockTokens: 400).fits($0.messages[0].content) })
     }
 
