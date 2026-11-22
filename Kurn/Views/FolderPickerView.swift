@@ -2,9 +2,11 @@
 //  FolderPickerView.swift
 //  Kurn
 //
-//  Sheet that assigns a meeting to a user folder (or back to the Inbox by
+//  Sheet that assigns meetings to a user folder (or back to the Inbox by
 //  picking "None"). Driven by the "Move to folder…" context-menu entry in
-//  `MeetingsListView`. Mirrors the drill-down navigation in
+//  `MeetingsListView` and by the selection-mode Move button, which passes
+//  every selected meeting. A row's checkmark means every selected meeting
+//  already sits in that folder. Mirrors the drill-down navigation in
 //  `FolderSidebarView` so subfolders are reachable as targets: the row body
 //  assigns the folder and dismisses, the trailing chevron drills into the
 //  folder's children.
@@ -18,7 +20,27 @@ struct FolderPickerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    let meeting: Meeting
+    /// The meetings the pick applies to; one for the context-menu move,
+    /// every selected meeting for the selection-mode Move button.
+    let meetings: [Meeting]
+    /// Called after a successful move so the caller can leave selection mode.
+    var onApplied: (() -> Void)?
+
+    init(meetings: [Meeting], onApplied: (() -> Void)? = nil) {
+        self.meetings = meetings
+        self.onApplied = onApplied
+    }
+
+    /// Convenience for the single-meeting context-menu entry.
+    init(meeting: Meeting) {
+        self.init(meetings: [meeting])
+    }
+
+    /// The shared folder only when ALL selected meetings sit there; a mixed
+    /// selection shows no checkmark.
+    private func isShared(_ folder: Folder?) -> Bool {
+        meetings.allSatisfy { $0.folder?.persistentModelID == folder?.persistentModelID }
+    }
 
     @Query(filter: #Predicate<Folder> { $0.parent == nil }, sort: \Folder.name)
     private var rootFolders: [Folder]
@@ -48,7 +70,7 @@ struct FolderPickerView: View {
                         systemImage: "tray",
                         tint: Theme.textSecondary,
                         text: NSLocalizedString("folder.inbox", comment: "Inbox"),
-                        isSelected: meeting.folder == nil
+                        isSelected: isShared(nil)
                     )
                 }
                 .buttonStyle(.plain)
@@ -78,7 +100,7 @@ struct FolderPickerView: View {
                         systemImage: parent.iconName,
                         tint: Color(hex: parent.colorHex),
                         text: NSLocalizedString("folder.select_this", comment: "Select this folder"),
-                        isSelected: meeting.folder?.persistentModelID == parent.persistentModelID
+                        isSelected: isShared(parent)
                     )
                 }
                 .buttonStyle(.plain)
@@ -106,7 +128,7 @@ struct FolderPickerView: View {
                     systemImage: folder.iconName,
                     tint: Color(hex: folder.colorHex),
                     text: folder.name,
-                    isSelected: meeting.folder?.persistentModelID == folder.persistentModelID
+                    isSelected: isShared(folder)
                 )
             }
             .buttonStyle(.plain)
@@ -145,11 +167,12 @@ struct FolderPickerView: View {
     }
 
     private func move(to folder: Folder?) {
-        meeting.folder = folder
+        for meeting in meetings { meeting.folder = folder }
         if let failure = modelContext.saveOrError() {
             saveError = failure
             return
         }
         dismiss()
+        onApplied?()
     }
 }

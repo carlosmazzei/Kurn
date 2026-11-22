@@ -281,12 +281,12 @@
 "meeting.has_summary" = "Tem resumo";
 "meetings.title" = "Reuniões";
 "meetings.record" = "Gravar";
-"meetings.search" = "Buscar gravações…";
+"meetings.search" = "Buscar reuniões";
 "filter.all" = "Todas";
 "filter.today" = "Hoje";
 "filter.this_week" = "Esta semana";
-"meetings.empty.title" = "Nenhuma Reunião";
-"meetings.empty.subtitle" = "Toque em + para criar sua primeira reunião e começar a gravar.";
+"meetings.empty.title" = "Nenhuma reunião ainda";
+"meetings.empty.subtitle" = "Grave uma conversa e o Kurn a transcreve, separa quem falou e escreve o resumo. Por padrão tudo fica neste dispositivo; um provedor de nuvem só recebe o que você escolher enviar.";
 "meetings.delete.confirm" = "Excluir esta reunião e suas gravações?";
 "meetings.rename" = "Renomear";
 "meetings.sort" = "Ordenar";
@@ -361,10 +361,10 @@
 "meetings.tag.edit" = "Editar tags";
 "filter.title" = "Filtros";
 "filter.clear" = "Limpar filtros";
-"filter.date" = "Data";
+"filter.date" = "Período";
 "filter.folder" = "Pasta";
 "filter.tags" = "Tags";
-"filter.status" = "Status";
+"filter.status" = "Situação";
 "filter.has_summary" = "Com resumo";
 "filter.yes" = "Sim";
 "filter.no" = "Não";
@@ -403,7 +403,7 @@
 "analytics.top_speakers" = "Top speakers";
 "analytics.no_speakers" = "Nenhum speaker identificado";
 "analytics.insights" = "Insights";
-"status.none" = "Sem transcript";
+"status.none" = "Sem transcrição";
 
 /* Comum */
 "common.delete" = "Excluir";
@@ -772,8 +772,8 @@
 "settings.recording_section_privacy_footer" = "Os arquivos de áudio ficam sempre criptografados em disco usando o código do aparelho, independentemente destas configurações.";
 "settings.hide_live_activity_meeting_title" = "Ocultar título na tela bloqueada";
 "settings.hide_live_activity_meeting_title_footer" = "Mostra um rótulo genérico \"Gravando…\" na tela bloqueada, no Dynamic Island e no Apple Watch pareado em vez do título real da reunião durante a gravação.";
-"recordings.locked_title" = "Gravações bloqueadas";
-"recordings.locked_subtitle" = "Autentique-se para ver suas reuniões e gravações.";
+"recordings.locked_title" = "O Kurn está bloqueado";
+"recordings.locked_subtitle" = "Suas reuniões ficam protegidas até você entrar.";
 "recording.live_activity.generic_title" = "Gravando…";
 "recordings.unlock_button" = "Desbloquear";
 "recordings.unlock_reason" = "Autentique-se para acessar as gravações das suas reuniões.";
@@ -1693,3 +1693,28 @@
 "folder.icon.pin" = "Alfinete";
 "folder.icon.flag" = "Bandeira";
 "folder.icon.tag" = "Tag";
+"meetings.empty.record_first" = "Grave sua primeira reunião";
+"meetings.empty.filtered.title" = "Nenhuma reunião corresponde";
+"meetings.empty.filtered.subtitle" = "Altere os filtros ou as opções acima.";
+"meetings.delete.confirm_titled" = "Excluir \"%@\"?";
+"meetings.delete.message" = "A gravação, a transcrição, os resumos e a página wiki desta reunião serão apagados deste dispositivo.";
+"meetings.bulk_delete.action" = "Excluir %d";
+"meetings.quick.all" = "Todas";
+"meetings.quick.favorites" = "Favoritas";
+"meetings.quick.no_summary" = "Sem resumo";
+"meetings.day.today" = "Hoje";
+"meetings.day.yesterday" = "Ontem";
+"meetings.status.transcribing" = "Transcrevendo…";
+"meetings.status.queued" = "Na fila para retomar";
+"meetings.status.transcription_failed" = "Falha na transcrição";
+"filter.any_date" = "Qualquer data";
+"filter.last_7_days" = "Últimos 7 dias";
+"filter.last_30_days" = "Últimos 30 dias";
+"filter.with_summary" = "Com resumo";
+"filter.without_summary" = "Sem resumo";
+"filter.longer_than" = "Mais longas que";
+"filter.shorter_than" = "Mais curtas que";
+"filter.duration.any" = "Qualquer";
+"filter.show_count" = "Mostrar %d";
+"filter.clear_all" = "Limpar todos os filtros";
+"folder.new_short" = "Nova";

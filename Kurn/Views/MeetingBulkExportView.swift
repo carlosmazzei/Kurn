@@ -58,6 +58,23 @@ struct MeetingBulkExportView: View {
                 } footer: {
                     Text(model.export.grouping.detail)
                 }
+
+                Section {
+                    Picker(
+                        NSLocalizedString("share.format.picker", comment: "Format"),
+                        selection: $model.export.format
+                    ) {
+                        ForEach(MeetingExportFormat.allCases, id: \.self) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .accessibilityIdentifier("bulk_export.format_picker")
+                } header: {
+                    Text(NSLocalizedString("share.format.picker", comment: "Format"))
+                } footer: {
+                    Text(model.export.format.explanation)
+                }
             }
             .navigationTitle(NSLocalizedString("bulk_export.title", comment: "Export meetings"))
             .navigationBarTitleDisplayMode(.inline)
@@ -65,14 +82,6 @@ struct MeetingBulkExportView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(NSLocalizedString("common.cancel", comment: "Cancel")) { dismiss() }
                         .accessibilityIdentifier("bulk_export.cancel")
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { model.copyAll() } label: {
-                        Image(systemName: model.didCopy ? "checkmark" : "doc.on.doc")
-                    }
-                    .disabled(!model.export.canExport)
-                    .accessibilityLabel(NSLocalizedString("share.copy_all", comment: "Copy All"))
-                    .accessibilityIdentifier("bulk_export.copy_all")
                 }
             }
             .safeAreaBar(edge: .bottom) { shareBar }
@@ -84,28 +93,20 @@ struct MeetingBulkExportView: View {
         .presentationDetents([.large])
     }
 
-    /// The same format picker and share button as `MeetingShareSelectionView`.
+    /// Copy on the left, the prominent Share-N button filling the rest.
     private var shareBar: some View {
-        VStack(spacing: 10) {
-            HStack {
-                Text(NSLocalizedString("share.format.picker", comment: "Format"))
-                    .font(Theme.subheadline)
-                    .foregroundStyle(Theme.textSecondary)
-                Spacer()
-                Picker(NSLocalizedString("share.format.picker", comment: "Format"), selection: $model.export.format) {
-                    ForEach(MeetingExportFormat.allCases, id: \.self) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .accessibilityIdentifier("bulk_export.format_picker")
+        HStack(spacing: 12) {
+            Button { model.copyAll() } label: {
+                Label(
+                    NSLocalizedString("share.copy_all", comment: "Copy All"),
+                    systemImage: model.didCopy ? "checkmark" : "doc.on.doc"
+                )
             }
-
-            Text(model.export.format.explanation)
-                .font(Theme.caption)
-                .foregroundStyle(Theme.textTertiary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            .buttonStyle(.glass)
+            .labelStyle(.iconOnly)
+            .disabled(!model.export.canExport)
+            .accessibilityLabel(NSLocalizedString("share.copy_all", comment: "Copy All"))
+            .accessibilityIdentifier("bulk_export.copy_all")
 
             Button {
                 Task {
@@ -115,7 +116,8 @@ struct MeetingBulkExportView: View {
                 }
             } label: {
                 ZStack {
-                    Text(model.export.shareButtonTitle).opacity(model.isExporting ? 0 : 1)
+                    Label(model.export.shareButtonTitle, systemImage: "square.and.arrow.up")
+                        .opacity(model.isExporting ? 0 : 1)
                     if model.isExporting {
                         ProgressView()
                             .accessibilityLabel(NSLocalizedString("share.exporting", comment: "Preparing files"))

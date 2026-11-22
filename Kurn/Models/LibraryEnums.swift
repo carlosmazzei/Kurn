@@ -142,3 +142,30 @@ enum LibrarySelection: Hashable, Sendable {
         }
     }
 }
+
+/// Quick one-tap chips above the meetings list, layered on top of the bucket
+/// selection and `MeetingFilter`. App-local: not persisted, not part of the
+/// smart-folder predicate model.
+enum MeetingQuickFilter: String, CaseIterable, Identifiable {
+    case all
+    case favorites
+    case noSummary
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return NSLocalizedString("meetings.quick.all", comment: "All")
+        case .favorites: return NSLocalizedString("meetings.quick.favorites", comment: "Favorites")
+        case .noSummary: return NSLocalizedString("meetings.quick.no_summary", comment: "No summary")
+        }
+    }
+
+    func contains(_ meeting: Meeting) -> Bool {
+        switch self {
+        case .all: return true
+        case .favorites: return meeting.isFavorite
+        case .noSummary: return meeting.summaries.isEmpty
+        }
+    }
+}

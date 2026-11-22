@@ -47,6 +47,23 @@ struct MeetingFilterTests {
         #expect(filter.matches(lastWeek) == false)
     }
 
+    @Test func dateRangeLast7And30Days() {
+        let recent = attributes(createdAt: Date().addingTimeInterval(-3 * 24 * 3600))
+        let tenDaysAgo = attributes(createdAt: Date().addingTimeInterval(-10 * 24 * 3600))
+        let fortyDaysAgo = attributes(createdAt: Date().addingTimeInterval(-40 * 24 * 3600))
+
+        var filter = MeetingFilter()
+        filter.dateRange = .last7Days
+        #expect(filter.matches(recent) == true)
+        #expect(filter.matches(tenDaysAgo) == false)
+        #expect(filter.matches(fortyDaysAgo) == false)
+
+        filter.dateRange = .last30Days
+        #expect(filter.matches(recent) == true)
+        #expect(filter.matches(tenDaysAgo) == true)
+        #expect(filter.matches(fortyDaysAgo) == false)
+    }
+
     @Test func tagFilterMatchesMeetingsWithTag() {
         let workTagID = UUID()
         let tagged = attributes(tagIDs: [workTagID])

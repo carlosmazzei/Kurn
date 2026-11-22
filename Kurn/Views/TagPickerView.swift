@@ -14,7 +14,29 @@ struct TagPickerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    let meeting: Meeting
+    /// The meetings the toggles apply to; one for the context-menu entry,
+    /// every selected meeting for the selection-mode Tags button.
+    let meetings: [Meeting]
+    /// Called after a successful toggle in bulk mode so the caller can leave
+    /// selection mode; single-meeting use leaves it nil and stays open.
+    var onApplied: (() -> Void)?
+
+    init(meetings: [Meeting], onApplied: (() -> Void)? = nil) {
+        self.meetings = meetings
+        self.onApplied = onApplied
+    }
+
+    /// Convenience for the single-meeting context-menu entry.
+    init(meeting: Meeting) {
+        self.init(meetings: [meeting])
+    }
+
+    /// 2 when every meeting carries the tag, 0 when none does, 1 for a mixed
+    /// selection (shown as `minus.circle`; the first tap turns it fully on).
+    private func tagState(_ tag: Tag) -> Int {
+        let count = meetings.count { $0.tags.contains(where: { $0.id == tag.id }) }
+        return count == meetings.count ? 2 : (count == 0 ? 0 : 1)
+    }
 
     @Query(sort: \Tag.name) private var allTags: [Tag]
     @State private var newTagName = ""
@@ -63,7 +85,10 @@ struct TagPickerView: View {
                     Button(NSLocalizedString("common.cancel", comment: "Cancel")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
+                    Button(NSLocalizedString("common.done", comment: "Done")) {
+                        dismiss()
+                        onApplied?()
+                    }
                 }
             }
         }
@@ -95,7 +120,7 @@ struct TagPickerView: View {
     }
 
     private func tagRow(_ tag: Tag) -> some View {
-        let isSelected = meeting.tags.contains(where: { $0.id == tag.id })
+        let state = tagState(tag)
         return Button {
             toggleTag(tag)
         } label: {
@@ -106,17 +131,25 @@ struct TagPickerView: View {
                 Text(tag.name)
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
-                if isSelected {
+                switch state {
+                case 2:
                     Image(systemName: "checkmark")
                         .font(.system(.footnote, weight: .semibold))
                         .foregroundStyle(Theme.link)
                         .accessibilityHidden(true)
+                case 1:
+                    Image(systemName: "minus.circle")
+                        .font(.system(.footnote, weight: .semibold))
+                        .foregroundStyle(Theme.textTertiary)
+                        .accessibilityHidden(true)
+                default:
+                    EmptyView()
                 }
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityAddTraits(state == 2 ? .isSelected : [])
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
                 pendingDelete = tag
@@ -132,18 +165,25 @@ struct TagPickerView: View {
         }
     }
 
+    /// Fully on → remove from every meeting; off or mixed → add to every
+    /// meeting that lacks it.
     private func toggleTag(_ tag: Tag) {
-        if let index = meeting.tags.firstIndex(where: { $0.id == tag.id }) {
-            meeting.tags.remove(at: index)
-        } else {
-            meeting.tags.append(tag)
+        let wasFullyOn = tagState(tag) == 2
+        for meeting in meetings {
+            if let index = meeting.tags.firstIndex(where: { $0.id == tag.id }) {
+                if wasFullyOn { meeting.tags.remove(at: index) }
+            } else {
+                meeting.tags.append(tag)
+            }
         }
         saveError = modelContext.saveOrError()
     }
 
     private func createTag() {
         do throws(AppError) {
-            try MeetingLibrary(context: modelContext).attachTag(named: newTagName, to: meeting)
+            for meeting in meetings {
+                try MeetingLibrary(context: modelContext).attachTag(named: newTagName, to: meeting)
+            }
         } catch {
             saveError = error
         }
