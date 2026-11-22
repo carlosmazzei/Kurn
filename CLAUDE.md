@@ -2825,7 +2825,17 @@ empty state. See "Visual system" for the rule.
   human confirmation, or emit merge/context-link operations. Events require a
   supporting assertion with a compatible predicate; a superseded event belongs
   to the object of `supersedes` (the replaced entity). Replies are capped at 2 MB;
-  decoding errors expose fixed codes rather than content.
+  decoding errors expose fixed codes rather than content. **Partial acceptance
+  (user decision, 2026-11-22):** a reply that cannot be trusted still rejects the
+  whole pass — unknown fields/vocabularies, duplicate or unresolved refs, coverage
+  outside the supplied segments, any fabricated/stitched/misattributed quote — but
+  a well-formed, cited fact that only breaks a domain rule (predicate/kind/value
+  mismatch, inferred where an explicit statement is required, unsupported
+  authority status, invalid date) is dropped with its events and the rest of the
+  pass is kept (`decodeReport` returns the counts; the service logs them). The
+  prompt labels segments `s1…sN` per pass and the service maps them back to the
+  real IDs before validation; the extraction's output budget follows the model
+  catalog's output limit (32k cap).
   `Application/Knowledge/KnowledgeExtractionService` is value-in/value-out: K1.6b
   composes it through `KnowledgeCompilationCoordinator`. It accepts an injected `LLMProvider`, `ContextBudget` and live
   authorization callback. Full context goes first when it fits; otherwise

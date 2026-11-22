@@ -75,15 +75,26 @@ public enum KnowledgeExtractionError: String, Error, Sendable {
 }
 
 extension KnowledgeExtraction {
-    /// All-or-nothing decoding. Unknown fields, vocabularies, unresolved refs,
-    /// invalid dates and even one fabricated quote reject the entire pass.
+    /// Strict decoding with partial acceptance (user decision, 2026-11-22).
+    /// Whole-pass rejections — the reply cannot be trusted: unknown fields or
+    /// vocabularies, duplicate or unresolved refs, coverage outside the
+    /// supplied segments, and any fabricated, stitched or misattributed quote.
+    /// Discarded individually — the fact is well-formed and cited but breaks a
+    /// domain rule: a predicate/kind/value mismatch, an inferred modality where
+    /// an explicit statement is required, an unsupported authority status, an
+    /// invalid date, and events that are inconsistent or point at a discarded
+    /// assertion. Use `decodeReport` to learn how many were dropped.
     public static func decode(_ data: Data, segments: [KnowledgeSourceSegment]) throws -> Self {
+        try decodeReport(data, segments: segments).extraction
+    }
+
+    public static func decodeReport(_ data: Data, segments: [KnowledgeSourceSegment]) throws
+        -> (extraction: Self, discardedAssertions: Int, discardedEvents: Int) {
         guard data.count <= 2_000_000 else { throw KnowledgeExtractionError.responseTooLarge }
         do {
             try KnowledgeExtractionShape.check(data)
             let result = try JSONDecoder().decode(Self.self, from: data)
-            try result.validate(segments: segments)
-            return result
+            return try result.validated(segments: segments)
         } catch let error as KnowledgeExtractionError {
             throw error
         } catch {
@@ -91,7 +102,8 @@ extension KnowledgeExtraction {
         }
     }
 
-    private func validate(segments: [KnowledgeSourceSegment]) throws {
+    private func validated(segments: [KnowledgeSourceSegment]) throws
+        -> (extraction: Self, discardedAssertions: Int, discardedEvents: Int) {
         guard version == 1 else { throw KnowledgeExtractionError.unsupportedVersion }
         let refs = entities.map(\.ref) + assertions.map(\.ref) + events.map(\.ref)
         guard refs.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }), Set(refs).count == refs.count else {
@@ -108,18 +120,12 @@ extension KnowledgeExtraction {
             throw KnowledgeExtractionError.invalidSchema
         }
         let validator = KnowledgeEvidenceValidator(segments: segments)
+        var kept: [Assertion] = []
         for assertion in assertions {
             guard let subject = entitiesByID[assertion.subject],
                   assertion.object == nil || entitiesByID[assertion.object ?? ""] != nil else {
                 throw KnowledgeExtractionError.unknownReference
             }
-            guard assertion.predicate.violation(subjectKind: subject.kind,
-                objectKind: assertion.object.flatMap { entitiesByID[$0]?.kind }, value: assertion.value) == nil,
-                !(assertion.predicate.rule.requiresExplicitStatement && assertion.modality == .inferred),
-                [.attributed, .unverified, .disputed].contains(assertion.authorityStatus) else {
-                throw KnowledgeExtractionError.invalidAssertion
-            }
-            try Self.checkDates(from: assertion.validFrom, to: assertion.validTo)
             let cited = Set(assertion.evidence.flatMap(\.segmentIDs))
             guard !assertion.evidence.isEmpty, cited.isSubset(of: examined), cited.contains(assertion.attributedToSegmentID) else {
                 throw KnowledgeExtractionError.invalidEvidence
@@ -127,25 +133,39 @@ extension KnowledgeExtraction {
             for evidence in assertion.evidence {
                 guard case .success = validator.validate(evidence.claim) else { throw KnowledgeExtractionError.invalidEvidence }
             }
+            let ruleHolds = assertion.predicate.violation(subjectKind: subject.kind,
+                objectKind: assertion.object.flatMap { entitiesByID[$0]?.kind }, value: assertion.value) == nil
+                && !(assertion.predicate.rule.requiresExplicitStatement && assertion.modality == .inferred)
+                && [.attributed, .unverified, .disputed].contains(assertion.authorityStatus)
+                && (try? Self.checkDates(from: assertion.validFrom, to: assertion.validTo)) != nil
+            if ruleHolds { kept.append(assertion) }
         }
+        let keptRefs = Set(kept.map(\.ref))
+        var keptEvents: [Event] = []
         for event in events {
-            guard let assertion = assertionsByID[event.assertion],
-                  event.entity == (event.kind == .superseded ? assertion.object : assertion.subject) else {
-                throw KnowledgeExtractionError.unknownReference
-            }
-            try Self.checkDates(from: event.occurredAt, to: nil)
-            let valid: Bool
-            switch event.kind {
-            case .created: valid = true
-            case .statusChanged: valid = assertion.predicate == .hasStatus
-            case .assigned: valid = assertion.predicate == .assignedTo
-            case .dueDateChanged: valid = assertion.predicate == .dueOn
-            case .metricReported: valid = assertion.predicate == .reportsMetric
-            case .superseded: valid = assertion.predicate == .supersedes
-            case .reopened: valid = assertion.predicate == .hasStatus && assertion.value == .enumeration("reopened")
-            case .merged, .contextLinked: valid = false
-            }
-            guard valid else { throw KnowledgeExtractionError.invalidAssertion }
+            guard let assertion = assertionsByID[event.assertion] else { throw KnowledgeExtractionError.unknownReference }
+            guard keptRefs.contains(assertion.ref),
+                  event.entity == (event.kind == .superseded ? assertion.object : assertion.subject),
+                  (try? Self.checkDates(from: event.occurredAt, to: nil)) != nil,
+                  Self.eventMatches(event.kind, assertion) else { continue }
+            keptEvents.append(event)
+        }
+        // Entities only some dropped fact used stay: an entity alone asserts nothing.
+        let extraction = KnowledgeExtraction(version: version, entities: entities, assertions: kept,
+                                             events: keptEvents, examinedSegmentIDs: examinedSegmentIDs)
+        return (extraction, assertions.count - kept.count, events.count - keptEvents.count)
+    }
+
+    private static func eventMatches(_ kind: KnowledgeEventKind, _ assertion: Assertion) -> Bool {
+        switch kind {
+        case .created: return true
+        case .statusChanged: return assertion.predicate == .hasStatus
+        case .assigned: return assertion.predicate == .assignedTo
+        case .dueDateChanged: return assertion.predicate == .dueOn
+        case .metricReported: return assertion.predicate == .reportsMetric
+        case .superseded: return assertion.predicate == .supersedes
+        case .reopened: return assertion.predicate == .hasStatus && assertion.value == .enumeration("reopened")
+        case .merged, .contextLinked: return false
         }
     }
 
