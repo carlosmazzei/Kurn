@@ -230,7 +230,7 @@
 "recorder.partial_saved" = "Uma gravação parcial foi salva após uma falha na captura de áudio. Verifique o espaço disponível antes de gravar novamente.";
 "recorder.recovery_failed" = "A gravação ainda está indisponível. O áudio foi preservado para que você tente recuperá-lo novamente.";
 "recorder.title" = "Nova Gravação";
-"recorder.discard" = "Descartar Gravação";
+"recorder.discard" = "Descartar";
 "recorder.title_field.accessibility_label" = "Título da reunião";
 "recorder.accessibility.timer_with_highlights" = "%1$@, %2$d destaques";
 "recorder.pause" = "Pausar";
@@ -1938,3 +1938,6 @@
 "tag.search_or_create" = "Buscar ou criar uma tag";
 "attach.recent" = "Recentes";
 "folder.name_section" = "Nome";
+"recorder.discard.confirm.title" = "Descartar esta gravação?";
+"recorder.discard.confirm.message" = "O áudio gravado até agora será apagado do aparelho. Parar, em vez disso, mantém a gravação.";
+"recorder.discard.confirm.keep" = "Continuar gravando";

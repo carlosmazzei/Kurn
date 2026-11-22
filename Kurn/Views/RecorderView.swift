@@ -43,6 +43,8 @@ private struct RecorderContent: View {
 
     @State private var levels: [Float] = Array(repeating: 0, count: 40)
     @State private var showingPhotoCapture = false
+    /// Discarding a real recording deletes its audio, so it asks first.
+    @State private var confirmingDiscard = false
     @Environment(\.openURL) private var openURL
     /// Fixed 20 Hz drive for the waveform scroll — the same cadence as the
     /// recorder's metering tick.
@@ -53,14 +55,9 @@ private struct RecorderContent: View {
 
     var body: some View {
         ZStack {
-            // Immersive black backdrop with a soft red glow, per the design mock.
+            // Immersive plain black backdrop (prototype: no glow; red is the
+            // Stop control and the recording dot only).
             Color.black.ignoresSafeArea()
-            RadialGradient(
-                colors: [Theme.record.opacity(0.12), .clear],
-                center: .center, startRadius: 0, endRadius: 260
-            )
-            .ignoresSafeArea()
-            .opacity(vm.state == .recording ? 1 : 0.4)
 
             if vm.permissionDenied {
                 permissionDeniedContent
@@ -68,16 +65,21 @@ private struct RecorderContent: View {
                 VStack(alignment: .leading, spacing: 0) {
                     headerLine
                     titleField
-                        .padding(.top, 8)
+                        .padding(.top, 4)
                     startingIndicator
-                    timer
-                        .padding(.top, 14)
-                    statusLine
-                        .padding(.top, 8)
-                    waveform
-                        .padding(.top, 20)
+                    // The timer, state line and waveform are centred as one
+                    // block under the left-aligned header, as in the prototype.
+                    VStack(spacing: 0) {
+                        timer
+                        statusLine
+                            .padding(.top, 6)
+                        waveform
+                            .padding(.top, 40)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 56)
                     liveTranscriptArea
-                        .padding(.top, 16)
+                        .padding(.top, 36)
                     routeMessage
                     Spacer()
                     controls
@@ -94,20 +96,18 @@ private struct RecorderContent: View {
         .navigationTitle(NSLocalizedString("recorder.title", comment: "Record"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItemGroup(placement: .topBarLeading) {
-                // `cancel()` deletes the in-progress recording once one
-                // exists, so the label and role must say so — a plain
-                // "Cancel" here would misrepresent a destructive action as a
-                // no-op dismiss, unlike every other exit affordance in the app.
-                let hasRecordingInProgress = vm.state != .idle || vm.isStarting
-                Button(
-                    hasRecordingInProgress
-                        ? NSLocalizedString("recorder.discard", comment: "Discard the in-progress recording")
-                        : NSLocalizedString("common.cancel", comment: "Cancel"),
-                    role: hasRecordingInProgress ? .destructive : .cancel
-                ) {
-                    session.discard()
-                }
+            // The prototype's recorder bar has no title: the header line and
+            // the title field below already name the screen. Keep the
+            // `navigationTitle` for VoiceOver/back labels, hide its glyphs.
+            ToolbarItem(placement: .principal) {
+                Text(NSLocalizedString("recorder.title", comment: "Record"))
+                    .hidden()
+                    .accessibilityHidden(true)
+            }
+            // Minimize sits alone in its own glass capsule, as in the
+            // prototype; Discard is a separate capsule after a fixed spacer so
+            // the destructive action is never a thumb's width from "minimize".
+            ToolbarItem(placement: .topBarLeading) {
                 // Collapses the recorder into the floating mini bar so the
                 // rest of the app stays usable while capture continues.
                 Button {
@@ -118,6 +118,27 @@ private struct RecorderContent: View {
                 }
                 .disabled(!session.canMinimize)
                 .accessibilityIdentifier("recorder.minimize")
+            }
+            ToolbarSpacer(.fixed, placement: .topBarLeading)
+            ToolbarItem(placement: .topBarLeading) {
+                // `cancel()` deletes the in-progress recording once one
+                // exists, so the label and role must say so — a plain
+                // "Cancel" here would misrepresent a destructive action as a
+                // no-op dismiss. Discarding a real recording asks first.
+                let hasRecordingInProgress = vm.state != .idle || vm.isStarting
+                Button(
+                    hasRecordingInProgress
+                        ? NSLocalizedString("recorder.discard", comment: "Discard the in-progress recording")
+                        : NSLocalizedString("common.cancel", comment: "Cancel"),
+                    role: hasRecordingInProgress ? .destructive : .cancel
+                ) {
+                    if hasRecordingInProgress {
+                        confirmingDiscard = true
+                    } else {
+                        session.discard()
+                    }
+                }
+                .accessibilityIdentifier("recorder.discard")
             }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 // Photo — a photo needs an active recording to attach its
@@ -163,6 +184,17 @@ private struct RecorderContent: View {
             levels.removeFirst()
             levels.append(vm.level)
         }
+        .kurnDialog(
+            isPresented: $confirmingDiscard,
+            iconSystemName: "trash.fill",
+            iconTint: Theme.destructive,
+            title: NSLocalizedString("recorder.discard.confirm.title", comment: "Discard recording?"),
+            message: NSLocalizedString("recorder.discard.confirm.message", comment: "Discard recording explanation"),
+            primaryTitle: NSLocalizedString("recorder.discard", comment: "Discard the in-progress recording"),
+            primaryRole: .destructive,
+            primaryAction: { session.discard() },
+            secondaryTitle: NSLocalizedString("recorder.discard.confirm.keep", comment: "Keep recording")
+        )
         .confirmationDialog(
             NSLocalizedString("recorder.choose_mic.title", comment: "Choose microphone"),
             isPresented: Binding(
@@ -322,15 +354,18 @@ private struct RecorderContent: View {
         }
     }
 
+    /// White level bars, 70pt tall and centred, as in the prototype; paused
+    /// bars sit flat and dimmed, idle bars are a faint resting line.
     private var waveform: some View {
-        HStack(alignment: .center, spacing: 3.5) {
+        let paused = vm.state == .paused
+        return HStack(alignment: .center, spacing: 4) {
             ForEach(levels.indices, id: \.self) { i in
                 Capsule()
-                    .fill(barColor.opacity(i.isMultiple(of: 3) ? 0.7 : 1))
-                    .frame(width: 3, height: max(4, CGFloat(levels[i]) * 56))
+                    .fill(.white.opacity(barOpacity))
+                    .frame(width: 3, height: paused ? 6 : max(6, CGFloat(levels[i]) * 70))
             }
         }
-        .frame(height: 56)
+        .frame(height: 70)
         .kurnAnimation(.linear(duration: 0.06), value: levels)
         // Purely decorative: the recording state and elapsed time are already
         // announced as text above, and a live level readout at 20 Hz would be
@@ -418,11 +453,11 @@ private struct RecorderContent: View {
         .disabled(disabled)
     }
 
-    private var barColor: Color {
+    private var barOpacity: Double {
         switch vm.state {
-        case .recording: return Theme.record
-        case .paused: return Theme.warning
-        case .idle: return .white.opacity(0.3)
+        case .recording: return 0.9
+        case .paused: return 0.4
+        case .idle: return 0.3
         }
     }
 }
