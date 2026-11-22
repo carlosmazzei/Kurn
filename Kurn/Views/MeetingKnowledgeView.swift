@@ -20,6 +20,13 @@ struct MeetingKnowledgeView: View {
     @Environment(WikiCoordinator.self) private var wiki
     @Environment(AppSettings.self) private var settings
     @State private var selectedEntityID: UUID?
+    /// The last loaded read, kept while a refresh re-reads the store so the
+    /// tab never drops to the loading placeholder and back (the flicker on
+    /// "Update knowledge").
+    @State private var lastRead: MeetingKnowledgeRead?
+    /// Fixed when the update starts, so the placeholder progress shown before
+    /// the coordinator's first report does not restart its clock every render.
+    @State private var updateStartedAt = Date()
 
     /// The section order the tab shows — specific kinds first, generic claims last.
     private static let sectionOrder: [KnowledgeWikiPage.Kind] = [.decisions, .actions, .risks, .questions, .metrics, .claims]
@@ -27,7 +34,7 @@ struct MeetingKnowledgeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                if case let .loaded(read) = state, !read.contributions.isEmpty {
+                if case let .loaded(read) = shownState, !read.contributions.isEmpty {
                     headerRow(read)
                     knowledgeProgressRow(hasFacts: true)
                     compileResultNote
@@ -39,7 +46,7 @@ struct MeetingKnowledgeView: View {
                     knowledgeProgressRow(hasFacts: false)
                     compileResultNote
                     statusRow
-                    if case let .loaded(read) = state {
+                    if case let .loaded(read) = shownState {
                         if read.contributions.isEmpty, meeting.wikiArticle != nil {
                             pageLinkRow
                         } else if read.contributions.isEmpty {
@@ -55,8 +62,19 @@ struct MeetingKnowledgeView: View {
             .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
         }
         .accessibilityIdentifier("knowledge.content")
+        .onChange(of: state, initial: true) { _, new in
+            if case let .loaded(read) = new { lastRead = read } else if new == .unavailable { lastRead = nil }
+        }
         .sheet(isPresented: Binding(get: { selectedEntityID != nil }, set: { if !$0 { selectedEntityID = nil } })) {
             if let selectedEntityID { KnowledgeBrowserView(meetingIDs: [meeting.id], initialEntityID: selectedEntityID) }
+        }
+    }
+
+    /// `state`, except that a re-read in progress keeps showing the last read.
+    private var shownState: MeetingKnowledgeState {
+        switch state {
+        case .loading, .idle: return lastRead.map { .loaded($0) } ?? state
+        default: return state
         }
     }
 
@@ -389,7 +407,7 @@ struct MeetingKnowledgeView: View {
 
     /// Placeholder used between the tap and the worker's first phase report.
     private var pendingProgress: KnowledgeCompilationProgress {
-        KnowledgeCompilationProgress(startedAt: Date(),
+        KnowledgeCompilationProgress(startedAt: updateStartedAt,
                                      providerLabel: settings.knowledgeProvider?.displayName ?? "",
                                      modelLabel: settings.knowledgeProvider.map { settings.summaryModel(for: $0) } ?? "")
     }
@@ -402,6 +420,7 @@ struct MeetingKnowledgeView: View {
     /// Forced explicit recompile — the failure reason lands on the
     /// coordinator's `lastExplicitFailure`, the count on its result note.
     private func updateKnowledgeRun() async {
+        updateStartedAt = Date()
         updateInFlight = true
         defer { updateInFlight = false }
         let outcome = await coordinator.compile(meetingID: meeting.id, trigger: .explicit, force: true)
