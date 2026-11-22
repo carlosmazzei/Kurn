@@ -376,8 +376,10 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
             context: httpContext(for: request)
         )
 
+        let chatData = usesResponses ? try LLMHTTP.responsesTextData(data) : data
+        TokenUsageRecording.record(responseBody: chatData)
         return try LLMHTTP.textResult(
-            from: usesResponses ? try LLMHTTP.responsesTextData(data) : data,
+            from: chatData,
             as: ChatResponse.self,
             emptyMessage: "empty chat response",
             isTruncated: { $0.isTruncated },

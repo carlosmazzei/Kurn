@@ -164,10 +164,18 @@ struct MeetingKnowledgeView: View {
     @ViewBuilder
     private var compileResultNote: some View {
         if let result = coordinator.result(for: meeting.id) {
-            Text(result.factCount > 0
-                 ? knowledgeCountText("knowledge.updated.fact", result.factCount)
-                 : NSLocalizedString(result.modelEmpty ? "knowledge.updated_empty" : "knowledge.updated_none",
-                                     comment: "No new facts"))
+            // "12 new facts · 2 discarded · 18,204 tokens · ≈$0.04" — the
+            // chat's usage caption format for the tokens and cost.
+            let headline = result.factCount > 0
+                ? knowledgeCountText("knowledge.updated.fact", result.factCount)
+                : NSLocalizedString(result.modelEmpty ? "knowledge.updated_empty" : "knowledge.updated_none",
+                                    comment: "No new facts")
+            let discarded = result.discardedFacts > 0
+                ? [knowledgeCountText("knowledge.updated.discarded", result.discardedFacts)] : []
+            let usage = result.usage.map {
+                [MeetingChatTurnView.usageCaptionText(usage: $0, costUSD: result.costUSD, elapsedSeconds: nil)]
+            } ?? []
+            Text(([headline] + discarded + usage).joined(separator: " · "))
             .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
             .transition(.opacity)
         }

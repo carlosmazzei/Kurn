@@ -1983,3 +1983,5 @@
 "knowledge.update.title" = "Updating knowledge";
 "knowledge.update.failed_title" = "Knowledge update failed";
 "detail.wiki.failed_title" = "Wiki generation failed";
+"knowledge.updated.discarded.one" = "%d discarded";
+"knowledge.updated.discarded.other" = "%d discarded";

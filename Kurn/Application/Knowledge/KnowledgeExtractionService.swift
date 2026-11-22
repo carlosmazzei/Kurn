@@ -37,6 +37,22 @@ struct KnowledgeExtractionService: Sendable {
         let passes: [KnowledgeExtraction]
         let examinedSegmentIDs: [String]
         let targetedPassCount: Int
+        /// Vendor-reported tokens across every pass and repair; nil when the
+        /// provider reports none (on-device).
+        var usage: TokenUsage?
+        /// Well-formed facts dropped for breaking a domain rule.
+        var discardedFacts = 0
+    }
+
+    /// Per-extraction accumulator, bound task-locally so passes and repairs
+    /// add to it without threading it through every helper.
+    final class Tally: @unchecked Sendable {
+        @TaskLocal static var current: Tally?
+        let usage = TokenUsageSink()
+        private let lock = NSLock()
+        private var discarded = 0
+        var discardedFacts: Int { lock.withLock { discarded } }
+        func discard(_ count: Int) { lock.withLock { discarded += count } }
     }
 
     // swiftlint:disable:next function_parameter_count
@@ -49,6 +65,22 @@ struct KnowledgeExtractionService: Sendable {
         authorization: @Sendable () async -> KnowledgeExtractionAuthorization,
         model: String? = nil,
         onPass: (@Sendable (_ completed: Int, _ total: Int) async -> Void)? = nil
+    ) async throws -> Result {
+        let tally = Tally()
+        var result = try await Tally.$current.withValue(tally) {
+            try await extractPasses(segments: segments, language: language, context: context, llm: llm,
+                budget: budget, authorization: authorization, model: model, onPass: onPass)
+        }
+        result.usage = tally.usage.total
+        result.discardedFacts = tally.discardedFacts
+        return result
+    }
+
+    // swiftlint:disable:next function_parameter_count
+    private func extractPasses(
+        segments: [TranscriptSegment], language: String, context: KnowledgeExtractionContext, llm: any LLMProvider,
+        budget: ContextBudget, authorization: @Sendable () async -> KnowledgeExtractionAuthorization,
+        model: String?, onPass: (@Sendable (_ completed: Int, _ total: Int) async -> Void)?
     ) async throws -> Result {
         try Task.checkCancellation()
         try await authorize(llm, authorization)
@@ -180,8 +212,15 @@ struct KnowledgeExtractionService: Sendable {
             AppLog.knowledge.atNotice.notice("knowledge extraction pass start attempt=\(attempt + 1, privacy: .public) segments=\(sources.count, privacy: .public) provider=\(llm.provider.id, privacy: .public) maxOutputTokens=\(options.maxOutputTokens, privacy: .public) timeout=\(Int(options.timeout), privacy: .public)s")
             let reply: String
             do {
-                reply = try await llm.chat(systemPrompt: system + diagnostic,
-                    messages: [ChatMessage(role: .user, content: input)], options: options)
+                let passUsage = TokenUsageSink()
+                reply = try await TokenUsageRecording.$sink.withValue(passUsage) {
+                    try await llm.chat(systemPrompt: system + diagnostic,
+                        messages: [ChatMessage(role: .user, content: input)], options: options)
+                }
+                if let used = passUsage.total {
+                    Tally.current?.usage.add(used)
+                    AppLog.knowledge.atNotice.notice("knowledge extraction pass usage attempt=\(attempt + 1, privacy: .public) promptTokens=\(used.promptTokens, privacy: .public) completionTokens=\(used.completionTokens, privacy: .public)")
+                }
             } catch {
                 AppLog.knowledge.atError.error("knowledge extraction pass request failed attempt=\(attempt + 1, privacy: .public) elapsed=\(Int(Date().timeIntervalSince(startedAt)), privacy: .public)s code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
                 throw error
@@ -192,6 +231,7 @@ struct KnowledgeExtractionService: Sendable {
             do {
                 let report = try KnowledgeExtraction.decodeReport(data, segments: revision.snapshot.sourceSegments)
                 let document = report.extraction
+                Tally.current?.discard(report.discardedAssertions)
                 if report.discardedAssertions + report.discardedEvents > 0 {
                     AppLog.knowledge.atNotice.notice("knowledge extraction pass discarded invalid facts=\(report.discardedAssertions, privacy: .public) events=\(report.discardedEvents, privacy: .public) kept=\(document.assertions.count, privacy: .public)")
                 }

@@ -147,3 +147,50 @@ extension LLMProvider {
         try await chat(systemPrompt: systemPrompt, messages: messages, options: .chat)
     }
 }
+
+/// Collects the token usage providers report while a caller's task runs, so
+/// a pipeline (knowledge extraction) can account for its calls without every
+/// `chat` signature returning usage. Only vendor-reported counts are added.
+final class TokenUsageSink: @unchecked Sendable {
+    private let lock = NSLock()
+    private var prompt = 0
+    private var completion = 0
+    private var reported = false
+
+    var total: TokenUsage? {
+        lock.withLock { reported ? TokenUsage(promptTokens: prompt, completionTokens: completion) : nil }
+    }
+
+    func add(_ usage: TokenUsage) {
+        lock.withLock { prompt += usage.promptTokens; completion += usage.completionTokens; reported = true }
+    }
+}
+
+enum TokenUsageRecording {
+    @TaskLocal static var sink: TokenUsageSink?
+
+    /// Records the usage in a response body, in whichever vendor shape it uses:
+    /// OpenAI/compatible `usage.prompt_tokens`/`completion_tokens` (also the
+    /// Responses API after normalisation), Anthropic `usage.input_tokens`/
+    /// `output_tokens`, Gemini `usageMetadata.promptTokenCount`/`candidatesTokenCount`.
+    static func record(responseBody data: Data) {
+        guard let sink, let usage = parse(data) else { return }
+        sink.add(usage)
+    }
+
+    static func parse(_ data: Data) -> TokenUsage? {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        if let usage = root["usage"] as? [String: Any] {
+            if let prompt = usage["prompt_tokens"] as? Int, let completion = usage["completion_tokens"] as? Int {
+                return TokenUsage(promptTokens: prompt, completionTokens: completion)
+            }
+            if let input = usage["input_tokens"] as? Int, let output = usage["output_tokens"] as? Int {
+                return TokenUsage(promptTokens: input, completionTokens: output)
+            }
+        }
+        if let meta = root["usageMetadata"] as? [String: Any], let prompt = meta["promptTokenCount"] as? Int {
+            return TokenUsage(promptTokens: prompt, completionTokens: meta["candidatesTokenCount"] as? Int ?? 0)
+        }
+        return nil
+    }
+}
