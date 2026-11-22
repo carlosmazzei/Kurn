@@ -444,8 +444,8 @@
 /* Formulario de reunión */
 "form.title_section" = "Título";
 "form.title_placeholder" = "Título de la reunión";
-"form.notes_section" = "Notas";
-"form.notes_placeholder" = "Añadir notas…";
+"form.notes_section" = "Comentarios";
+"form.notes_placeholder" = "Añadir comentarios…";
 "form.language_section" = "Idioma de Transcripción";
 "form.language" = "Idioma";
 "form.new_title" = "Nueva Reunión";
@@ -898,14 +898,14 @@
 "settings.correction" = "Corregir errores de transcripción";
 "settings.correction_footer" = "Usa tu proveedor de IA de resúmenes después de transcribir. Primero revisa la transcripción para identificar el tema de la reunión y las palabras que no encajan con él; luego corrige ortografía, puntuación y palabras mal entendidas en los pasajes inciertos o señalados, conservando solo los cambios que suenan como lo que se dijo. Desactivado de forma predeterminada: realiza llamadas en la nube y puede tardar más en finalizar.";
 "settings.correction_needs_key" = "Añade una clave de API para tu proveedor de resúmenes para activar la corrección con IA.";
-"detail.wiki.view" = "Ver wiki";
-"detail.wiki.generate" = "Generar Wiki";
-"detail.wiki.regenerate" = "Regenerar Wiki";
-"detail.wiki.generating" = "Generando Wiki…";
+"detail.wiki.view" = "Ver página";
+"detail.wiki.generate" = "Generar página";
+"detail.wiki.regenerate" = "Regenerar página";
+"detail.wiki.generating" = "Generando página…";
 "detail.title.generate" = "Generar Título";
 "detail.title.regenerate" = "Regenerar Título";
 "detail.title.generating" = "Generando Título…";
-"detail.wiki.title" = "Wiki de la reunión";
+"detail.wiki.title" = "Página de la reunión";
 "detail.wiki.updated" = "Actualizada el %@";
 
 /* Documentos generados */
@@ -1074,7 +1074,7 @@
 "chat.sources.part.transcript" = "Transcripción";
 "chat.sources.part.summary" = "Resumen";
 "chat.sources.part.wiki" = "Wiki";
-"chat.sources.part.knowledge" = "Conocimiento";
+"chat.sources.part.knowledge" = "Wiki";
 "chat.sources.part.attachments" = "Adjuntos";
 "chat.sources.parts.none" = "Ninguna parte";
 "chat.sources.summary.one" = "1 reunión · %@";
@@ -1356,15 +1356,15 @@
 /* Meeting knowledge contributions (K2.3). */
 "tab.knowledge" = "Wiki";
 "detail.knowledge.counts" = "Entidades: %ld · Afirmaciones: %ld · Pasajes: %ld";
-"detail.knowledge.contributions" = "Contribuciones de esta reunión";
+"detail.knowledge.contributions" = "Páginas modificadas";
 "detail.knowledge.refresh" = "Actualizar";
-"detail.knowledge.notes" = "Notas de la reunión";
-"detail.knowledge.notes_empty" = "Genera notas condensadas a partir de la transcripción de esta reunión.";
+"detail.knowledge.notes" = "Página de la reunión";
+"detail.knowledge.notes_empty" = "Genera una página a partir de la transcripción de esta reunión.";
 "detail.knowledge.loading" = "Cargando contribuciones…";
-"detail.knowledge.unavailable" = "Conocimiento no disponible";
+"detail.knowledge.unavailable" = "Wiki no disponible";
 "detail.knowledge.unavailable_detail" = "El acceso o los datos de origen pueden haber cambiado. Actualiza para volver a intentarlo.";
 "detail.knowledge.empty" = "Aún no hay contribuciones";
-"detail.knowledge.empty_detail" = "Las contribuciones aparecen tras procesar el conocimiento de esta reunión.";
+"detail.knowledge.empty_detail" = "Las contribuciones aparecen tras procesar la wiki de esta reunión.";
 "detail.knowledge.claim_count" = "Afirmaciones: %ld";
 "detail.knowledge.negated" = "Afirmación negada";
 "detail.knowledge.attribution" = "Atribuido a %@";
@@ -1430,14 +1430,14 @@
 "knowledge.value.false" = "Falso";
 
 // Scoped knowledge reader
-"knowledge.browser.title" = "Conocimiento";
+"knowledge.browser.title" = "Wiki";
 "knowledge.browser.refresh" = "Actualizar";
-"knowledge.browser.export" = "Exportar Knowledge";
-"knowledge.browser.export_failed" = "No se pudo exportar Knowledge";
-"knowledge.browser.narrative" = "Notas";
-"knowledge.browser.narrative_note" = "Generado a partir de las afirmaciones de abajo; revísalas antes de confiar en él.";
-"knowledge.browser.narrative_sources" = "Basado en %d afirmaciones";
-"knowledge.browser.ask_entity" = "Preguntar sobre esto";
+"knowledge.browser.export" = "Exportar Wiki";
+"knowledge.browser.export_failed" = "No se pudo exportar Wiki";
+"knowledge.browser.narrative" = "Wiki";
+"knowledge.browser.narrative_note" = "Generado a partir de los hechos siguientes; revísalos antes de confiar en él.";
+"knowledge.browser.narrative_sources" = "Basado en %d hechos";
+"knowledge.browser.ask_entity" = "Preguntar sobre esta página";
 "knowledge.browser.ask_draft" = "¿Qué sabemos sobre %@?";
 "knowledge.browser.page" = "Sección de la página";
 "knowledge.browser.overview" = "Resumen";
@@ -1529,7 +1529,7 @@
 "knowledge.graph.filter" = "Filtrar";
 "knowledge.graph.unnamed" = "Sin nombre";
 "knowledge.late.header" = "Revisado después";
-"knowledge.late.footer" = "Conocimiento registrado después cambió lo que valía en estos días anteriores.";
+"knowledge.late.footer" = "Los hechos registrados más tarde cambiaron lo que era válido en esos días anteriores.";
 "knowledge.late.recorded" = "Registrado el %@";
 "knowledge.late.from" = "Desde el %@";
 "knowledge.late.on" = "El %@";
@@ -1552,12 +1552,12 @@
 
 // Knowledge source selection
 "knowledge.browser.choose_sources" = "Elegir reuniones";
-"knowledge.browser.choose_sources_detail" = "Elige hasta 16 reuniones para consultar su conocimiento.";
-"knowledge.browser.disabled_title" = "Knowledge está desactivado";
-"knowledge.browser.disabled_detail" = "Activa Knowledge en Ajustes → Knowledge para recopilar entidades, decisiones y evidencias de tus reuniones.";
+"knowledge.browser.choose_sources_detail" = "Hasta 16 reuniones a la vez.";
+"knowledge.browser.disabled_title" = "Una wiki de tus reuniones";
+"knowledge.browser.disabled_detail" = "La IA lee las transcripciones y mantiene páginas sobre personas, proyectos y decisiones, cada hecho con la línea de la que procede. Funciona en este dispositivo.";
 
 /* Local, source-authorized Knowledge search. */
-"knowledge.browser.search_prompt" = "Buscar nombres, alias y afirmaciones";
+"knowledge.browser.search_prompt" = "Buscar páginas y hechos";
 "knowledge.browser.search_page" = "Página";
 "knowledge.browser.search_alias" = "Alias";
 "knowledge.browser.search_assertion" = "Afirmación";
@@ -1588,36 +1588,36 @@
 "knowledge.review.keep" = "Identidad para conservar";
 "knowledge.review.merge_detail" = "Combinar identidades conserva el nombre de destino. Las afirmaciones y los pasajes siguen siendo rastreables. Puedes deshacer la fusión en el Historial.";
 "knowledge.review.reopen" = "Revisar de nuevo";
-"knowledge.review.merge" = "Combinar identidades";
+"knowledge.review.merge" = "Fusionar…";
 "knowledge.review.dismiss" = "Mantener separadas";
-"knowledge.review.confirm_title" = "¿Combinar estas identidades?";
-"knowledge.review.confirm_detail" = "Conservar “%@” como identidad canónica. Puedes deshacer esta fusión en el Historial.";
+"knowledge.review.confirm_title" = "¿Fusionar “%1$@” en “%2$@”?";
+"knowledge.review.confirm_detail" = "Los hechos de ambas aparecen en una página. Puedes deshacerlo en el Historial.";
 
 // Knowledge settings and explicit backfill
-"knowledge.settings.title" = "Knowledge";
-"knowledge.settings.unreadable" = "No se pudieron leer las preferencias de Knowledge";
+"knowledge.settings.title" = "Wiki";
+"knowledge.settings.unreadable" = "No se pudieron leer las preferencias de Wiki";
 "knowledge.settings.reset" = "Restaurar valores seguros";
-"knowledge.settings.unlock" = "Desbloquea la biblioteca para gestionar Knowledge";
+"knowledge.settings.unlock" = "Desbloquea la biblioteca para gestionar Wiki";
 "knowledge.settings.confirm" = "¿Compilar estas reuniones?";
 "knowledge.settings.start" = "Iniciar compilación";
 "knowledge.settings.local_cost" = "Coste estimado del proveedor: 0,00 US$. El procesamiento permanece en este dispositivo; la duración varía.";
-"knowledge.settings.reset_detail" = "Knowledge se desactivará y se restablecerán sus preferencias. Se conservarán las reuniones y Knowledge guardado.";
-"knowledge.settings.enable" = "Activar Knowledge";
+"knowledge.settings.reset_detail" = "Wiki se desactivará y se restablecerán sus preferencias. Se conservarán las reuniones y Wiki guardado.";
+"knowledge.settings.enable" = "Activar Wiki";
 "knowledge.settings.automatic" = "Compilar futuras transcripciones automáticamente";
-"knowledge.settings.pause" = "Pausar compilación de Knowledge";
-"knowledge.settings.export" = "Permitir exportar Knowledge como JSON";
+"knowledge.settings.pause" = "Pausar compilación de Wiki";
+"knowledge.settings.export" = "Permitir exportar Wiki como JSON";
 "knowledge.settings.provider" = "Proveedor de procesamiento";
 "knowledge.settings.unavailable" = "El procesamiento local no está disponible";
 "knowledge.settings.use_local" = "Usar procesamiento local";
-"knowledge.settings.cloud_title" = "¿Compilar Knowledge en la nube?";
+"knowledge.settings.cloud_title" = "¿Compilar Wiki en la nube?";
 "knowledge.settings.cloud_message" = "Las transcripciones de las reuniones incluidas se envían a %1$@ en %2$@ en cada compilación, incluidas las automáticas de nuevas grabaciones. Se aplican tarifas del proveedor. Puedes detenerlo en Privacidad y nube.";
 "knowledge.settings.cloud_allow" = "Permitir envío automático";
 "knowledge.settings.cloud_cost" = "El procesamiento envía estas transcripciones a %@; se aplican tarifas del proveedor.";
 "knowledge.settings.scope" = "Ámbito y exclusiones";
-"knowledge.settings.automatic_detail" = "La compilación automática se aplica a futuras transcripciones. Activar Knowledge no procesa reuniones antiguas. El trabajo pendiente autorizado puede continuar; usa Pausar para detenerlo.";
+"knowledge.settings.automatic_detail" = "La compilación automática se aplica a futuras transcripciones. Activar Wiki no procesa reuniones antiguas. El trabajo pendiente autorizado puede continuar; usa Pausar para detenerlo.";
 "knowledge.settings.choose" = "Elegir reuniones";
 "knowledge.settings.selected" = "Reuniones seleccionadas: %d";
-"knowledge.settings.recompile" = "Recompilar Knowledge existente";
+"knowledge.settings.recompile" = "Recompilar Wiki existente";
 "knowledge.settings.preview" = "Vista previa de compilación";
 "knowledge.settings.coverage" = "Cobertura";
 "knowledge.settings.pages" = "Reconstruir páginas guardadas";
@@ -1626,23 +1626,23 @@
 "knowledge.settings.current" = "Compilación actualizada";
 "knowledge.settings.needs_work" = "Se necesita compilación o inspección";
 "knowledge.settings.planned" = "Reuniones a procesar: %d";
-"knowledge.settings.recompile_required" = "Algunas fuentes requieren recompilación. Activa Recompilar Knowledge existente y vuelve a generar la vista previa.";
+"knowledge.settings.recompile_required" = "Algunas fuentes requieren recompilación. Activa Recompilar Wiki existente y vuelve a generar la vista previa.";
 "knowledge.settings.progress" = "Progreso de compilación";
 "knowledge.settings.progress_counts" = "Completadas: %d · Aplazadas: %d · Fallidas: %d";
 "knowledge.settings.failed" = "La operación se detuvo o no pudo finalizar. Comprueba el ámbito y actualiza la vista previa antes de reintentar.";
 "knowledge.settings.all" = "Incluir todas las reuniones";
-"knowledge.settings.scope_detail" = "El ámbito se aplica a las lecturas y compilación de Knowledge. Las reuniones excluidas permanecen en la biblioteca.";
+"knowledge.settings.scope_detail" = "El ámbito se aplica a las lecturas y compilación de Wiki. Las reuniones excluidas permanecen en la biblioteca.";
 "knowledge.settings.coverage_counts" = "Segmentos examinados: %d de %d";
 "knowledge.settings.coverage_detail" = "La cobertura mide segmentos de transcripción examinados, no precisión semántica ni exhaustividad.";
-"knowledge.settings.delete" = "Eliminar Knowledge";
-"knowledge.settings.delete_detail" = "Se eliminarán de este dispositivo todas las entidades, afirmaciones, citas, revisiones y páginas guardadas compiladas a partir de tus reuniones. Se conservan las reuniones, las transcripciones, los artículos wiki de las reuniones y tus ajustes de Knowledge, y podrás volver a compilar más adelante.";
-"knowledge.settings.delete_footer" = "Solo elimina el Knowledge compilado. Al eliminar una reunión o una grabación también se elimina todo lo que Knowledge compiló a partir de ella.";
-"knowledge.settings.deleted" = "Se eliminó Knowledge.";
-"knowledge.settings.delete_failed" = "No se pudo eliminar todo el Knowledge. Terminará automáticamente la próxima vez que se abra la app.";
+"knowledge.settings.delete" = "Eliminar Wiki";
+"knowledge.settings.delete_detail" = "Se eliminarán de este dispositivo todas las entidades, afirmaciones, citas, revisiones y páginas guardadas compiladas a partir de tus reuniones. Se conservan las reuniones, las transcripciones, los artículos wiki de las reuniones y tus ajustes de Wiki, y podrás volver a compilar más adelante.";
+"knowledge.settings.delete_footer" = "Solo elimina la Wiki compilado. Al eliminar una reunión o una grabación también se elimina todo lo que Wiki compiló a partir de ella.";
+"knowledge.settings.deleted" = "Se eliminó Wiki.";
+"knowledge.settings.delete_failed" = "No se pudo eliminar todo la Wiki. Terminará automáticamente la próxima vez que se abra la app.";
 
 /* Privacy and cloud settings */
 "privacy.cloud.title" = "Privacidad y nube";
-"privacy.cloud.rule" = "El contenido solo sale de este dispositivo hacia un proveedor que permitiste. A petición: solo cuando lo pides (resúmenes, chat, documentos). Automático: en cada grabación (títulos automáticos, wiki, corrección, Knowledge). Envío de audio: transcripción en la nube, con su propio permiso.";
+"privacy.cloud.rule" = "El contenido solo sale de este dispositivo hacia un proveedor que permitiste. A petición: solo cuando lo pides (resúmenes, chat, documentos). Automático: en cada grabación (títulos automáticos, wiki, corrección, Wiki). Envío de audio: transcripción en la nube, con su propio permiso.";
 "privacy.cloud.none" = "Ningún proveedor en la nube está permitido. Todo se queda en este dispositivo.";
 "privacy.cloud.other" = "Otros usos compartidos";
 "privacy.cloud.downloads" = "Las descargas de modelos en el dispositivo solo obtienen archivos de modelo; no se envía nada de tu contenido. Gestiónalas en Almacenamiento.";
@@ -1655,16 +1655,16 @@
 "privacy.cloud.revoke_title" = "¿Detener el envío automático?";
 "privacy.cloud.revoke_text_title" = "¿Detener el envío automático de texto?";
 "privacy.cloud.revoke_automatic" = "Detener envío automático";
-"privacy.cloud.revoke_detail" = "La transcripción en la nube, los títulos automáticos, la wiki, la corrección y Knowledge dejan de enviar a este proveedor y se desactivan para él. Pedir un resumen o una respuesta en el chat sigue funcionando.";
-"privacy.cloud.revoke_text_detail" = "Los títulos automáticos, la wiki y la corrección se desactivan para este proveedor, y Knowledge deja de enviarle contenido. El envío de audio para la transcripción en la nube no cambia; desactívalo por separado. Pedir un resumen o una respuesta en el chat sigue funcionando.";
+"privacy.cloud.revoke_detail" = "La transcripción en la nube, los títulos automáticos, la wiki, la corrección y Wiki dejan de enviar a este proveedor y se desactivan para él. Pedir un resumen o una respuesta en el chat sigue funcionando.";
+"privacy.cloud.revoke_text_detail" = "Los títulos automáticos, la wiki y la corrección se desactivan para este proveedor, y Wiki deja de enviarle contenido. El envío de audio para la transcripción en la nube no cambia; desactívalo por separado. Pedir un resumen o una respuesta en el chat sigue funcionando.";
 "privacy.cloud.feature.transcription" = "Transcripción en la nube";
 "privacy.cloud.feature.title" = "Títulos automáticos";
 "privacy.cloud.feature.wiki" = "Wiki de reuniones";
 "privacy.cloud.feature.correction" = "Corrección de la transcripción";
-"privacy.cloud.feature.knowledge" = "Knowledge";
+"privacy.cloud.feature.knowledge" = "Wiki";
 "privacy.cloud.revoke_all" = "Quitar todos los permisos";
 "privacy.cloud.revoke_all_title" = "¿Quitar todos los permisos de este proveedor?";
-"privacy.cloud.revoke_all_detail" = "Ya no se envía nada a este proveedor, ni a petición ni automáticamente. Los resúmenes y Knowledge que lo usaban pasan al procesamiento en el dispositivo.";
+"privacy.cloud.revoke_all_detail" = "Ya no se envía nada a este proveedor, ni a petición ni automáticamente. Los resúmenes y Wiki que lo usaban pasan al procesamiento en el dispositivo.";
 "privacy.cloud.audio" = "Envío de audio";
 
 /* G1 destructive action confirmations */
@@ -1770,3 +1770,57 @@
 "detail.compare.only_in" = "Solo en %@";
 "detail.compare.no_differences" = "Sin diferencias";
 "detail.compare.local_note" = "Comparado en este dispositivo; sin llamada de IA.";
+
+// P3 — wiki surfaces
+"knowledge.browser.enable" = "Activar la wiki";
+"knowledge.browser.explore" = "Explorar";
+"knowledge.browser.relations" = "Relaciones";
+"knowledge.browser.updated_today" = "Actualizadas hoy";
+"knowledge.browser.pages" = "Páginas";
+"knowledge.browser.all_pages" = "Todas las páginas";
+"knowledge.browser.page_subtitle" = "%1$@ · %2$@ · %3$@";
+"knowledge.browser.scope_week" = "Esta semana";
+"knowledge.browser.scope_today" = "Hoy";
+"knowledge.browser.scope_meetings" = "%ld reuniones";
+"knowledge.browser.actions" = "Acciones de la wiki";
+"knowledge.browser.settings" = "Ajustes de la wiki";
+"knowledge.sources.choose" = "Elegir";
+"knowledge.sources.use" = "Usar %ld";
+"knowledge.entity.page_actions" = "Acciones de la página";
+"knowledge.entity.facts" = "Hechos";
+"knowledge.entity.updated" = "Actualizada %@";
+"knowledge.entity.provenance" = "Escrita por la IA a partir de los hechos siguientes";
+"knowledge.entity.mentioned_in" = "Mencionada en";
+"knowledge.entity.ask_about" = "Preguntar sobre %@";
+"knowledge.graph.footer_counts" = "%1$ld páginas · %2$ld relaciones · discontinua = propuesta";
+"knowledge.review.candidate_reason" = "Mismo nombre en varias reuniones. Nada se fusiona sin ti.";
+"knowledge.review.pending" = "Pendientes";
+"knowledge.review.kept" = "Conservadas";
+"knowledge.search.aliases" = "Alias";
+"detail.knowledge.changed_summary" = "%1$@ · %2$@";
+"detail.knowledge.entity_facts" = "%1$@ · +%2$@";
+"detail.wiki.provenance" = "Escrita por la IA · %@";
+"detail.knowledge.no_page" = "Aún no hay página";
+"detail.knowledge.no_page_detail" = "Genera una página a partir de la transcripción de esta reunión.";
+"knowledge.entity_kind.topic" = "Tema";
+"knowledge.entity_kind.project" = "Proyecto";
+"knowledge.entity_kind.initiative" = "Iniciativa";
+"knowledge.entity_kind.person" = "Persona";
+"knowledge.entity_kind.team" = "Equipo";
+"knowledge.entity_kind.organization" = "Organización";
+"knowledge.entity_kind.system" = "Sistema";
+"knowledge.entity_kind.technology" = "Tecnología";
+"knowledge.entity_kind.decisionThread" = "Hilo de decisión";
+"knowledge.entity_kind.actionItem" = "Acción";
+"knowledge.entity_kind.risk" = "Riesgo";
+"knowledge.entity_kind.question" = "Pregunta";
+"knowledge.entity_kind.metric" = "Métrica";
+"knowledge.entity.day_facts" = "%1$@ · %2$@";
+
+// P3 — plural counts (key selection by count, no stringsdict needed)
+"knowledge.count.fact.one" = "%d hecho";
+"knowledge.count.fact.other" = "%d hechos";
+"knowledge.count.meeting.one" = "%d reunión";
+"knowledge.count.meeting.other" = "%d reuniones";
+"knowledge.count.page.one" = "%d página";
+"knowledge.count.page.other" = "%d páginas";

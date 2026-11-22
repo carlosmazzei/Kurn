@@ -26,8 +26,8 @@ struct KnowledgeIdentityReviewView: View {
             isPresented: $confirming,
             iconSystemName: "arrow.triangle.merge",
             iconTint: Theme.ink,
-            title: KnowledgeReviewCopy.text("confirm_title"),
-            message: String(format: KnowledgeReviewCopy.text("confirm_detail"), candidate.target.name),
+            title: String(format: KnowledgeReviewCopy.text("confirm_title"), candidate.source.name, candidate.target.name),
+            message: KnowledgeReviewCopy.text("confirm_detail"),
             primaryTitle: KnowledgeReviewCopy.text("merge"),
             primaryAction: { decide(.merge(candidate.id)) },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
@@ -59,17 +59,17 @@ struct KnowledgeIdentityReviewView: View {
             .accessibilityIdentifier("knowledge.review.reopen")
         } else {
             VStack(spacing: 10) {
+                Button { decide(.dismiss(candidate.id)) } label: {
+                    Text(KnowledgeReviewCopy.text("dismiss")).font(Theme.calloutEmphasized).frame(maxWidth: .infinity).frame(minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("knowledge.review.dismiss")
                 Button { confirming = true } label: {
                     Text(KnowledgeReviewCopy.text("merge")).font(Theme.calloutEmphasized).frame(maxWidth: .infinity).frame(minHeight: 44)
                 }
                 .buttonStyle(.glassProminent)
                 .tint(Theme.ink)
                 .accessibilityIdentifier("knowledge.review.merge")
-                Button { decide(.dismiss(candidate.id)) } label: {
-                    Text(KnowledgeReviewCopy.text("dismiss")).font(Theme.calloutEmphasized).frame(maxWidth: .infinity).frame(minHeight: 44)
-                }
-                .buttonStyle(.bordered)
-                .accessibilityIdentifier("knowledge.review.dismiss")
             }
         }
     }

@@ -82,8 +82,9 @@ final class MeetingKnowledgeUITests: XCTestCase {
         entity.tap()
         let claim = app.staticTexts["knowledge.browser.claim"].firstMatch
         XCTAssertTrue(claim.waitForExistence(timeout: 10))
-        XCTAssertTrue(claim.label.contains("Example portal"))
+        XCTAssertTrue(claim.label.contains("Open"))
         capture(app, named: "knowledge-entity-overview")
+        app.buttons["knowledge.entity.actions"].tap()
         let sources = app.buttons["knowledge.browser.sources"]
         XCTAssertTrue(sources.waitForExistence(timeout: 10))
         sources.tap()
@@ -225,7 +226,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         let knowledge = app.buttons["root.destination.knowledge"]
         XCTAssertTrue(knowledge.waitForExistence(timeout: 10))
         knowledge.tap()
-        XCTAssertTrue(app.staticTexts["Knowledge is turned off"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["A wiki of your meetings"].waitForExistence(timeout: 10))
         let openSettings = app.buttons["knowledge.openSettings"]
         XCTAssertTrue(openSettings.waitForExistence(timeout: 5))
         openSettings.tap()
@@ -248,7 +249,10 @@ final class MeetingKnowledgeUITests: XCTestCase {
         let choose = app.buttons["knowledge.chooseSources"]
         XCTAssertTrue(choose.waitForExistence(timeout: 10))
         choose.tap()
-        let source = app.buttons["knowledge.sourceMeeting"].firstMatch
+        // The home preselects this week's meetings; the seeded knowledge
+        // meeting is the newest one (first row), so toggle a different row to
+        // keep its facts in scope.
+        let source = app.buttons.matching(identifier: "knowledge.sourceMeeting").element(boundBy: 1)
         XCTAssertTrue(source.waitForExistence(timeout: 10))
         source.tap()
         app.buttons["knowledge.sources.done"].tap()
@@ -260,7 +264,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         source.tap()
         app.navigationBars.buttons["Cancel"].tap()
         XCTAssertTrue(entity.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Selected meetings: 1")).firstMatch.exists)
+        XCTAssertTrue(app.buttons["knowledge.chooseSources"].label.contains("meeting"))
         // The selection belongs to the meetings screen: closing the sheet and
         // opening Knowledge again reads the same meetings.
         closeSheet(app)
@@ -289,6 +293,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         let entity = app.buttons["knowledge.browser.entity"].firstMatch
         XCTAssertTrue(entity.waitForExistence(timeout: 15))
         entity.tap()
+        app.buttons["knowledge.entity.actions"].tap()
         let compare = app.buttons["knowledge.browser.compare"].firstMatch
         XCTAssertTrue(compare.waitForExistence(timeout: 10))
         compare.tap()
@@ -367,7 +372,7 @@ final class MeetingKnowledgeUITests: XCTestCase {
         let app = launch(prototype: true)
         // The meetings list's own search field stays in the hierarchy under
         // the Knowledge sheet, so pick the reader's field by its prompt.
-        let field = app.searchFields["Search names, aliases and claims"]
+        let field = app.searchFields["Search pages and facts"]
         XCTAssertTrue(field.waitForExistence(timeout: 15))
         field.tap()
         field.typeText("ORION\n")

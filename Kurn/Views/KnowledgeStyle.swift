@@ -33,7 +33,7 @@ struct KnowledgeIconWell: View {
             .font(Theme.callout)
             .foregroundStyle(tint)
             .frame(width: 32, height: 32)
-            .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(Theme.fill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .accessibilityHidden(true)
     }
 }
@@ -52,7 +52,7 @@ struct KnowledgeChipLabel: View {
             Text(title).lineLimit(2)
         }
         .font(Theme.footnoteEmphasized)
-        .foregroundStyle(Theme.textSecondary)
+        .foregroundStyle(Theme.ink)
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
         .background(Theme.fill, in: Capsule())
@@ -87,7 +87,8 @@ struct KnowledgeChevron: View {
     }
 }
 
-/// A card that opens a route: the content, a chevron, on a `kurnCard`.
+/// A row that opens a route: the content plus a chevron. Rows sit inside a
+/// `knowledgeGroup()` container that supplies the surface and separators.
 struct KnowledgeLinkCard<Route: Hashable, Content: View>: View {
     let route: Route
     @ViewBuilder let content: () -> Content
@@ -98,8 +99,8 @@ struct KnowledgeLinkCard<Route: Hashable, Content: View>: View {
                 content().frame(maxWidth: .infinity, alignment: .leading)
                 KnowledgeChevron()
             }
-            .kurnCard(padding: 14, cornerRadius: 16)
-            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -121,6 +122,12 @@ struct KnowledgeQuote: View {
     }
 }
 
+/// "N facts" / "N meetings" with the project's `.one`/`.other` plural key pairs.
+func knowledgeCountText(_ stem: String, _ count: Int) -> String {
+    let key = "\(stem).\(count == 1 ? "one" : "other")"
+    return String(format: NSLocalizedString(key, comment: "Item count"), count)
+}
+
 extension View {
     /// The scrolling reading surface every Knowledge page sits on.
     func knowledgeReadingSurface() -> some View {
@@ -130,5 +137,20 @@ extension View {
     /// A card in the Knowledge screens: `kurnCard` with the meeting tabs' 16pt corners.
     func knowledgeCard() -> some View {
         kurnCard(padding: 16, cornerRadius: 16)
+    }
+
+    /// One grouped `Theme.surface` container: rows inside it carry their own
+    /// padding and hairline separators between them.
+    func knowledgeGroup() -> some View {
+        background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    /// A hairline separator between rows of a `knowledgeGroup()`.
+    func knowledgeHairline() -> some View {
+        overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.separator).frame(height: 0.5)
+                .padding(.leading, 14)
+                .accessibilityHidden(true)
+        }
     }
 }

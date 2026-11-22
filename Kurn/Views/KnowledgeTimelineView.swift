@@ -73,7 +73,7 @@ struct KnowledgeTimelineView: View {
             }
         } label: {
             Label(KnowledgeTimelinePresentation.text("filter"),
-                  systemImage: filter.isDefault ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                  systemImage: filter.isDefault ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
         }
         .accessibilityIdentifier("knowledge.timeline.filter")
     }
@@ -91,13 +91,29 @@ struct KnowledgeTimelineView: View {
     @ViewBuilder
     private func row(_ entry: KnowledgeTimeline.Entry) -> some View {
         let row = KnowledgeTimelinePresentation.row(entry, meetingTitles: read.meetingTitles)
-        let content = VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: row.claim).font(Theme.subheadlineEmphasized).foregroundStyle(Theme.textPrimary)
-            if let stated = row.stated { Text(verbatim: stated).font(Theme.caption).foregroundStyle(Theme.textPrimary) }
-            Text(verbatim: row.source).font(Theme.caption).foregroundStyle(Theme.textSecondary)
-            if !row.badges.isEmpty {
-                Text(verbatim: row.badges.joined(separator: " · ")).font(Theme.caption2Emphasized).foregroundStyle(Theme.textSecondary)
+        let proposed = entry.item.fact.qualifiers.modality == .proposed || entry.item.fact.qualifiers.modality == .hypothetical
+        let content = HStack(alignment: .top, spacing: 12) {
+            // An ink dot — hollow for a proposed fact — on the timeline's line.
+            VStack(spacing: 0) {
+                Circle()
+                    .strokeBorder(Theme.ink, lineWidth: proposed ? 1.5 : 0)
+                    .background(proposed ? Color.clear : Theme.ink, in: Circle())
+                    .frame(width: 9, height: 9)
+                    .padding(.top, 5)
+                Rectangle().fill(Theme.decorationTertiary).frame(width: 1).frame(maxHeight: .infinity)
             }
+            .frame(width: 9)
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: row.claim).font(Theme.subheadlineEmphasized).foregroundStyle(Theme.textPrimary)
+                Text(verbatim: [entry.item.subject.name, row.stated].compactMap { $0 }.joined(separator: " · "))
+                    .font(Theme.caption).foregroundStyle(Theme.textPrimary)
+                Text(verbatim: row.source).font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                if !row.badges.isEmpty {
+                    Text(verbatim: row.badges.joined(separator: " · ")).font(Theme.caption2Emphasized).foregroundStyle(Theme.textSecondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         if let route = row.evidence {

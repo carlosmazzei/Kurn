@@ -33,8 +33,9 @@ struct KnowledgeCompareView: View {
                     Toggle(KnowledgeComparePresentation.copy("as_known_then"), isOn: $asKnownThen)
                         .accessibilityIdentifier("knowledge.compare.asKnownThen")
                 }
+                .padding(.horizontal, 14).padding(.vertical, 8)
                 .font(Theme.subheadline)
-                .knowledgeCard()
+                .knowledgeGroup()
                 Text(KnowledgeComparePresentation.copy(asKnownThen ? "as_known_then_footer" : "as_known_now_footer"))
                     .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -48,13 +49,14 @@ struct KnowledgeCompareView: View {
                     }
                     ForEach(sections, id: \.kind) { section in
                         KnowledgeSectionLabel(section.title).padding(.top, 4)
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 0) {
                             ForEach(Array(section.rows.enumerated()), id: \.offset) { index, row in
-                                if index > 0 { Divider().overlay(Theme.separator).accessibilityHidden(true) }
+                                if index > 0 { Divider().overlay(Theme.separator).padding(.leading, 14).accessibilityHidden(true) }
                                 KnowledgeChangeRow(row: row, identifier: "knowledge.compare.change")
+                                    .padding(.horizontal, 14).padding(.vertical, 10)
                             }
                         }
-                        .knowledgeCard()
+                        .knowledgeGroup()
                     }
                 }
             }

@@ -1,8 +1,10 @@
 import KurnCore
+import SwiftData
 import SwiftUI
 
 struct KnowledgeSettingsView: View {
     @Environment(AppSettings.self) private var settings
+    @Query(sort: \Meeting.createdAt, order: .reverse) private var allMeetings: [Meeting]
     @Environment(KnowledgeSettingsCoordinator.self) private var management: KnowledgeSettingsCoordinator?
     @Environment(KnowledgeDeletionCoordinator.self) private var deletion: KnowledgeDeletionCoordinator?
     @State private var sourceIDs: Set<UUID> = []
@@ -34,7 +36,10 @@ struct KnowledgeSettingsView: View {
         }
         .navigationTitle(KnowledgeSettingsCopy.text("title"))
         .sheet(isPresented: $showingSources) {
-            KnowledgeMeetingSelectionView(selectedIDs: sourceIDs) { sourceIDs = $0; showingSources = false }
+            let allowed = allMeetings.filter { settings.knowledgeControls?.allows($0.id) == true }
+            KnowledgeMeetingSelectionView(selectedIDs: sourceIDs, allowedIDs: allowed.map(\.id), meetings: allowed) {
+                sourceIDs = $0; showingSources = false
+            }
         }
         .task(id: action) {
             guard let action, let management else { return }

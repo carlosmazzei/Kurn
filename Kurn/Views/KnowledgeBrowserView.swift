@@ -10,6 +10,9 @@ struct KnowledgeBrowserView: View {
     let meetingIDs: Set<UUID>
     let showsDone: Bool
     let onChooseSources: (() -> Void)?
+    /// What the scope chip names, e.g. "This week"; empty hides the qualifier.
+    var scopeLabel: String = ""
+    var onOpenSettings: (() -> Void)?
     @Environment(KnowledgeCompilationCoordinator.self) private var coordinator
     @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
@@ -30,10 +33,13 @@ struct KnowledgeBrowserView: View {
     @Environment(ChatConversationHost.self) private var conversations: ChatConversationHost?
 
     init(meetingIDs: Set<UUID>, initialEntityID: UUID? = nil, initialEvidenceSelection: KnowledgeEvidenceSelection? = nil,
-         showsDone: Bool = true, onChooseSources: (() -> Void)? = nil) {
+         showsDone: Bool = true, scopeLabel: String = "", onChooseSources: (() -> Void)? = nil,
+         onOpenSettings: (() -> Void)? = nil) {
         self.meetingIDs = meetingIDs
         self.showsDone = showsDone
+        self.scopeLabel = scopeLabel
         self.onChooseSources = onChooseSources
+        self.onOpenSettings = onOpenSettings
         _path = State(initialValue: initialEvidenceSelection.map { [.evidence(assertionID: $0.assertionID, evidenceID: $0.evidenceID)] }
             ?? initialEntityID.map { [.entity($0)] } ?? [])
     }
@@ -73,29 +79,28 @@ struct KnowledgeBrowserView: View {
                     .onSubmit(of: .search) { searchFocused = false }
                     .navigationDestination(for: KnowledgeBrowserRoute.self) { destination($0) }
                     .toolbar {
-                        if let onChooseSources {
-                            ToolbarItem(placement: .topBarLeading) {
-                                Button(action: onChooseSources) {
-                                    Label(KnowledgeBrowserCopy.text("choose_sources"), systemImage: "checklist")
-                                }
-                                .accessibilityIdentifier("knowledge.chooseSources")
-                            }
-                        }
                         ToolbarItem(placement: .primaryAction) {
-                            Button { showingReview = true } label: { Label(KnowledgeReviewCopy.text("title"), systemImage: "tray.full") }
-                                .accessibilityIdentifier("knowledge.review.open")
-                        }
-                        if settings.knowledgeExportEnabled {
-                            ToolbarItem(placement: .primaryAction) {
-                                Button { exportKnowledge() } label: {
-                                    Label(KnowledgeBrowserCopy.text("export"), systemImage: "square.and.arrow.up")
+                            Menu {
+                                Button { invalidateAndRefresh() } label: {
+                                    Label(KnowledgeBrowserCopy.text("refresh"), systemImage: "arrow.clockwise")
                                 }
-                                .accessibilityIdentifier("knowledge.browser.export")
-                            }
-                        }
-                        ToolbarItem(placement: .primaryAction) {
-                            Button { invalidateAndRefresh() } label: { Label(KnowledgeBrowserCopy.text("refresh"), systemImage: "arrow.clockwise") }
                                 .accessibilityIdentifier("knowledge.browser.refresh")
+                                if settings.knowledgeExportEnabled {
+                                    Button { exportKnowledge() } label: {
+                                        Label(KnowledgeBrowserCopy.text("export"), systemImage: "square.and.arrow.up")
+                                    }
+                                    .accessibilityIdentifier("knowledge.browser.export")
+                                }
+                                if let onOpenSettings {
+                                    Button(action: onOpenSettings) {
+                                        Label(KnowledgeBrowserCopy.text("settings"), systemImage: "gearshape")
+                                    }
+                                }
+                            } label: {
+                                Label(KnowledgeBrowserCopy.text("actions"), systemImage: "ellipsis")
+                            }
+                            .accessibilityLabel(KnowledgeBrowserCopy.text("actions"))
+                            .accessibilityIdentifier("knowledge.actions")
                         }
                         if showsDone {
                             ToolbarItem(placement: .confirmationAction) {
@@ -108,7 +113,7 @@ struct KnowledgeBrowserView: View {
         .sheet(isPresented: $showingReview) { KnowledgeReviewInboxView(meetingIDs: meetingIDs) }
         // A save to a chosen location, never the generic share sheet (private-corporate boundary).
         .fileExporter(isPresented: Binding(get: { exportDocument != nil }, set: { if !$0 { exportDocument = nil } }),
-                      document: exportDocument, contentType: .json, defaultFilename: "Knowledge") { result in
+                      document: exportDocument, contentType: .json, defaultFilename: "Wiki") { result in
             if case .failure = result { exportFailed = true }
         }
         .alert(KnowledgeBrowserCopy.text("export_failed"), isPresented: $exportFailed) {}
@@ -188,7 +193,7 @@ struct KnowledgeBrowserView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.background)
         .navigationTitle(title(route))
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(route == nil || routeIsEntityPage(route!) ? .large : .inline)
     }
 
     @ViewBuilder
@@ -197,7 +202,8 @@ struct KnowledgeBrowserView: View {
         case nil:
             Group {
                 if searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    KnowledgeHomeView(read: read)
+                    KnowledgeHomeView(read: read, scopeLabel: scopeLabel,
+                                      onChooseSources: onChooseSources, onOpenReview: { showingReview = true })
                 } else {
                     KnowledgeSearchResultsView(query: searchQuery,
                         state: searchModel.presentation(query: searchQuery, meetingIDs: meetingIDs), scopeCount: meetingIDs.count)
@@ -205,10 +211,10 @@ struct KnowledgeBrowserView: View {
             }
         case let .entity(id):
             if let page = read.pages.first(where: { $0.entity.id == id }) {
-                KnowledgeEntityPageView(page: page, meetingTitles: read.meetingTitles) { scope in
+                KnowledgeEntityPageView(page: page, meetingTitles: read.meetingTitles, onAsk: { scope in
                     entityAsk = KnowledgeEntityAskRequest(name: page.entity.name, scope: scope,
                         conversation: conversations?.standaloneConversation() ?? MeetingChatViewModel())
-                }
+                }, navigate: { path.append($0) })
             } else { KnowledgeBrowserUnavailable() }
         case .timeline:
             KnowledgeTimelineView(read: read)
@@ -221,8 +227,11 @@ struct KnowledgeBrowserView: View {
                 KnowledgeGraphView(read: read, entityID: id, service: graphService)
             } else { KnowledgeBrowserUnavailable() }
         case .evidence:
-            if let source = read.selectedEvidence { KnowledgeEvidenceDetailView(source: source) }
-            else { KnowledgeBrowserUnavailable() }
+            if let source = read.selectedEvidence {
+                KnowledgeEvidenceDetailView(source: source, isPlaying: model.isPlaying, isLoadingAudio: model.isLoadingAudio) {
+                    if model.isPlaying { model.stopAudio() } else { playRequest += 1 }
+                }
+            } else { KnowledgeBrowserUnavailable() }
         case .transcript:
             if let source = read.selectedEvidence {
                 KnowledgeSourceTranscriptView(source: source, isPlaying: model.isPlaying, isLoadingAudio: model.isLoadingAudio) {
@@ -230,6 +239,12 @@ struct KnowledgeBrowserView: View {
                 }
             } else { KnowledgeBrowserUnavailable() }
         }
+    }
+
+    /// The entity page reads like a wiki page with its large title.
+    private func routeIsEntityPage(_ route: KnowledgeBrowserRoute) -> Bool {
+        if case .entity = route { return true }
+        return false
     }
 
     private func title(_ route: KnowledgeBrowserRoute?) -> String {
@@ -268,42 +283,150 @@ struct KnowledgeBrowserUnavailable: View {
 
 struct KnowledgeHomeView: View {
     let read: KnowledgeBrowserRead
+    var scopeLabel: String = ""
+    var onChooseSources: (() -> Void)?
+    var onOpenReview: (() -> Void)?
+
+    /// Pages with a fact recorded today lead the home as "Updated today".
+    private var updatedToday: [KnowledgeWikiPage] {
+        let calendar = Calendar.current
+        return read.pages.filter { page in
+            page.sections.flatMap(\.entries).contains { calendar.isDateInToday($0.fact.source.recordedAt) }
+        }
+    }
+
+    private func facts(_ page: KnowledgeWikiPage) -> [KnowledgeWikiPage.Entry] {
+        page.sections.flatMap(\.entries)
+    }
+
+    private func subtitle(_ page: KnowledgeWikiPage) -> String {
+        let entries = facts(page)
+        let kind = NSLocalizedString("knowledge.entity_kind." + page.entity.kind.rawValue, comment: "Entity kind")
+        let meetings = Set(entries.map(\.fact.source.meetingID)).count
+        return String(format: KnowledgeBrowserCopy.text("page_subtitle"), kind,
+                      knowledgeCountText("knowledge.count.fact", entries.count),
+                      knowledgeCountText("knowledge.count.meeting", meetings))
+    }
 
     var body: some View {
         if read.pages.isEmpty {
-            ContentUnavailableView(NSLocalizedString("detail.knowledge.empty", comment: "No contributions"), systemImage: "book.closed")
+            VStack(alignment: .leading) {
+                scopeChip.padding(.horizontal, 20)
+                ContentUnavailableView(NSLocalizedString("detail.knowledge.empty", comment: "No contributions"), systemImage: "book.closed")
+            }
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
-                    KnowledgeLinkCard(route: KnowledgeBrowserRoute.timeline) {
-                        HStack(spacing: 12) {
-                            KnowledgeIconWell(systemImage: "calendar.day.timeline.leading", tint: Theme.info)
-                            Text(KnowledgeBrowserCopy.text("timeline")).font(Theme.headline).foregroundStyle(Theme.textPrimary)
+                    scopeChip
+                    KnowledgeSectionLabel(KnowledgeBrowserCopy.text("explore")).padding(.top, 14)
+                    VStack(spacing: 0) {
+                        exploreRow
+                        if let onOpenReview {
+                            Divider().overlay(Theme.separator).padding(.leading, 58).accessibilityHidden(true)
+                            Button(action: onOpenReview) {
+                                HStack(spacing: 12) {
+                                    KnowledgeIconWell(systemImage: "tray.full")
+                                    Text(KnowledgeReviewCopy.text("title")).font(Theme.subheadline).foregroundStyle(Theme.textPrimary)
+                                    Spacer()
+                                    KnowledgeChevron()
+                                }
+                                .padding(.horizontal, 14).padding(.vertical, 12)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("knowledge.review.open")
                         }
                     }
-                    .accessibilityIdentifier("knowledge.browser.timeline")
-                    KnowledgeSectionLabel(String(format: KnowledgeBrowserCopy.text("scope"), read.meetingIDs.count))
-                        .padding(.top, 14)
-                    ForEach(read.pages, id: \.entity.id) { page in
-                        KnowledgeLinkCard(route: KnowledgeBrowserRoute.entity(page.entity.id)) {
-                            HStack(spacing: 12) {
-                                KnowledgeIconWell(systemImage: "book.pages")
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(verbatim: page.entity.name).font(Theme.headline).foregroundStyle(Theme.textPrimary)
-                                    if !page.entity.aliases.isEmpty {
-                                        Text(verbatim: page.entity.aliases.joined(separator: " · "))
-                                            .font(Theme.caption).foregroundStyle(Theme.textSecondary).lineLimit(1)
-                                    }
-                                }
-                            }
+                    .knowledgeGroup()
+                    let today = updatedToday
+                    let rest = read.pages.filter { page in !today.contains(where: { $0.entity.id == page.entity.id }) }
+                    if !today.isEmpty {
+                        KnowledgeSectionLabel(KnowledgeBrowserCopy.text("updated_today")).padding(.top, 14)
+                        pageGroup(today)
+                        if !rest.isEmpty {
+                            KnowledgeSectionLabel(KnowledgeBrowserCopy.text("all_pages")).padding(.top, 14)
+                            pageGroup(rest)
                         }
-                        .accessibilityIdentifier("knowledge.browser.entity")
+                    } else {
+                        KnowledgeSectionLabel(KnowledgeBrowserCopy.text("pages")).padding(.top, 14)
+                        pageGroup(read.pages)
                     }
                 }
                 .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 24)
             }
             .accessibilityIdentifier("knowledge.browser.home")
         }
+    }
+
+    /// "This week · N meetings ⌄" — the selection's name and count.
+    @ViewBuilder
+    private var scopeChip: some View {
+        if let onChooseSources {
+            Button(action: onChooseSources) {
+                HStack(spacing: 6) {
+                    Image(systemName: "list.bullet").accessibilityHidden(true)
+                    Text(verbatim: scopeLabel.isEmpty
+                         ? knowledgeCountText("knowledge.count.meeting", read.meetingIDs.count)
+                         : scopeLabel + " · " + knowledgeCountText("knowledge.count.meeting", read.meetingIDs.count))
+                    Image(systemName: "chevron.down").font(Theme.caption2).accessibilityHidden(true)
+                }
+                .font(Theme.footnoteEmphasized)
+                .foregroundStyle(Theme.ink)
+                .padding(.horizontal, 14).padding(.vertical, 7)
+                .background(Theme.fill, in: Capsule())
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("knowledge.chooseSources")
+        }
+    }
+
+    @ViewBuilder
+    private var exploreRow: some View {
+        VStack(spacing: 0) {
+            KnowledgeLinkCard(route: KnowledgeBrowserRoute.timeline) {
+                HStack(spacing: 12) {
+                    KnowledgeIconWell(systemImage: "clock")
+                    Text(KnowledgeBrowserCopy.text("timeline")).font(Theme.subheadline).foregroundStyle(Theme.textPrimary)
+                }
+            }
+            .accessibilityIdentifier("knowledge.browser.timeline")
+            if let root = mostMentionedPage {
+                Divider().overlay(Theme.separator).padding(.leading, 58).accessibilityHidden(true)
+                KnowledgeLinkCard(route: KnowledgeBrowserRoute.graph(root.entity.id)) {
+                    HStack(spacing: 12) {
+                        KnowledgeIconWell(systemImage: "point.3.connected.trianglepath.dotted")
+                        Text(KnowledgeBrowserCopy.text("relations")).font(Theme.subheadline).foregroundStyle(Theme.textPrimary)
+                    }
+                }
+                .accessibilityIdentifier("knowledge.browser.relations")
+            }
+        }
+    }
+
+    /// The page with the most facts is where the graph opens from home.
+    private var mostMentionedPage: KnowledgeWikiPage? {
+        read.pages.max { facts($0).count < facts($1).count }
+    }
+
+    private func pageGroup(_ pages: [KnowledgeWikiPage]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(pages.enumerated()), id: \.element.entity.id) { index, page in
+                if index > 0 { Divider().overlay(Theme.separator).padding(.leading, 58).accessibilityHidden(true) }
+                KnowledgeLinkCard(route: KnowledgeBrowserRoute.entity(page.entity.id)) {
+                    HStack(spacing: 12) {
+                        KnowledgeIconWell(systemImage: "book")
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verbatim: page.entity.name).font(Theme.subheadline).foregroundStyle(Theme.textPrimary)
+                            Text(verbatim: subtitle(page)).font(Theme.caption).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                        }
+                    }
+                }
+                .accessibilityIdentifier("knowledge.browser.entity")
+            }
+        }
+        .knowledgeGroup()
     }
 }
 

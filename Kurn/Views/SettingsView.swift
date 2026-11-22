@@ -81,7 +81,7 @@ struct SettingsView: View {
                 ) {
                     SummarySettingsView()
                 }
-                link(KnowledgeSettingsCopy.text("title"), systemImage: "book.pages", identifier: "settings.link.knowledge") {
+                link(KnowledgeSettingsCopy.text("title"), systemImage: "book", identifier: "settings.link.knowledge") {
                     KnowledgeSettingsView()
                 }
                 link(

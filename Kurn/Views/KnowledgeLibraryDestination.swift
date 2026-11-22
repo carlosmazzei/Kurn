@@ -1,9 +1,11 @@
+import KurnCore
 import SwiftData
 import SwiftUI
 
-/// The library's Knowledge reader, presented over the meetings list. Its
+/// The library's wiki reader, presented over the meetings list. Its
 /// source selection belongs to the list (`meetingIDs`), so closing and
-/// reopening the sheet keeps the meetings it was reading.
+/// reopening the sheet keeps the meetings it was reading; a fresh open
+/// preselects this week's allowed meetings.
 struct KnowledgeLibraryDestination: View {
     private enum ActiveSheet: Identifiable {
         case sources
@@ -12,9 +14,30 @@ struct KnowledgeLibraryDestination: View {
     }
 
     @Binding var meetingIDs: Set<UUID>
+    @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
     @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
     @State private var activeSheet: ActiveSheet?
+
+    private var allowedMeetings: [Meeting] {
+        meetings.filter { settings.knowledgeControls?.allows($0.id) == true }
+    }
+
+    /// What the scope chip names: "Today" / "This week" when the selection is
+    /// exactly that day/week, else the count.
+    private var scopeLabel: String {
+        let calendar = Calendar.current
+        let selected = allowedMeetings.filter { meetingIDs.contains($0.id) }
+        if !selected.isEmpty, selected.allSatisfy({ calendar.isDateInToday($0.createdAt) }) {
+            return KnowledgeBrowserCopy.text("scope_today")
+        }
+        if !selected.isEmpty,
+           let weekStart = calendar.dateInterval(of: .weekOfYear, for: Date())?.start,
+           selected.allSatisfy({ $0.createdAt >= weekStart }) {
+            return KnowledgeBrowserCopy.text("scope_week")
+        }
+        return knowledgeCountText("knowledge.count.meeting", meetingIDs.count)
+    }
 
     var body: some View {
         ZStack {
@@ -23,10 +46,10 @@ struct KnowledgeLibraryDestination: View {
             } else if meetingIDs.isEmpty {
                 NavigationStack {
                     ContentUnavailableView {
-                        Label(KnowledgeBrowserCopy.text("title"), systemImage: "book.pages")
+                        Label(KnowledgeBrowserCopy.text("title"), systemImage: "book")
                     } description: {
-                        Text(KnowledgeBrowserCopy.text("choose_sources_detail"))
-                    } actions: { chooseSourcesButton }
+                        Text(NSLocalizedString("detail.knowledge.empty", comment: "No contributions"))
+                    }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .knowledgeReadingSurface()
                     .navigationTitle(KnowledgeBrowserCopy.text("title"))
@@ -37,14 +60,23 @@ struct KnowledgeLibraryDestination: View {
                     }
                 }
             } else {
-                KnowledgeBrowserView(meetingIDs: meetingIDs, showsDone: true, onChooseSources: { activeSheet = .sources })
+                KnowledgeBrowserView(meetingIDs: meetingIDs, showsDone: true, scopeLabel: scopeLabel,
+                                     onChooseSources: { activeSheet = .sources },
+                                     onOpenSettings: { activeSheet = .settings })
                     .id(meetingIDs)
             }
         }
+        // Meetings resolve asynchronously; re-check when the allowed set or
+        // the enabled flag changes, not only on first appear.
+        .task(id: "\(settings.knowledgeEnabled):\(allowedMeetings.count)") {
+            preselectDefaultScope()
+        }
+        .onAppear { preselectDefaultScope() }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .sources:
-                KnowledgeMeetingSelectionView(selectedIDs: meetingIDs) { meetingIDs = $0; activeSheet = nil }
+                KnowledgeMeetingSelectionView(selectedIDs: meetingIDs, allowedIDs: allowedMeetings.map(\.id),
+                                              meetings: allowedMeetings) { meetingIDs = $0; activeSheet = nil }
             case .settings:
                 NavigationStack {
                     KnowledgeSettingsView()
@@ -58,21 +90,27 @@ struct KnowledgeLibraryDestination: View {
         }
     }
 
+    /// A fresh open with nothing selected starts on this week's meetings
+    /// (or the newest when the week is empty), never on a picker screen.
+    private func preselectDefaultScope() {
+        guard settings.knowledgeEnabled, meetingIDs.isEmpty, !allowedMeetings.isEmpty else { return }
+        let ids = WikiDefaultScope.select(
+            candidates: allowedMeetings.map { (id: $0.id, createdAt: $0.createdAt) }, now: Date())
+        if !ids.isEmpty { meetingIDs = Set(ids) }
+    }
+
     private var disabledState: some View {
         NavigationStack {
             ContentUnavailableView {
-                Label(KnowledgeBrowserCopy.text("disabled_title"), systemImage: "book.pages")
+                Label(KnowledgeBrowserCopy.text("disabled_title"), systemImage: "book")
             } description: {
                 Text(KnowledgeBrowserCopy.text("disabled_detail"))
             } actions: {
                 Button {
                     activeSheet = .settings
                 } label: {
-                    Label(
-                        NSLocalizedString("recordings.open_settings", comment: "Open Settings"),
-                        systemImage: "gearshape"
-                    )
-                    .font(Theme.calloutEmphasized)
+                    Text(KnowledgeBrowserCopy.text("enable"))
+                        .font(Theme.calloutEmphasized)
                 }
                 .buttonStyle(.glassProminent)
                 .tint(Theme.ink)
@@ -88,38 +126,40 @@ struct KnowledgeLibraryDestination: View {
             }
         }
     }
-
-    /// Choosing sources is the one thing this empty screen is for: the
-    /// primary action style (Theme "Button language").
-    private var chooseSourcesButton: some View {
-        Button { activeSheet = .sources } label: {
-            Label(KnowledgeBrowserCopy.text("choose_sources"), systemImage: "checklist")
-                .font(Theme.calloutEmphasized)
-        }
-        .buttonStyle(.glassProminent)
-        .tint(Theme.ink)
-        .accessibilityIdentifier("knowledge.chooseSources")
-    }
 }
 
 struct KnowledgeMeetingSelectionView: View {
-    @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
-    @Environment(\.dismiss) private var dismiss
-    @Environment(AppSettings.self) private var settings
-    @State private var selectedIDs: Set<UUID>
-    let onDone: (Set<UUID>) -> Void
-    private var allowedMeetings: [Meeting] { meetings.filter { settings.knowledgeControls?.allows($0.id) == true } }
+    private enum ScopeMode { case today, week, choose }
 
-    init(selectedIDs: Set<UUID>, onDone: @escaping (Set<UUID>) -> Void) {
-        _selectedIDs = State(initialValue: selectedIDs)
+    let allowedIDs: [UUID]
+    let meetings: [Meeting]
+    let onDone: (Set<UUID>) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedIDs: Set<UUID>
+    @State private var mode: ScopeMode = .choose
+
+    init(selectedIDs: Set<UUID>, allowedIDs: [UUID], meetings: [Meeting], onDone: @escaping (Set<UUID>) -> Void) {
+        self.allowedIDs = allowedIDs
+        self.meetings = meetings
         self.onDone = onDone
+        _selectedIDs = State(initialValue: selectedIDs)
     }
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    ForEach(allowedMeetings) { meeting in
+                    Picker(KnowledgeBrowserCopy.text("choose_sources"), selection: $mode) {
+                        Text(KnowledgeBrowserCopy.text("scope_today")).tag(ScopeMode.today)
+                        Text(KnowledgeBrowserCopy.text("scope_week")).tag(ScopeMode.week)
+                        Text(NSLocalizedString("knowledge.sources.choose", comment: "Manual source choice")).tag(ScopeMode.choose)
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("knowledge.sources.scope")
+                }
+                Section {
+                    ForEach(meetings) { meeting in
                         Button { toggle(meeting.id) } label: {
                             HStack(spacing: 12) {
                                 Image(systemName: selectedIDs.contains(meeting.id) ? "checkmark.circle.fill" : "circle")
@@ -128,7 +168,7 @@ struct KnowledgeMeetingSelectionView: View {
                                     .accessibilityHidden(true)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(verbatim: meeting.title).font(Theme.subheadline).foregroundStyle(Theme.textPrimary)
-                                    Text(meeting.createdAt.meetingDisplay).font(Theme.caption).foregroundStyle(Theme.textSecondary)
+                                    Text(meeting.createdAt.relativeDay).font(Theme.caption).foregroundStyle(Theme.textSecondary)
                                 }
                             }
                             .contentShape(Rectangle())
@@ -137,30 +177,46 @@ struct KnowledgeMeetingSelectionView: View {
                         .accessibilityIdentifier("knowledge.sourceMeeting")
                         .disabled(!selectedIDs.contains(meeting.id) && selectedIDs.count >= 16)
                     }
-                } header: {
-                    Text(String(format: KnowledgeBrowserCopy.text("scope"), selectedIDs.count))
                 } footer: { Text(KnowledgeBrowserCopy.text("choose_sources_detail")) }
             }
             .navigationTitle(KnowledgeBrowserCopy.text("choose_sources"))
             .navigationBarTitleDisplayMode(.inline)
+            .presentationDetents([.large])
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(NSLocalizedString("common.cancel", comment: "Cancel")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(NSLocalizedString("common.done", comment: "Done")) {
-                        onDone(selectedIDs.intersection(Set(allowedMeetings.map(\.id))))
+                    Button(String(format: NSLocalizedString("knowledge.sources.use", comment: "Use selection"), selectedIDs.count)) {
+                        onDone(selectedIDs.intersection(Set(allowedIDs)))
                     }
-                    .disabled(selectedIDs.count > 16)
+                    .buttonStyle(.glassProminent)
+                    .tint(Theme.ink)
+                    .disabled(selectedIDs.isEmpty || selectedIDs.count > 16)
                     .accessibilityIdentifier("knowledge.sources.done")
                 }
             }
-            .onChange(of: Set(allowedMeetings.map(\.id))) { _, ids in selectedIDs.formIntersection(ids) }
+            .onChange(of: mode) { _, mode in
+                switch mode {
+                case .today, .week:
+                    let calendar = Calendar.current
+                    let dayFiltered = meetings.filter { meeting in
+                        mode == .today
+                            ? calendar.isDateInToday(meeting.createdAt)
+                            : calendar.isDate(meeting.createdAt, equalTo: Date(), toGranularity: .weekOfYear)
+                    }
+                    selectedIDs = Set(WikiDefaultScope.select(
+                        candidates: dayFiltered.map { (id: $0.id, createdAt: $0.createdAt) }, now: Date()))
+                case .choose:
+                    break
+                }
+            }
+            .onChange(of: Set(allowedIDs)) { _, ids in selectedIDs.formIntersection(ids) }
         }
     }
 
     private func toggle(_ id: UUID) {
-        if selectedIDs.contains(id) { selectedIDs.remove(id) }
-        else if selectedIDs.count < 16 { selectedIDs.insert(id) }
+        mode = .choose
+        if selectedIDs.contains(id) { selectedIDs.remove(id) } else if selectedIDs.count < 16 { selectedIDs.insert(id) }
     }
 }
