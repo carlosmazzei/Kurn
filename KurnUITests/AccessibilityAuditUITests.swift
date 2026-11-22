@@ -51,7 +51,7 @@ final class AccessibilityAuditUITests: XCTestCase {
         XCTAssertFalse(app.buttons["tab.knowledge"].exists, "Knowledge stays hidden without its independent opt-in")
         continueAfterFailure = true
 
-        for tab in ["recordings", "transcript", "summary", "chat"] {
+        for tab in ["summary", "transcript", "recordings"] {
             XCTContext.runActivity(named: "Audit the \(tab) tab") { _ in
                 let button = app.buttons["tab.\(tab)"]
                 XCTAssertTrue(button.waitForExistence(timeout: 10), "Tab \(tab) missing")
@@ -61,6 +61,18 @@ final class AccessibilityAuditUITests: XCTestCase {
                 } catch {
                     XCTFail("Accessibility audit of the \(tab) tab failed: \(error)")
                 }
+            }
+        }
+
+        // Ask is a sheet on every tab now, not a tab of its own.
+        XCTContext.runActivity(named: "Audit the Ask sheet") { _ in
+            let ask = app.buttons["detail.ask"]
+            XCTAssertTrue(ask.waitForExistence(timeout: 10), "Ask bar missing")
+            ask.tap()
+            do {
+                try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
+            } catch {
+                XCTFail("Accessibility audit of the Ask sheet failed: \(error)")
             }
         }
     }

@@ -479,12 +479,12 @@
 "detail.speakers.note" = "Gli speaker vengono rilevati automaticamente e potrebbero richiedere correzioni. Tocca un nome per rinominarlo.";
 "detail.summary" = "Riassunto";
 "detail.summarizing" = "Generazione riassunto…";
-"detail.summary.needs_transcript" = "Trascrivi almeno una registrazione per generare un riassunto.";
+"detail.summary.needs_transcript" = "Trascrivi prima una registrazione, poi genera un riepilogo.";
 "detail.summary.model_nudge" = "Userà %1$@ · modello %2$@";
 "detail.summary.model_missing" = "Nessun modello di riassunto selezionato";
 "detail.summary.new" = "Nuovo Riassunto";
 "detail.summary.untitled" = "Riassunto";
-"detail.summary.generate" = "Genera Riassunto";
+"detail.summary.generate" = "Genera riepilogo";
 "detail.summary.cancel" = "Annulla Riassunto";
 "detail.summary.cancelling" = "Annullamento riassunto…";
 "detail.summary.cancelling.subtitle" = "Interruzione della richiesta in corso. I riassunti già generati vengono mantenuti.";
@@ -493,9 +493,9 @@
 "detail.summary.progress.streaming" = "Il modello sta scrivendo: circa %d parole finora.";
 "detail.summary.draft.title" = "Bozza: formattata al termine";
 "detail.summary.delete_confirm.title" = "Eliminare questo riassunto?";
-"detail.summary.delete_confirm.message" = "Non è possibile annullare l'operazione.";
+"detail.summary.delete_confirm.message" = "Gli altri riepiloghi e la trascrizione vengono mantenuti.";
 "detail.share" = "Condividi";
-"detail.more_options" = "Altre opzioni";
+"detail.more_options" = "Azioni della riunione";
 "detail.segment_count" = "%d segmenti";
 "detail.recording_n" = "Registrazione %d";
 "detail.playback_position" = "Posizione riproduzione";
@@ -536,7 +536,7 @@
 "detail.transcript.warnings_banner" = "Completato con avvisi in: %@";
 "detail.summary.empty.title" = "Ancora nessun riassunto";
 "detail.section" = "Sezione";
-"tab.recordings" = "Registrazioni";
+"tab.recordings" = "Audio";
 "tab.transcript" = "Trascrizione";
 "tab.summary" = "Riassunto";
 "quality.high" = "Alta";
@@ -548,9 +548,9 @@
 /* Riassunto */
 "summary.key_decisions" = "Decisioni Chiave";
 "summary.action_items" = "Azioni da Svolgere";
-"summary.footer" = "Generato da %1$@ · %2$@";
+"summary.footer" = "Scritto da %1$@ · %2$@";
 "summary.photo_reference" = "Visualizza foto alle %@";
-"summary.footer_with_model" = "Generato da %1$@ · %2$@ · %3$@";
+"summary.footer_with_model" = "Scritto da %1$@ · %2$@ · %3$@";
 "summary.template_label" = "Modello: %@";
 
 /* Traduzione del riassunto */
@@ -857,7 +857,7 @@
 "chat.stop" = "Interrompi";
 "chat.disabled.title" = "La ricerca semantica è disattivata";
 "chat.disabled.subtitle" = "Attiva la ricerca semantica in Impostazioni per chattare sulle tue riunioni.";
-"chat.ask.title" = "Interroga le tue riunioni";
+"chat.ask.title" = "Chiedi";
 "chat.retry" = "Riprova";
 "chat.usage.tokens" = "%d token";
 "chat.usage.cost" = "~$%.4f";
@@ -1354,7 +1354,7 @@
 "chat.draft.save_failed" = "Non è stato possibile salvare il testo non inviato. È ancora nel campo del messaggio.";
 
 /* Meeting knowledge contributions (K2.3). */
-"tab.knowledge" = "Conoscenza";
+"tab.knowledge" = "Wiki";
 "detail.knowledge.counts" = "Entità: %ld · Affermazioni: %ld · Passaggi: %ld";
 "detail.knowledge.contributions" = "Contributi di questa riunione";
 "detail.knowledge.refresh" = "Aggiorna";
@@ -1718,3 +1718,27 @@
 "filter.show_count" = "Mostra %d";
 "filter.clear_all" = "Cancella tutti i filtri";
 "folder.new_short" = "Nuova";
+"detail.more" = "Altro";
+"meetings.delete" = "Elimina riunione";
+"detail.ask.placeholder" = "Chiedi di questa riunione";
+"chat.ask.subtitle.meeting" = "Su \"%1$@\" · trascrizione, riepilogo e wiki";
+"chat.ask.subtitle.meeting.no_wiki" = "Su \"%1$@\" · trascrizione e riepilogo";
+"chat.ask.subtitle.library" = "Tutte le riunioni · %1$d riunioni";
+"chat.suggest.decisions" = "Cosa è stato deciso?";
+"chat.suggest.next_steps" = "Quali sono i prossimi passi e chi se ne occupa?";
+"chat.suggest.open" = "Cosa è ancora aperto?";
+"chat.suggest.email" = "Scrivi un'email di riepilogo per chi non ha partecipato";
+"chat.provider.title" = "Collega un provider IA";
+"chat.provider.subtitle" = "Le risposte usano la trascrizione e citano il tempo di ogni riga. Al provider vengono inviate solo le fonti che scegli.";
+"chat.provider.setup" = "Configura provider";
+"detail.summary.writing" = "scrittura…";
+"detail.summary.today_at" = "Oggi %1$@";
+"detail.summary.of_meeting" = "Riepiloghi di questa riunione";
+"detail.summary.compare" = "Confronta fianco a fianco";
+"detail.summary.delete" = "Elimina questo riepilogo";
+"detail.summary.listen" = "Ascolta";
+"detail.summary.translating_to" = "Traduzione in %1$@…";
+"detail.summary.generating.stats" = "%1$@ · %2$ds · %3$d parole";
+"detail.summary.generating.stats.no_model" = "%1$ds · %2$d parole";
+"detail.summary.empty.hint" = "Scegli un modello e Kurn scrive il riepilogo dalla trascrizione.";
+"detail.summary.delete_confirm.title_named" = "Eliminare il riepilogo \"%1$@\"?";

@@ -230,6 +230,7 @@ struct KurnApp: App {
                 .environment(appEnvironment.reviewPrompt)
                 .environment(appEnvironment.chatConversations)
                 .environment(incomingFiles)
+                .environment(MeetingDetailTabMemory())
                 // Both the app-switcher privacy placeholder and the lock screen
                 // live in a window above everything this hierarchy presents.
                 // They used to be an in-hierarchy `ZStack` branch and a view

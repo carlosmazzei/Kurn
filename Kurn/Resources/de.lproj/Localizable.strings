@@ -479,7 +479,7 @@
 "detail.speakers.note" = "Sprecher werden automatisch erkannt und müssen eventuell korrigiert werden. Tippen Sie auf einen Namen, um ihn umzubenennen.";
 "detail.summary" = "Zusammenfassung";
 "detail.summarizing" = "Zusammenfassung wird erstellt…";
-"detail.summary.needs_transcript" = "Transkribieren Sie mindestens eine Aufnahme, um eine Zusammenfassung zu erstellen.";
+"detail.summary.needs_transcript" = "Transkribiere zuerst eine Aufnahme und erstelle dann eine Zusammenfassung.";
 "detail.summary.model_nudge" = "Verwendet %1$@ · Modell %2$@";
 "detail.summary.model_missing" = "Kein Zusammenfassungsmodell ausgewählt";
 "detail.summary.new" = "Neue Zusammenfassung";
@@ -493,9 +493,9 @@
 "detail.summary.progress.streaming" = "Das Modell schreibt – bisher etwa %d Wörter.";
 "detail.summary.draft.title" = "Entwurf – wird am Ende formatiert";
 "detail.summary.delete_confirm.title" = "Diese Zusammenfassung löschen?";
-"detail.summary.delete_confirm.message" = "Dies kann nicht rückgängig gemacht werden.";
+"detail.summary.delete_confirm.message" = "Die anderen Zusammenfassungen und das Transkript bleiben erhalten.";
 "detail.share" = "Teilen";
-"detail.more_options" = "Weitere Optionen";
+"detail.more_options" = "Aktionen der Besprechung";
 "detail.segment_count" = "%d Abschnitte";
 "detail.recording_n" = "Aufnahme %d";
 "detail.playback_position" = "Wiedergabeposition";
@@ -536,7 +536,7 @@
 "detail.transcript.warnings_banner" = "Abgeschlossen mit Warnungen bei: %@";
 "detail.summary.empty.title" = "Noch keine Zusammenfassung";
 "detail.section" = "Bereich";
-"tab.recordings" = "Aufnahmen";
+"tab.recordings" = "Audio";
 "tab.transcript" = "Transkript";
 "tab.summary" = "Zusammenfassung";
 "quality.high" = "Hoch";
@@ -548,9 +548,9 @@
 /* Zusammenfassung */
 "summary.key_decisions" = "Wichtige Entscheidungen";
 "summary.action_items" = "Aufgaben";
-"summary.footer" = "Erstellt von %1$@ · %2$@";
+"summary.footer" = "Verfasst von %1$@ · %2$@";
 "summary.photo_reference" = "Foto um %@ ansehen";
-"summary.footer_with_model" = "Erstellt von %1$@ · %2$@ · %3$@";
+"summary.footer_with_model" = "Verfasst von %1$@ · %2$@ · %3$@";
 "summary.template_label" = "Vorlage: %@";
 
 /* Zusammenfassungsübersetzung */
@@ -857,7 +857,7 @@
 "chat.stop" = "Stopp";
 "chat.disabled.title" = "Semantische Suche ist aus";
 "chat.disabled.subtitle" = "Aktiviere die semantische Suche in den Einstellungen, um über deine Meetings zu chatten.";
-"chat.ask.title" = "Frag deine Meetings";
+"chat.ask.title" = "Fragen";
 "chat.retry" = "Erneut versuchen";
 "chat.usage.tokens" = "%d Token";
 "chat.usage.cost" = "~%.4f $";
@@ -1354,7 +1354,7 @@
 "chat.draft.save_failed" = "Der nicht gesendete Text konnte nicht gespeichert werden. Er steht noch im Nachrichtenfeld.";
 
 /* Meeting knowledge contributions (K2.3). */
-"tab.knowledge" = "Wissen";
+"tab.knowledge" = "Wiki";
 "detail.knowledge.counts" = "Entitäten: %ld · Aussagen: %ld · Passagen: %ld";
 "detail.knowledge.contributions" = "Beiträge aus diesem Meeting";
 "detail.knowledge.refresh" = "Aktualisieren";
@@ -1718,3 +1718,27 @@
 "filter.show_count" = "%d anzeigen";
 "filter.clear_all" = "Alle Filter löschen";
 "folder.new_short" = "Neu";
+"detail.more" = "Mehr";
+"meetings.delete" = "Besprechung löschen";
+"detail.ask.placeholder" = "Frage zu dieser Besprechung";
+"chat.ask.subtitle.meeting" = "Über „%1$@“ · Transkript, Zusammenfassung und Wiki";
+"chat.ask.subtitle.meeting.no_wiki" = "Über „%1$@“ · Transkript und Zusammenfassung";
+"chat.ask.subtitle.library" = "Alle Besprechungen · %1$d Besprechungen";
+"chat.suggest.decisions" = "Was wurde beschlossen?";
+"chat.suggest.next_steps" = "Was sind die nächsten Schritte und wer ist dafür verantwortlich?";
+"chat.suggest.open" = "Was ist noch offen?";
+"chat.suggest.email" = "Schreibe eine Zusammenfassungs-E-Mail für Abwesende";
+"chat.provider.title" = "KI-Anbieter verbinden";
+"chat.provider.subtitle" = "Antworten nutzen das Transkript und zitieren die Zeit jeder Zeile. Nur die von dir gewählten Quellen werden an den Anbieter gesendet.";
+"chat.provider.setup" = "Anbieter einrichten";
+"detail.summary.writing" = "wird geschrieben…";
+"detail.summary.today_at" = "Heute %1$@";
+"detail.summary.of_meeting" = "Zusammenfassungen dieser Besprechung";
+"detail.summary.compare" = "Nebeneinander vergleichen";
+"detail.summary.delete" = "Diese Zusammenfassung löschen";
+"detail.summary.listen" = "Anhören";
+"detail.summary.translating_to" = "Übersetzung ins %1$@…";
+"detail.summary.generating.stats" = "%1$@ · %2$d s · %3$d Wörter";
+"detail.summary.generating.stats.no_model" = "%1$d s · %2$d Wörter";
+"detail.summary.empty.hint" = "Wähle eine Vorlage und Kurn schreibt die Zusammenfassung aus dem Transkript.";
+"detail.summary.delete_confirm.title_named" = "Zusammenfassung „%1$@“ löschen?";

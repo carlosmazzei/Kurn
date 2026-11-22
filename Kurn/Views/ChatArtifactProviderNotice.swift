@@ -1,22 +1,38 @@
 import SwiftUI
 
+/// Shown where an agent-capable provider is required but the configured one
+/// cannot chat: a full empty state with a direct route into provider
+/// settings. The composer is hidden entirely wherever this renders.
 struct ChatArtifactProviderNotice: View {
     @State private var showingSettings = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(NSLocalizedString("chat.artifact.cloud_required", comment: "Document provider requirement"), systemImage: "info.circle")
-                .font(.footnote)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("chat.artifact.provider.notice")
-            Button { showingSettings = true } label: {
-                Label(NSLocalizedString("chat.artifact.configure_provider", comment: "Configure provider"), systemImage: "gearshape")
+        ContentUnavailableView {
+            Label(NSLocalizedString("chat.provider.title", comment: "Connect an AI provider"),
+                  systemImage: "icloud.slash")
+        } description: {
+            Text(NSLocalizedString("chat.provider.subtitle", comment: "Provider notice description"))
+        } actions: {
+            Button(NSLocalizedString("chat.provider.setup", comment: "Set up provider")) {
+                showingSettings = true
             }
+            .buttonStyle(.glassProminent)
+            .tint(Theme.ink)
+            .foregroundStyle(Theme.onInk)
             .accessibilityIdentifier("chat.artifact.provider.settings")
         }
+        .accessibilityIdentifier("chat.artifact.provider.notice")
         .sheet(isPresented: $showingSettings) {
-            NavigationStack { SettingsView() }
+            NavigationStack {
+                ProvidersSettingsView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(NSLocalizedString("common.done", comment: "Done")) {
+                                showingSettings = false
+                            }
+                        }
+                    }
+            }
         }
     }
 }

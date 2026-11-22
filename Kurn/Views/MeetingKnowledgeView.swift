@@ -4,6 +4,9 @@ import SwiftUI
 struct MeetingKnowledgeView: View {
     let meeting: Meeting
     let state: MeetingKnowledgeState
+    /// The contribution counters line, formerly in the detail header — it
+    /// moved here with the rest of the Wiki content (identifier kept).
+    var headerText: String = ""
     let isGeneratingArticle: Bool
     let canGenerateArticle: Bool
     /// Apple on-device generation revalidates the canonical read first; another provider uses the
@@ -18,6 +21,12 @@ struct MeetingKnowledgeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                if !headerText.isEmpty {
+                    Text(headerText)
+                        .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("knowledge.header")
+                }
                 if case .loaded = state { articleSection }
                 contributionsHeader
                 contributions

@@ -23,11 +23,9 @@ final class ShareAndChatFlowUITests: FlowUITestCase {
         XCTAssertTrue(explanation.waitForExistence(timeout: 10))
         let standardExplanation = explanation.label
 
-        let picker = app.buttons["share.format_picker"]
-        XCTAssertTrue(picker.exists)
-        picker.tap()
-        // Menu-picker options carry no identifiers; `share.format.obsidian`
-        // is the en string.
+        // The format is now a row of chips in the "Format" section; each chip
+        // is a button titled with the format's en name.
+        XCTAssertTrue(anyElement("share.format_picker").waitForExistence(timeout: 10))
         let obsidian = app.buttons["Obsidian"]
         XCTAssertTrue(obsidian.waitForExistence(timeout: 5))
         obsidian.tap()
@@ -74,12 +72,11 @@ final class ShareAndChatFlowUITests: FlowUITestCase {
         let expectation = XCTNSPredicateExpectation(predicate: rendered, object: nil)
         XCTAssertEqual(XCTWaiter().wait(for: [expectation], timeout: 10), .completed)
 
+        // Without an agent-capable provider the composer is not rendered at
+        // all — not merely disabled.
         let send = app.buttons["chat.send"]
-        XCTAssertTrue(send.waitForExistence(timeout: 5))
-        XCTAssertFalse(send.isEnabled, "Composer must be disabled without a cloud provider")
+        XCTAssertFalse(send.waitForExistence(timeout: 3), "Composer must be absent without a cloud provider")
         let input = anyElement("chat.input")
-        if input.exists {
-            XCTAssertFalse(input.isEnabled)
-        }
+        XCTAssertFalse(input.exists, "Composer input must be absent without a cloud provider")
     }
 }

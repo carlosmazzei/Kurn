@@ -84,11 +84,12 @@ struct MeetingChatConversationView: View {
     var body: some View {
         VStack(spacing: 0) {
             if !usesHarness {
+                // No agent-capable provider: the notice is the whole state —
+                // no conversation, and the composer below is not rendered at
+                // all (not even disabled).
                 ChatArtifactProviderNotice()
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-            }
-            if !settings.semanticSearchEnabled {
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if !settings.semanticSearchEnabled {
                 disabledState
             } else {
                 conversation
@@ -108,8 +109,10 @@ struct MeetingChatConversationView: View {
         // respects the keyboard safe area, so the bottom-aligned overlay
         // rides up with it for free.
         .overlay(alignment: .bottom) {
-            composer
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { composerHeight = $0 }
+            if usesHarness {
+                composer
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { composerHeight = $0 }
+            }
         }
         .errorAlert($vm.error)
         .chatChangeConfirmation(vm.changeConfirmation)
@@ -167,36 +170,21 @@ struct MeetingChatConversationView: View {
     /// affordances: start fresh, or reopen a saved one. Shown regardless of
     /// `canChat` so past conversations stay reachable even if semantic search
     /// is currently off or unindexed.
+    /// "History" leading, the conversation menu trailing. "New conversation"
+    /// is the menu's first item; the Sources control lives in the composer as
+    /// a chip beside the model chip.
     @ToolbarContentBuilder
     private var historyToolbar: some ToolbarContent {
-        if usesHarness {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { showingSources = true } label: {
-                    Label(sourceSummary, systemImage: "slider.horizontal.3")
-                        .font(.caption)
-                        .lineLimit(1)
-                        .frame(maxWidth: 180)
-                        .frame(minHeight: 44)
-                }
-                .disabled(vm.isResponding)
-                .accessibilityLabel(NSLocalizedString("chat.sources.title", comment: "Sources") + ": " + sourceSummary)
-                .accessibilityIdentifier("chat.sources.open")
-            }
-        }
-        ToolbarItemGroup(placement: .topBarTrailing) {
+        ToolbarItem(placement: .topBarLeading) {
             Button {
                 showingHistory = true
             } label: {
                 Image(systemName: "clock.arrow.circlepath")
             }
             .accessibilityLabel(NSLocalizedString("chat.history.button", comment: "Open chat history"))
+        }
+        ToolbarItem(placement: .topBarTrailing) {
             ChatConversationMenu(vm: vm, shareItem: $shareItem, showingImporter: $showingImporter)
-            Button {
-                vm.reset()
-            } label: {
-                Image(systemName: "square.and.pencil")
-            }
-            .accessibilityLabel(NSLocalizedString("chat.new.button", comment: "Start a new conversation"))
         }
     }
 
@@ -376,21 +364,40 @@ struct MeetingChatConversationView: View {
         .accessibilityIdentifier("chat.retry")
     }
 
+    /// Four tappable questions while the conversation is empty — tapping one
+    /// fills the composer and sends it, same text either scope.
     private var starterHint: some View {
-        // The library-wide "Ask" sheet (`meeting == nil`) needs its own copy —
-        // "Ask about this meeting" makes no sense when there isn't one.
-        let titleKey = meeting == nil ? "chat.starter.library.title" : "chat.starter.title"
-        let subtitleKey = meeting == nil ? "chat.starter.library.subtitle" : "chat.starter.subtitle"
-        return VStack(alignment: .leading, spacing: 6) {
-            Text(NSLocalizedString(titleKey, comment: "Chat starter title"))
-                .font(Theme.subheadlineEmphasized).foregroundStyle(Theme.textPrimary)
-            Text(NSLocalizedString(subtitleKey, comment: "Chat starter subtitle"))
-                .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Self.suggestionKeys, id: \.self) { key in
+                let text = NSLocalizedString(key, comment: "Starter suggestion")
+                Button {
+                    input = text
+                    send()
+                } label: {
+                    Text(text)
+                        .font(Theme.footnote)
+                        .foregroundStyle(Theme.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .strokeBorder(Theme.separator, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(Theme.fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
+
+    private static let suggestionKeys = [
+        "chat.suggest.decisions",
+        "chat.suggest.next_steps",
+        "chat.suggest.open",
+        "chat.suggest.email"
+    ]
 
     // MARK: - Composer
 
@@ -419,7 +426,12 @@ struct MeetingChatConversationView: View {
             .disabled(!canChat)
 
             HStack(spacing: 10) {
-                if canQueue { queueButtons } else { modelChip }
+                if canQueue {
+                    queueButtons
+                } else {
+                    if usesHarness { sourcesChip }
+                    modelChip
+                }
                 Spacer(minLength: 0)
                 sendOrStopButton
             }
@@ -472,6 +484,30 @@ struct MeetingChatConversationView: View {
         guard let draft = vm.restoredDraft else { return }
         vm.restoredDraft = nil
         input = input.isEmpty ? draft : input + "\n\n" + draft
+    }
+
+    /// The Sources control, moved out of the nav bar into the composer row:
+    /// a chip with the same sheet, identifier and accessibility label it had
+    /// as a toolbar button.
+    private var sourcesChip: some View {
+        Button { showingSources = true } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "books.vertical")
+                    .accessibilityHidden(true)
+                Text(sourceSummary)
+                    .lineLimit(1)
+            }
+            .font(.caption)
+            .foregroundStyle(Theme.textSecondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(minHeight: 30)
+            .background(Theme.fill, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(vm.isResponding)
+        .accessibilityLabel(NSLocalizedString("chat.sources.title", comment: "Sources") + ": " + sourceSummary)
+        .accessibilityIdentifier("chat.sources.open")
     }
 
     /// Which model answers and how hard it reasons, with the context in use; tapping it opens the

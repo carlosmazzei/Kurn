@@ -479,12 +479,12 @@
 "detail.speakers.note" = "Os participantes são detectados automaticamente e podem precisar de correção. Toque em um nome para renomear.";
 "detail.summary" = "Resumo";
 "detail.summarizing" = "Gerando resumo…";
-"detail.summary.needs_transcript" = "Transcreva ao menos uma gravação para gerar um resumo.";
+"detail.summary.needs_transcript" = "Transcreva uma gravação primeiro e depois gere um resumo.";
 "detail.summary.model_nudge" = "Usará %1$@ · modelo %2$@";
 "detail.summary.model_missing" = "Nenhum modelo de resumo selecionado";
 "detail.summary.new" = "Novo Resumo";
 "detail.summary.untitled" = "Resumo";
-"detail.summary.generate" = "Gerar Resumo";
+"detail.summary.generate" = "Gerar resumo";
 "detail.summary.cancel" = "Cancelar Resumo";
 "detail.summary.cancelling" = "Cancelando resumo…";
 "detail.summary.cancelling.subtitle" = "Interrompendo a solicitação atual. Os resumos já gerados são mantidos.";
@@ -493,9 +493,9 @@
 "detail.summary.progress.streaming" = "O modelo está escrevendo — cerca de %d palavras até agora.";
 "detail.summary.draft.title" = "Rascunho — formatado ao concluir";
 "detail.summary.delete_confirm.title" = "Excluir este resumo?";
-"detail.summary.delete_confirm.message" = "Essa ação não pode ser desfeita.";
+"detail.summary.delete_confirm.message" = "Os outros resumos e a transcrição são mantidos.";
 "detail.share" = "Compartilhar";
-"detail.more_options" = "Mais opções";
+"detail.more_options" = "Ações da reunião";
 "detail.segment_count" = "%d segmentos";
 "detail.recording_n" = "Gravação %d";
 "detail.playback_position" = "Posição da reprodução";
@@ -536,7 +536,7 @@
 "detail.transcript.warnings_banner" = "Concluído com avisos em: %@";
 "detail.summary.empty.title" = "Nenhum resumo ainda";
 "detail.section" = "Seção";
-"tab.recordings" = "Gravações";
+"tab.recordings" = "Áudio";
 "tab.transcript" = "Transcript";
 "tab.summary" = "Resumo";
 "quality.high" = "Alta";
@@ -548,9 +548,9 @@
 /* Resumo */
 "summary.key_decisions" = "Decisões Principais";
 "summary.action_items" = "Itens de Ação";
-"summary.footer" = "Gerado por %1$@ · %2$@";
+"summary.footer" = "Escrito por %1$@ · %2$@";
 "summary.photo_reference" = "Ver foto às %@";
-"summary.footer_with_model" = "Gerado por %1$@ · %2$@ · %3$@";
+"summary.footer_with_model" = "Escrito por %1$@ · %2$@ · %3$@";
 "summary.template_label" = "Modelo: %@";
 
 /* Tradução de resumo */
@@ -857,7 +857,7 @@
 "chat.stop" = "Parar";
 "chat.disabled.title" = "A busca semântica está desativada";
 "chat.disabled.subtitle" = "Ative a busca semântica nos Ajustes para conversar sobre suas reuniões.";
-"chat.ask.title" = "Pergunte às suas reuniões";
+"chat.ask.title" = "Pergunte";
 "chat.retry" = "Tentar novamente";
 "chat.usage.tokens" = "%d tokens";
 "chat.usage.cost" = "~US$ %.4f";
@@ -1354,7 +1354,7 @@
 "chat.draft.save_failed" = "Não foi possível salvar o texto não enviado. Ele continua no campo de mensagem.";
 
 /* Meeting knowledge contributions (K2.3). */
-"tab.knowledge" = "Conhecimento";
+"tab.knowledge" = "Wiki";
 "detail.knowledge.counts" = "Entidades: %ld · Afirmações: %ld · Trechos: %ld";
 "detail.knowledge.contributions" = "Contribuições desta reunião";
 "detail.knowledge.refresh" = "Atualizar";
@@ -1718,3 +1718,27 @@
 "filter.show_count" = "Mostrar %d";
 "filter.clear_all" = "Limpar todos os filtros";
 "folder.new_short" = "Nova";
+"detail.more" = "Mais";
+"meetings.delete" = "Excluir reunião";
+"detail.ask.placeholder" = "Pergunte sobre esta reunião";
+"chat.ask.subtitle.meeting" = "Sobre \"%1$@\" · transcrição, resumo e wiki";
+"chat.ask.subtitle.meeting.no_wiki" = "Sobre \"%1$@\" · transcrição e resumo";
+"chat.ask.subtitle.library" = "Todas as reuniões · %1$d reuniões";
+"chat.suggest.decisions" = "O que foi decidido?";
+"chat.suggest.next_steps" = "Quais são os próximos passos e quem é responsável por eles?";
+"chat.suggest.open" = "O que ainda está em aberto?";
+"chat.suggest.email" = "Escreva um e-mail de resumo para quem não participou";
+"chat.provider.title" = "Conecte um provedor de IA";
+"chat.provider.subtitle" = "As respostas usam a transcrição e citam o horário de cada linha. Apenas as fontes que você escolher são enviadas ao provedor.";
+"chat.provider.setup" = "Configurar provedor";
+"detail.summary.writing" = "escrevendo…";
+"detail.summary.today_at" = "Hoje %1$@";
+"detail.summary.of_meeting" = "Resumos desta reunião";
+"detail.summary.compare" = "Comparar lado a lado";
+"detail.summary.delete" = "Excluir este resumo";
+"detail.summary.listen" = "Ouvir";
+"detail.summary.translating_to" = "Traduzindo para %1$@…";
+"detail.summary.generating.stats" = "%1$@ · %2$ds · %3$d palavras";
+"detail.summary.generating.stats.no_model" = "%1$ds · %2$d palavras";
+"detail.summary.empty.hint" = "Escolha um modelo e a Kurn escreve o resumo a partir da transcrição.";
+"detail.summary.delete_confirm.title_named" = "Excluir o resumo \"%1$@\"?";

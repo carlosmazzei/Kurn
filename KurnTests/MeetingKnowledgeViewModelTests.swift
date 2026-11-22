@@ -17,8 +17,8 @@ struct MeetingKnowledgeViewModelTests {
     }
 
     @Test func modeVisibilityFollowsIndependentKnowledgeFlag() {
-        #expect(MeetingDetailMode.visible(knowledgeEnabled: false) == [.recordings, .transcript, .summary, .chat])
-        #expect(MeetingDetailMode.visible(knowledgeEnabled: true) == [.recordings, .transcript, .summary, .knowledge, .chat])
+        #expect(MeetingDetailMode.visible(knowledgeEnabled: false) == [.summary, .transcript, .recordings])
+        #expect(MeetingDetailMode.visible(knowledgeEnabled: true) == [.summary, .transcript, .recordings, .knowledge])
         #expect(MeetingDetailMode.allCases.allSatisfy { !$0.title.isEmpty && !$0.systemImage.isEmpty })
     }
 

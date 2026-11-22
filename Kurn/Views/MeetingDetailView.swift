@@ -42,6 +42,9 @@ struct MeetingDetailView: View {
     /// The app-wide recording session "Add segment" starts (or re-opens, when
     /// a recording is already running minimized).
     @Environment(RecordingSessionController.self) private var recordingSession
+    /// Per-meeting memory of the last chosen tab; optional so previews work.
+    @Environment(MeetingDetailTabMemory.self) private var tabMemory: MeetingDetailTabMemory?
+    @Environment(\.dismiss) private var dismiss
 
     typealias Tab = MeetingDetailMode
 
@@ -76,7 +79,9 @@ struct MeetingDetailView: View {
             }
         )
     }
-    @State private var tab: Tab = .recordings
+    /// Not `private` — `MeetingDetailToolbar.swift` reads it for the menu.
+    @State var tab: Tab = .summary
+    @State private var tabInitialized = false
     @State var meetingKnowledge = MeetingKnowledgeViewModel()
     @State private var knowledgeRefresh = 0
 
@@ -121,6 +126,16 @@ struct MeetingDetailView: View {
     @State var autoTagSuggestion: AutoTaggingService.Suggestion?
     /// Auto-tagging failure surfaced to the user.
     @State var autoTagError: AppError?
+    /// The Ask sheet (`MeetingAskSheet`) — Ask is a sheet on every tab, not a
+    /// tab of its own.
+    @State private var showingAsk = false
+    /// Drives the delete-meeting confirmation from the overflow menu.
+    @State var pendingDeleteMeeting = false
+    /// The tag and folder pickers from the overflow menu.
+    @State var showingTagPicker = false
+    @State var showingFolderPicker = false
+    /// The "Compare side by side" summary sheet.
+    @State private var showingCompare = false
 
     init(meeting: Meeting) {
         self.meeting = meeting
@@ -133,19 +148,38 @@ struct MeetingDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
+            MeetingDetailHeader(meeting: meeting, expanded: tab == .summary, duration: totalDuration)
             sectionPicker
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
-            Divider().overlay(Theme.separator)
             tabContent
         }
-        // The Chat tab sits on the system background so the keyboard blends
-        // with it (see `MeetingChatView`); the header follows so the two
-        // don't meet in a visible seam at the divider.
-        .background((tab == .chat ? Color(uiColor: .systemBackground) : Theme.background).ignoresSafeArea())
+        // The summary/transcript/wiki tabs read on the white "paper" surface;
+        // Audio sits on the app background like the list it is.
+        .background((tab == .recordings ? Theme.background : Theme.readingBackground).ignoresSafeArea())
         .navigationTitle(meeting.title)
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom) {
+            MeetingAskBar { showingAsk = true }
+        }
+        .sheet(isPresented: $showingAsk) {
+            MeetingAskSheet(meeting: meeting) { time in
+                jumpToTime(time)
+            }
+        }
+        .sheet(isPresented: $showingTagPicker) {
+            TagPickerView(meeting: meeting)
+        }
+        .sheet(isPresented: $showingFolderPicker) {
+            FolderPickerView(meeting: meeting)
+        }
+        .sheet(isPresented: $showingCompare) {
+            SummaryCompareView(summaries: meeting.summaries.sorted { $0.createdAt > $1.createdAt }, meeting: meeting)
+        }
+        .onAppear(perform: applyInitialTab)
+        .onChange(of: tab) { _, newTab in
+            tabMemory?.set(newTab, for: meeting.id)
+        }
         .background {
             if settings.knowledgeEnabled {
                 MeetingKnowledgeRefreshDriver(meetingID: meeting.id, model: meetingKnowledge, refreshID: knowledgeRefresh)
@@ -153,7 +187,7 @@ struct MeetingDetailView: View {
         }
         .onChange(of: settings.knowledgeEnabled) { _, enabled in
             meetingKnowledge.invalidate()
-            if !enabled, tab == .knowledge { tab = .recordings }
+            if !enabled, tab == .knowledge { tab = .summary }
         }
         .toolbar { toolbarContent }
         .modelDownloadAlerts(downloads, settings: settings) { showingNetworkSettings = true }
@@ -253,13 +287,36 @@ struct MeetingDetailView: View {
             ),
             iconSystemName: "trash.circle.fill",
             iconTint: Theme.warning,
-            title: NSLocalizedString("detail.summary.delete_confirm.title", comment: "Delete summary confirmation"),
+            title: String(
+                format: NSLocalizedString("detail.summary.delete_confirm.title_named", comment: "Delete summary confirmation"),
+                pendingDeleteSummary?.templateName?.isEmpty == false
+                    ? pendingDeleteSummary!.templateName!
+                    : NSLocalizedString("detail.summary.untitled", comment: "Summary")
+            ),
             message: NSLocalizedString("detail.summary.delete_confirm.message", comment: "Delete summary message"),
             primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
             primaryRole: .destructive,
             primaryAction: {
                 guard let summary = pendingDeleteSummary else { return }
                 deleteSummary(summary)
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
+        .kurnDialog(
+            isPresented: $pendingDeleteMeeting,
+            iconSystemName: "trash.circle.fill",
+            iconTint: Theme.destructive,
+            title: String(format: NSLocalizedString("meetings.delete.confirm_titled", comment: "Delete meeting confirmation"), meeting.title),
+            message: NSLocalizedString("meetings.delete.message", comment: "Delete meeting message"),
+            primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
+            primaryRole: .destructive,
+            primaryAction: {
+                do throws(AppError) {
+                    try MeetingLibrary(context: modelContext).deleteMeeting(meeting)
+                    dismiss()
+                } catch {
+                    actionError = error
+                }
             },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
         )
@@ -277,47 +334,22 @@ struct MeetingDetailView: View {
         )
     }
 
-    // MARK: - Header
-
-    private var header: some View {
-        // The real transcribed language once one exists; otherwise the
-        // pre-transcription hint (Settings default or per-meeting override),
-        // so this always shows something and quietly upgrades once
-        // transcription lands on the language that actually counts.
-        let displayLanguage = meeting.transcribedLanguage ?? meeting.language
-        return VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 8) {
-                Text(meeting.createdAt.meetingDisplay)
-                metaDot
-                Text(String(format: NSLocalizedString("detail.segment_count", comment: ""), sortedRecordings.count))
-                if totalDuration > 0 {
-                    metaDot
-                    Text(totalDuration.clockDisplay)
-                }
-            }
-            .font(Theme.footnote)
-            .foregroundStyle(Theme.textSecondary)
-            Text(displayLanguage.displayName)
-                .font(Theme.footnote)
-                .foregroundStyle(Theme.textSecondary)
-            if settings.knowledgeEnabled {
-                Text(meetingKnowledge.header(for: meeting.id))
-                    .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("knowledge.header")
-            }
-            if !meeting.tags.isEmpty {
-                TagChipsView(tags: meeting.tags)
-            }
+    /// First-open tab choice: the remembered one when this meeting was
+    /// visited before (and it's still visible), else summary → transcript →
+    /// recordings by available content.
+    private func applyInitialTab() {
+        guard !tabInitialized else { return }
+        tabInitialized = true
+        let visible = Tab.visible(knowledgeEnabled: settings.knowledgeEnabled)
+        if let remembered = tabMemory?.tab(for: meeting.id), visible.contains(remembered) {
+            tab = remembered
+        } else if meeting.latestSummary != nil {
+            tab = .summary
+        } else if hasAnyTranscript {
+            tab = .transcript
+        } else {
+            tab = .recordings
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 14)
-    }
-
-    private var metaDot: some View {
-        Circle().fill(Theme.textTertiary).frame(width: 3, height: 3)
     }
 
     // MARK: - Tab content
@@ -337,7 +369,6 @@ struct MeetingDetailView: View {
                     meeting: meeting,
                     settings: settings,
                     isSummarizing: summaries?.isSummarizing == true,
-                    isCancellingSummary: summaries?.isCancellingSummary == true,
                     isTranslatingSummary: summaries?.isTranslatingSummary == true,
                     translationTargetLanguage: summaries?.translationTargetLanguage,
                     summaryProgress: summaries?.summaryProgress,
@@ -352,6 +383,9 @@ struct MeetingDetailView: View {
                     onDeleteSummary: { pendingDeleteSummary = $0 },
                     onTranslateSummary: { pendingTranslateSummary = $0 },
                     onCancelTranslateSummary: { cancelTranslateSummary() },
+                    onCompare: { showingCompare = true },
+                    onShare: { showingShareSelection = true },
+                    onCopySummary: { MeetingPasteboard.copy(SummaryService.markdownText(from: $0.sections)) },
                     onShowPhoto: allPhotos.isEmpty ? nil : { showPhoto(atMeetingRelativeTime: $0) }
                 )
                 .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
@@ -359,11 +393,11 @@ struct MeetingDetailView: View {
             .onChange(of: meeting.summaries.count) { _, _ in
                 selectedSummaryID = meeting.latestSummary?.id
             }
-        case .chat:
-            MeetingChatView(meeting: meeting, onJumpToTime: jumpToTime)
         case .knowledge:
             if settings.knowledgeEnabled {
-                MeetingKnowledgeView(meeting: meeting, state: meetingKnowledge.presentation(for: meeting.id), isGeneratingArticle: isGeneratingWiki,
+                MeetingKnowledgeView(meeting: meeting, state: meetingKnowledge.presentation(for: meeting.id),
+                    headerText: meetingKnowledge.header(for: meeting.id),
+                    isGeneratingArticle: isGeneratingWiki,
                     canGenerateArticle: canGenerateWiki, generatesLocally: settings.aiProvider.kind == .appleOnDevice, onRefresh: {
                         meetingKnowledge.invalidate()
                         knowledgeRefresh += 1
@@ -466,7 +500,7 @@ struct MeetingDetailView: View {
 
     /// These are view modes of one meeting, not top-level
     /// destinations, so they get a segmented control rather than a bottom bar —
-    /// which also leaves the bottom edge free for the Chat tab's composer.
+    /// which leaves the bottom edge free for the floating Ask bar.
     private var sectionPicker: some View {
         Picker(NSLocalizedString("detail.section", comment: "Meeting section"), selection: $tab) {
             ForEach(Tab.visible(knowledgeEnabled: settings.knowledgeEnabled), id: \.self) { value in

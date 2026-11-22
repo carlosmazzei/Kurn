@@ -112,8 +112,8 @@ final class MeetingKnowledgeUITests: XCTestCase {
         XCTAssertFalse(app.buttons["root.destination.meetings"].exists)
         capture(app, named: "knowledge-navigation-meetings-prototype")
         app.buttons["root.destination.ask"].tap()
-        XCTAssertTrue(app.buttons["chat.send"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["chat.send"].isEnabled)
+        // A seeded launch has no provider key, so the composer isn't rendered.
+        XCTAssertFalse(app.buttons["chat.send"].waitForExistence(timeout: 3))
         capture(app, named: "knowledge-navigation-ask-prototype")
         closeSheet(app)
         let documents = app.buttons["root.destination.documents"]
@@ -175,10 +175,11 @@ final class MeetingKnowledgeUITests: XCTestCase {
         ).firstMatch
         XCTAssertTrue(filters.waitForExistence(timeout: 5))
         filters.tap()
-        let week = app.segmentedControls.buttons["This week"]
+        let week = app.buttons["This week"]
         XCTAssertTrue(week.waitForExistence(timeout: 10))
         week.tap()
-        app.navigationBars.buttons["Done"].tap()
+        // The filter sheet applies via its "Show N" confirmation, not a Done.
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Show ")).firstMatch.tap()
         actions.tap()
         let select = app.buttons.matching(
             NSPredicate(format: "identifier == %@ OR label == %@", "meetings.select", "Select")
@@ -194,7 +195,8 @@ final class MeetingKnowledgeUITests: XCTestCase {
         capture(app, named: "knowledge-navigation-selection-actions")
         done.tap()
         app.buttons["root.destination.ask"].tap()
-        XCTAssertTrue(app.buttons["chat.send"].waitForExistence(timeout: 10))
+        // No provider key in the seeded fixture: the composer isn't rendered.
+        XCTAssertFalse(app.buttons["chat.send"].waitForExistence(timeout: 3))
         closeSheet(app)
         XCTAssertTrue(library.waitForExistence(timeout: 10))
         library.tap()
