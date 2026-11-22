@@ -75,4 +75,11 @@ struct ModelPricingTests {
         // The summary's plain token count is the same price as an uncached agent request.
         #expect(ModelPricing.estimatedCostUSD(model: "claude-3-5-sonnet", usage: TokenUsage(promptTokens: 1_000_000, completionTokens: 0)) == plain)
     }
+
+    @Test func gpt61TerraUsesItsPublishedRates() throws {
+        // The extraction log's run: 27,234 prompt + 5,716 completion tokens.
+        let cost = try #require(ModelPricing.estimatedCostUSD(
+            model: "gpt-6.1-terra", usage: TokenUsage(promptTokens: 27_234, completionTokens: 5_716)))
+        #expect(abs(cost - (27_234 * 1e-6 + 5_716 * 5e-6)) < 1e-9)
+    }
 }
