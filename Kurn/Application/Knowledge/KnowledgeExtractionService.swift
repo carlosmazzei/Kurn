@@ -190,7 +190,11 @@ struct KnowledgeExtractionService: Sendable {
             let data = Self.dealiased(KnowledgeExtraction.normalizedReply(reply), aliases: aliases)
             let elapsed = Int(Date().timeIntervalSince(startedAt))
             do {
-                let document = try KnowledgeExtraction.decode(data, segments: revision.snapshot.sourceSegments)
+                let report = try KnowledgeExtraction.decodeReport(data, segments: revision.snapshot.sourceSegments)
+                let document = report.extraction
+                if report.discardedAssertions + report.discardedEvents > 0 {
+                    AppLog.knowledge.atNotice.notice("knowledge extraction pass discarded invalid facts=\(report.discardedAssertions, privacy: .public) events=\(report.discardedEvents, privacy: .public) kept=\(document.assertions.count, privacy: .public)")
+                }
                 guard Set(document.examinedSegmentIDs).isSubset(of: Set(sources.map(\.id))) else {
                     throw KnowledgeExtractionError.invalidCoverage
                 }

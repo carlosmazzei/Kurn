@@ -89,7 +89,7 @@ struct KnowledgeExtractionTests {
         }
     }
 
-    @Test func predicateValuesAndMachineConfirmationFailClosed() {
+    @Test func predicateValuesAndMachineConfirmationFailClosed() throws {
         for invalid in [
             changingAssertion({ $0["value"] = ["type": "enum", "value": "invented"] }),
             changingAssertion({ $0["value"] = ["type": "boolean", "value": "true"] }),
@@ -102,7 +102,10 @@ struct KnowledgeExtractionTests {
                 $0["modality"] = "inferred"
             })
         ] {
-            #expect(throws: KnowledgeExtractionError.invalidAssertion) { try decode(invalid) }
+            // Partial acceptance: the rule-breaking fact is dropped, the pass survives.
+            let report = try KnowledgeExtraction.decodeReport(try JSONSerialization.data(withJSONObject: invalid), segments: sources)
+            #expect(report.extraction.assertions.isEmpty)
+            #expect(report.discardedAssertions == 1)
         }
     }
 
@@ -124,7 +127,7 @@ struct KnowledgeExtractionTests {
         #expect(throws: KnowledgeExtractionError.invalidEvidence) { try decode(unexamined) }
     }
 
-    @Test func nestedUnknownFieldsAndInvalidDateShapesAreRejected() {
+    @Test func nestedUnknownFieldsAndInvalidDateShapesAreRejected() throws {
         for invalid in [
             changingAssertion({ $0["value"] = ["type": "enum", "value": "open", "unit": "ms"] }),
             changingAssertion({ $0["value"] = ["type": "enum", "value": "open", "precision": "day"] }),
@@ -134,15 +137,14 @@ struct KnowledgeExtractionTests {
         ] {
             #expect(throws: KnowledgeExtractionError.invalidSchema) { try decode(invalid) }
         }
+        // A well-shaped but invalid date drops only that fact.
         for date in [["text": "2026-02-30", "precision": "day"], ["text": "2026", "precision": "unknown"]] {
-            #expect(throws: KnowledgeExtractionError.invalidDate) { try decode(changingAssertion { $0["validFrom"] = date }) }
+            #expect(try decode(changingAssertion { $0["validFrom"] = date }).assertions.isEmpty)
         }
-        #expect(throws: KnowledgeExtractionError.invalidDate) {
-            try decode(changingAssertion {
-                $0["validFrom"] = ["text": "2026-12", "precision": "month"]
-                $0["validTo"] = ["text": "2026-11", "precision": "month"]
-            })
-        }
+        #expect(try decode(changingAssertion {
+            $0["validFrom"] = ["text": "2026-12", "precision": "month"]
+            $0["validTo"] = ["text": "2026-11", "precision": "month"]
+        }).assertions.isEmpty)
     }
 
     @Test func emptyExtractionIsValidButNotAClaimOfCoverage() throws {
@@ -154,15 +156,23 @@ struct KnowledgeExtractionTests {
         #expect(throws: KnowledgeExtractionError.invalidSchema) { try decode(invalid) }
     }
 
-    @Test func eventsCannotInventOperationsOrReferenceUnrelatedAssertions() {
-        for change in [["kind": "merged"], ["kind": "assigned"], ["entity": "missing"],
-                       ["assertion": "missing"], ["kind": "reopened"], ["occurredAt": "yesterday"]] {
+    @Test func eventsCannotInventOperationsOrReferenceUnrelatedAssertions() throws {
+        func document(_ change: [String: Any]) -> [String: Any] {
             var invalid = wire()
             var event: [String: Any] = ["ref": "v1", "entity": "e1", "assertion": "a1", "kind": "statusChanged"]
             event.merge(change) { _, new in new }
             invalid["events"] = [event]
-            #expect(throws: KnowledgeExtractionError.self) { try decode(invalid) }
+            return invalid
         }
+        // Inconsistent events are dropped; the fact they describe stays.
+        for change in [["kind": "merged"], ["kind": "assigned"], ["entity": "missing"], ["kind": "reopened"]] {
+            let decoded = try decode(document(change))
+            #expect(decoded.events.isEmpty)
+            #expect(decoded.assertions.count == 1)
+        }
+        // An event naming an assertion the reply never defined, or a bad shape, rejects the pass.
+        #expect(throws: KnowledgeExtractionError.unknownReference) { try decode(document(["assertion": "missing"])) }
+        #expect(throws: KnowledgeExtractionError.invalidSchema) { try decode(document(["occurredAt": "yesterday"])) }
     }
 
     @Test func supersededEventBelongsToTheOldEntityNotItsReplacement() throws {
@@ -178,7 +188,7 @@ struct KnowledgeExtractionTests {
         let valid = try decode(document)
         #expect(valid.events[0].entity == "e2")
         document["events"] = [["ref": "v1", "entity": "e1", "assertion": "a1", "kind": "superseded"]]
-        #expect(throws: KnowledgeExtractionError.unknownReference) { try decode(document) }
+        #expect(try decode(document).events.isEmpty)
     }
 
 
