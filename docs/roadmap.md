@@ -654,6 +654,67 @@ or in-app analytics. The first run should need none of them if rules 3 and 5
 hold; if the review disagrees, add one empty-state call to action rather than a
 tour.
 
+### Design review implementation (prototype revision 10, 2026-11-21 → `feature/ui-design-review`)
+
+The "Kurn Revisão de Interface" prototype (revision 10) was implemented on
+`feature/ui-design-review` in seven commits (theme roles, meetings list,
+meeting detail ×2, Wiki, Settings, recorder/Watch, documents and sheets); the
+decisions are recorded in `CLAUDE.md` → "Visual system". What it settles or
+changes in this track:
+
+- **Vocabulary decision (overrides U0b rule 4 and F1):** the user chose the
+  prototype's rule — **Wiki** is the only visible word for the knowledge
+  surfaces (destination, tab, reader, Settings); "Knowledge" and "Notes" no
+  longer appear in any UI string. Code identifiers, type names, accessibility
+  identifiers and localization keys keep `knowledge`. **Ask** replaced the
+  Chat tab (U1.3 resolved: Chat is a sheet from a floating bar; Wiki is the
+  fourth segment only when on).
+- **Colours (U2b V1, V2, V5 done):** roles `ink` / `link` / `record` /
+  `destructive` / `indicator` / `favorite` in `Theme`; red only for Record and
+  destructive; `AccentColor` is the link blue; dark mode is system black;
+  `Theme.Spacing` and `Theme.Radius` exist (V3 partially — literals are migrated
+  screen by screen, not yet enforced by static policy).
+- **U1.1 (toolbar):** kept the ⋯ list menu (Filters, Select, Sort) + Settings on
+  top and Library · Wiki · Ask · Documents + Record below, with Knowledge-on and
+  -off identical; the date chips left the list (period lives in Filters; the
+  list groups by day) and the quick chips are All / Favorites / No summary.
+  Sorting by duration costs 3 taps (accepted, see U0b task baseline).
+- **U1.2 done:** "Meeting actions" menu in three sections, `ProgressView`
+  loading labels, Tags/Move/Delete added, `accessibilityInputLabels`.
+- **U1.4 consolidation:** Wiki settings merged (Knowledge + meeting page), hub
+  rows show their current value; Search/Usage/Health/Diagnostics stay separate
+  rows (prototype choice; 14 rows).
+- **U1.5 done** as "Simple / Advanced" with four measured presets
+  (`TranscriptionPreset`, numbers from `docs/pipeline-evaluation.md`) applied
+  through the existing consent dialogs.
+- **U1.7 done:** the Wiki reader's bar is one "Wiki actions" menu; Review is a
+  row under Explore.
+- **U2b step 4 (first-run empty state) done** with the privacy-true sentence;
+  step 5 (sensory feedback) and 6–7 (screenshot review, brand) remain.
+- **New capabilities shipped with the review** (user-approved): summary
+  comparison (`SummaryDiff`), bulk Move/Tags in selection mode, Watch
+  "Record on iPhone" (`WatchCommand.start`, queued while the phone is in the
+  background), bulk/period filters (last 7/30 days).
+- **Kept by user decision (not in the prototype):** the recorder's Discard
+  button and title field.
+- **Deferred:** a custom date range in Filters; a Watch complication (needs a
+  watchOS widget target); "Rename recording" (no name field on `Recording`);
+  the K0.5 "each control open in the bar" review is superseded by the above.
+- **Measurement after the review (2026-11-22, `AccessibilityBaselineUITests`,
+  iPhone 17 Pro simulator, 24 screen-states incl. the new Ask sheet):** 85
+  findings against 351 in the 2026-11-21 baseline, 0 `.sufficientElementDescription`
+  and 0 `.trait`. Largest moves: meetings list `.contrast` 27 → 1 (Default),
+  transcript 25/14/18/2 → 7/5/0/1 (all 18 speaker hit-region findings gone),
+  Audio 15/8/2/2 → 2/2/4/1 (4 new `.hitRegion` findings on the recording
+  row's trailing controls — to check), `FolderFormView` symbol-name labels
+  17 → 0, Settings clipping 5 → 0. Remaining: Ask sheet 1/4/0/2 (subtitle
+  contrast, two clipped labels), recorder 2/4/0/0 (its deliberate Dynamic Type
+  cap), summary AX5 2/3/0/3. Also found: at AX5 a centre tap on a meeting row
+  can be swallowed (the test now taps the row's upper area) — confirm on a
+  device whether a floating/bottom bar overlaps the last visible row and give
+  the list a matching bottom inset if so. The table above (U0) is the
+  pre-review baseline and is kept for history.
+
 ### U1 · Simplify the structure (2 sprints)
 
 Each item is a product decision first; the control/content layering and the
