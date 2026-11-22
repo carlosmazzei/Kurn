@@ -96,20 +96,30 @@ final class KnowledgeCompilationCoordinator {
             // Validate completed provenance/current support before the queue's
             // terminal shortcut. A -> B -> A requires an explicit new generation.
             if try await store.compilationReplay(work, authorization: authorize) != nil { return .completed }
-            return try await jobQueue.submit(work, explicit: trigger == .explicit)
+            AppLog.knowledge.atNotice.notice("knowledge compile submitted meeting=\(meetingID, privacy: .private) provider=\(provider.id, privacy: .public) model=\(model, privacy: .public) explicit=\(trigger == .explicit, privacy: .public)")
+            let submitted = try await jobQueue.submit(work, explicit: trigger == .explicit)
+            if let code = submitted.code { lastFailureCode = code }
+            if submitted.outcome != .completed {
+                AppLog.knowledge.atNotice.notice("knowledge compile \(submitted.outcome == .failed ? "failed" : "deferred", privacy: .public) meeting=\(meetingID, privacy: .private) code=\(submitted.code ?? "none", privacy: .public)")
+            }
+            return submitted.outcome
         } catch is CancellationError {
             return .deferred
         } catch let deferred as KnowledgeJobDeferred {
             lastFailureCode = deferred.reason.rawValue
+            AppLog.knowledge.atNotice.notice("knowledge compile deferred meeting=\(meetingID, privacy: .private) reason=\(deferred.reason.rawValue, privacy: .public)")
             return .deferred
         } catch KnowledgeStoreError.policyDenied {
             lastFailureCode = "policy_denied"
+            AppLog.knowledge.atNotice.notice("knowledge compile deferred meeting=\(meetingID, privacy: .private) reason=policy_denied")
             return .deferred
         } catch KnowledgeStoreError.sourceNotReady {
             lastFailureCode = "source_not_ready"
+            AppLog.knowledge.atNotice.notice("knowledge compile deferred meeting=\(meetingID, privacy: .private) reason=source_not_ready")
             return .deferred
         } catch {
             lastFailureCode = (error as? KnowledgeStoreError)?.rawValue ?? "compilation_failed"
+            AppLog.knowledge.atError.error("knowledge compile failed meeting=\(meetingID, privacy: .private) code=\(self.lastFailureCode ?? "compilation_failed", privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             return .failed
         }
     }
@@ -207,13 +217,16 @@ final class KnowledgeCompilationCoordinator {
                 elapsedSeconds: Date().timeIntervalSince(started), code: "interrupted"))
             throw CancellationError()
         } catch let deferred as KnowledgeJobDeferred {
+            AppLog.knowledge.atNotice.notice("knowledge compilation deferred reason=\(deferred.reason.rawValue, privacy: .public)")
             throw deferred
         } catch let obsolete as KnowledgeWorkObsolete {
+            AppLog.knowledge.atNotice.notice("knowledge compilation obsolete reason=\(obsolete.rawValue, privacy: .public)")
             throw obsolete
         } catch {
             let code = (error as? AppError)?.logCode ?? (error as? KnowledgeStoreError)?.rawValue
                 ?? (error as? KnowledgeExtractionError)?.rawValue ?? (error as? KnowledgeExtractionServiceError)?.rawValue
                 ?? (error as? KnowledgeQueueError)?.rawValue ?? "compilation_failed"
+            AppLog.knowledge.atError.error("knowledge compilation failed code=\(code, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             ReliabilityLog.record(ReliabilityEvent(operationID: runID, operation: "knowledge_compilation", outcome: .failed,
                 elapsedSeconds: Date().timeIntervalSince(started), code: code))
             throw error

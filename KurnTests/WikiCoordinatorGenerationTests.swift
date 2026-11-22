@@ -196,3 +196,65 @@ struct WikiCoordinatorGenerationTests {
         #expect(meeting.wikiArticle == nil)
     }
 }
+
+// MARK: - Explicit-trigger observability
+
+extension WikiCoordinatorGenerationTests {
+    @Test func explicitGenerateWithADeferredQueueSurfacesTheReason() async {
+        // A live recording makes the queue refuse the job (`recording`
+        // deferral); an explicit tap must translate that into a readable
+        // `lastError` tied to this meeting.
+        let harness = Harness()
+        harness.coordinator.jobQueue.setRecording(true)
+        defer { harness.coordinator.jobQueue.setRecording(false) }
+        let meeting = MeetingFixtures.transcribed("Deferred", in: harness.context)
+        let outcome = await harness.coordinator.generate(meeting, trigger: .explicit, force: true)
+        #expect(outcome == .skipped)
+        guard case .wikiGenerationDeferred(let reason)? = harness.coordinator.lastError else {
+            Issue.record("expected a wikiGenerationDeferred lastError")
+            return
+        }
+        #expect(reason == "recording")
+        #expect(harness.coordinator.lastErrorMeetingID == meeting.id)
+        #expect(harness.coordinator.lastError?.errorDescription?.isEmpty == false)
+    }
+
+    @Test func explicitGenerateWithoutTranscriptSurfacesNoTranscript() async {
+        let harness = Harness()
+        let meeting = Meeting(title: "Empty")
+        harness.context.insert(meeting)
+        try? harness.context.save()
+        let outcome = await harness.coordinator.generate(meeting, trigger: .explicit, force: true)
+        #expect(outcome == .skipped)
+        guard case .wikiGenerationDeferred(let reason)? = harness.coordinator.lastError else {
+            Issue.record("expected a wikiGenerationDeferred lastError")
+            return
+        }
+        #expect(reason == "no_transcript")
+        #expect(harness.coordinator.lastErrorMeetingID == meeting.id)
+    }
+
+    @Test func automaticGenerateStaysSilentWhenDeferred() async {
+        let harness = Harness()
+        harness.coordinator.jobQueue.setRecording(true)
+        defer { harness.coordinator.jobQueue.setRecording(false) }
+        let meeting = MeetingFixtures.transcribed("Quiet", in: harness.context)
+        let outcome = await harness.coordinator.generate(meeting)
+        #expect(outcome == .skipped)
+        #expect(harness.coordinator.lastError == nil)
+        #expect(harness.coordinator.lastErrorMeetingID == nil)
+    }
+
+    @Test func aNewExplicitAttemptClearsThePreviousError() async {
+        let harness = Harness()
+        harness.coordinator.jobQueue.setRecording(true)
+        defer { harness.coordinator.jobQueue.setRecording(false) }
+        let meeting = MeetingFixtures.transcribed("Retry", in: harness.context)
+        _ = await harness.coordinator.generate(meeting, trigger: .explicit, force: true)
+        #expect(harness.coordinator.lastError != nil)
+        // A second attempt clears first; since it also defers the error is
+        // set again for the new attempt's own reason.
+        _ = await harness.coordinator.generate(meeting, trigger: .explicit, force: true)
+        #expect(harness.coordinator.lastErrorMeetingID == meeting.id)
+    }
+}

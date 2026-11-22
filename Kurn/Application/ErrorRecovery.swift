@@ -41,6 +41,8 @@ struct ErrorRecovery: Equatable {
             // Only the caller's `onOpenNetworkSettings` shortcut offers this one:
             // the Transcription screen shows the error with the switches on screen.
             case .networkPolicyRestricted: return nil
+            case .wikiGenerationDeferred(let reason):
+                destination = .screen(Self.deferredScreen(reason: reason))
             default: destination = .screen(.providers)
             }
         case .freeSpace:
@@ -60,6 +62,17 @@ struct ErrorRecovery: Equatable {
         self.destination = destination
     }
 
+    /// The screen that resolves a deferred wiki generation's reason: cloud
+    /// grants live under Privacy & cloud, Wiki toggles under Wiki settings,
+    /// anything else under Providers.
+    private static func deferredScreen(reason: String) -> ErrorRecoveryScreen {
+        switch reason {
+        case "policy_denied", "cloud_review_required": return .privacy
+        case "knowledge_paused", "knowledge_automatic_disabled", "feature_disabled": return .knowledge
+        default: return .providers
+        }
+    }
+
     var title: String {
         switch action {
         case .retry: NSLocalizedString("error.recovery.retry", comment: "Error dialog button that reruns the failed operation")
@@ -74,7 +87,7 @@ struct ErrorRecovery: Equatable {
 
 /// A settings screen an error dialog can open in a sheet (`View+ErrorAlert.swift`).
 enum ErrorRecoveryScreen: String, Identifiable {
-    case providers, transcription, summary, storage, health, diagnostics
+    case providers, transcription, summary, storage, health, diagnostics, privacy, knowledge
 
     var id: String { rawValue }
 }

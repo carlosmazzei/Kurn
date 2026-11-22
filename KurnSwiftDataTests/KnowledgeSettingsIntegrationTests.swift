@@ -196,7 +196,7 @@ struct KnowledgeSettingsIntegrationTests {
         controls.isPaused = true
         try f.settings.saveKnowledgeControls(controls)
         await gate.release()
-        #expect(try await operation.value == KnowledgeJobQueue.Outcome.completed)
+        #expect(try await operation.value.outcome == KnowledgeJobQueue.Outcome.completed)
     }
 
     @Test func scopedRefreshCannotStrandAnUnrelatedCancellationBarrier() async throws {

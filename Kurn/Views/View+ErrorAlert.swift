@@ -53,6 +53,8 @@ extension ErrorRecoveryScreen {
         case .storage: StorageSettingsView()
         case .health: HealthRecoveryView()
         case .diagnostics: DiagnosticsSettingsView()
+        case .privacy: PrivacyCloudSettingsView()
+        case .knowledge: KnowledgeSettingsView()
         }
     }
 }

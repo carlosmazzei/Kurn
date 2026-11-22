@@ -388,6 +388,9 @@ struct MeetingGenerateEmptyState: View {
     var actionTitle: String?
     var actionIdentifier: String?
     var footnote: String?
+    /// Localized "last attempt failed" line shown when an explicit generate
+    /// already failed — destructive, under the button.
+    var errorText: String?
     var action: (() -> Void)?
 
     var body: some View {
@@ -401,6 +404,11 @@ struct MeetingGenerateEmptyState: View {
                 Button(actionTitle, action: action)
                     .inkProminent()
                     .accessibilityIdentifier(actionIdentifier ?? "")
+                if let errorText {
+                    Text(errorText)
+                        .font(Theme.footnote)
+                        .foregroundStyle(Theme.destructive)
+                }
                 if let footnote {
                     Text(footnote)
                         .font(Theme.footnote)

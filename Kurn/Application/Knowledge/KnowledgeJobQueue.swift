@@ -110,16 +110,17 @@ final class KnowledgeJobQueue {
         try await storeHost.writer().storeJobProgress(data, handle: handle)
     }
 
-    func submit(_ work: KnowledgeQueuedWork, explicit: Bool, restartCompleted: Bool = false) async throws -> Outcome {
+    func submit(_ work: KnowledgeQueuedWork, explicit: Bool, restartCompleted: Bool = false) async throws -> (outcome: Outcome, code: String?) {
         let record = try await storeHost.writer().enqueue(work, explicitRetry: explicit, restartCompleted: restartCompleted)
-        if record.state == .succeeded { return .completed }
-        if record.state == .failed { return .failed }
-        if record.state == .cancelled { return .deferred }
+        if record.state == .succeeded { return (.completed, record.code) }
+        if record.state == .failed { return (.failed, record.code) }
+        if record.state == .cancelled { return (.deferred, record.code) }
         if cancellationInProgress {
             resumeCancellation()
             await cancellationTask?.value
         }
-        guard canRun(record.envelope?.work ?? work) else { return .deferred }
+        let gatedWork = record.envelope?.work ?? work
+        if let blockCode = runBlockCode(gatedWork) { return (.deferred, record.code ?? blockCode) }
         if explicit && foreground && record.state != .running { explicitJobs.insert(record.id) }
         wake()
         await drainTask?.value
@@ -130,14 +131,14 @@ final class KnowledgeJobQueue {
         if let error = runErrors.removeValue(forKey: record.id) { throw error }
         let records = try await storeHost.writer().queuedJobs(kinds: Set(handlers.keys))
         if let pending = records.first(where: { $0.id == record.id }) {
-            return pending.state == .running ? .deferred : (pending.code == "work_failed" ? .failed : .deferred)
+            return (pending.state == .running ? .deferred : (pending.code == "work_failed" ? .failed : .deferred), pending.code)
         }
         // Terminal rows are omitted from the pending query. Read the original
         // identity without restarting a completed job or granting another retry.
         let terminal = try await storeHost.writer().jobState(id: record.id)
         explicitJobs.remove(record.id)
-        guard let terminal else { return .deferred }
-        return terminal == .succeeded ? .completed : (terminal == .cancelled ? .deferred : .failed)
+        guard let terminal else { return (.deferred, nil) }
+        return (terminal == .succeeded ? .completed : (terminal == .cancelled ? .deferred : .failed), lastFailureCode)
     }
 
     /// Stops publication immediately, then cancels only work predating this
@@ -187,8 +188,18 @@ final class KnowledgeJobQueue {
     }
 
     private func canRun(_ work: KnowledgeQueuedWork) -> Bool {
-        !cancellationInProgress && !recording && (eligibility[work.kind.rawValue]?(work) ?? true)
-            && (foreground || (backgroundOpportunity && work.provider.kind == .appleOnDevice))
+        runBlockCode(work) == nil
+    }
+
+    /// The closed-vocabulary reason `canRun` currently refuses `work`, or nil
+    /// when it can run — surfaced to explicit submissions so a silent deferral
+    /// becomes a readable "why".
+    private func runBlockCode(_ work: KnowledgeQueuedWork) -> String? {
+        if cancellationInProgress { return "cancelled" }
+        if recording { return "recording" }
+        if !(eligibility[work.kind.rawValue]?(work) ?? true) { return "knowledge_paused" }
+        if !(foreground || (backgroundOpportunity && work.provider.kind == .appleOnDevice)) { return "background" }
+        return nil
     }
 
     private func pause() {

@@ -55,6 +55,14 @@ final class WikiCoordinator {
     /// bulk Settings run), for a view to surface via `.errorAlert`. Never set
     /// by an automatic background failure — see `generate`'s catch block.
     var lastError: AppError?
+    /// Meeting an explicit `lastError` belongs to, so a tab only shows its own
+    /// failure. Cleared when a new explicit attempt starts.
+    private(set) var lastErrorMeetingID: UUID?
+
+    private func recordExplicitError(_ error: AppError, meetingID: UUID) {
+        lastError = error
+        lastErrorMeetingID = meetingID
+    }
     /// True while a backfill sweep is running, so it never overlaps itself.
     private(set) var isBackfilling = false
 
@@ -113,7 +121,7 @@ final class WikiCoordinator {
         localOnly: Bool = false
     ) async -> GenerationOutcome {
         let meetingID = meeting.id
-        if trigger == .explicit { lastError = nil }
+        if trigger == .explicit { lastError = nil; lastErrorMeetingID = nil }
         guard !generatingMeetingIDs.contains(meetingID), let settings = appSettings,
               settings.wikiEnabled || trigger == .explicit else { return .skipped }
         let provider = settings.wikiGenerationProvider
@@ -121,7 +129,12 @@ final class WikiCoordinator {
         let model = settings.wikiGenerationModel
         let generator = Self.generatorIdentifier(provider: provider, model: model)
         let text = meeting.assembledContextText()
-        guard !text.isEmpty else { return .skipped }
+        guard !text.isEmpty else {
+            if trigger == .explicit {
+                recordExplicitError(.wikiGenerationDeferred(reason: "no_transcript"), meetingID: meetingID)
+            }
+            return .skipped
+        }
         let hash = Self.contentHash(text)
         if !force, let article = meeting.wikiArticle,
            article.sourceContentHash == hash, article.generatorModelIdentifier == generator { return .skipped }
@@ -131,14 +144,30 @@ final class WikiCoordinator {
             let work = try KnowledgeQueuedWork.article(meetingID: meetingID, generator: generator, provider: provider,
                 model: model, fingerprint: hash, force: force, explicit: trigger == .explicit, generation: clearedGeneration,
                 priorArticleVersion: meeting.wikiArticle.map(Self.articleVersion))
-            let outcome = try await jobQueue.submit(work, explicit: trigger == .explicit, restartCompleted: true)
-            switch outcome {
-            case .completed: return .generated
-            case .deferred: return .skipped
-            case .failed: return .failed
+            AppLog.wiki.atNotice.notice("wiki generate submitted meeting=\(meetingID, privacy: .private) provider=\(provider.id, privacy: .public) model=\(model, privacy: .public) explicit=\(trigger == .explicit, privacy: .public)")
+            let result = try await jobQueue.submit(work, explicit: trigger == .explicit, restartCompleted: true)
+            switch result.outcome {
+            case .completed:
+                return .generated
+            case .deferred:
+                AppLog.wiki.atNotice.notice("wiki generate deferred meeting=\(meetingID, privacy: .private) reason=\(result.code ?? "unknown", privacy: .public)")
+                if trigger == .explicit {
+                    recordExplicitError(.wikiGenerationDeferred(reason: result.code ?? "unknown"), meetingID: meetingID)
+                }
+                return .skipped
+            case .failed:
+                AppLog.wiki.atError.error("wiki generate failed meeting=\(meetingID, privacy: .private) code=\(result.code ?? "unknown", privacy: .public)")
+                if trigger == .explicit, lastError == nil {
+                    recordExplicitError(.wikiGenerationDeferred(reason: "last_attempt_failed"), meetingID: meetingID)
+                }
+                return .failed
             }
         } catch {
-            if trigger == .explicit, lastError == nil { lastError = (error as? AppError) ?? .wikiGenerationFailed(error.localizedDescription) }
+            let code = (error as? AppError)?.logCode ?? "unexpected"
+            AppLog.wiki.atError.error("wiki generate failed meeting=\(meetingID, privacy: .private) code=\(code, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
+            if trigger == .explicit, lastError == nil {
+                recordExplicitError((error as? AppError) ?? .wikiGenerationFailed(error.localizedDescription), meetingID: meetingID)
+            }
             return .failed
         }
     }
@@ -182,6 +211,7 @@ final class WikiCoordinator {
             let markdown = try await wikiService.generate(transcriptText: text, meetingTitle: meeting.aiTitle ?? meeting.title,
                 provider: work.provider, model: work.model, resume: checkpoint, onMapStageCompleted: { [weak self] checkpoint in
                     guard let self else { throw CancellationError() }
+                    AppLog.wiki.atInfo.info("wiki map stage completed meeting=\(work.meetingID, privacy: .private)")
                     let bytes = try KnowledgeStoreRows.authoritativeData(checkpoint)
                     try await self.jobQueue.checkpoint(bytes, for: handle)
                 })
@@ -209,17 +239,22 @@ final class WikiCoordinator {
         } catch KnowledgeQueueError.staleLease {
             throw KnowledgeWorkObsolete.sourceDeleted
         } catch let obsolete as KnowledgeWorkObsolete {
+            AppLog.wiki.atNotice.notice("wiki generation obsolete reason=\(obsolete.rawValue, privacy: .public)")
             throw obsolete
         } catch let deferred as KnowledgeJobDeferred {
+            AppLog.wiki.atNotice.notice("wiki generation deferred reason=\(deferred.reason.rawValue, privacy: .public)")
             throw deferred
         } catch {
             if case AppError.persistenceFailed = error {} else {
                 await providerCircuitBreaker.recordFailure(providerID: work.provider.id, failure: ProviderCircuitFailure(error: error))
             }
             let code = (error as? AppError)?.logCode ?? "unexpected"
+            AppLog.wiki.atError.error("wiki generation failed code=\(code, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             ReliabilityLog.record(ReliabilityEvent(operationID: runID, operation: "wiki_generation", outcome: .failed,
                 elapsedSeconds: Date().timeIntervalSince(startedAt), code: code))
-            if handle.isExplicit { lastError = (error as? AppError) ?? .wikiGenerationFailed(error.localizedDescription) }
+            if handle.isExplicit {
+                recordExplicitError((error as? AppError) ?? .wikiGenerationFailed(error.localizedDescription), meetingID: work.meetingID)
+            }
             throw error
         }
     }

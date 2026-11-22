@@ -90,8 +90,17 @@ struct MeetingKnowledgeView: View {
 
     /// Compact generate affordance for the no-page-with-contributions case —
     /// the big "No page yet" empty state would bury the real content.
+    /// The most recent explicit failure's reason, only when it belongs to
+    /// this meeting — automatic runs stay silent (logs only).
+    private var lastAttemptErrorText: String? {
+        guard wiki.lastErrorMeetingID == meeting.id, let error = wiki.lastError else { return nil }
+        return String(format: NSLocalizedString("knowledge.last_attempt_failed", comment: "Inline wiki failure reason"),
+                      error.errorDescription ?? error.localizedDescription)
+    }
+
     @ViewBuilder
     private var compactPageRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
         HStack(spacing: 10) {
             if isGeneratingArticle {
                 ProgressView().controlSize(.small)
@@ -101,6 +110,11 @@ struct MeetingKnowledgeView: View {
                 KnowledgeChipButton(title: NSLocalizedString("detail.wiki.generate", comment: "Generate page"),
                                     systemImage: "sparkles", action: generate)
                     .accessibilityIdentifier("knowledge.generateNotes")
+            }
+        }
+            if let lastAttemptErrorText {
+                Text(lastAttemptErrorText)
+                    .font(Theme.footnote).foregroundStyle(Theme.destructive)
             }
         }
     }
@@ -146,6 +160,7 @@ struct MeetingKnowledgeView: View {
                         : nil,
                     actionIdentifier: "knowledge.generateNotes",
                     footnote: wikiModelNudge,
+                    errorText: lastAttemptErrorText,
                     action: generate
                 )
             }
