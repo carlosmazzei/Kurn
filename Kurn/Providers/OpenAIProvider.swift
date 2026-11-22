@@ -353,11 +353,16 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
         // the entire budget and leaving `message.content` empty. Keep this
         // OpenAI/GPT-5-specific so compatible vendors are not sent a parameter
         // they may not implement.
-        if provider.id == AIProvider.openAI.id,
-           chatModel.lowercased().hasPrefix("gpt-5") {
+        if provider.id == AIProvider.openAI.id, Self.usesLowReasoningEffort(chatModel) {
             body["reasoning_effort"] = "low"
         }
         if let format = Self.jsonResponseFormat(options, providerID: provider.id) { body["response_format"] = format }
+        // One cache key per extraction prompt version: every block of every
+        // meeting shares the same long system prompt, so OpenAI can route the
+        // passes to the same prompt cache (official endpoint only).
+        if options.requiresCompleteJSON, provider.id == AIProvider.openAI.id {
+            body["prompt_cache_key"] = Self.extractionPromptCacheKey
+        }
         let request = try makeRequest(timeout: options.timeout, body: body)
 
         let (data, _) = try await LLMHTTP.sendValidated(
@@ -534,6 +539,16 @@ private extension Data {
 }
 
 extension OpenAIProvider {
+    static let extractionPromptCacheKey = "kurn.knowledge.extraction.v1"
+
+    /// GPT-5 and later reasoning models count hidden reasoning against the
+    /// completion budget; low effort keeps a chat answer or a structured
+    /// extraction from spending most of its time and tokens thinking.
+    static func usesLowReasoningEffort(_ model: String) -> Bool {
+        let name = model.lowercased()
+        return name.hasPrefix("gpt-5") || name.hasPrefix("gpt-6")
+    }
+
     /// JSON mode for structured extraction on the vendors that document it
     /// (OpenAI Chat Completions / Responses via `text.format`, Groq). Other
     /// compatible endpoints are left unchanged — an unknown parameter can be

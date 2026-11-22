@@ -119,7 +119,7 @@ struct AnthropicProvider: LLMProvider {
             body: [
                 "model": model,
                 "max_tokens": options.maxOutputTokens,
-                "system": systemPrompt,
+                "system": Self.systemField(systemPrompt, options),
                 "messages": wire
             ]
         )
@@ -230,4 +230,15 @@ private struct StreamEvent: Decodable {
     let type: String
     let delta: Delta?
     let error: ErrorInfo?
+}
+
+extension AnthropicProvider {
+    /// Structured extraction repeats one long system prompt for every block of
+    /// a meeting; marking it `cache_control: ephemeral` lets the second and
+    /// later passes read it from Anthropic's prompt cache. Other calls keep the
+    /// plain string they always sent.
+    static func systemField(_ systemPrompt: String, _ options: TextGenerationOptions) -> Any {
+        guard options.requiresCompleteJSON else { return systemPrompt }
+        return [["type": "text", "text": systemPrompt, "cache_control": ["type": "ephemeral"]]]
+    }
 }
