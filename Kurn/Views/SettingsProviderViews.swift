@@ -604,31 +604,39 @@ struct ProviderRow: View {
 
     @Environment(AppSettings.self) private var settings
 
+    private var usable: Bool { settings.credentials.isUsable(provider) }
+
+    /// One-line status: on-device, key saved, or the missing-key cases —
+    /// transcription-only providers (ElevenLabs) say so instead of hinting
+    /// at a chat use they don't have.
+    private var status: String {
+        if provider.kind == .appleOnDevice {
+            return NSLocalizedString("settings.provider_status.on_device", comment: "On device")
+        }
+        if usable {
+            return NSLocalizedString("settings.provider_status.key_saved", comment: "Key saved")
+        }
+        if provider.supportsTranscription && !provider.supportsSummarization {
+            return NSLocalizedString("settings.provider_status.transcription_no_key", comment: "Transcription only")
+        }
+        return NSLocalizedString("settings.provider_status.no_key", comment: "No key")
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            ProviderIcon(provider: provider)
+            SettingsRowIcon(systemImage: "cpu")
             VStack(alignment: .leading, spacing: 2) {
                 Text(provider.displayName).font(Theme.subheadlineEmphasized)
-                Text(provider.kind.displayName)
+                Text(status)
                     .font(Theme.caption)
                     .foregroundStyle(Theme.textSecondary)
-                if provider.kind == .appleOnDevice {
-                    OnDeviceStatusLabel(reason: OnDeviceModelAvailability.unavailableReason)
-                        .id(settings.credentials.revision)
-                } else {
-                    let configured = settings.credentials.hasKey(for: provider)
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(configured ? Theme.success : Theme.textTertiary)
-                            .frame(width: 6, height: 6)
-                        Text(configured
-                             ? NSLocalizedString("settings.configured", comment: "Configured")
-                             : NSLocalizedString("settings.not_configured", comment: "Not configured"))
-                            .font(Theme.caption)
-                            .foregroundStyle(Theme.textSecondary)
-                    }
                     .id(settings.credentials.revision)
-                }
+            }
+            Spacer()
+            if usable {
+                Image(systemName: "checkmark.circle")
+                    .foregroundStyle(Theme.success)
+                    .accessibilityHidden(true)
             }
         }
     }

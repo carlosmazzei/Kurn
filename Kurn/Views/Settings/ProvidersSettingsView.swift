@@ -18,7 +18,7 @@ struct ProvidersSettingsView: View {
 
     var body: some View {
         Form {
-            Section(NSLocalizedString("settings.providers", comment: "AI Providers")) {
+            Section {
                 ForEach(settings.providers) { provider in
                     NavigationLink {
                         ProviderEditor(
@@ -41,16 +41,25 @@ struct ProvidersSettingsView: View {
                     }
                     .accessibilityIdentifier("settings.providers.row.\(provider.id)")
                 }
-                Button {
-                    showingAddProvider = true
-                } label: {
-                    Label(NSLocalizedString("settings.add_provider", comment: "Add Provider"), systemImage: "plus")
-                }
-                .accessibilityIdentifier("settings.providers.add")
+            } header: {
+                Text(NSLocalizedString("settings.providers", comment: "AI Providers"))
+            } footer: {
+                Text(NSLocalizedString("settings.providers.keychain_footer", comment: "Keys stay in the device Keychain"))
             }
         }
         .accessibilityIdentifier("settings.providers.form")
         .navigationTitle(NSLocalizedString("settings.providers", comment: "AI Providers"))
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingAddProvider = true
+                } label: {
+                    Image(systemName: "plus")
+                        .accessibilityLabel(NSLocalizedString("settings.add_provider", comment: "Add Provider"))
+                }
+                .accessibilityIdentifier("settings.providers.add")
+            }
+        }
         .errorAlert($keychainError, offersRecovery: false)
         .sheet(isPresented: $showingAddProvider) {
             NavigationStack {

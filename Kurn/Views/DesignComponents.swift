@@ -195,6 +195,21 @@ struct FilterChip: View {
 /// Title with its explanation directly underneath, for Form rows (toggles,
 /// pickers, buttons) whose meaning would otherwise live in a section footer
 /// several rows away from the control it describes.
+/// The 30pt grey icon well used by every Settings hub row — one component
+/// so all screens share the same well size, radius and glyph colour.
+struct SettingsRowIcon: View {
+    let systemImage: String
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 15))
+            .foregroundStyle(Theme.textSecondary)
+            .accessibilityHidden(true)
+            .frame(width: 30, height: 30)
+            .background(Theme.fill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
 struct SettingsRowLabel: View {
     let title: String
     let detail: String

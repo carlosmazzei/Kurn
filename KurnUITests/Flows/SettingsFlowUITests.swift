@@ -158,7 +158,16 @@ final class SettingsFlowUITests: FlowUITestCase {
 
         let picker = anyElement("settings.fluid_audio.diarization_model")
         XCTAssertTrue(scrollUntilExists(picker), "The default FluidAudio diarization model picker is missing")
-        scrollIntoSafeArea(picker)
+        // The model picker row is recycled out of the list hierarchy when it
+        // scrolls past the top edge, so anchor on the speaker-count stepper at
+        // the bottom of the same section (always on screen once "Who spoke"
+        // is reached) and walk the picker back down into the safe area.
+        let speakers = app.steppers.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Number of Speakers")
+        ).firstMatch
+        XCTAssertTrue(scrollUntilExists(speakers), "The diarization speaker-count control is missing")
+        for _ in 0..<8 where !picker.isHittable { app.swipeDown() }
+        XCTAssertTrue(picker.isHittable, "The diarization model picker is not reachable")
         let before = pickerValue(picker)
         XCTAssertTrue(before.contains("Pyannote"), "Fresh install should default to Pyannote, got \(before)")
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
@@ -235,7 +244,11 @@ final class SettingsFlowUITests: FlowUITestCase {
         // failure row is the reliable handle (its log line starts with
         // "<operation>: failed").
         let allClear = app.descendants(matching: .any).matching(
-            NSPredicate(format: "identifier == %@ OR label == %@", "health.all_clear", "Nothing needs attention")
+            NSPredicate(
+                format: "identifier IN %@ OR label IN %@",
+                ["health.all_clear", "health.needs_attention"],
+                ["Nothing needs attention", "Needs attention"]
+            )
         ).firstMatch
         let failures = app.descendants(matching: .any).matching(
             NSPredicate(

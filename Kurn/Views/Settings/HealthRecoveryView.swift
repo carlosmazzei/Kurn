@@ -44,6 +44,13 @@ struct HealthRecoveryView: View {
     @State var pendingQuarantineDeletion: QuarantinedRecording?
     @State var quarantineShareItem: ShareItem?
 
+    /// Total open items across every check — the status card's count line.
+    var issueCount: Int {
+        recoveryNeeded.count + stalledTranscriptions.count + degraded.count
+            + quarantineItems.count + corruptModels.count + blockedProviders.count
+            + recentFailures.count
+    }
+
     var isEmpty: Bool {
         HealthRecoveryAggregation.isEmpty(
             recoveryNeeded: recoveryNeeded,
@@ -58,16 +65,28 @@ struct HealthRecoveryView: View {
 
     var body: some View {
         List {
-            if isEmpty {
-                Section {
-                    Label(
-                        NSLocalizedString("health.all_clear", comment: "Nothing needs attention"),
-                        systemImage: "checkmark.circle.fill"
-                    )
-                    .foregroundStyle(Theme.textSecondary)
-                    .accessibilityIdentifier("health.all_clear")
+            Section {
+                HStack(spacing: 12) {
+                    Image(systemName: isEmpty ? "checkmark.circle" : "exclamationmark.triangle")
+                        .font(.title2)
+                        .foregroundStyle(isEmpty ? Theme.success : Theme.warning)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(isEmpty
+                             ? NSLocalizedString("health.all_clear", comment: "Nothing needs attention")
+                             : NSLocalizedString("health.needs_attention", comment: "Needs attention"))
+                            .font(Theme.subheadlineEmphasized)
+                        Text(isEmpty
+                             ? NSLocalizedString("health.all_clear_detail", comment: "All checks pass")
+                             : String(format: NSLocalizedString("health.issues_count", comment: "N items"), issueCount))
+                            .font(Theme.caption)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
                 }
-            } else {
+                .padding(.vertical, 4)
+                .accessibilityIdentifier(isEmpty ? "health.all_clear" : "health.needs_attention")
+            }
+            if !isEmpty {
                 recoverySection
                 stalledSection
                 degradedSection

@@ -7,6 +7,7 @@ struct KnowledgeSettingsView: View {
     @Query(sort: \Meeting.createdAt, order: .reverse) private var allMeetings: [Meeting]
     @Environment(KnowledgeSettingsCoordinator.self) private var management: KnowledgeSettingsCoordinator?
     @Environment(KnowledgeDeletionCoordinator.self) private var deletion: KnowledgeDeletionCoordinator?
+    @Environment(WikiCoordinator.self) private var wiki
     @State private var sourceIDs: Set<UUID> = []
     @State private var showingSources = false
     @State private var rebuild = false
@@ -20,6 +21,10 @@ struct KnowledgeSettingsView: View {
     @State private var resetting = false
     @State private var deleting = false
     @State private var pendingCloudProvider: AIProvider?
+    /// Per-meeting generated articles (the old `WikiSettingsView` content,
+    /// merged into this screen): count refreshes on appear and after bulk runs.
+    @State private var wikiArticleCount = 0
+    @State private var showingWikiClear = false
 
     var body: some View {
         @Bindable var presentation = model
@@ -91,6 +96,21 @@ struct KnowledgeSettingsView: View {
             primaryAction: { do { try settings.resetKnowledgeControls() } catch { model.reportError() } },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
         )
+        .task { wikiArticleCount = wiki.articleCount() }
+        .kurnDialog(
+            isPresented: $showingWikiClear,
+            iconSystemName: "trash.circle.fill",
+            iconTint: Theme.warning,
+            title: NSLocalizedString("settings.wiki_clear_confirm.title", comment: "Clear wiki confirmation"),
+            message: NSLocalizedString("settings.wiki_clear_confirm.message", comment: "Clear wiki message"),
+            primaryTitle: NSLocalizedString("settings.wiki_clear", comment: "Clear wiki"),
+            primaryRole: .destructive,
+            primaryAction: {
+                wiki.clearWiki()
+                wikiArticleCount = wiki.articleCount()
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
         .kurnDialog(
             isPresented: $deleting,
             iconSystemName: "exclamationmark.triangle.fill",
@@ -125,9 +145,8 @@ struct KnowledgeSettingsView: View {
                     .disabled(!settings.knowledgeEnabled).accessibilityIdentifier("knowledge.settings.automatic")
                 Toggle(KnowledgeSettingsCopy.text("pause"), isOn: binding(controls, \.isPaused))
                     .disabled(!settings.knowledgeEnabled).accessibilityIdentifier("knowledge.settings.paused")
-                Toggle(KnowledgeSettingsCopy.text("export"), isOn: Binding(get: { settings.knowledgeExportEnabled },
-                                                                           set: { enabled in Task { await setExport(enabled) } }))
-                    .disabled(!settings.knowledgeEnabled).accessibilityIdentifier("knowledge.settings.export")
+            } footer: { Text(KnowledgeSettingsCopy.text("wiki_about")) }
+            Section {
                 Picker(KnowledgeSettingsCopy.text("provider"), selection: Binding(
                     get: { controls.providerID },
                     set: { id in choose(id, controls: controls) }
@@ -135,9 +154,15 @@ struct KnowledgeSettingsView: View {
                     ForEach(knowledgeProviders) { Text(verbatim: $0.displayName).tag($0.id) }
                 }
                 .accessibilityIdentifier("knowledge.settings.provider")
+            } header: {
+                Text(KnowledgeSettingsCopy.text("section_write"))
+            } footer: { Text(KnowledgeSettingsCopy.text("automatic_detail")) }
+            Section {
                 NavigationLink(KnowledgeSettingsCopy.text("scope")) { KnowledgeScopeSettingsView(controls: controls) }
                     .accessibilityIdentifier("knowledge.settings.scope")
-            } footer: { Text(KnowledgeSettingsCopy.text("automatic_detail")) }
+            } header: {
+                Text(KnowledgeSettingsCopy.text("section_meetings"))
+            }
             Section {
                 Button { showingSources = true } label: { Label(KnowledgeSettingsCopy.text("choose"), systemImage: "checklist") }
                     .accessibilityIdentifier("knowledge.settings.choose")
@@ -151,6 +176,17 @@ struct KnowledgeSettingsView: View {
                     Button(KnowledgeSettingsCopy.text("pages")) { action = .init(action: .pages) }
                 }
                 .disabled(!settings.knowledgeEnabled || sourceIDs.isEmpty || model.isBusy || management.progress?.isRunning == true)
+                Button {
+                    Task {
+                        await wiki.rebuildWiki()
+                        wikiArticleCount = wiki.articleCount()
+                    }
+                } label: {
+                    Label(KnowledgeSettingsCopy.text("rewrite"), systemImage: "arrow.clockwise")
+                }
+                .disabled(wiki.bulkOperation != nil || !settings.wikiEnabled || !settings.credentials.isUsable(settings.aiProvider))
+            } header: {
+                Text(KnowledgeSettingsCopy.text("section_older"))
             } footer: { Text(KnowledgeSettingsCopy.text("selection_detail")) }
             if let plan = model.plan {
                 Section(KnowledgeSettingsCopy.text("preview")) {
@@ -173,6 +209,59 @@ struct KnowledgeSettingsView: View {
             }
             if let coverage = model.coverage { KnowledgeCoverageSection(report: coverage.report) }
             Section {
+                let hasKey = settings.credentials.isUsable(settings.aiProvider)
+                Toggle(
+                    isOn: Binding(
+                        get: { settings.wikiEnabled && hasKey },
+                        set: { settings.wikiEnabled = $0 }
+                    )
+                ) {
+                    SettingsRowLabel(
+                        title: NSLocalizedString("settings.wiki", comment: "Meeting wiki toggle"),
+                        detail: hasKey
+                            ? NSLocalizedString("settings.wiki_footer", comment: "Meeting wiki footer")
+                            : wikiUnavailableFooter
+                    )
+                }
+                .disabled(!hasKey)
+                .accessibilityIdentifier("settings.wiki")
+                LabeledContent(
+                    NSLocalizedString("settings.wiki_articles", comment: "Wiki article count"),
+                    value: "\(wikiArticleCount)"
+                )
+                if let progress = wiki.bulkOperation {
+                    wikiBulkProgressRow(progress)
+                }
+                Button {
+                    Task {
+                        await wiki.generateMissing()
+                        wikiArticleCount = wiki.articleCount()
+                    }
+                } label: {
+                    Label(
+                        NSLocalizedString("settings.wiki_generate_missing", comment: "Generate missing wiki articles"),
+                        systemImage: "plus.circle"
+                    )
+                }
+                .disabled(wiki.bulkOperation != nil || !settings.wikiEnabled || !hasKey)
+            } header: {
+                Text(KnowledgeSettingsCopy.text("section_meeting_pages"))
+            } footer: { Text(NSLocalizedString("settings.wiki_section_footer", comment: "Explains Generate Missing")) }
+            Section {
+                Toggle(KnowledgeSettingsCopy.text("export"), isOn: Binding(get: { settings.knowledgeExportEnabled },
+                                                                           set: { enabled in Task { await setExport(enabled) } }))
+                    .disabled(!settings.knowledgeEnabled).accessibilityIdentifier("knowledge.settings.export")
+                    .tint(Theme.link)
+                Button(role: .destructive) { showingWikiClear = true } label: {
+                    Label(
+                        NSLocalizedString("settings.wiki_clear", comment: "Clear wiki"),
+                        systemImage: "trash"
+                    )
+                }
+                .disabled(wiki.bulkOperation != nil || wikiArticleCount == 0)
+                .accessibilityIdentifier("settings.wiki.clear")
+            }
+            Section {
                 Button(KnowledgeSettingsCopy.text("delete"), role: .destructive) { deleting = true }
                     .disabled(deletion == nil || model.isDeletingCorpus || deletion?.isDeletingCorpus == true
                         || management.progress?.isRunning == true)
@@ -192,6 +281,39 @@ struct KnowledgeSettingsView: View {
                 Section(KnowledgeSettingsCopy.text("progress")) { ProgressView() }
             }
         }
+    }
+
+    /// The reason the meeting-articles toggle is disabled, when it is — names
+    /// the on-device unavailability reason rather than always suggesting a key.
+    private var wikiUnavailableFooter: String {
+        if settings.aiProvider.kind == .appleOnDevice, let reason = OnDeviceModelAvailability.unavailableReason {
+            return reason
+        }
+        return NSLocalizedString("settings.wiki_needs_key", comment: "Meeting wiki needs an API key")
+    }
+
+    /// Determinate "N of M" progress for a wiki bulk run, straight from the
+    /// coordinator's observable `bulkOperation`.
+    @ViewBuilder
+    private func wikiBulkProgressRow(
+        _ progress: (kind: WikiCoordinator.BulkOperationKind, completed: Int, total: Int)
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(progress.kind == .missingOnly
+                 ? NSLocalizedString("settings.wiki_generating_missing", comment: "Generating missing wikis")
+                 : NSLocalizedString("settings.wiki_rebuilding", comment: "Rebuilding wiki"))
+                .font(.subheadline)
+                .foregroundStyle(Theme.textPrimary)
+            ProgressView(value: Double(progress.completed), total: Double(progress.total))
+            Text(String(
+                format: NSLocalizedString("settings.wiki_bulk_progress", comment: "N of M meetings"),
+                progress.completed, progress.total
+            ))
+            .font(.caption)
+            .foregroundStyle(Theme.textSecondary)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
     }
 
     private func binding(_ controls: KnowledgeControls, _ key: WritableKeyPath<KnowledgeControls, Bool>) -> Binding<Bool> {

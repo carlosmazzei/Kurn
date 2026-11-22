@@ -23,6 +23,11 @@ struct StorageSettingsView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var storageText = "—"
+    /// The stacked usage bar's three segments: audio (originals + enhanced
+    /// copies), on-device models, and whatever else the app container holds.
+    @State private var usageAudio: Int64 = 0
+    @State private var usageModels: Int64 = 0
+    @State private var usageOther: Int64 = 0
     /// Free space on the volume, for context next to what Kurn is using.
     @State private var freeSpaceText = "—"
     /// Current estimate of temp files that can be removed by the manual cleanup.
@@ -45,14 +50,24 @@ struct StorageSettingsView: View {
     var body: some View {
         Form {
             Section(NSLocalizedString("settings.storage", comment: "Storage")) {
-                LabeledContent(
-                    NSLocalizedString("settings.audio_usage", comment: "Audio usage"),
-                    value: storageText
-                )
+                VStack(alignment: .leading, spacing: 8) {
+                    StorageUsageBar(audio: usageAudio, models: usageModels, other: usageOther)
+                    HStack(spacing: 12) {
+                        legendDot(Theme.ink, NSLocalizedString("settings.storage.audio", comment: "Audio"), usageAudio)
+                        legendDot(Theme.textSecondary, NSLocalizedString("settings.models", comment: "On-device models"), usageModels)
+                        legendDot(Theme.decorationTertiary, NSLocalizedString("settings.storage.other", comment: "Other"), usageOther)
+                    }
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                }
+                .padding(.vertical, 4)
+                .accessibilityElement(children: .combine)
                 LabeledContent(
                     NSLocalizedString("settings.free_space", comment: "Free space"),
                     value: freeSpaceText
                 )
+            }
+            Section(NSLocalizedString("settings.storage.free_up", comment: "Free up space")) {
                 if enhancedAudioBytes > 0 {
                     Button {
                         showingDeleteEnhancedConfirm = true
@@ -317,6 +332,38 @@ struct StorageSettingsView: View {
     func refreshStorage() {
         storageText = AudioFileStore.formattedSize(AudioFileStore.totalAudioBytes())
         freeSpaceText = AudioFileStore.formattedSize(ResourceGuard.availableStorageBytes() ?? 0)
+        usageAudio = AudioFileStore.totalAudioBytes() + enhancedAudioBytes
+        usageModels = downloads.installedModels.reduce(0) { $0 + $1.size }
+        let footprint = Self.appFootprintBytes()
+        usageOther = max(footprint - usageAudio - usageModels, 0)
+    }
+
+    /// Everything under the app's own containers, recursively — the "Other"
+    /// segment is whatever this leaves after audio and models.
+    private static func appFootprintBytes() -> Int64 {
+        let fm = FileManager.default
+        var total: Int64 = 0
+        for domain in [FileManager.SearchPathDirectory.documentDirectory,
+                       .applicationSupportDirectory] {
+            guard let base = fm.urls(for: domain, in: .userDomainMask).first,
+                  let enumerator = fm.enumerator(
+                      at: base,
+                      includingPropertiesForKeys: [.fileSizeKey],
+                      options: [.skipsHiddenFiles]
+                  ) else { continue }
+            for case let url as URL in enumerator {
+                let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+                total += Int64(size)
+            }
+        }
+        return total
+    }
+
+    private func legendDot(_ color: Color, _ label: String, _ bytes: Int64) -> some View {
+        HStack(spacing: 4) {
+            Circle().fill(color).frame(width: 7, height: 7)
+            Text("\(label) \(AudioFileStore.formattedSize(bytes))")
+        }
     }
 
     private func loadCacheCleanupPreview() async -> (files: Int, bytes: Int64) {
@@ -354,5 +401,33 @@ struct StorageSettingsView: View {
         } catch {
             quarantineError = .audioError(error.localizedDescription)
         }
+    }
+}
+
+/// The three-segment usage bar at the top of Storage: audio in ink, models in
+/// secondary, everything else a hairline-grey remainder.
+struct StorageUsageBar: View {
+    let audio: Int64
+    let models: Int64
+    let other: Int64
+
+    var body: some View {
+        let total = max(audio + models + other, 1)
+        GeometryReader { geo in
+            HStack(spacing: 2) {
+                segment(Theme.ink, fraction: CGFloat(audio) / CGFloat(total), width: geo.size.width)
+                segment(Theme.textSecondary, fraction: CGFloat(models) / CGFloat(total), width: geo.size.width)
+                segment(Theme.decorationTertiary, fraction: CGFloat(other) / CGFloat(total), width: geo.size.width)
+            }
+        }
+        .frame(height: 10)
+        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        .accessibilityHidden(true)
+    }
+
+    private func segment(_ color: Color, fraction: CGFloat, width: CGFloat) -> some View {
+        Rectangle()
+            .fill(color)
+            .frame(width: max(width * fraction, fraction > 0 ? 3 : 0))
     }
 }
