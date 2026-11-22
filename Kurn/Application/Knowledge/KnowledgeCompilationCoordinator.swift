@@ -68,6 +68,14 @@ final class KnowledgeCompilationCoordinator {
         compilationProgress[meetingID] = entry
     }
 
+    /// Stops this meeting's running knowledge update: the in-flight provider
+    /// request is cancelled, nothing is published and no failure is shown.
+    func stopUpdate(meetingID: UUID) {
+        guard jobQueue.cancelRunning(kind: .extraction, meetingID: meetingID) else { return }
+        compilationProgress[meetingID] = nil
+        AppLog.knowledge.atNotice.notice("knowledge compile stop requested meeting=\(meetingID, privacy: .private)")
+    }
+
     private func noteExtractedFacts(_ meetingID: UUID, count: Int) {
         guard var entry = compilationProgress[meetingID] else { return }
         entry.factsSoFar += count
@@ -173,6 +181,10 @@ final class KnowledgeCompilationCoordinator {
             }
             AppLog.knowledge.atNotice.notice("knowledge compile submitted meeting=\(meetingID, privacy: .private) provider=\(provider.id, privacy: .public) model=\(model, privacy: .public) explicit=\(trigger == .explicit, privacy: .public)")
             let submitted = try await jobQueue.submit(work, explicit: trigger == .explicit)
+            if submitted.code == "user_cancelled" {
+                AppLog.knowledge.atNotice.notice("knowledge compile stopped by the user meeting=\(meetingID, privacy: .private)")
+                return .deferred
+            }
             if submitted.outcome != .completed {
                 markFailure(submitted.code ?? "last_attempt_failed", meetingID: meetingID, trigger: trigger)
                 AppLog.knowledge.atNotice.notice("knowledge compile \(submitted.outcome == .failed ? "failed" : "deferred", privacy: .public) meeting=\(meetingID, privacy: .private) code=\(submitted.code ?? "none", privacy: .public)")

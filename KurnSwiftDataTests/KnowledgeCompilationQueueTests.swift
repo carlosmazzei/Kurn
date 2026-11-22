@@ -307,6 +307,21 @@ struct KnowledgeCompilationQueueTests {
         #expect(result.modelEmpty == false)
     }
 
+    @Test func stoppingARunningUpdateDiscardsItWithoutAFailure() async throws {
+        let gate = Gate()
+        let provider = Provider(gateAt: 1, gate: gate)
+        let f = try fixture(provider: provider)
+        let task = Task { await f.coordinator.compile(meetingID: f.meeting.id, trigger: .explicit, force: true) }
+        try await wait(gate)
+        f.coordinator.stopUpdate(meetingID: f.meeting.id)
+        #expect(f.coordinator.progress(for: f.meeting.id) == nil)
+        await gate.release()
+        #expect(await task.value == .deferred)
+        // Stopped, not failed: no inline failure and nothing published.
+        #expect(f.coordinator.lastExplicitFailure == nil)
+        #expect(f.coordinator.result(for: f.meeting.id) == nil)
+    }
+
     @Test func forcedCompileRecompilesAnAlreadyCurrentMeeting() async throws {
         let provider = Provider()
         let f = try fixture(provider: provider)
