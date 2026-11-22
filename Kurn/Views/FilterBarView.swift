@@ -2,8 +2,10 @@
 //  FilterBarView.swift
 //  Kurn
 //
-//  Sheet for editing the active meetings-list filters: date range, tags,
-//  transcription status, summary presence, and duration bounds.
+//  Sheet for editing the meetings-list filters as a draft: nothing applies
+//  until the confirmation button ("Show N" — the count comes live from the
+//  caller's `matchCount`) writes the draft back to the binding. Cancel leaves
+//  the list untouched.
 //
 
 import KurnCore
@@ -15,6 +17,12 @@ struct FilterBarView: View {
     @Environment(\.modelContext) private var modelContext
 
     @Binding var filter: MeetingFilter
+    /// Counts meetings the bucket + quick chip allow that a candidate filter
+    /// would keep; drives the confirmation button's "Show N" title.
+    let matchCount: (MeetingFilter) -> Int
+
+    /// The working copy; Cancel discards it, "Show N" writes it to `filter`.
+    @State private var draft: MeetingFilter
 
     @Query(sort: \Tag.name) private var tags: [Tag]
 
@@ -22,26 +30,24 @@ struct FilterBarView: View {
     @State private var showingSaveSheet = false
     @State private var saveError: AppError?
 
+    init(filter: Binding<MeetingFilter>, matchCount: @escaping (MeetingFilter) -> Int) {
+        _filter = filter
+        self.matchCount = matchCount
+        _draft = State(initialValue: filter.wrappedValue)
+    }
+
+    /// Duration presets offered by the "Longer than"/"Shorter than" menus.
+    private static let durationOptions: [TimeInterval] = [300, 900, 1_800, 3_600, 7_200]
+
     var body: some View {
         NavigationStack {
             Form {
-                dateSection
+                periodSection
                 tagSection
                 statusSection
-                summarySection
                 durationSection
-                if filter.isActive {
-                    Section {
-                        Button {
-                            showingSaveSheet = true
-                        } label: {
-                            Label(
-                                NSLocalizedString("smart_folder.save", comment: "Save as Smart Folder"),
-                                systemImage: "sparkles.square.fill.on.square"
-                            )
-                            .foregroundStyle(Theme.link)
-                        }
-                    }
+                if draft.isActive {
+                    footerSection
                 }
             }
             .navigationTitle(NSLocalizedString("filter.title", comment: "Filters"))
@@ -54,64 +60,76 @@ struct FilterBarView: View {
                     Button(NSLocalizedString("common.cancel", comment: "Cancel")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    if filter.isActive {
-                        Button(NSLocalizedString("filter.clear", comment: "Clear")) {
-                            filter = MeetingFilter()
-                        }
+                    Button {
+                        filter = draft
+                        dismiss()
+                    } label: {
+                        Text(
+                            String(
+                                format: NSLocalizedString("filter.show_count", comment: "Show N meetings"),
+                                matchCount(draft)
+                            )
+                        )
                     }
+                    .buttonStyle(.glassProminent)
+                    .tint(Theme.ink)
                 }
             }
             .errorAlert($saveError)
         }
+        .presentationDetents([.large])
     }
 
     // MARK: - Sections
 
-    private var dateSection: some View {
-        Section(NSLocalizedString("filter.date", comment: "Date")) {
-            Picker(
-                NSLocalizedString("filter.date", comment: "Date"),
-                selection: $filter.dateRange
-            ) {
+    private var periodSection: some View {
+        Section(NSLocalizedString("filter.date", comment: "Period")) {
+            FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
                 ForEach(MeetingDateFilter.allCases) { option in
-                    Text(option.title).tag(option)
+                    FilterChip(
+                        title: option.title,
+                        isSelected: draft.dateRange == option,
+                        tint: draft.dateRange == option ? Theme.ink : .primary
+                    ) {
+                        draft.dateRange = option
+                    }
                 }
             }
-            .pickerStyle(.segmented)
         }
     }
 
     private var tagSection: some View {
-        Section(NSLocalizedString("filter.tags", comment: "Tags")) {
+        Section {
             if tags.isEmpty {
                 Text(NSLocalizedString("tag.empty", comment: "No tags yet"))
                     .foregroundStyle(Theme.textSecondary)
             } else {
                 ForEach(tags) { tag in
-                    let isSelected = filter.tagIDs.contains(tag.id)
+                    let isSelected = draft.tagIDs.contains(tag.id)
                     Button {
-                        toggleTag(tag)
+                        draft.toggleTag(tag.id)
                     } label: {
-                        HStack(spacing: 12) {
-                            Circle()
-                                .fill(Color(hex: tag.colorHex))
-                                .frame(width: 10, height: 10)
-                            Text(tag.name)
-                                .foregroundStyle(Theme.textPrimary)
-                            Spacer()
-                            if isSelected {
-                                Image(systemName: "checkmark")
-                                    .font(.system(.footnote, weight: .semibold))
-                                    .foregroundStyle(Theme.link)
-                                    .accessibilityHidden(true)
-                            }
-                        }
-                        .contentShape(Rectangle())
+                        selectionRow(
+                            text: tag.name,
+                            leading: AnyView(
+                                Circle()
+                                    .fill(Color(hex: tag.colorHex))
+                                    .frame(width: 10, height: 10)
+                            ),
+                            isSelected: isSelected
+                        )
                     }
                     .buttonStyle(.plain)
+                }
+            }
+        } header: {
+            HStack {
+                Text(NSLocalizedString("filter.tags", comment: "Tags"))
+                Spacer()
+                if !draft.tagIDs.isEmpty {
+                    Button(NSLocalizedString("filter.clear", comment: "Clear")) {
+                        draft.tagIDs = []
+                    }
                 }
             }
         }
@@ -120,82 +138,140 @@ struct FilterBarView: View {
     private var statusSection: some View {
         Section(NSLocalizedString("filter.status", comment: "Status")) {
             ForEach(TranscriptionStatus.allCases, id: \.self) { status in
-                let isSelected = filter.statuses.contains(status)
+                let isSelected = draft.statuses.contains(status)
                 Button {
-                    toggleStatus(status)
+                    draft.toggleStatus(status)
                 } label: {
-                    HStack {
-                        Text(status.displayName)
-                            .foregroundStyle(Theme.textPrimary)
-                        Spacer()
-                        if isSelected {
-                            Image(systemName: "checkmark")
-                                .font(.system(.footnote, weight: .semibold))
-                                .foregroundStyle(Theme.link)
-                                .accessibilityHidden(true)
-                        }
-                    }
-                    .contentShape(Rectangle())
+                    selectionRow(text: status.displayName, leading: nil, isSelected: isSelected)
                 }
                 .buttonStyle(.plain)
             }
+            summaryRow(
+                title: NSLocalizedString("filter.with_summary", comment: "With summary"),
+                value: true
+            )
+            summaryRow(
+                title: NSLocalizedString("filter.without_summary", comment: "Without summary"),
+                value: false
+            )
         }
     }
 
-    private var summarySection: some View {
-        Section(NSLocalizedString("filter.has_summary", comment: "Has summary")) {
-            Picker(
-                NSLocalizedString("filter.has_summary", comment: "Has summary"),
-                selection: $filter.hasSummary
-            ) {
-                Text(NSLocalizedString("filter.all", comment: "All")).tag(nil as Bool?)
-                Text(NSLocalizedString("filter.yes", comment: "Yes")).tag(true as Bool?)
-                Text(NSLocalizedString("filter.no", comment: "No")).tag(false as Bool?)
-            }
-            .pickerStyle(.segmented)
+    /// With/Without summary: mutually exclusive toggles over `hasSummary`;
+    /// tapping the checked one clears the condition.
+    private func summaryRow(title: String, value: Bool) -> some View {
+        let isSelected = draft.hasSummary == value
+        return Button {
+            draft.hasSummary = isSelected ? nil : value
+        } label: {
+            selectionRow(text: title, leading: nil, isSelected: isSelected)
         }
+        .buttonStyle(.plain)
     }
 
     private var durationSection: some View {
         Section(NSLocalizedString("filter.duration", comment: "Duration")) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(
-                        String(
-                            format: NSLocalizedString("filter.min_duration", comment: "Min duration"),
-                            NSNumber(value: Int(filter.minDuration ?? 0))
-                        )
-                    )
-                    Spacer()
-                    Text(
-                        String(
-                            format: NSLocalizedString("filter.max_duration", comment: "Max duration"),
-                            NSNumber(value: Int(filter.maxDuration ?? 3600))
-                        )
-                    )
-                }
-                .font(.caption)
-                .foregroundStyle(Theme.textSecondary)
+            durationRow(
+                title: NSLocalizedString("filter.longer_than", comment: "Longer than"),
+                value: draft.minDuration
+            ) { draft.minDuration = $0 }
+            durationRow(
+                title: NSLocalizedString("filter.shorter_than", comment: "Shorter than"),
+                value: draft.maxDuration
+            ) { draft.maxDuration = $0 }
+        }
+    }
 
-                HStack(spacing: 12) {
-                    TextField("Min", value: $filter.minDuration, format: .number)
-                        .keyboardType(.numberPad)
-                    TextField("Max", value: $filter.maxDuration, format: .number)
-                        .keyboardType(.numberPad)
+    private func durationRow(
+        title: String,
+        value: TimeInterval?,
+        set: @escaping (TimeInterval?) -> Void
+    ) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Menu {
+                Button {
+                    set(nil)
+                } label: {
+                    durationMenuLabel(NSLocalizedString("filter.duration.any", comment: "Any"), checked: value == nil)
+                }
+                ForEach(Self.durationOptions, id: \.self) { seconds in
+                    Button {
+                        set(seconds)
+                    } label: {
+                        durationMenuLabel(durationText(seconds), checked: value == seconds)
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(value.map(durationText) ?? NSLocalizedString("filter.duration.any", comment: "Any"))
+                        .foregroundStyle(Theme.textSecondary)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.textTertiary)
+                        .accessibilityHidden(true)
                 }
             }
         }
     }
 
-    // MARK: - Helpers
-
-    private func toggleTag(_ tag: Tag) {
-        filter.toggleTag(tag.id)
+    private func durationMenuLabel(_ title: String, checked: Bool) -> some View {
+        Label {
+            Text(title)
+        } icon: {
+            if checked {
+                Image(systemName: "checkmark")
+            }
+        }
     }
 
-    private func toggleStatus(_ status: TranscriptionStatus) {
-        filter.toggleStatus(status)
+    /// "5 min"/"2 hr" labels for the duration presets — formatted, never a
+    /// hard-coded "min" string.
+    private func durationText(_ seconds: TimeInterval) -> String {
+        Duration.seconds(seconds)
+            .formatted(.units(allowed: [.hours, .minutes], width: .abbreviated,
+                              maximumUnitCount: 1))
     }
+
+    private var footerSection: some View {
+        Section {
+            Button {
+                showingSaveSheet = true
+            } label: {
+                Label(
+                    NSLocalizedString("smart_folder.save", comment: "Save as Smart Folder"),
+                    systemImage: "sparkles.square.fill.on.square"
+                )
+                .foregroundStyle(Theme.link)
+            }
+            Button {
+                draft = MeetingFilter()
+            } label: {
+                Text(NSLocalizedString("filter.clear_all", comment: "Clear all filters"))
+            }
+        }
+    }
+
+    /// Shared row: optional leading decoration, title, blue checkmark when
+    /// selected.
+    private func selectionRow(text: String, leading: AnyView?, isSelected: Bool) -> some View {
+        HStack(spacing: 12) {
+            if let leading { leading }
+            Text(text)
+                .foregroundStyle(Theme.textPrimary)
+            Spacer()
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(.footnote, weight: .semibold))
+                    .foregroundStyle(Theme.link)
+                    .accessibilityHidden(true)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    // MARK: - Smart folder sheet
 
     private var saveSmartFolderSheet: some View {
         NavigationStack {
@@ -229,7 +305,7 @@ struct FilterBarView: View {
         let name = smartFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
         do throws(AppError) {
-            try MeetingLibrary(context: modelContext).createSmartFolder(name: name, filter: filter)
+            try MeetingLibrary(context: modelContext).createSmartFolder(name: name, filter: draft)
             showingSaveSheet = false
             dismiss()
         } catch {

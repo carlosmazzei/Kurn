@@ -25,11 +25,16 @@ struct FolderSidebarView: View {
     @Environment(\.dismiss) private var dismiss
 
     @Binding var selection: LibrarySelection
+    /// When the sheet can drive the list's tag filter (`MeetingsListView`),
+    /// the caller passes it here and a Tags section appears; `ContentView`'s
+    /// iPad sidebar passes nil and the section stays hidden.
+    var filter: Binding<MeetingFilter>? = nil
 
     @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
     @Query(filter: #Predicate<Folder> { $0.parent == nil }, sort: \Folder.createdAt)
     private var rootFolders: [Folder]
     @Query(sort: \SmartFolder.name) private var smartFolders: [SmartFolder]
+    @Query(sort: \Tag.name) private var tags: [Tag]
 
     /// Chain of folders the user has drilled into, oldest first. Driven by
     /// `NavigationStack(path:)` so the system back gesture / button restores
@@ -99,6 +104,9 @@ struct FolderSidebarView: View {
                 }
             }
             folderSection(folders: rootFolders, parent: nil)
+            if filter != nil, !tags.isEmpty {
+                tagsSection
+            }
         }
         .navigationTitle(NSLocalizedString("meetings.bucket", comment: "Library"))
         .navigationBarTitleDisplayMode(.inline)
@@ -113,6 +121,7 @@ struct FolderSidebarView: View {
                         systemImage: "chart.bar"
                     )
                 }
+                .tint(Theme.ink)
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
@@ -172,13 +181,11 @@ struct FolderSidebarView: View {
                 Button {
                     creating = NewFolderContext(parent: parent)
                 } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.headline)
+                    Text(NSLocalizedString("folder.new_short", comment: "New"))
                         .foregroundStyle(Theme.link)
                 }
                 .accessibilityLabel(NSLocalizedString("folder.new", comment: "New folder"))
                 .accessibilityIdentifier(parent == nil ? "folders.new" : "folders.new_subfolder")
-                .accessibilityLabel(NSLocalizedString("folder.new", comment: "New folder"))
             }
         }
     }
@@ -195,14 +202,14 @@ struct FolderSidebarView: View {
             HStack(spacing: 12) {
                 Image(systemName: bucket.systemImage)
                     .frame(width: 26, alignment: .center)
-                    .foregroundStyle(isSelected ? Theme.link : Theme.textSecondary)
+                    .foregroundStyle(Theme.textSecondary)
                     .accessibilityHidden(true)
                 Text(bucket.displayName)
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
                 Text("\(count)")
                     .font(.footnote)
-                    .foregroundStyle(Theme.textTertiary)
+                    .foregroundStyle(Theme.textSecondary)
                 if isSelected {
                     Image(systemName: "checkmark")
                         .font(.system(.footnote, weight: .semibold))
@@ -227,14 +234,14 @@ struct FolderSidebarView: View {
             HStack(spacing: 12) {
                 Image(systemName: smartFolder.iconName)
                     .frame(width: 26, alignment: .center)
-                    .foregroundStyle(Color(hex: smartFolder.colorHex))
+                    .foregroundStyle(Theme.textSecondary)
                     .accessibilityHidden(true)
                 Text(smartFolder.name)
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
                 Text("\(count)")
                     .font(.footnote)
-                    .foregroundStyle(Theme.textTertiary)
+                    .foregroundStyle(Theme.textSecondary)
                 if isSelected {
                     Image(systemName: "checkmark")
                         .font(.system(.footnote, weight: .semibold))
@@ -265,7 +272,7 @@ struct FolderSidebarView: View {
                     Spacer()
                     Text("\(count)")
                         .font(.footnote)
-                        .foregroundStyle(Theme.textTertiary)
+                        .foregroundStyle(Theme.textSecondary)
                     if isSelected {
                         Image(systemName: "checkmark")
                             .font(.system(.footnote, weight: .semibold))
@@ -287,7 +294,6 @@ struct FolderSidebarView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(NSLocalizedString("folder.open_subfolders", comment: "Open subfolders"))
             .accessibilityLabel(NSLocalizedString("folder.open_subfolders", comment: "Open subfolders"))
         }
         .swipeActions(edge: .trailing) {
@@ -314,7 +320,76 @@ struct FolderSidebarView: View {
                     systemImage: "chart.bar"
                 )
             }
+            Button {
+                editing = folder
+            } label: {
+                Label(
+                    NSLocalizedString("folder.rename", comment: "Edit"),
+                    systemImage: "pencil"
+                )
+            }
+            Button {
+                creating = NewFolderContext(parent: folder)
+            } label: {
+                Label(
+                    NSLocalizedString("folder.new_subfolder", comment: "New subfolder"),
+                    systemImage: "folder.badge.plus"
+                )
+            }
+            Divider()
+            Button(role: .destructive) {
+                pendingDelete = folder
+            } label: {
+                Label(
+                    NSLocalizedString("folder.delete", comment: "Delete"),
+                    systemImage: "trash"
+                )
+            }
         }
+    }
+
+    // MARK: - Tags
+
+    /// Outlined chips of every tag; tapping one filters the list to that
+    /// single tag and dismisses the sheet.
+    private var tagsSection: some View {
+        Section(NSLocalizedString("tag.title", comment: "Tags")) {
+            FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
+                ForEach(tags) { tag in
+                    tagChip(tag)
+                }
+            }
+        }
+    }
+
+    private func tagChip(_ tag: Tag) -> some View {
+        let isSelected = filter?.wrappedValue.tagIDs == Set([tag.id])
+        return Button {
+            filter?.wrappedValue.tagIDs = [tag.id]
+            dismiss()
+        } label: {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color(hex: tag.colorHex))
+                    .frame(width: 6, height: 6)
+                Text(tag.name)
+                    .font(Theme.footnote)
+                    .foregroundStyle(Theme.textPrimary)
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(.footnote, weight: .semibold))
+                        .foregroundStyle(Theme.link)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Capsule().strokeBorder(Theme.separator))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(tag.name)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: - Mutations

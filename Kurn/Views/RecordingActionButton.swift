@@ -11,7 +11,9 @@ struct RecordingActionButton: View {
     @State private var saveError: AppError?
 
     private var title: String {
-        guard session.isActive else { return NSLocalizedString("meetings.record", comment: "Record") }
+        guard session.isActive else {
+            return NSLocalizedString("meetings.record", comment: "Record")
+        }
         return session.isPaused
             ? NSLocalizedString("recorder.mini.paused", comment: "Mini recorder bar: paused")
             : NSLocalizedString("recorder.mini.recording", comment: "Mini recorder bar: recording")
@@ -35,10 +37,27 @@ struct RecordingActionButton: View {
 
     private func startRecording() {
         guard !session.isActive else { session.expand(); return }
+        saveError = Self.createAndBeginRecording(
+            context: modelContext, settings: settings, session: session
+        )
+    }
+
+    /// Creates a blank meeting and begins its session — the single code path
+    /// behind both this button and the empty list's "Record your first
+    /// meeting" action, which needs its own label/chrome.
+    @MainActor
+    static func createAndBeginRecording(
+        context: ModelContext,
+        settings: AppSettings,
+        session: RecordingSessionController
+    ) -> AppError? {
         do throws(AppError) {
-            let meeting = try MeetingLibrary(context: modelContext)
+            let meeting = try MeetingLibrary(context: context)
                 .createMeeting(title: "", language: settings.defaultLanguage)
             session.begin(meeting: meeting)
-        } catch { saveError = error }
+            return nil
+        } catch {
+            return error
+        }
     }
 }

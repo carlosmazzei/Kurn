@@ -24,8 +24,8 @@ extension MeetingsListView {
     var listTitle: String { listSelection.navigationTitle(visible: filtered) }
 
     @ViewBuilder
-    func selectableCard(for meeting: Meeting) -> some View {
-        let card = MeetingCard(meeting: meeting, preview: preview(for: meeting))
+    func selectableCard(for meeting: Meeting, showsDate: Bool) -> some View {
+        let card = MeetingCard(meeting: meeting, showsDate: showsDate)
         if listSelection.isActive {
             let isSelected = listSelection.isSelected(meeting.id)
             HStack(spacing: 12) {
@@ -79,7 +79,11 @@ extension MeetingsListView {
                 .accessibilityIdentifier("meetings.selection.done")
         }
 
+        // One glass group: Export / Move / Tags on the left, Delete on the
+        // right of the flexible spacer.
         ToolbarItem(placement: .bottomBar) { exportSelectionButton }
+        ToolbarItem(placement: .bottomBar) { moveSelectionButton }
+        ToolbarItem(placement: .bottomBar) { tagSelectionButton }
         ToolbarSpacer(.flexible, placement: .bottomBar)
         ToolbarItem(placement: .bottomBar) { deleteSelectionButton }
     }
@@ -91,9 +95,33 @@ extension MeetingsListView {
                 systemImage: "square.and.arrow.up"
             )
         }
-        .labelStyle(.titleAndIcon)
+        .labelStyle(.iconOnly)
         .disabled(selectedMeetings.isEmpty)
         .accessibilityIdentifier("meetings.selection.export")
+    }
+
+    private var moveSelectionButton: some View {
+        Button { bulkMoving = true } label: {
+            Label(
+                NSLocalizedString("folder.move_to", comment: "Move to folder"),
+                systemImage: "folder"
+            )
+        }
+        .labelStyle(.iconOnly)
+        .disabled(selectedMeetings.isEmpty)
+        .accessibilityIdentifier("meetings.selection.move")
+    }
+
+    private var tagSelectionButton: some View {
+        Button { bulkTagging = true } label: {
+            Label(
+                NSLocalizedString("meetings.tag.edit", comment: "Edit tags"),
+                systemImage: "tag"
+            )
+        }
+        .labelStyle(.iconOnly)
+        .disabled(selectedMeetings.isEmpty)
+        .accessibilityIdentifier("meetings.selection.tags")
     }
 
     private var deleteSelectionButton: some View {
@@ -103,7 +131,7 @@ extension MeetingsListView {
                 systemImage: "trash"
             )
         }
-        .labelStyle(.titleAndIcon)
+        .labelStyle(.iconOnly)
         .tint(Theme.destructive)
         .disabled(selectedMeetings.isEmpty)
         .accessibilityIdentifier("meetings.selection.delete")
@@ -126,7 +154,10 @@ extension View {
                 count
             ),
             message: NSLocalizedString("meetings.bulk_delete.message", comment: "Bulk delete explanation"),
-            primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
+            primaryTitle: String(
+                format: NSLocalizedString("meetings.bulk_delete.action", comment: "Delete N"),
+                count
+            ),
             primaryRole: .destructive,
             primaryAction: onConfirm,
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel"),

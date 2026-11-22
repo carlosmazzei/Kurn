@@ -115,10 +115,12 @@ extension MeetingsListView {
                         }
                     }
                 } label: {
-                    Label(
-                        NSLocalizedString("meetings.sort", comment: "Sort"),
-                        systemImage: "arrow.up.arrow.down"
-                    )
+                    Label {
+                        Text(NSLocalizedString("meetings.sort", comment: "Sort"))
+                        Text(settings.meetingsSortOrder.displayName)
+                    } icon: {
+                        Image(systemName: "arrow.up.arrow.down")
+                    }
                 }
             }
         } label: {

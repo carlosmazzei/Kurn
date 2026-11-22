@@ -6,6 +6,7 @@
 //  on state and navigation.
 //
 
+import KurnCore
 import SwiftUI
 
 /// The lock screen, rendered by `SecurityCoverView` in the cover window that
@@ -39,14 +40,19 @@ struct LockedRecordingsView: View {
             }
             // The one action this screen exists for — Liquid Glass primary
             // button language (Theme.swift, "Button language"), not a
-            // hand-drawn rectangle.
+            // hand-drawn rectangle. `RecordingAccessGate` does not expose the
+            // device's biometry type, so the glyph is the generic open lock.
             Button {
                 Task { await gate.authenticate() }
             } label: {
-                Text(NSLocalizedString("recordings.unlock_button", comment: "Unlock"))
-                    .font(Theme.subheadlineEmphasized)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 4)
+                Label(
+                    NSLocalizedString("recordings.unlock_button", comment: "Unlock"),
+                    systemImage: "lock.open"
+                )
+                .font(Theme.subheadlineEmphasized)
+                .foregroundStyle(Theme.onInk)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
             }
             .buttonStyle(.glassProminent)
             .tint(Theme.ink)
@@ -69,147 +75,171 @@ struct LockedRecordingsView: View {
     }
 }
 
-/// One card in the meetings list.
+/// One row in the meetings list: title, a metadata-or-status line, an optional
+/// folder/tags line, and trailing grey indicators (favourite, transcript,
+/// summary count). No card chrome — it sits in a grouped `List` row.
 struct MeetingCard: View {
     let meeting: Meeting
-    let preview: String
+    /// Flat (non-day-grouped) sorts prefix the metadata line with the short
+    /// date, since no section header carries it.
+    var showsDate = false
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    if meeting.isFavorite {
-                        Image(systemName: "star.fill")
-                            .foregroundStyle(Theme.warning)
-                            .font(.footnote)
-                            .accessibilityLabel(NSLocalizedString("meetings.favorite", comment: "Favorite"))
-                    }
-                    Text(meeting.title)
-                        .font(Theme.calloutEmphasized)
-                        .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(2)
-                }
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(meeting.title)
+                    .font(Theme.body.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
 
-                metadata
-
-                if !preview.isEmpty {
-                    Text(preview)
-                        .font(Theme.footnote)
-                        .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(2)
-                }
+                statusOrMetadata
 
                 classifiers
             }
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.right")
-                .font(.system(.caption, weight: .semibold))
-                .foregroundStyle(Theme.textTertiary)
-                .accessibilityHidden(true)
+            Spacer(minLength: 8)
+            indicators
         }
-        .kurnCard()
     }
 
+    /// Line 2: the time/duration line, replaced by status words whenever the
+    /// meeting needs attention (transcribing, queued, failed).
     @ViewBuilder
-    private var metadata: some View {
-        FlowLayout(horizontalSpacing: 10, verticalSpacing: 4) {
-            metadataItem(systemImage: "calendar", text: meeting.createdAt.meetingDisplay)
-            if meeting.totalDuration > 0 {
-                metadataItem(systemImage: "clock", text: meeting.totalDuration.clockDisplay)
+    private var statusOrMetadata: some View {
+        switch meeting.aggregateStatus {
+        case .inProgress:
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.mini)
+                    .accessibilityHidden(true)
+                Text(NSLocalizedString("meetings.status.transcribing", comment: "Transcribing"))
             }
-            metadataItem(
-                systemImage: transcriptionIcon,
-                text: meeting.aggregateStatus.displayName,
-                tint: transcriptionColor
-            )
-            if !meeting.summaries.isEmpty {
-                metadataItem(
-                    systemImage: "sparkles",
-                    text: summaryCountText,
-                    tint: Theme.info
-                )
-            }
+            .font(Theme.subheadline)
+            .foregroundStyle(Theme.warning)
+        case .pending:
+            Text(NSLocalizedString("meetings.status.queued", comment: "Queued to resume"))
+                .font(Theme.subheadline)
+                .foregroundStyle(Theme.warning)
+        case .failed:
+            Text(NSLocalizedString("meetings.status.transcription_failed", comment: "Transcription failed"))
+                .font(Theme.subheadline)
+                .foregroundStyle(Theme.destructive)
+        case .none, .done:
+            Text(metadataLine)
+                .font(Theme.subheadline)
+                .foregroundStyle(Theme.textSecondary)
         }
     }
 
+    /// "18:28 · 12 min" for day-grouped lists, "Nov 20 · 18:28 · 12 min" for
+    /// flat sorts. The duration joins only when the meeting has audio.
+    private var metadataLine: String {
+        var parts: [String] = []
+        if showsDate {
+            parts.append(meeting.createdAt.formatted(.dateTime.month(.abbreviated).day()))
+        }
+        parts.append(meeting.createdAt.formatted(date: .omitted, time: .shortened))
+        if meeting.totalDuration > 0 {
+            parts.append(durationText)
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private var durationText: String {
+        Duration.seconds(meeting.totalDuration)
+            .formatted(.units(allowed: [.hours, .minutes], width: .abbreviated,
+                              maximumUnitCount: 2))
+    }
+
+    /// Line 3: folder glyph + name, then up to three tag dots + names, then
+    /// "+N" — only rendered when the meeting has either.
     @ViewBuilder
     private var classifiers: some View {
         let visibleTags = Array(meeting.tags.prefix(3))
         let overflowCount = max(0, meeting.tags.count - visibleTags.count)
         if meeting.folder != nil || !meeting.tags.isEmpty {
-            FlowLayout(horizontalSpacing: 6, verticalSpacing: 6) {
+            FlowLayout(horizontalSpacing: 10, verticalSpacing: 4) {
                 if let folder = meeting.folder {
-                    folderChip(folder)
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder.fill")
+                            .foregroundStyle(Color(hex: folder.colorHex))
+                            .accessibilityHidden(true)
+                        Text(folder.name)
+                            .lineLimit(1)
+                    }
                 }
                 ForEach(visibleTags) { tag in
-                    TagChip(tag: tag)
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Color(hex: tag.colorHex))
+                            .frame(width: 6, height: 6)
+                            .accessibilityHidden(true)
+                        Text(tag.name)
+                            .lineLimit(1)
+                    }
                 }
                 if overflowCount > 0 {
                     Text("+\(overflowCount)")
-                        .font(.system(.caption2, design: .default, weight: .medium))
                         .foregroundStyle(Theme.textTertiary)
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Theme.fill, in: Capsule())
+                }
+            }
+            .font(Theme.footnote)
+            .foregroundStyle(Theme.textSecondary)
+        }
+    }
+
+    /// Trailing grey glyphs, read top-aligned against the title line.
+    @ViewBuilder
+    private var indicators: some View {
+        HStack(spacing: 8) {
+            if meeting.isFavorite {
+                Image(systemName: "star.fill")
+                    .accessibilityHidden(true)
+            }
+            if meeting.aggregateStatus == .done {
+                Image(systemName: "text.alignleft")
+                    .accessibilityHidden(true)
+            }
+            if !meeting.summaries.isEmpty {
+                HStack(spacing: 2) {
+                    Image(systemName: "sparkles")
+                        .accessibilityHidden(true)
+                    if meeting.summaries.count > 1 {
+                        Text("\(meeting.summaries.count)")
+                    }
                 }
             }
         }
-    }
-
-    private func metadataItem(systemImage: String, text: String, tint: Color = Theme.textSecondary) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: systemImage)
-                .font(.system(.caption2, design: .default, weight: .medium))
-                .accessibilityHidden(true)
-            Text(text)
-                .lineLimit(2)
-        }
         .font(Theme.footnote)
-        .foregroundStyle(tint)
+        .foregroundStyle(Theme.indicator)
     }
 
-    private func folderChip(_ folder: Folder) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: folder.iconName)
-                .font(.system(.caption2, design: .default, weight: .semibold))
-                .accessibilityHidden(true)
-            Text(folder.name)
-                .font(.system(.caption2, design: .default, weight: .medium))
-                .lineLimit(2)
-        }
-        .foregroundStyle(Color(hex: folder.colorHex))
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(Color(hex: folder.colorHex).opacity(0.12), in: Capsule())
-    }
-
-    private var summaryCountText: String {
-        let count = meeting.summaries.count
-        let key = count == 1 ? "meetings.summary_count.one" : "meetings.summary_count.other"
-        return String(
-            format: NSLocalizedString(key, comment: "Number of summaries on a meeting card"),
-            count
-        )
-    }
-
-    private var transcriptionIcon: String {
+    /// One spoken line combining title, status/time and the indicator words
+    /// ("Favourite", "Transcribed", "N summaries") the glyphs stand for. The
+    /// row Button reads it via `accessibilitySummary` — the combined-a11y
+    /// element lives on the button, not on this inner stack, so the button's
+    /// hit point stays tappable in every row.
+    var accessibilitySummary: String {
+        var parts = [meeting.title]
         switch meeting.aggregateStatus {
-        case .none: return "waveform.slash"
-        case .inProgress: return "waveform"
-        case .pending: return "pause.circle"
-        case .done: return "checkmark.circle"
-        case .failed: return "exclamationmark.circle"
+        case .inProgress:
+            parts.append(NSLocalizedString("meetings.status.transcribing", comment: "Transcribing"))
+        case .pending:
+            parts.append(NSLocalizedString("meetings.status.queued", comment: "Queued to resume"))
+        case .failed:
+            parts.append(NSLocalizedString("meetings.status.transcription_failed", comment: "Transcription failed"))
+        case .none, .done:
+            parts.append(metadataLine)
         }
-    }
-
-    private var transcriptionColor: Color {
-        switch meeting.aggregateStatus {
-        case .none: return Theme.textSecondary
-        case .inProgress, .pending: return Theme.warning
-        case .done: return Theme.success
-        case .failed: return Theme.destructive
+        if meeting.isFavorite {
+            parts.append(NSLocalizedString("meetings.favorite", comment: "Favorite"))
         }
+        if meeting.aggregateStatus == .done {
+            parts.append(NSLocalizedString("status.done", comment: "Done"))
+        }
+        if !meeting.summaries.isEmpty {
+            let count = meeting.summaries.count
+            let key = count == 1 ? "meetings.summary_count.one" : "meetings.summary_count.other"
+            parts.append(String(format: NSLocalizedString(key, comment: "Summary count"), count))
+        }
+        return parts.joined(separator: ", ")
     }
 }

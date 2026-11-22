@@ -122,14 +122,16 @@ public struct MeetingFilter: Hashable, Sendable, Codable {
 
 /// Date-range filter for the meetings list.
 public enum MeetingDateFilter: String, CaseIterable, Identifiable, Sendable, Codable {
-    case all, today, thisWeek
+    case all, today, thisWeek, last7Days, last30Days
     public var id: String { rawValue }
 
     public var title: String {
         switch self {
-        case .all: return NSLocalizedString("filter.all", comment: "All")
+        case .all: return NSLocalizedString("filter.any_date", comment: "Any date")
         case .today: return NSLocalizedString("filter.today", comment: "Today")
         case .thisWeek: return NSLocalizedString("filter.this_week", comment: "This week")
+        case .last7Days: return NSLocalizedString("filter.last_7_days", comment: "Last 7 days")
+        case .last30Days: return NSLocalizedString("filter.last_30_days", comment: "Last 30 days")
         }
     }
 
@@ -139,6 +141,18 @@ public enum MeetingDateFilter: String, CaseIterable, Identifiable, Sendable, Cod
         case .today: return calendar.isDateInToday(date)
         case .thisWeek:
             return calendar.isDate(date, equalTo: now, toGranularity: .weekOfYear)
+        case .last7Days:
+            return withinLast(days: 7, date: date, now: now, calendar: calendar)
+        case .last30Days:
+            return withinLast(days: 30, date: date, now: now, calendar: calendar)
         }
+    }
+
+    /// Start-of-day `days` ago or later (and not in the future).
+    private func withinLast(days: Int, date: Date, now: Date, calendar: Calendar) -> Bool {
+        guard let cutoff = calendar.date(byAdding: .day, value: -days, to: calendar.startOfDay(for: now)) else {
+            return true
+        }
+        return date >= cutoff && date <= now
     }
 }
