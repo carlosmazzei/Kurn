@@ -186,7 +186,9 @@ final class RecorderViewModel {
     }
 
     /// Localized stand-in for routes whose `portName` is just the type id.
-    private static func localizedMicName(for portType: AVAudioSession.Port) -> String? {
+    /// `static` internal (not `private`) so `KurnTests` can drive the
+    /// per-port-type branches the simulator's single route can't produce.
+    static func localizedMicName(for portType: AVAudioSession.Port) -> String? {
         switch portType {
         case .builtInMic:
             return NSLocalizedString("recorder.mic.builtin", comment: "Built-in microphone")

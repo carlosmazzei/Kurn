@@ -64,6 +64,13 @@ struct MeetingFilterTests {
         #expect(filter.matches(fortyDaysAgo) == false)
     }
 
+    @Test func everyDateFilterHasALocalizedTitle() {
+        let titles = MeetingDateFilter.allCases.map(\.title)
+        #expect(titles.count == 5)
+        #expect(titles.allSatisfy { !$0.isEmpty })
+        #expect(Set(titles).count == titles.count)
+    }
+
     /// "Last N days" counts calendar days — today + the previous N−1 — from
     /// `startOfDay(now)`: 08:00 seven days ago is OUT for last7Days while
     /// start-of-day six days ago is IN.

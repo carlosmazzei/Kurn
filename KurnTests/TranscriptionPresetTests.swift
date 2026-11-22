@@ -54,6 +54,24 @@ struct TranscriptionPresetTests {
         #expect(TranscriptionPreset.nextUnmetStep(target: target, current: current) == .asrModel)
     }
 
+    @Test func everyPresetHasLocalizedCardText() {
+        let expectedRows: [TranscriptionPreset: Int] = [
+            .bestQuality: 4, .bestOnDevice: 4, .fastCloud: 3, .basic: 2
+        ]
+        for preset in TranscriptionPreset.allCases {
+            #expect(preset.titleKey == "settings.preset.\(preset.stringKey).title")
+            #expect(preset.subtitleKey == "settings.preset.\(preset.stringKey).subtitle")
+            #expect(!preset.title.isEmpty)
+            #expect(!preset.subtitle.isEmpty)
+            let rows = preset.cardRows
+            #expect(rows.count == expectedRows[preset])
+            for row in rows {
+                #expect(!row.label.isEmpty)
+                #expect(!row.value.isEmpty)
+            }
+        }
+    }
+
     @Test func cloudModelMatchesCaseInsensitively() {
         var choice = TranscriptionPreset.fastCloud.choice(for: .english)
         choice.cloudModel = " Whisper-Large-V3-Turbo "

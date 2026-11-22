@@ -138,7 +138,7 @@ enum TranscriptionPreset: String, CaseIterable, Identifiable {
 extension TranscriptionPreset {
     /// The localization key stem — the enum's camelCase `rawValue` doesn't
     /// match the snake_case string keys, so map explicitly.
-    private var stringKey: String {
+    var stringKey: String {
         switch self {
         case .bestQuality: return "best_quality"
         case .bestOnDevice: return "best_on_device"
