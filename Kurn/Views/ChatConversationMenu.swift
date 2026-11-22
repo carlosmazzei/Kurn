@@ -11,6 +11,13 @@ struct ChatConversationMenu: View {
     var body: some View {
         Menu {
             Button {
+                vm.reset()
+            } label: {
+                Label(NSLocalizedString("chat.new.button", comment: "Start a new conversation"),
+                      systemImage: "square.and.pencil")
+            }
+            .accessibilityIdentifier("chat.conversation.new")
+            Button {
                 showingBranches = true
             } label: {
                 Label(NSLocalizedString("chat.branch.tree", comment: "Every branch of the conversation"),

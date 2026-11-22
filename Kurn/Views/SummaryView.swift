@@ -17,44 +17,36 @@ struct SummaryView: View {
     var onShowPhoto: ((TimeInterval) -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 20) {
             ForEach(Array(summary.sections.enumerated()), id: \.offset) { _, section in
-                sectionCard(section)
-                    .kurnCard()
+                sectionBlock(section)
             }
 
-            if let templateName = summary.templateName, !templateName.isEmpty {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .accessibilityHidden(true)
                 Text(
                     String(
-                        format: NSLocalizedString("summary.template_label", comment: "Template label"),
-                        templateName
+                        format: summary.model == nil
+                            ? NSLocalizedString("summary.footer", comment: "Provider footer")
+                            : NSLocalizedString("summary.footer_with_model", comment: "Provider and model footer"),
+                        summary.provider.displayName,
+                        summary.model ?? summary.updatedAt.meetingDisplay,
+                        summary.updatedAt.meetingDisplay
                     )
                 )
-                .font(.caption2)
-                .foregroundStyle(.secondary)
             }
-
-            Text(
-                String(
-                    format: summary.model == nil
-                        ? NSLocalizedString("summary.footer", comment: "Provider footer")
-                        : NSLocalizedString("summary.footer_with_model", comment: "Provider and model footer"),
-                    summary.provider.displayName,
-                    summary.model ?? summary.updatedAt.meetingDisplay,
-                    summary.updatedAt.meetingDisplay
-                )
-            )
-            .font(.caption2)
-            .foregroundStyle(.secondary)
+            .font(Theme.footnote)
+            .foregroundStyle(Theme.textSecondary)
         }
     }
 
     @ViewBuilder
-    private func sectionCard(_ section: SummarySection) -> some View {
+    private func sectionBlock(_ section: SummarySection) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if !section.title.isEmpty {
                 markdownInlineText(section.title)
-                    .font(.headline)
+                    .font(.system(.title3, weight: .bold))
             }
             if !section.body.isEmpty {
                 MarkdownText(section.body)

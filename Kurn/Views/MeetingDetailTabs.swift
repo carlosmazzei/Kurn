@@ -123,14 +123,16 @@ private struct SpeakerRow: View {
 /// Summary tab content: a switcher across every generated summary (when more
 /// than one exists), the selected summary's body, and a button to generate
 /// another one (or an empty state when none exist yet).
+/// Summary tab content: the summary bar (pill menu + Listen + page dots), the
+/// selected summary rendered on paper, a discreet streaming state while a
+/// summary is being written, and an empty state offering generation.
 struct SummaryTab: View {
     let meeting: Meeting
     let settings: AppSettings
     let isSummarizing: Bool
-    let isCancellingSummary: Bool
     let isTranslatingSummary: Bool
     /// The language an in-flight translation targets, to label the inline
-    /// progress chip. `nil` whenever `isTranslatingSummary` is false.
+    /// progress line. `nil` whenever `isTranslatingSummary` is false.
     var translationTargetLanguage: MeetingLanguage?
     /// (stage, total) when a long transcript is summarized in parts; nil for
     /// single-pass summaries.
@@ -141,7 +143,7 @@ struct SummaryTab: View {
     /// The unformatted draft streaming in for the request in flight; empty
     /// before its first fragment.
     var summaryDraft = ""
-    /// When the request in flight started, for the "thinking" timer.
+    /// When the request in flight started, for the elapsed counter.
     var summaryRequestStartedAt: Date?
     /// Currently selected summary's id; falls back to the newest when nil or
     /// no longer present (e.g. it was just deleted).
@@ -153,11 +155,14 @@ struct SummaryTab: View {
     let onDeleteSummary: (Summary) -> Void
     let onTranslateSummary: (Summary) -> Void
     let onCancelTranslateSummary: () -> Void
+    let onCompare: () -> Void
+    let onShare: () -> Void
+    let onCopySummary: (Summary) -> Void
     /// Taps a section's photo reference chip; `nil` when the meeting has no
     /// photos, hiding the chip row entirely (see `SummaryView.onShowPhoto`).
     var onShowPhoto: ((TimeInterval) -> Void)?
-    @ScaledMetric(relativeTo: .footnote) private var cancelButtonMinHeight: CGFloat = 44
-    @ScaledMetric(relativeTo: .callout) private var generateButtonMinHeight: CGFloat = 54
+
+    private var controller: ReadAloudController { .shared }
 
     private var sortedSummaries: [Summary] {
         meeting.summaries.sorted { $0.createdAt > $1.createdAt }
@@ -167,82 +172,151 @@ struct SummaryTab: View {
         sortedSummaries.first { $0.id == selectedSummaryID } ?? sortedSummaries.first
     }
 
+    private var readAloudItem: ReadAloudItem? {
+        selectedSummary.map { .summary($0, meeting: meeting) }
+    }
+
     var body: some View {
-        if let selectedSummary {
-            VStack(alignment: .leading, spacing: 16) {
-                summarySwitcher(selected: selectedSummary)
-                if isSummarizing {
-                    summaryProgressPanel
+        VStack(alignment: .leading, spacing: 16) {
+            if isSummarizing || selectedSummary != nil {
+                MeetingDetailSummaryBar(
+                    meeting: meeting,
+                    summaries: orderedSummaries,
+                    isSummarizing: isSummarizing,
+                    generatingTitle: generatingTitle,
+                    onSelectSummary: onSelectSummary,
+                    onGenerate: onGenerate,
+                    onCompare: onCompare,
+                    onTranslateSummary: onTranslateSummary,
+                    onCopySummary: onCopySummary,
+                    onShare: onShare,
+                    onDeleteSummary: onDeleteSummary,
+                    onCancel: onCancel,
+                    onListen: listen
+                )
+                if let item = readAloudItem, controller.phase(for: item.id) != .idle {
+                    ReadAloudControl(item: item)
                 }
-                ReadAloudControl(item: .summary(selectedSummary, meeting: meeting))
+            }
+
+            if isSummarizing {
+                generatingState
+            } else if let selectedSummary {
                 SummaryView(summary: selectedSummary, onShowPhoto: onShowPhoto)
-                if !isSummarizing {
-                    newSummaryButton
-                }
+            } else {
+                summaryEmptyState(canGenerate: hasAnyTranscript)
             }
-        } else if isSummarizing {
-            summaryProgressPanel
-                .padding(.top, 24)
-        } else if hasAnyTranscript {
-            summaryEmptyState(canGenerate: true)
-        } else {
-            summaryEmptyState(canGenerate: false)
+
+            if isTranslatingSummary, let translationTargetLanguage {
+                translatingRow(to: translationTargetLanguage)
+            }
+        }
+        .simultaneousGesture(summarySwipe)
+    }
+
+    /// The selection the bar's menu/dots show — while a new summary streams,
+    /// the previous selection stays highlighted instead of jumping.
+    private var orderedSummaries: [Summary] {
+        guard let selectedSummary else { return sortedSummaries }
+        var ordered = [selectedSummary]
+        ordered.append(contentsOf: sortedSummaries.filter { $0.id != selectedSummary.id })
+        return ordered
+    }
+
+    private var generatingTitle: String {
+        settings.summaryTemplates.first { $0.id == settings.lastSummaryTemplateID }?.displayName
+            ?? NSLocalizedString("detail.summary.untitled", comment: "Summary")
+    }
+
+    private func listen() {
+        guard let item = readAloudItem else { return }
+        controller.toggle(item, settings: settings)
+    }
+
+    /// A horizontal swipe on the summary body steps through the summaries
+    /// (newest first); the pill menu already names where you land, so the dots
+    /// stay `accessibilityHidden` and this announces the change.
+    private var summarySwipe: some Gesture {
+        DragGesture(minimumDistance: 10).onEnded { value in
+            guard sortedSummaries.count > 1,
+                  let selectedSummary,
+                  let index = sortedSummaries.firstIndex(where: { $0.id == selectedSummary.id }),
+                  abs(value.translation.height) < 40,
+                  abs(value.translation.width) > 60 else { return }
+            let target = value.translation.width < 0 ? index + 1 : index - 1
+            guard sortedSummaries.indices.contains(target) else { return }
+            let summary = sortedSummaries[target]
+            onSelectSummary(summary)
+            AccessibilityNotification.Announcement(
+                summary.templateName?.isEmpty == false
+                    ? summary.templateName!
+                    : NSLocalizedString("detail.summary.untitled", comment: "Summary")
+            ).post()
         }
     }
 
-    private func summarySwitcher(selected: Summary) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(sortedSummaries) { summary in
-                    FilterChip(
-                        title: chipTitle(for: summary),
-                        isSelected: summary.id == selected.id
-                    ) {
-                        onSelectSummary(summary)
-                    }
-                    .contextMenu {
-                        Button {
-                            onTranslateSummary(summary)
-                        } label: {
-                            Label(NSLocalizedString("detail.summary.translate", comment: "Translate"), systemImage: "character.bubble")
-                        }
-                        .disabled(isTranslatingSummary)
-                        Button(role: .destructive) {
-                            onDeleteSummary(summary)
-                        } label: {
-                            Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
-                        }
-                    }
+    /// Streaming replaces the finished summary in place — the pill reads
+    /// "<template> · writing…" above and this streams the raw draft with one
+    /// discreet status line underneath; no card, no border.
+    private var generatingState: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SummaryDraftView(draft: summaryDraft, startedAt: summaryRequestStartedAt)
+            if let progressValue {
+                ProgressView(value: progressValue)
+                    .progressViewStyle(.linear)
+                    .tint(Theme.ink)
+            }
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .accessibilityHidden(true)
+                    Text(generatingStats(at: context.date))
                 }
-                if isTranslatingSummary, let translationTargetLanguage {
-                    translatingChip(to: translationTargetLanguage)
-                }
-                FilterChip(title: "+", isSelected: false) {
-                    onGenerate()
-                }
-                .disabled(isSummarizing)
-                .accessibilityLabel(NSLocalizedString("detail.summary.new", comment: "New Summary"))
+                .font(Theme.footnote)
+                .foregroundStyle(Theme.textSecondary)
             }
         }
+        .padding(.top, 8)
     }
 
-    /// Sits inline in the summary switcher's horizontal scroll rather than
-    /// blocking the tab with a panel like `summaryProgressPanel` — translation
-    /// is quick and starts from an existing, already-visible summary, so the
-    /// only thing worth signaling is "this is in progress", not staged
-    /// progress or a cancel button that takes over the screen.
-    private func translatingChip(to language: MeetingLanguage) -> some View {
+    /// "<model> · 12s · 348 words"
+    private func generatingStats(at now: Date) -> String {
+        let model = settings.summaryModel(for: settings.aiProvider)
+        let elapsed = Int(now.timeIntervalSince(summaryRequestStartedAt ?? now))
+        let words = summaryWordsReceived ?? 0
+        if model.isEmpty {
+            return String(
+                format: NSLocalizedString("detail.summary.generating.stats.no_model", comment: "elapsed and words"),
+                elapsed, words
+            )
+        }
+        return String(
+            format: NSLocalizedString("detail.summary.generating.stats", comment: "model, elapsed, words"),
+            model, elapsed, words
+        )
+    }
+
+    private var progressValue: Double? {
+        guard let progress = summaryProgress, progress.total > 0 else { return nil }
+        return Double(progress.stage) / Double(progress.total)
+    }
+
+    /// Same spot and weight as the generating state — a translation is quick
+    /// and starts from an already-visible summary, so it gets one line with a
+    /// cancel glyph, nothing more.
+    private func translatingRow(to language: MeetingLanguage) -> some View {
         HStack(spacing: 6) {
             ProgressView()
-                .controlSize(.small)
+                .controlSize(.mini)
                 .accessibilityHidden(true)
             Text(String(
-                format: NSLocalizedString("detail.summary.translating", comment: "Translating…"),
+                format: NSLocalizedString("detail.summary.translating_to", comment: "Translating to a language"),
                 language.displayName
             ))
-            .font(.system(.footnote, design: .default, weight: .regular))
-            .lineLimit(1)
+            .font(Theme.footnote)
             .foregroundStyle(Theme.textSecondary)
+            Spacer(minLength: 0)
             Button {
                 onCancelTranslateSummary()
             } label: {
@@ -252,149 +326,31 @@ struct SummaryTab: View {
             .buttonStyle(.plain)
             .accessibilityLabel(NSLocalizedString("detail.summary.cancel_translate", comment: "Cancel translation"))
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .background(Theme.fill, in: Capsule())
-    }
-
-    private func chipTitle(for summary: Summary) -> String {
-        let name = summary.templateName?.isEmpty == false
-            ? summary.templateName!
-            : NSLocalizedString("detail.summary.untitled", comment: "Summary")
-        return "\(name) · \(summary.createdAt.shortTime)"
-    }
-
-    private var summaryProgressPanel: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Theme.fill)
-                        .frame(width: 42, height: 42)
-                    if isCancellingSummary {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Image(systemName: "sparkles")
-                            .font(Theme.bodyEmphasized)
-                            .foregroundStyle(Theme.textSecondary)
-                            .accessibilityHidden(true)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(progressTitle)
-                        .font(Theme.headline)
-                        .foregroundStyle(Theme.textPrimary)
-                    Text(progressSubtitle)
-                        .font(Theme.footnote)
-                        .foregroundStyle(Theme.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-            }
-
-            if let progressValue {
-                ProgressView(value: progressValue)
-                    .progressViewStyle(.linear)
-                    .tint(Theme.ink)
-            } else {
-                IndeterminateSummaryProgressBar()
-            }
-
-            if !isCancellingSummary {
-                SummaryDraftView(draft: summaryDraft, startedAt: summaryRequestStartedAt)
-            }
-
-            Button(role: .cancel) {
-                onCancel()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "xmark.circle")
-                        .accessibilityHidden(true)
-                    Text(NSLocalizedString("detail.summary.cancel", comment: "Cancel summary"))
-                        .font(Theme.footnoteEmphasized)
-                }
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, minHeight: cancelButtonMinHeight)
-            }
-            .buttonStyle(.bordered)
-            .disabled(isCancellingSummary)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Theme.separator, lineWidth: 1)
-        )
     }
 
     private func summaryEmptyState(canGenerate: Bool) -> some View {
-        VStack(spacing: 20) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(Theme.fill)
-                    .frame(width: 72, height: 72)
-                Image(systemName: "sparkles").font(.largeTitle).foregroundStyle(Theme.textTertiary)
-                    .accessibilityHidden(true)
-            }
-            VStack(spacing: 8) {
-                Text(NSLocalizedString("detail.summary.empty.title", comment: ""))
-                    .font(.system(.title3, design: .default, weight: .bold)).foregroundStyle(Theme.textPrimary)
-                Text(NSLocalizedString("detail.summary.needs_transcript", comment: ""))
-                    .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
-                    .multilineTextAlignment(.center)
-            }
-            HStack(spacing: 6) {
-                Image(systemName: "cpu").font(Theme.caption2).foregroundStyle(Theme.textSecondary)
-                    .accessibilityHidden(true)
+        ContentUnavailableView {
+            Label(NSLocalizedString("detail.summary.empty.title", comment: "No summary yet"),
+                  systemImage: "sparkles")
+        } description: {
+            Text(NSLocalizedString(
+                canGenerate ? "detail.summary.empty.hint" : "detail.summary.needs_transcript",
+                comment: "Summary empty state"
+            ))
+        } actions: {
+            if canGenerate {
+                Button(NSLocalizedString("detail.summary.generate", comment: "Generate summary")) {
+                    onGenerate()
+                }
+                .buttonStyle(.glassProminent)
+                .tint(Theme.ink)
+                .foregroundStyle(Theme.onInk)
                 Text(summaryModelNudge)
-                    .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+                    .font(Theme.footnote)
+                    .foregroundStyle(Theme.textSecondary)
             }
-            .padding(.horizontal, 14).padding(.vertical, 6)
-            .background(Theme.fill, in: Capsule())
-
-            if canGenerate { generateButton(title: NSLocalizedString("detail.summary.generate", comment: "Generate Summary")) }
         }
-        .frame(maxWidth: .infinity).padding(.top, 40)
-    }
-
-    private var summarizingLabel: String {
-        if let progress = summaryProgress {
-            return String(
-                format: NSLocalizedString("detail.summarizing.progress", comment: "Summarizing part i of n"),
-                progress.stage, progress.total
-            )
-        }
-        return NSLocalizedString("detail.summarizing", comment: "Generating...")
-    }
-
-    private var progressTitle: String {
-        isCancellingSummary
-            ? NSLocalizedString("detail.summary.cancelling", comment: "Cancelling summary")
-            : summarizingLabel
-    }
-
-    private var progressSubtitle: String {
-        if isCancellingSummary {
-            return NSLocalizedString("detail.summary.cancelling.subtitle", comment: "Cancelling summary subtitle")
-        }
-        if let words = summaryWordsReceived {
-            return String(
-                format: NSLocalizedString("detail.summary.progress.streaming", comment: "Words streamed so far"),
-                words
-            )
-        }
-        if summaryProgress != nil {
-            return NSLocalizedString("detail.summary.progress.subtitle", comment: "Staged summary subtitle")
-        }
-        return NSLocalizedString("detail.summary.progress.single.subtitle", comment: "Single-pass summary subtitle")
-    }
-
-    private var progressValue: Double? {
-        guard let progress = summaryProgress, progress.total > 0 else { return nil }
-        return Double(progress.stage) / Double(progress.total)
+        .padding(.top, 24)
     }
 
     private var summaryModelNudge: String {
@@ -409,69 +365,8 @@ struct SummaryTab: View {
             model
         )
     }
-
-    private var newSummaryButton: some View {
-        generateButton(title: NSLocalizedString("detail.summary.new", comment: "New Summary"))
-    }
-
-    private func generateButton(title: String) -> some View {
-        Button { onGenerate() } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "sparkles")
-                    .accessibilityHidden(true)
-                Text(title)
-                    .font(Theme.calloutEmphasized)
-            }
-            .foregroundStyle(Theme.onInk)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, minHeight: generateButtonMinHeight)
-            .background(Theme.ink, in: Capsule())
-            .shadow(color: .black.opacity(0.12), radius: 18, y: 4)
-        }
-        .buttonStyle(.plain)
-        .disabled(isSummarizing)
-    }
 }
 
-private struct IndeterminateSummaryProgressBar: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var phase = false
-
-    var body: some View {
-        GeometryReader { proxy in
-            let width = proxy.size.width
-            let segmentWidth = max(48, width * 0.34)
-
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Theme.fill)
-                Capsule()
-                    .fill(Theme.ink)
-                    .frame(width: segmentWidth)
-                    .offset(x: phase ? width : -segmentWidth)
-            }
-            .clipShape(Capsule())
-        }
-        .frame(height: 4)
-        .onAppear {
-            phase = false
-            // Reduce Motion: never start the infinite slide, leave the segment
-            // parked at its resting position.
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 1.25).repeatForever(autoreverses: false)) {
-                phase = true
-            }
-        }
-    }
-}
-
-/// The live, unformatted draft of a summary being written — the summary's
-/// counterpart of the chat's streaming reply: a "thinking for Ns" row until
-/// the first fragment arrives, then the text growing in a bounded window
-/// that follows the newest line, dimmed and with a trailing cursor so it
-/// reads as provisional. It is replaced by the formatted summary when
-/// generation finishes.
 private struct SummaryDraftView: View {
     let draft: String
     let startedAt: Date?

@@ -479,7 +479,7 @@
 "detail.speakers.note" = "发言人为自动检测，可能需要更正。点击姓名即可重命名。";
 "detail.summary" = "摘要";
 "detail.summarizing" = "正在生成摘要…";
-"detail.summary.needs_transcript" = "至少转录一段录音才能生成摘要。";
+"detail.summary.needs_transcript" = "先转录一段录音，然后生成摘要。";
 "detail.summary.model_nudge" = "将使用 %1$@ · 模型 %2$@";
 "detail.summary.model_missing" = "未选择摘要模型";
 "detail.summary.new" = "新建摘要";
@@ -493,9 +493,9 @@
 "detail.summary.progress.streaming" = "模型正在撰写，目前约 %d 个词。";
 "detail.summary.draft.title" = "草稿 — 完成后排版";
 "detail.summary.delete_confirm.title" = "删除此摘要？";
-"detail.summary.delete_confirm.message" = "此操作无法撤销。";
+"detail.summary.delete_confirm.message" = "其他摘要和转录内容将保留。";
 "detail.share" = "分享";
-"detail.more_options" = "更多选项";
+"detail.more_options" = "会议操作";
 "detail.segment_count" = "%d 个片段";
 "detail.recording_n" = "录音 %d";
 "detail.playback_position" = "播放位置";
@@ -536,7 +536,7 @@
 "detail.transcript.warnings_banner" = "已完成，但以下环节有警告：%@";
 "detail.summary.empty.title" = "暂无摘要";
 "detail.section" = "板块";
-"tab.recordings" = "录音";
+"tab.recordings" = "音频";
 "tab.transcript" = "转录";
 "tab.summary" = "摘要";
 "quality.high" = "高";
@@ -548,9 +548,9 @@
 /* 摘要 */
 "summary.key_decisions" = "关键决策";
 "summary.action_items" = "行动事项";
-"summary.footer" = "由 %1$@ 生成 · %2$@";
+"summary.footer" = "由 %1$@ 撰写 · %2$@";
 "summary.photo_reference" = "查看 %@ 的照片";
-"summary.footer_with_model" = "由 %1$@ 生成 · %2$@ · %3$@";
+"summary.footer_with_model" = "由 %1$@ 撰写 · %2$@ · %3$@";
 "summary.template_label" = "模板：%@";
 
 /* 摘要翻译 */
@@ -857,7 +857,7 @@
 "chat.stop" = "停止";
 "chat.disabled.title" = "语义搜索已关闭";
 "chat.disabled.subtitle" = "在设置中开启语义搜索，即可就会议内容进行聊天。";
-"chat.ask.title" = "询问你的会议";
+"chat.ask.title" = "提问";
 "chat.retry" = "重试";
 "chat.usage.tokens" = "%d 个词元";
 "chat.usage.cost" = "~$%.4f";
@@ -1354,7 +1354,7 @@
 "chat.draft.save_failed" = "未能保存未发送的文本，它仍在消息框中。";
 
 /* Meeting knowledge contributions (K2.3). */
-"tab.knowledge" = "知识";
+"tab.knowledge" = "Wiki";
 "detail.knowledge.counts" = "实体：%ld · 陈述：%ld · 片段：%ld";
 "detail.knowledge.contributions" = "本次会议的贡献";
 "detail.knowledge.refresh" = "刷新";
@@ -1718,3 +1718,27 @@
 "filter.show_count" = "显示 %d";
 "filter.clear_all" = "清除所有筛选";
 "folder.new_short" = "新建";
+"detail.more" = "更多";
+"meetings.delete" = "删除会议";
+"detail.ask.placeholder" = "询问此会议";
+"chat.ask.subtitle.meeting" = "关于“%1$@” · 转录、摘要和 Wiki";
+"chat.ask.subtitle.meeting.no_wiki" = "关于“%1$@” · 转录和摘要";
+"chat.ask.subtitle.library" = "全部会议 · %1$d 场会议";
+"chat.suggest.decisions" = "决定了什么？";
+"chat.suggest.next_steps" = "后续步骤是什么，由谁负责？";
+"chat.suggest.open" = "还有哪些事项未决？";
+"chat.suggest.email" = "为缺席者撰写一封摘要邮件";
+"chat.provider.title" = "连接 AI 提供商";
+"chat.provider.subtitle" = "回答会使用转录内容并引用每一行的时间。只有您选择的来源才会发送给提供商。";
+"chat.provider.setup" = "设置提供商";
+"detail.summary.writing" = "撰写中…";
+"detail.summary.today_at" = "今天 %1$@";
+"detail.summary.of_meeting" = "此会议的摘要";
+"detail.summary.compare" = "并排比较";
+"detail.summary.delete" = "删除此摘要";
+"detail.summary.listen" = "收听";
+"detail.summary.translating_to" = "正在翻译为%1$@…";
+"detail.summary.generating.stats" = "%1$@ · %2$d 秒 · %3$d 字";
+"detail.summary.generating.stats.no_model" = "%1$d 秒 · %2$d 字";
+"detail.summary.empty.hint" = "选择模板，Kurn 会根据转录内容撰写摘要。";
+"detail.summary.delete_confirm.title_named" = "删除摘要“%1$@”？";

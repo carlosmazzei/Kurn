@@ -314,17 +314,7 @@ struct MeetingsListView: View {
             FilterBarView(filter: $filter, matchCount: matchCount(for:))
         }
         .sheet(isPresented: $showingAsk) {
-            NavigationStack {
-                MeetingChatView(meeting: nil)
-                .navigationTitle(NSLocalizedString("chat.ask.title", comment: "Ask across meetings"))
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button(NSLocalizedString("common.done", comment: "Done")) { showingAsk = false }
-                    }
-                }
-            }
-            .hostsRecordingMiniBarInSheet()
+            MeetingAskSheet(meeting: nil)
         }
         .sheet(isPresented: $showingKnowledge) {
             KnowledgeLibraryDestination(meetingIDs: $knowledgeSourceIDs).hostsRecordingMiniBarInSheet()

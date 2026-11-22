@@ -180,6 +180,7 @@ struct FilterChip: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var selectedBackground: Color {
