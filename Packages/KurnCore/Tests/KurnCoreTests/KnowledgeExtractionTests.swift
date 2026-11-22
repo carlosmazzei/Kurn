@@ -181,4 +181,26 @@ struct KnowledgeExtractionTests {
         #expect(throws: KnowledgeExtractionError.unknownReference) { try decode(document) }
     }
 
+
+    @Test func fencedOrProseWrappedRepliesAreNormalizedToTheObject() throws {
+        let json = String(decoding: try JSONSerialization.data(withJSONObject: wire()), as: UTF8.self)
+        let fenced = "Here is the JSON:\n```json\n" + json + "\n```"
+        let decoded = try KnowledgeExtraction.decode(KnowledgeExtraction.normalizedReply(fenced), segments: sources)
+        #expect(decoded.assertions.count == 1)
+        #expect(KnowledgeExtraction.normalizedReply("no json here") == Data("no json here".utf8))
+    }
+
+    @Test func diagnoseNamesTheFirstStructuralProblemWithSchemaKeysOnly() throws {
+        func data(_ w: [String: Any]) throws -> Data { try JSONSerialization.data(withJSONObject: w) }
+        #expect(KnowledgeExtractionShape.diagnose(try data(wire())) == nil)
+        var noAliases = wire()
+        noAliases["entities"] = [["ref": "e1", "kind": "project", "name": "Example project"]]
+        #expect(KnowledgeExtractionShape.diagnose(try data(noAliases)) == "entities[0]: missing aliases")
+        var extra = wire()
+        extra["modelNotes"] = "secret text"
+        #expect(KnowledgeExtractionShape.diagnose(try data(extra)) == "root: unexpected key")
+        #expect(KnowledgeExtractionShape.diagnose(Data("not json".utf8)) == "not_json")
+        let missingEvidence = changingAssertion { $0["evidence"] = [["quote": "Example project is open."]] }
+        #expect(KnowledgeExtractionShape.diagnose(try data(missingEvidence)) == "assertions[0].evidence[0]: missing segmentIDs or quote")
+    }
 }
