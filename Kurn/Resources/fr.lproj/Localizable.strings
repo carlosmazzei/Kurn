@@ -915,14 +915,14 @@
 "settings.correction" = "Corriger les erreurs de transcription";
 "settings.correction_footer" = "Utilise votre fournisseur d'IA de résumé après la transcription. Il relit d'abord la transcription pour identifier le sujet de la réunion et les mots qui n'y correspondent pas, puis corrige l'orthographe, la ponctuation et les mots mal compris dans les passages incertains ou signalés, en ne gardant que les modifications qui ressemblent à ce qui a été dit. Désactivé par défaut — cela effectue des appels dans le cloud et peut prendre plus de temps.";
 "settings.correction_needs_key" = "Ajoutez une clé d'API pour votre fournisseur de résumé afin d'activer la correction par IA.";
-"detail.wiki.view" = "Voir la page";
-"detail.wiki.generate" = "Générer la page";
-"detail.wiki.regenerate" = "Régénérer la page";
-"detail.wiki.generating" = "Génération de la page…";
+"detail.wiki.view" = "Voir le wiki";
+"detail.wiki.generate" = "Générer le wiki";
+"detail.wiki.regenerate" = "Régénérer le wiki";
+"detail.wiki.generating" = "Génération du wiki…";
 "detail.title.generate" = "Générer le Titre";
 "detail.title.regenerate" = "Régénérer le Titre";
 "detail.title.generating" = "Génération du Titre…";
-"detail.wiki.title" = "Page de la réunion";
+"detail.wiki.title" = "Wiki de la réunion";
 "detail.wiki.updated" = "Mis à jour le %@";
 
 /* Documents générés */
@@ -931,6 +931,8 @@
 "documents.new" = "Ouvrir le chat";
 "documents.empty.title" = "Aucun document pour l'instant";
 "documents.empty.subtitle" = "Les documents sont créés depuis Ask : demandez un compte rendu, un rapport ou un plan.";
+"documents.ask" = "Demandez un document dans Ask";
+"documents.needs_provider" = "Le fournisseur sélectionné ne peut pas créer de documents.";
 "documents.prompt.title" = "Instructions";
 "documents.source.transcripts" = "Transcriptions";
 "documents.source.tags" = "Tags";
@@ -1376,8 +1378,8 @@
 "detail.knowledge.counts" = "Entités : %ld · Énoncés : %ld · Extraits : %ld";
 "detail.knowledge.contributions" = "Pages modifiées";
 "detail.knowledge.refresh" = "Actualiser";
-"detail.knowledge.notes" = "Page de la réunion";
-"detail.knowledge.notes_empty" = "Générez une page à partir de la transcription de cette réunion.";
+"detail.knowledge.notes" = "Wiki de la réunion";
+"detail.knowledge.notes_empty" = "Générez un wiki à partir de la transcription de cette réunion.";
 "detail.knowledge.loading" = "Chargement des contributions…";
 "detail.knowledge.unavailable" = "Wiki indisponibles";
 "detail.knowledge.unavailable_detail" = "L’accès ou les données sources ont peut-être changé. Actualisez pour réessayer.";
@@ -1782,6 +1784,7 @@
 "detail.recording.add" = "Ajouter un enregistrement";
 "detail.attachments.reading" = "Lecture de « %@ »…";
 "detail.read_aloud.title" = "Lecture du résumé";
+"detail.read_aloud.wiki_title" = "Lecture du wiki";
 "read_aloud.progress_named" = "Paragraphe %1$d sur %2$d";
 "read_aloud.voice.device" = "Voix de l'appareil";
 "detail.voice" = "Voix";
@@ -1822,8 +1825,12 @@
 "detail.knowledge.changed_summary" = "%1$@ · %2$@";
 "detail.knowledge.entity_facts" = "%1$@ · +%2$@";
 "detail.wiki.provenance" = "Rédigée par l’IA · %@";
-"detail.knowledge.no_page" = "Pas encore de page";
-"detail.knowledge.no_page_detail" = "Générez une page à partir de la transcription de cette réunion.";
+"detail.knowledge.no_page" = "Pas encore de wiki";
+"detail.knowledge.no_page_detail" = "Générez un wiki à partir de la transcription de cette réunion.";
+"detail.knowledge.fact_sentence" = "%1$@ %2$@ %3$@";
+"detail.knowledge.facts_title" = "Connaissances de cette réunion";
+"detail.knowledge.page_written" = "Wiki · rédigé %@";
+"detail.wiki.writing" = "Rédaction du wiki de la réunion · %@";
 "knowledge.entity_kind.topic" = "Sujet";
 "knowledge.entity_kind.project" = "Projet";
 "knowledge.entity_kind.initiative" = "Initiative";

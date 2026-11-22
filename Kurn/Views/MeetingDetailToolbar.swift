@@ -94,35 +94,32 @@ extension MeetingDetailView {
                     .disabled(attachments.isImporting)
                 }
                 Section {
-                    // The wiki shortcut hides only while the Knowledge tab is
-                    // actually showing the page — knowledge off, still loading,
-                    // or unavailable means the tab cannot reach it, so the
-                    // menu keeps the direct View/Generate entries.
-                    if !wikiLivesInKnowledgeTab {
-                        if meeting.wikiArticle != nil {
-                            Button { showingWiki = true } label: {
-                                Label(
-                                    NSLocalizedString("detail.wiki.view", comment: "View meeting wiki"),
-                                    systemImage: "book"
-                                )
-                            }
+                    // The Knowledge tab lists facts; the page itself is a link
+                    // row there — View/Generate stay reachable from the menu.
+                    if meeting.wikiArticle != nil {
+                        Button { showingWiki = true } label: {
+                            Label(
+                                NSLocalizedString("detail.wiki.view", comment: "View meeting wiki"),
+                                systemImage: "book"
+                            )
                         }
-                        if canGenerateWiki {
-                            Button { regenerateWiki() } label: {
-                                if isGeneratingWiki {
-                                    Label {
-                                        Text(NSLocalizedString("detail.wiki.generating", comment: "Generating wiki"))
-                                    } icon: {
-                                        ProgressView().controlSize(.mini)
-                                    }
-                                } else if meeting.wikiArticle != nil {
-                                    Label(NSLocalizedString("detail.wiki.regenerate", comment: "Regenerate wiki"), systemImage: "arrow.clockwise")
-                                } else {
-                                    Label(NSLocalizedString("detail.wiki.generate", comment: "Generate wiki"), systemImage: "book")
+                    }
+                    if canGenerateWiki {
+                        Button { regenerateWiki() } label: {
+                            if isGeneratingWiki {
+                                Label {
+                                    Text(NSLocalizedString("detail.wiki.generating", comment: "Generating wiki"))
+                                } icon: {
+                                    ProgressView().controlSize(.mini)
                                 }
+                            } else if meeting.wikiArticle != nil {
+                                Label(NSLocalizedString("detail.wiki.regenerate", comment: "Regenerate wiki"), systemImage: "arrow.clockwise")
+                            } else {
+                                Label(NSLocalizedString("detail.wiki.generate", comment: "Generate wiki"), systemImage: "book")
                             }
-                            .disabled(isGeneratingWiki)
                         }
+                        .disabled(isGeneratingWiki)
+                        .accessibilityIdentifier("knowledge.generateNotes")
                     }
                     if hasAnyTranscript {
                         Button { pendingRetranscribeAll = true } label: {
@@ -157,14 +154,5 @@ extension MeetingDetailView {
             ])
             .accessibilityIdentifier("detail.more")
         }
-    }
-}
-
-extension MeetingDetailView {
-    /// True only while the Knowledge tab itself presents the wiki — the one
-    /// case where a View/Generate menu shortcut would duplicate the tab.
-    var wikiLivesInKnowledgeTab: Bool {
-        settings.knowledgeEnabled
-            && { if case .loaded = meetingKnowledge.presentation(for: meeting.id) { return true }; return false }()
     }
 }

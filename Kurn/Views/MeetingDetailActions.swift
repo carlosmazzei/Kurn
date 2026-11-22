@@ -114,6 +114,14 @@ extension MeetingDetailView {
         }
     }
 
+    /// A knowledge fact's `[m:ss]` chip: the evidence timestamp is
+    /// recording-relative, so add the recording's meeting offset and reuse
+    /// the transcript seek path.
+    func seekEvidence(_ recordingID: UUID, _ time: TimeInterval) {
+        guard let recording = sortedRecordings.first(where: { $0.id == recordingID }) else { return }
+        jumpToTime(startOffset(of: recording) + time)
+    }
+
     func seek(_ recording: Recording, to time: TimeInterval) {
         guard !enhancement.isEnhancing(recording) else { return }
         Task {

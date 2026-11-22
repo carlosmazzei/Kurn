@@ -170,3 +170,30 @@ struct ReadAloudBar: View {
         }
     }
 }
+
+/// The ghost "Listen" button that starts read-aloud for an item — the Summary
+/// bar's and the Wiki sheet's entry point. Playback chrome (transport,
+/// progress, errors) lives in `ReadAloudBar`; this is only the way in.
+struct ReadAloudListenButton: View {
+    let item: ReadAloudItem
+
+    @Environment(AppSettings.self) private var settings
+
+    private var controller: ReadAloudController { .shared }
+
+    var body: some View {
+        Button { controller.toggle(item, settings: settings) } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "speaker.wave.2")
+                    .accessibilityHidden(true)
+                Text(NSLocalizedString("detail.summary.listen", comment: "Listen"))
+            }
+            .font(Theme.footnote)
+            .foregroundStyle(Theme.textSecondary)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 44)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("readAloud.listen")
+    }
+}

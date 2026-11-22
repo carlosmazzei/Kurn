@@ -915,14 +915,14 @@
 "settings.correction" = "Correct transcription errors";
 "settings.correction_footer" = "Uses your summary AI provider after transcription. It first reviews the transcript to identify the meeting's topic and the words that don't fit it, then fixes spelling, punctuation and misheard words in uncertain or flagged passages, keeping only changes that sound like what was said. Off by default — it makes cloud calls and can take longer to finish.";
 "settings.correction_needs_key" = "Add an API key for your summary provider to enable AI correction.";
-"detail.wiki.view" = "View page";
-"detail.wiki.generate" = "Generate page";
-"detail.wiki.regenerate" = "Regenerate page";
-"detail.wiki.generating" = "Generating page…";
+"detail.wiki.view" = "View wiki";
+"detail.wiki.generate" = "Generate wiki";
+"detail.wiki.regenerate" = "Regenerate wiki";
+"detail.wiki.generating" = "Generating wiki…";
 "detail.title.generate" = "Generate Title";
 "detail.title.regenerate" = "Regenerate Title";
 "detail.title.generating" = "Generating Title…";
-"detail.wiki.title" = "Meeting page";
+"detail.wiki.title" = "Meeting wiki";
 "detail.wiki.updated" = "Updated %@";
 
 /* Generated documents */
@@ -931,6 +931,8 @@
 "documents.new" = "Open chat";
 "documents.empty.title" = "No documents yet";
 "documents.empty.subtitle" = "Documents are created from Ask: request minutes, a report or a plan.";
+"documents.ask" = "Ask for a document";
+"documents.needs_provider" = "The selected provider can't create documents.";
 "documents.prompt.title" = "Instructions";
 "documents.source.transcripts" = "Transcripts";
 "documents.source.tags" = "Tags";
@@ -1376,8 +1378,8 @@
 "detail.knowledge.counts" = "Entities: %ld · Claims: %ld · Passages: %ld";
 "detail.knowledge.contributions" = "Changed pages";
 "detail.knowledge.refresh" = "Refresh";
-"detail.knowledge.notes" = "Meeting page";
-"detail.knowledge.notes_empty" = "Generate a page from this meeting’s transcript.";
+"detail.knowledge.notes" = "Meeting wiki";
+"detail.knowledge.notes_empty" = "Generate a wiki from this meeting’s transcript.";
 "detail.knowledge.loading" = "Loading contributions…";
 "detail.knowledge.unavailable" = "Wiki is unavailable";
 "detail.knowledge.unavailable_detail" = "Access or source data may have changed. Refresh to try again.";
@@ -1782,6 +1784,7 @@
 "detail.recording.add" = "Add recording";
 "detail.attachments.reading" = "Reading “%@”…";
 "detail.read_aloud.title" = "Reading the summary";
+"detail.read_aloud.wiki_title" = "Reading the wiki";
 "read_aloud.progress_named" = "Paragraph %1$d of %2$d";
 "read_aloud.voice.device" = "Device voice";
 "detail.voice" = "Voice";
@@ -1822,8 +1825,12 @@
 "detail.knowledge.changed_summary" = "%1$@ · %2$@";
 "detail.knowledge.entity_facts" = "%1$@ · +%2$@";
 "detail.wiki.provenance" = "Written by the AI · %@";
-"detail.knowledge.no_page" = "No page yet";
-"detail.knowledge.no_page_detail" = "Generate a page from this meeting's transcript.";
+"detail.knowledge.no_page" = "No wiki yet";
+"detail.knowledge.no_page_detail" = "Generate a wiki from this meeting’s transcript.";
+"detail.knowledge.fact_sentence" = "%1$@ %2$@ %3$@";
+"detail.knowledge.facts_title" = "Knowledge from this meeting";
+"detail.knowledge.page_written" = "Wiki · written %@";
+"detail.wiki.writing" = "Writing the meeting wiki · %@";
 "knowledge.entity_kind.topic" = "Topic";
 "knowledge.entity_kind.project" = "Project";
 "knowledge.entity_kind.initiative" = "Initiative";

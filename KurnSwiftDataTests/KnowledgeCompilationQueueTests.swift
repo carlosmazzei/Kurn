@@ -271,6 +271,17 @@ struct KnowledgeCompilationQueueTests {
         #expect(f.coordinator.lastFailureCode == "feature_disabled")
     }
 
+    @Test func explicitCompileForExcludedMeetingReportsTheDeferredReason() async throws {
+        let provider = Provider()
+        let f = try fixture(provider: provider)
+        var controls = try #require(f.settings.knowledgeControls)
+        controls.excludedMeetingIDs = [f.meeting.id]
+        try f.settings.saveKnowledgeControls(controls)
+        #expect(await f.coordinator.compile(meetingID: f.meeting.id, trigger: .explicit) == .deferred)
+        #expect(f.coordinator.lastFailureCode == "policy_denied")
+        #expect(await provider.calls == 0)
+    }
+
     @Test func explicitRebuildGenerationIsIdempotentAndRetiresPreviousMachineAssertions() async throws {
         let provider = Provider()
         let f = try fixture(provider: provider)

@@ -107,7 +107,9 @@ public enum KnowledgeWikiProjector {
         }
     }
 
-    private static func section(_ entry: KnowledgeWikiPage.Entry) -> KnowledgeWikiPage.Kind {
+    /// The section a projected entry belongs to — also the grouping the
+    /// meeting Knowledge tab presents, so it stays public and shared.
+    public static func section(_ entry: KnowledgeWikiPage.Entry) -> KnowledgeWikiPage.Kind {
         switch entry.subject.kind {
         case .decisionThread: .decisions
         case .actionItem: .actions

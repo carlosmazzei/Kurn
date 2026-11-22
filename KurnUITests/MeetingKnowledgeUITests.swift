@@ -39,26 +39,25 @@ final class MeetingKnowledgeUITests: XCTestCase {
         continueAfterFailure = false
         let app = launch()
         openKnowledge(app)
-        let header = app.staticTexts.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "knowledge.header", "Claims: 1")).firstMatch
+        let header = app.staticTexts.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "knowledge.header", "fact")).firstMatch
         XCTAssertTrue(header.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["knowledge.quote"].firstMatch.label.contains("Example portal"))
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
         capture(app, named: "knowledge-meeting-compact")
-        let notes = app.descendants(matching: .any)["knowledge.notes"].firstMatch
+        let pageRow = app.descendants(matching: .any)["knowledge.meetingPage"].firstMatch
         let content = app.descendants(matching: .any)["knowledge.content"].firstMatch
-        for _ in 0..<4 where !notes.isHittable { content.swipeDown() }
-        XCTAssertTrue(notes.exists)
-        notes.tap()
+        for _ in 0..<4 where !pageRow.isHittable { content.swipeUp() }
+        XCTAssertTrue(pageRow.exists)
+        pageRow.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "The team reported")).firstMatch.waitForExistence(timeout: 5))
         capture(app, named: "knowledge-meeting-notes")
+        app.buttons["Done"].firstMatch.tap()
         app.buttons["detail.more"].tap()
         XCTAssertTrue(app.buttons["Archive"].firstMatch.waitForExistence(timeout: 5))
-        // The Knowledge tab's own "Regenerate Wiki" chip stays; the menu has no wiki items.
+        // The page is a link row in the tab; View/Regenerate live in the menu.
         XCTAssertTrue(app.buttons["knowledge.generateNotes"].exists)
-        for label in ["View wiki", "Generate Wiki", "Regenerate Wiki"] {
-            let menuItem = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", label, "knowledge.generateNotes"))
-            XCTAssertEqual(menuItem.count, 0, label)
-        }
+        XCTAssertTrue(app.buttons["View wiki"].firstMatch.exists)
+        XCTAssertTrue(app.buttons["Regenerate wiki"].firstMatch.exists)
     }
 
     func testKnowledgeAtAccessibilityTextSize() throws {
@@ -520,4 +519,5 @@ final class MeetingKnowledgeUITests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
     }
+
 }
