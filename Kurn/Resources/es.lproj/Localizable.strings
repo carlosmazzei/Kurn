@@ -449,7 +449,6 @@
 "phase.knowledge.publishing" = "Publicando";
 "detail.knowledge.update" = "Actualizar conocimiento";
 "detail.knowledge.updating" = "Conocimiento · actualizando…";
-"detail.knowledge.update.stats" = "%1$@ · %2$d%% · %3$@ · %4$ds · %5$@";
 "knowledge.updated.fact.one" = "%d hecho nuevo";
 "knowledge.updated.fact.other" = "%d hechos nuevos";
 "knowledge.updated_empty" = "No hay hechos nuevos: el modelo no encontró afirmaciones";
@@ -1981,3 +1980,4 @@
 "recorder.discard.confirm.message" = "El audio grabado hasta ahora se borrará de este dispositivo. Detener, en cambio, lo conserva.";
 "recorder.discard.confirm.keep" = "Seguir grabando";
 "recorder.mic.builtin_forced_hint" = "La opción Usar siempre el micrófono del iPhone está activada en Ajustes";
+"knowledge.update.title" = "Actualizando conocimiento";

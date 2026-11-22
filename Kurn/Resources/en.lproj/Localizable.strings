@@ -449,7 +449,6 @@
 "phase.knowledge.publishing" = "Publishing";
 "detail.knowledge.update" = "Update knowledge";
 "detail.knowledge.updating" = "Knowledge · updating…";
-"detail.knowledge.update.stats" = "%1$@ · %2$d%% · %3$@ · %4$ds · %5$@";
 "knowledge.updated.fact.one" = "%d new fact";
 "knowledge.updated.fact.other" = "%d new facts";
 "knowledge.updated_empty" = "No new facts — the model found no statements";
@@ -1981,3 +1980,4 @@
 "recorder.discard.confirm.message" = "Its audio so far will be deleted from this device. Stopping instead keeps it.";
 "recorder.discard.confirm.keep" = "Keep recording";
 "recorder.mic.builtin_forced_hint" = "Always Use iPhone Microphone is on in Settings";
+"knowledge.update.title" = "Updating knowledge";
