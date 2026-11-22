@@ -313,38 +313,25 @@ struct SummaryTab: View {
     }
 
     private func summaryEmptyState(canGenerate: Bool) -> some View {
-        ContentUnavailableView {
-            Label(NSLocalizedString("detail.summary.empty.title", comment: "No summary yet"),
-                  systemImage: "sparkles")
-        } description: {
-            Text(NSLocalizedString(
+        MeetingGenerateEmptyState(
+            systemImage: "sparkles",
+            title: NSLocalizedString("detail.summary.empty.title", comment: "No summary yet"),
+            description: NSLocalizedString(
                 canGenerate ? "detail.summary.empty.hint" : "detail.summary.needs_transcript",
                 comment: "Summary empty state"
-            ))
-        } actions: {
-            if canGenerate {
-                Button(NSLocalizedString("detail.summary.generate", comment: "Generate summary")) {
-                    onGenerate()
-                }
-                .inkProminent()
-                Text(summaryModelNudge)
-                    .font(Theme.footnote)
-                    .foregroundStyle(Theme.textSecondary)
-            }
-        }
-        .padding(.top, 24)
+            ),
+            actionTitle: canGenerate
+                ? NSLocalizedString("detail.summary.generate", comment: "Generate summary")
+                : nil,
+            footnote: canGenerate ? summaryModelNudge : nil,
+            action: onGenerate
+        )
     }
 
     private var summaryModelNudge: String {
-        let provider = settings.aiProvider
-        let model = settings.summaryModel(for: provider)
-        guard !model.isEmpty else {
-            return NSLocalizedString("detail.summary.model_missing", comment: "No summary model selected")
-        }
-        return String(
-            format: NSLocalizedString("detail.summary.model_nudge", comment: "Summary model nudge"),
-            provider.displayName,
-            model
+        MeetingGenerateEmptyState.modelNudge(
+            provider: settings.aiProvider,
+            model: settings.summaryModel(for: settings.aiProvider)
         )
     }
 }
@@ -386,5 +373,58 @@ private struct SummaryDraftView: View {
                 .background(Theme.fill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
         }
+    }
+}
+
+/// The shared "nothing generated yet" layout for the detail tabs (Summary
+/// and Wiki) — one glyph/title/description/button/footnote shape so the two
+/// empty states cannot drift. `actionTitle`/`footnote`/`action` are all
+/// gated on `actionTitle`: without it the state is description-only.
+struct MeetingGenerateEmptyState: View {
+    let systemImage: String
+    let title: String
+    let description: String
+    var descriptionIdentifier: String?
+    var actionTitle: String?
+    var actionIdentifier: String?
+    var footnote: String?
+    var action: (() -> Void)?
+
+    var body: some View {
+        ContentUnavailableView {
+            Label(title, systemImage: systemImage)
+        } description: {
+            Text(description)
+                .accessibilityIdentifier(descriptionIdentifier ?? "")
+        } actions: {
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .inkProminent()
+                    .accessibilityIdentifier(actionIdentifier ?? "")
+                if let footnote {
+                    Text(footnote)
+                        .font(Theme.footnote)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+        }
+        .padding(.top, 24)
+    }
+
+    /// The shared footnote under the generate button: "Will use <provider> ·
+    /// model <model>" for a cloud pick, or the on-device wording when the
+    /// resolved provider is Apple Intelligence.
+    static func modelNudge(provider: AIProvider, model: String) -> String {
+        if provider.kind == .appleOnDevice {
+            return NSLocalizedString("detail.generate.on_device", comment: "On-device generation footnote")
+        }
+        guard !model.isEmpty else {
+            return NSLocalizedString("detail.summary.model_missing", comment: "No summary model selected")
+        }
+        return String(
+            format: NSLocalizedString("detail.summary.model_nudge", comment: "Summary model nudge"),
+            provider.displayName,
+            model
+        )
     }
 }

@@ -134,29 +134,32 @@ struct MeetingKnowledgeView: View {
                         .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
                 }
             } else {
-                ContentUnavailableView {
-                    Label(NSLocalizedString("detail.knowledge.no_page", comment: "No page yet"), systemImage: "book")
-                } description: {
-                    // Carries `knowledge.header` while the counters line is
-                    // hidden — the identifier stays findable in this state.
-                    Text(NSLocalizedString("detail.knowledge.no_page_detail", comment: "Generate a page"))
-                        .accessibilityIdentifier("knowledge.header")
-                } actions: {
-                    if canGenerateArticle {
-                        Button(action: generate) {
-                            Text(NSLocalizedString("detail.wiki.generate", comment: "Generate page"))
-                                .font(Theme.calloutEmphasized)
-                        }
-                        .inkProminent()
-                        .accessibilityIdentifier("knowledge.generateNotes")
-                        Text(verbatim: generatesLocally
-                             ? NSLocalizedString("mode.on_device", comment: "On-device")
-                             : settings.aiProvider.displayName)
-                            .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
-                    }
-                }
+                MeetingGenerateEmptyState(
+                    systemImage: "book",
+                    title: NSLocalizedString("detail.knowledge.no_page", comment: "No page yet"),
+                    // `knowledge.header` rides on the description while the
+                    // counters line is hidden — the identifier stays findable.
+                    description: NSLocalizedString("detail.knowledge.no_page_detail", comment: "Generate a page"),
+                    descriptionIdentifier: "knowledge.header",
+                    actionTitle: canGenerateArticle
+                        ? NSLocalizedString("detail.wiki.generate", comment: "Generate page")
+                        : nil,
+                    actionIdentifier: "knowledge.generateNotes",
+                    footnote: wikiModelNudge,
+                    action: generate
+                )
             }
         }
+    }
+
+    /// Same provider·model nudge the Summary empty state shows — the Wiki
+    /// writer resolves through `wikiGenerationProvider`/`wikiGenerationModel`
+    /// (explicit pick, else "Same as summaries").
+    private var wikiModelNudge: String {
+        MeetingGenerateEmptyState.modelNudge(
+            provider: settings.wikiGenerationProvider,
+            model: settings.wikiGenerationModel
+        )
     }
 
     private func generate() {

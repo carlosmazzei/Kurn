@@ -484,6 +484,7 @@
 "detail.summarizing" = "Generando resumen…";
 "detail.summary.needs_transcript" = "Transcribe primero una grabación y luego genera un resumen.";
 "detail.summary.model_nudge" = "Se usará %1$@ · modelo %2$@";
+"detail.generate.on_device" = "Apple Intelligence · en este dispositivo";
 "detail.summary.model_missing" = "No hay ningún modelo de resumen seleccionado";
 "detail.summary.new" = "Nuevo Resumen";
 "detail.summary.untitled" = "Resumen";
@@ -1618,6 +1619,9 @@
 "knowledge.settings.cloud_cost" = "El procesamiento envía estas transcripciones a %@; se aplican tarifas del proveedor.";
 "knowledge.settings.scope" = "Ámbito y exclusiones";
 "knowledge.settings.automatic_detail" = "La compilación automática se aplica a futuras transcripciones. Activar Wiki no procesa reuniones antiguas. El trabajo pendiente autorizado puede continuar; usa Pausar para detenerlo.";
+"knowledge.settings.wiki_writer" = "Redactor del Wiki";
+"knowledge.settings.same_as_summaries" = "Igual que los resúmenes (%@)";
+"knowledge.settings.wiki_writer_detail" = "Las actualizaciones automáticas del Wiki envían cada nueva transcripción a este proveedor; necesita el permiso Automático en Privacidad y nube.";
 "knowledge.settings.choose" = "Elegir reuniones";
 "knowledge.settings.selected" = "Reuniones seleccionadas: %d";
 "knowledge.settings.recompile" = "Recompilar Wiki existente";
@@ -1748,8 +1752,7 @@
 "detail.summary.delete_confirm.title_named" = "¿Eliminar el resumen \"%1$@\"?";
 "transcript.seek_to" = "Ir a %@";
 "detail.participants" = "Participantes";
-"detail.transcript.in_progress" = "Transcribiendo… %d%%";
-"detail.transcript.leave_hint" = "Puedes salir de esta pantalla; Kurn te avisa cuando termine.";
+"detail.transcript.leave_hint" = "Puedes salir de esta pantalla. Kurn te avisa cuando termine.";
 "detail.transcript.failed.hint" = "El audio está guardado; inténtalo de nuevo o cambia el motor de transcripción.";
 "detail.transcript.go_to_audio" = "Ir a Audio";
 "detail.transcript.open_settings" = "Ajustes de transcripción";

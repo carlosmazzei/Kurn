@@ -484,6 +484,7 @@
 "detail.summarizing" = "Generating summary…";
 "detail.summary.needs_transcript" = "Transcribe a recording first, then generate a summary.";
 "detail.summary.model_nudge" = "Will use %1$@ · model %2$@";
+"detail.generate.on_device" = "Apple Intelligence · on this device";
 "detail.summary.model_missing" = "No summary model selected";
 "detail.summary.new" = "New Summary";
 "detail.summary.untitled" = "Summary";
@@ -1618,6 +1619,9 @@
 "knowledge.settings.cloud_cost" = "Processing sends these transcripts to %@; provider fees apply.";
 "knowledge.settings.scope" = "Scope and exclusions";
 "knowledge.settings.automatic_detail" = "Automatic compilation applies to future transcriptions. Enabling Wiki does not process older meetings. Approved pending work may resume; use Pause to stop compilation.";
+"knowledge.settings.wiki_writer" = "Wiki writer";
+"knowledge.settings.same_as_summaries" = "Same as summaries (%@)";
+"knowledge.settings.wiki_writer_detail" = "Automatic Wiki updates send each new transcript to this provider; it needs the Automatic permission in Privacy & Cloud.";
 "knowledge.settings.choose" = "Choose meetings";
 "knowledge.settings.selected" = "Selected meetings: %d";
 "knowledge.settings.recompile" = "Recompile existing Wiki";
@@ -1748,8 +1752,7 @@
 "detail.summary.delete_confirm.title_named" = "Delete the summary \"%1$@\"?";
 "transcript.seek_to" = "Seek to %@";
 "detail.participants" = "Participants";
-"detail.transcript.in_progress" = "Transcribing… %d%%";
-"detail.transcript.leave_hint" = "You can leave this screen; Kurn tells you when it is done.";
+"detail.transcript.leave_hint" = "You can leave this screen. Kurn lets you know when it is done.";
 "detail.transcript.failed.hint" = "The audio is saved; try again or change the transcription engine.";
 "detail.transcript.go_to_audio" = "Go to Audio";
 "detail.transcript.open_settings" = "Transcription settings";

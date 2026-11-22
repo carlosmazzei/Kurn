@@ -21,7 +21,8 @@ struct AppSettingsTests {
         "settings.transcriptionProviderID", "settings.transcriptionModels",
         "settings.defaultLanguage", "settings.micPickup", "settings.audioQuality",
         "settings.alwaysUseBuiltInMic",
-        "settings.summaryModels", "settings.summaryTemplates", "settings.lastSummaryTemplate",
+        "settings.summaryModels", "settings.wikiProviderID", "settings.wikiModels",
+        "settings.summaryTemplates", "settings.lastSummaryTemplate",
         "settings.templatesSyncEnabled",
         "settings.liveTranscriptionEnabled", "settings.diarizationEngine", "settings.transcriptionEngine",
         "settings.diarizationPreprocessingEnabled", "settings.preprocessingEngine",
@@ -203,6 +204,56 @@ struct AppSettingsTests {
             #expect(settings.summaryModel(for: .openAI) == AIProvider.openAI.defaultModel)
             settings.setSummaryModel("custom-model", for: .openAI)
             #expect(settings.summaryModel(for: .openAI) == "custom-model")
+        }
+    }
+
+    /// With no pick the Wiki writer is "Same as summaries": provider and
+    /// model both follow the summary configuration.
+    @Test func wikiGenerationDefaultsToTheSummaryProviderAndModel() {
+        withScopedDefaults { settings in
+            settings.aiProviderID = AIProvider.openAI.id
+            settings.setSummaryModel("gpt-custom", for: .openAI)
+            #expect(settings.wikiProviderID == nil)
+            #expect(settings.wikiGenerationProvider.id == AIProvider.openAI.id)
+            #expect(settings.wikiGenerationModel == "gpt-custom")
+        }
+    }
+
+    /// A picked Wiki writer with no Wiki model uses that provider's default —
+    /// even when a summary model was stored for it — until the user picks a
+    /// Wiki model, which then wins without touching the summary model.
+    @Test func wikiWriterPickUsesProviderDefaultThenExplicitWikiModel() {
+        withScopedDefaults { settings in
+            settings.aiProviderID = AIProvider.openAI.id
+            settings.setSummaryModel("claude-summary", for: .anthropic)
+            settings.wikiProviderID = AIProvider.anthropic.id
+
+            #expect(settings.wikiGenerationProvider.id == AIProvider.anthropic.id)
+            #expect(settings.wikiGenerationModel == AIProvider.anthropic.defaultModel)
+
+            settings.setWikiModel("claude-wiki", for: .anthropic)
+            #expect(settings.wikiGenerationModel == "claude-wiki")
+            #expect(settings.summaryModel(for: .anthropic) == "claude-summary")
+        }
+    }
+
+    /// Picking the summary provider explicitly still inherits its summary
+    /// model — the Wiki pick only diverges once a Wiki model is stored.
+    @Test func wikiWriterOnTheSummaryProviderInheritsItsSummaryModel() {
+        withScopedDefaults { settings in
+            settings.aiProviderID = AIProvider.openAI.id
+            settings.setSummaryModel("gpt-custom", for: .openAI)
+            settings.wikiProviderID = AIProvider.openAI.id
+            #expect(settings.wikiGenerationModel == "gpt-custom")
+        }
+    }
+
+    /// A stale or removed pick silently returns to "Same as summaries".
+    @Test func wikiWriterWithAnUnresolvablePickFallsBackToSummaries() {
+        withScopedDefaults { settings in
+            settings.aiProviderID = AIProvider.openAI.id
+            settings.wikiProviderID = "no-such-provider"
+            #expect(settings.wikiGenerationProvider.id == AIProvider.openAI.id)
         }
     }
 

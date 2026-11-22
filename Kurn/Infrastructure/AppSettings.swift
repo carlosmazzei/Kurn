@@ -427,6 +427,30 @@ final class AppSettings {
         usageStats = UsageStats()
     }
 
+    /// The picked Wiki writer provider; `nil` means "Same as summaries" —
+    /// `wikiGenerationProvider` then follows `aiProvider`. Persisting only:
+    /// the cloud consent is granted by the settings row that sets this, never
+    /// silently here.
+    var wikiProviderID: String? {
+        didSet {
+            if let wikiProviderID {
+                defaults.set(wikiProviderID, forKey: Keys.wikiProvider)
+            } else {
+                defaults.removeObject(forKey: Keys.wikiProvider)
+            }
+        }
+    }
+
+    /// Per-provider chosen Wiki model (rawValue → model id); absent entries
+    /// fall back through `wikiGenerationModel`'s rules.
+    var wikiModels: [String: String] {
+        didSet {
+            if let data = try? JSONEncoder().encode(wikiModels) {
+                defaults.set(data, forKey: Keys.wikiModels)
+            }
+        }
+    }
+
     /// Per-provider chosen summary model (rawValue → model id).
     var summaryModels: [String: String] {
         didSet {
@@ -594,6 +618,8 @@ final class AppSettings {
         logLevel = resolvedLogLevel
         AppLog.minimumLevel = resolvedLogLevel
         summaryModels = defaults.decoded([String: String].self, forKey: Keys.summaryModels) ?? [:]
+        wikiProviderID = defaults.string(forKey: Keys.wikiProvider)
+        wikiModels = defaults.decoded([String: String].self, forKey: Keys.wikiModels) ?? [:]
         chatReasoningLevel = ChatReasoningPreference.stored(defaults)
         transcriptionModels = defaults.decoded([String: String].self, forKey: Keys.transcriptionModels) ?? [:]
         usageStats = defaults.decoded(UsageStats.self, forKey: Keys.usageStats) ?? UsageStats()

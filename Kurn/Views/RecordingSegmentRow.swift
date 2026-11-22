@@ -60,6 +60,10 @@ struct RecordingSegmentRow: View {
             }
             .accessibilityElement(children: .combine)
             .frame(maxWidth: .infinity, alignment: .leading)
+            // The title/subtitle wins space before the trailing controls do —
+            // without this the "Try again"/menu column squeezes the text into
+            // hyphenated wraps.
+            .layoutPriority(1)
             HStack(spacing: 8) {
                 trailingStatus
                 actionsMenu
@@ -113,7 +117,9 @@ struct RecordingSegmentRow: View {
     /// has no transcript.
     private var subtitle: String {
         var text = "\(recording.recordedAt.shortTime) · \(recording.duration.clockDisplay)"
-        if recording.transcriptionStatus != .done {
+        // `.failed` already carries "Transcription failed" as its status
+        // line; doubling it with "not transcribed" is just noise.
+        if recording.transcriptionStatus != .done && recording.transcriptionStatus != .failed {
             text += " · \(NSLocalizedString("detail.recording.not_transcribed", comment: "not transcribed"))"
         }
         return text
@@ -150,7 +156,7 @@ struct RecordingSegmentRow: View {
                 .font(Theme.footnote)
                 .foregroundStyle(Theme.textSecondary)
         } else if recording.transcriptionStatus == .failed {
-            Text(NSLocalizedString("status.failed", comment: "Failed"))
+            Text(NSLocalizedString("meetings.status.transcription_failed", comment: "Transcription failed"))
                 .font(Theme.footnote)
                 .foregroundStyle(Theme.destructive)
         }
@@ -209,7 +215,7 @@ struct RecordingSegmentRow: View {
             Button {
                 onStartTranscription()
             } label: {
-                Image(systemName: "arrow.clockwise")
+                Image(systemName: "play.fill")
                     .font(Theme.footnoteEmphasized)
                     .foregroundStyle(Theme.textSecondary)
                     .frame(width: 30, height: 30)
@@ -227,16 +233,17 @@ struct RecordingSegmentRow: View {
             Button {
                 onStartTranscription()
             } label: {
-                Text(NSLocalizedString("detail.recording.try_again", comment: "Try again"))
+                Image(systemName: "arrow.clockwise")
                     .font(Theme.footnoteEmphasized)
                     .foregroundStyle(Theme.ink)
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: 30)
-                    .background(Theme.fill, in: Capsule())
-                    .frame(minHeight: 44)
+                    .frame(width: 30, height: 30)
+                    .background(Theme.fill, in: Circle())
+                    .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(NSLocalizedString("detail.recording.try_again", comment: "Try again"))
+            .accessibilityIdentifier("recording.retry")
         } else if recording.transcriptionStatus == .inProgress {
             // Persisted `.inProgress` but not actually running in this
             // process (a stale row awaiting the next recovery sweep, which

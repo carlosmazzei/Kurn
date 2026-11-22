@@ -484,6 +484,7 @@
 "detail.summarizing" = "Zusammenfassung wird erstellt…";
 "detail.summary.needs_transcript" = "Transkribiere zuerst eine Aufnahme und erstelle dann eine Zusammenfassung.";
 "detail.summary.model_nudge" = "Verwendet %1$@ · Modell %2$@";
+"detail.generate.on_device" = "Apple Intelligence · auf diesem Gerät";
 "detail.summary.model_missing" = "Kein Zusammenfassungsmodell ausgewählt";
 "detail.summary.new" = "Neue Zusammenfassung";
 "detail.summary.untitled" = "Zusammenfassung";
@@ -1618,6 +1619,9 @@
 "knowledge.settings.cloud_cost" = "Die Verarbeitung sendet diese Transkripte an %@; es fallen Anbietergebühren an.";
 "knowledge.settings.scope" = "Umfang und Ausschlüsse";
 "knowledge.settings.automatic_detail" = "Die automatische Kompilierung gilt für künftige Transkripte. Die Aktivierung verarbeitet keine alten Besprechungen. Bereits genehmigte Aufgaben können fortgesetzt werden; mit Pause stoppst du die Kompilierung.";
+"knowledge.settings.wiki_writer" = "Wiki-Autor";
+"knowledge.settings.same_as_summaries" = "Wie Zusammenfassungen (%@)";
+"knowledge.settings.wiki_writer_detail" = "Automatische Wiki-Aktualisierungen senden jedes neue Transkript an diesen Anbieter; dafür ist die Automatisch-Berechtigung unter Datenschutz & Cloud nötig.";
 "knowledge.settings.choose" = "Besprechungen auswählen";
 "knowledge.settings.selected" = "Ausgewählte Besprechungen: %d";
 "knowledge.settings.recompile" = "Vorhandenes Wiki erneut kompilieren";
@@ -1748,8 +1752,7 @@
 "detail.summary.delete_confirm.title_named" = "Zusammenfassung „%1$@“ löschen?";
 "transcript.seek_to" = "Zu %@ springen";
 "detail.participants" = "Teilnehmer";
-"detail.transcript.in_progress" = "Transkribiert… %d %%";
-"detail.transcript.leave_hint" = "Du kannst diesen Bildschirm verlassen; Kurn meldet sich, wenn es fertig ist.";
+"detail.transcript.leave_hint" = "Du kannst diesen Bildschirm verlassen. Kurn meldet sich, wenn es fertig ist.";
 "detail.transcript.failed.hint" = "Das Audio ist gespeichert; versuche es erneut oder wechsle die Transkriptions-Engine.";
 "detail.transcript.go_to_audio" = "Zu Audio";
 "detail.transcript.open_settings" = "Transkriptionseinstellungen";

@@ -40,6 +40,38 @@ extension AppSettings {
         summaryModels[provider.rawValue] = model
     }
 
+    /// The provider that writes meeting Wiki pages: the explicit pick while
+    /// it still resolves to a configured provider, else the summary provider
+    /// ("Same as summaries").
+    var wikiGenerationProvider: AIProvider {
+        if let wikiProviderID, let provider = providers.first(where: { $0.id == wikiProviderID }) {
+            return provider
+        }
+        return aiProvider
+    }
+
+    /// The model the Wiki writer runs with. An explicit `wikiModels` entry
+    /// wins; while the Wiki provider IS the summary provider ("Same as
+    /// summaries" or the same pick) the summary model is inherited, and a
+    /// different provider without a Wiki pick falls back to its default.
+    var wikiGenerationModel: String {
+        let provider = wikiGenerationProvider
+        if let stored = wikiModels[provider.rawValue], !stored.isEmpty { return stored }
+        if provider.id == aiProvider.id { return summaryModel(for: provider) }
+        return provider.defaultModel
+    }
+
+    /// Selected Wiki model for a provider, falling back to its default.
+    func wikiModel(for provider: AIProvider) -> String {
+        let stored = wikiModels[provider.rawValue]
+        if let stored, !stored.isEmpty { return stored }
+        return provider.defaultModel
+    }
+
+    func setWikiModel(_ model: String, for provider: AIProvider) {
+        wikiModels[provider.rawValue] = model
+    }
+
     /// Selected transcription model for a provider, falling back to its default
     /// Whisper model (`whisper-1`, or `whisper-large-v3` for Groq).
     func transcriptionModel(for provider: AIProvider) -> String {
@@ -76,7 +108,13 @@ extension AppSettings {
         guard !provider.isBuiltIn else { return }
         providers.removeAll { $0.id == provider.id }
         summaryModels[provider.id] = nil
+        wikiModels[provider.id] = nil
         transcriptionModels[provider.id] = nil
+        if wikiProviderID == provider.id {
+            // Back to "Same as summaries" — an in-place removal is not a
+            // choice, so it records no grant for the fallback.
+            wikiProviderID = nil
+        }
         if aiProviderID == provider.id {
             isRepointingSelection = true
             aiProviderID = providers.first?.id ?? AIProvider.openAI.id

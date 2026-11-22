@@ -116,9 +116,9 @@ final class WikiCoordinator {
         if trigger == .explicit { lastError = nil }
         guard !generatingMeetingIDs.contains(meetingID), let settings = appSettings,
               settings.wikiEnabled || trigger == .explicit else { return .skipped }
-        let provider = settings.aiProvider
+        let provider = settings.wikiGenerationProvider
         guard !localOnly || provider.kind == .appleOnDevice else { return .skipped }
-        let model = settings.summaryModel(for: provider)
+        let model = settings.wikiGenerationModel
         let generator = Self.generatorIdentifier(provider: provider, model: model)
         let text = meeting.assembledContextText()
         guard !text.isEmpty else { return .skipped }
@@ -148,7 +148,7 @@ final class WikiCoordinator {
         guard let settings = appSettings, settings.wikiEnabled || work.explicitlyRequested else {
             throw KnowledgeJobDeferred(reason: .featureDisabled)
         }
-        guard settings.aiProvider == work.provider, settings.summaryModel(for: work.provider) == work.model else {
+        guard settings.wikiGenerationProvider == work.provider, settings.wikiGenerationModel == work.model else {
             throw KnowledgeWorkObsolete.providerChanged
         }
         let requestedMeetingID = work.meetingID
@@ -187,7 +187,7 @@ final class WikiCoordinator {
                 })
             try Task.checkCancellation()
             guard jobQueue.mayPublish(handle) else { throw CancellationError() }
-            guard settings.aiProvider == work.provider, settings.summaryModel(for: work.provider) == work.model else {
+            guard settings.wikiGenerationProvider == work.provider, settings.wikiGenerationModel == work.model else {
                 throw KnowledgeWorkObsolete.providerChanged
             }
             guard settings.wikiEnabled || work.explicitlyRequested else { throw KnowledgeJobDeferred(reason: .featureDisabled) }
@@ -254,7 +254,7 @@ final class WikiCoordinator {
         defer { isBackfilling = false }
 
         let generator = Self.generatorIdentifier(
-            provider: settings.aiProvider, model: settings.summaryModel(for: settings.aiProvider)
+            provider: settings.wikiGenerationProvider, model: settings.wikiGenerationModel
         )
         let stale = ((try? modelContext.fetch(FetchDescriptor<Meeting>())) ?? [])
             .filter { needsWiki($0, generator: generator) }
@@ -305,7 +305,7 @@ final class WikiCoordinator {
     func generateMissing() async {
         guard hasProviderKey, let settings = appSettings else { return }
         let generator = Self.generatorIdentifier(
-            provider: settings.aiProvider, model: settings.summaryModel(for: settings.aiProvider)
+            provider: settings.wikiGenerationProvider, model: settings.wikiGenerationModel
         )
         let meetings = ((try? modelContext.fetch(FetchDescriptor<Meeting>())) ?? [])
             .filter { needsWiki($0, generator: generator) }
@@ -350,7 +350,7 @@ final class WikiCoordinator {
     /// key for a cloud vendor, or a runnable model for the on-device provider).
     private var hasProviderKey: Bool {
         guard let settings = appSettings else { return false }
-        return isProviderUsable(settings.aiProvider)
+        return isProviderUsable(settings.wikiGenerationProvider)
     }
 
     private static func generatorIdentifier(provider: AIProvider, model: String) -> String {
