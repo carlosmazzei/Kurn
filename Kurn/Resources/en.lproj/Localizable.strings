@@ -1981,3 +1981,5 @@
 "recorder.discard.confirm.keep" = "Keep recording";
 "recorder.mic.builtin_forced_hint" = "Always Use iPhone Microphone is on in Settings";
 "knowledge.update.title" = "Updating knowledge";
+"knowledge.update.failed_title" = "Knowledge update failed";
+"detail.wiki.failed_title" = "Wiki generation failed";

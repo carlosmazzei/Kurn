@@ -1981,3 +1981,5 @@
 "recorder.discard.confirm.keep" = "Seguir grabando";
 "recorder.mic.builtin_forced_hint" = "La opción Usar siempre el micrófono del iPhone está activada en Ajustes";
 "knowledge.update.title" = "Actualizando conocimiento";
+"knowledge.update.failed_title" = "La actualización del conocimiento falló";
+"detail.wiki.failed_title" = "La generación de la wiki falló";
