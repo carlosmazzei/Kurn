@@ -45,14 +45,26 @@ struct RecordingSegmentRow: View {
                 Text(String(format: NSLocalizedString("detail.recording_n", comment: ""), index + 1))
                     .font(Theme.body)
                     .foregroundStyle(Theme.textPrimary)
-                Text(subtitle)
-                    .font(Theme.footnote)
-                    .foregroundStyle(Theme.textSecondary)
-                statusLine
+                if isTranscribing {
+                    Text(transcribingStatus)
+                        .font(Theme.footnote)
+                        .foregroundStyle(Theme.textSecondary)
+                    ProgressView(value: (phase ?? .preparing).fractionComplete)
+                        .tint(Theme.ink)
+                } else {
+                    Text(subtitle)
+                        .font(Theme.footnote)
+                        .foregroundStyle(Theme.textSecondary)
+                    statusLine
+                }
             }
-            Spacer(minLength: 8)
-            trailingStatus
-            actionsMenu
+            .accessibilityElement(children: .combine)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 8) {
+                trailingStatus
+                actionsMenu
+            }
+            .fixedSize()
         }
         .padding(.vertical, 4)
         .contextMenu { menuItems }
@@ -122,10 +134,6 @@ struct RecordingSegmentRow: View {
             ))
             .font(Theme.caption2)
             .foregroundStyle(Theme.warning)
-        } else if isTranscribing, let phase, !isCancelling {
-            Text(phase.displayName)
-                .font(Theme.caption2)
-                .foregroundStyle(Theme.textTertiary)
         } else if let postTranscriptionPhase {
             HStack(spacing: 6) {
                 ProgressView()
@@ -137,7 +145,22 @@ struct RecordingSegmentRow: View {
             }
         } else if !isLoaded, let enhancementProgress {
             EnhancementProgressView(progress: enhancementProgress)
+        } else if recording.transcriptionStatus == .pending {
+            Text(NSLocalizedString("meetings.status.queued", comment: "Queued to resume"))
+                .font(Theme.footnote)
+                .foregroundStyle(Theme.textSecondary)
+        } else if recording.transcriptionStatus == .failed {
+            Text(NSLocalizedString("status.failed", comment: "Failed"))
+                .font(Theme.footnote)
+                .foregroundStyle(Theme.destructive)
         }
+    }
+
+    /// "<phase>… <overall %>": the phase's base name (which already carries
+    /// its ellipsis) plus the single `fractionComplete` percent.
+    private var transcribingStatus: String {
+        let active = phase ?? .preparing
+        return "\(active.baseName) \(Int((active.fractionComplete * 100).rounded()))%"
     }
 
     // MARK: - Trailing status
@@ -161,39 +184,15 @@ struct RecordingSegmentRow: View {
             .buttonStyle(.plain)
             .accessibilityLabel(NSLocalizedString("detail.retry_recovery", comment: "Retry recording recovery"))
         } else if isTranscribing {
-            HStack(spacing: 8) {
-                transcriptionProgress
-                if isCancelling {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .controlSize(.small)
-                } else {
-                    Button {
-                        onCancelTranscription()
-                    } label: {
-                        Image(systemName: "pause.fill")
-                            .font(Theme.footnoteEmphasized)
-                            .foregroundStyle(Theme.textSecondary)
-                            .frame(width: 30, height: 30)
-                            .background(Theme.fill, in: Circle())
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(NSLocalizedString("detail.cancel_transcription", comment: "Pause transcription"))
-                }
-            }
-        } else if recording.transcriptionStatus == .pending {
-            // Interrupted mid-run with a checkpoint; tapping resumes right
-            // away instead of waiting for the next foreground pass.
-            HStack(spacing: 6) {
-                Text(NSLocalizedString("detail.recording.queued", comment: "Queued"))
-                    .font(Theme.caption2)
-                    .foregroundStyle(Theme.textSecondary)
+            if isCancelling {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .controlSize(.small)
+            } else {
                 Button {
-                    onStartTranscription()
+                    onCancelTranscription()
                 } label: {
-                    Image(systemName: "arrow.clockwise")
+                    Image(systemName: "pause.fill")
                         .font(Theme.footnoteEmphasized)
                         .foregroundStyle(Theme.textSecondary)
                         .frame(width: 30, height: 30)
@@ -202,31 +201,42 @@ struct RecordingSegmentRow: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(NSLocalizedString("detail.resume_transcription", comment: "Resume transcription"))
+                .accessibilityLabel(NSLocalizedString("detail.cancel_transcription", comment: "Pause transcription"))
             }
+        } else if recording.transcriptionStatus == .pending {
+            // Interrupted mid-run with a checkpoint; tapping resumes right
+            // away instead of waiting for the next foreground pass.
+            Button {
+                onStartTranscription()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(Theme.footnoteEmphasized)
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(width: 30, height: 30)
+                    .background(Theme.fill, in: Circle())
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(NSLocalizedString("detail.resume_transcription", comment: "Resume transcription"))
         } else if recording.transcriptionStatus == .done {
             Image(systemName: "checkmark.circle")
                 .foregroundStyle(Theme.success)
                 .accessibilityLabel(NSLocalizedString("status.done", comment: "Transcribed"))
         } else if recording.transcriptionStatus == .failed {
-            HStack(spacing: 6) {
-                Text(NSLocalizedString("status.failed", comment: "Failed"))
-                    .font(Theme.caption2)
-                    .foregroundStyle(Theme.destructive)
-                Button {
-                    onStartTranscription()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(Theme.footnoteEmphasized)
-                        .foregroundStyle(Theme.textSecondary)
-                        .frame(width: 30, height: 30)
-                        .background(Theme.fill, in: Circle())
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"))
+            Button {
+                onStartTranscription()
+            } label: {
+                Text(NSLocalizedString("detail.recording.try_again", comment: "Try again"))
+                    .font(Theme.footnoteEmphasized)
+                    .foregroundStyle(Theme.ink)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 30)
+                    .background(Theme.fill, in: Capsule())
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
         } else if recording.transcriptionStatus == .inProgress {
             // Persisted `.inProgress` but not actually running in this
             // process (a stale row awaiting the next recovery sweep, which
@@ -247,28 +257,6 @@ struct RecordingSegmentRow: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-        }
-    }
-
-    /// Percent-complete text next to a small ring while a transcription runs.
-    @ViewBuilder
-    private var transcriptionProgress: some View {
-        if !isCancelling, case .diarizing(nil) = phase {
-            ProgressView()
-                .progressViewStyle(.circular)
-                .controlSize(.small)
-        } else {
-            let fraction = (phase ?? .preparing).fractionComplete
-            HStack(spacing: 4) {
-                ProgressView(value: fraction)
-                    .progressViewStyle(.circular)
-                    .controlSize(.small)
-                    .tint(Theme.ink)
-                Text("\(Int((fraction * 100).rounded()))%")
-                    .font(Theme.caption2)
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.textSecondary)
-            }
         }
     }
 

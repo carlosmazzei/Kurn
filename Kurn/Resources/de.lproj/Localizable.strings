@@ -1733,6 +1733,7 @@
 "chat.suggest.email" = "Schreibe eine Zusammenfassungs-E-Mail für Abwesende";
 "chat.provider.title" = "KI-Anbieter verbinden";
 "chat.provider.subtitle" = "Antworten nutzen das Transkript und zitieren die Zeit jeder Zeile. Nur die von dir gewählten Quellen werden an den Anbieter gesendet.";
+"chat.provider.subtitle.meeting" = "Diese Unterhaltung ist auf «%1$@» begrenzt — Antworten nutzen dessen Transkript und zitieren die Zeit jeder Zeile. Nur die von dir gewählten Quellen werden an den Anbieter gesendet.";
 "chat.provider.setup" = "Anbieter einrichten";
 "detail.summary.writing" = "wird geschrieben…";
 "detail.summary.today_at" = "Heute %1$@";
@@ -1755,6 +1756,7 @@
 "detail.try_again" = "Erneut versuchen";
 "detail.recording.not_transcribed" = "nicht transkribiert";
 "detail.recording.queued" = "In Warteschlange";
+"detail.recording.try_again" = "Erneut versuchen";
 "detail.resume_transcription" = "Transkription fortsetzen";
 "detail.recording.actions" = "Aktionen für die Aufnahme";
 "detail.recording.delete" = "Aufnahme löschen";

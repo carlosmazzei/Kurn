@@ -29,7 +29,7 @@ struct MeetingDetailHeader: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        VStack(alignment: .leading, spacing: expanded ? 8 : 0) {
+        VStack(alignment: .leading, spacing: expanded ? 6 : 0) {
             // The user asked for a one-line title like the prototype; AX
             // text sizes get a second line so the label stays readable, and
             // VoiceOver still gets the full title via accessibilityLabel.
@@ -41,7 +41,13 @@ struct MeetingDetailHeader: View {
                 .truncationMode(.tail)
                 .accessibilityLabel(meeting.title)
             if expanded {
+                // Date · time · duration on one line; the language on its
+                // own line underneath, so a long name ("Detect
+                // automatically") never wraps the whole line.
                 Text(metaLine)
+                    .font(Theme.subheadline)
+                    .foregroundStyle(Theme.textSecondary)
+                Text((meeting.transcribedLanguage ?? meeting.language).displayName)
                     .font(Theme.subheadline)
                     .foregroundStyle(Theme.textSecondary)
                 chips
@@ -54,8 +60,8 @@ struct MeetingDetailHeader: View {
         .kurnAnimation(.easeInOut(duration: 0.2), value: expanded)
     }
 
-    /// "Fri, Nov 21 · 18:28 · 12 min · Portuguese" — duration only when the
-    /// recordings add up to something, language always.
+    /// "Fri, Nov 21 · 18:28 · 12 min" — duration only when the recordings add
+    /// up to something; the language is the line below.
     private var metaLine: String {
         var parts = [
             meeting.createdAt.formatted(Date.FormatStyle().weekday(.abbreviated).month(.abbreviated).day()),
@@ -64,8 +70,6 @@ struct MeetingDetailHeader: View {
         if duration > 0, let formatted = Self.durationFormatter.string(from: duration) {
             parts.append(formatted)
         }
-        let language = meeting.transcribedLanguage ?? meeting.language
-        parts.append(language.displayName)
         return parts.joined(separator: " · ")
     }
 

@@ -87,7 +87,7 @@ struct MeetingChatConversationView: View {
                 // No agent-capable provider: the notice is the whole state —
                 // no conversation, and the composer below is not rendered at
                 // all (not even disabled).
-                ChatArtifactProviderNotice()
+                ChatArtifactProviderNotice(meetingTitle: meeting?.title)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !settings.semanticSearchEnabled {
                 disabledState

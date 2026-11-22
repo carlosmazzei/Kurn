@@ -44,7 +44,9 @@ struct MeetingDetailView: View {
     @Environment(RecordingSessionController.self) private var recordingSession
     /// Per-meeting memory of the last chosen tab; optional so previews work.
     @Environment(MeetingDetailTabMemory.self) private var tabMemory: MeetingDetailTabMemory?
-    @Environment(\.dismiss) private var dismiss
+    /// Not `private` — `MeetingDetailDialogs.swift` pops the detail after
+    /// the delete-meeting confirm.
+    @Environment(\.dismiss) var dismiss
 
     typealias Tab = MeetingDetailMode
 
@@ -152,6 +154,13 @@ struct MeetingDetailView: View {
     }
 
     var body: some View {
+        detailOverlays(base)
+    }
+
+    /// The screen itself — split from `detailOverlays` so neither half of
+    /// the modifier chain is one giant expression for the type-checker
+    /// (CI's slower compiler timed out here).
+    private var base: some View {
         VStack(spacing: 0) {
             MeetingDetailHeader(meeting: meeting, expanded: tab == .summary, duration: totalDuration)
             sectionPicker
@@ -166,8 +175,12 @@ struct MeetingDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
             // While the summary is being read aloud, the floating read-aloud
-            // bar takes over the Ask bar's spot.
-            if let item = readAloudItem, ReadAloudController.shared.phase(for: item.id) != .idle {
+            // bar takes over the Ask bar's spot — and it stays up after a
+            // failure (phase idle + error) so the error text can be seen and
+            // dismissed instead of vanishing with the bar.
+            if let item = readAloudItem,
+               ReadAloudController.shared.phase(for: item.id) != .idle
+                 || ReadAloudController.shared.error(for: item.id) != nil {
                 ReadAloudBar(item: item)
             } else {
                 MeetingAskBar { showingAsk = true }
@@ -216,148 +229,95 @@ struct MeetingDetailView: View {
         }
         .toolbar { toolbarContent }
         .modelDownloadAlerts(downloads, settings: settings) { showingNetworkSettings = true }
-        .onDisappear { player.stop(); meetingKnowledge.invalidate() }
-        .readAloudCoordination(player: player, meetingID: meeting.id, isRecording: recordingSession.isActive)
-        .errorAlert(Binding(get: { enhancement.error }, set: { enhancement.error = $0 }))
-        .sheet(isPresented: $showingEdit) {
-            NavigationStack { MeetingFormView(meeting: meeting) }
-        }
-        .sheet(isPresented: $showingWiki) {
-            if let article = meeting.wikiArticle {
-                NavigationStack { MeetingWikiView(article: article) }
+    }
+
+    /// Sheets, alerts and confirmation dialogs layered over `base` — the
+    /// second half of the split that keeps `body` under the CI type-check
+    /// budget.
+    private func detailOverlays(_ content: some View) -> some View {
+        content
+            .onDisappear { player.stop(); meetingKnowledge.invalidate() }
+            .readAloudCoordination(player: player, meetingID: meeting.id, isRecording: recordingSession.isActive)
+            .errorAlert(Binding(get: { enhancement.error }, set: { enhancement.error = $0 }))
+            .sheet(isPresented: $showingEdit) {
+                NavigationStack { MeetingFormView(meeting: meeting) }
             }
-        }
-        .sheet(item: $shareItem) { item in ActivityView(items: item.urls) }
-        .sheet(item: $presentedPhoto) { photo in
-            PhotoViewerView(photo: photo, onDelete: { deletePhoto(photo) })
-        }
-        .fileImporter(
-            isPresented: $attachments.isShowingImporter,
-            allowedContentTypes: [.pdf],
-            allowsMultipleSelection: true
-        ) { result in
-            Task { await attachments.importPicked(result, into: meeting, context: modelContext) }
-        }
-        .quickLookPreview($attachments.previewURL)
-        .errorAlert($attachments.error)
-        .sheet(isPresented: $showingShareSelection) {
-            MeetingShareSelectionView(meeting: meeting, preselectedSummary: selectedSummary) { urls in
-                shareItem = ShareItem(urls: urls)
+            .sheet(isPresented: $showingWiki) {
+                if let article = meeting.wikiArticle {
+                    NavigationStack { MeetingWikiView(article: article) }
+                }
             }
-        }
-        .sheet(isPresented: $showingTemplatePicker) {
-            SummaryTemplatePicker(
-                templates: settings.summaryTemplates,
-                selectedID: settings.lastSummaryTemplateID
-            ) { template in
-                runSummary(with: template)
+            .sheet(item: $shareItem) { item in ActivityView(items: item.urls) }
+            .sheet(item: $presentedPhoto) { photo in
+                PhotoViewerView(photo: photo, onDelete: { deletePhoto(photo) })
             }
-        }
-        .sheet(item: $pendingTranslateSummary) { summary in
-            SummaryTranslateLanguagePicker(
-                suggestedLanguage: meeting.transcribedLanguage ?? meeting.language
-            ) { language in
-                runTranslateSummary(summary, to: language)
+            .fileImporter(
+                isPresented: $attachments.isShowingImporter,
+                allowedContentTypes: [.pdf],
+                allowsMultipleSelection: true
+            ) { result in
+                Task { await attachments.importPicked(result, into: meeting, context: modelContext) }
             }
-        }
-        .errorAlert(transcriptionErrorBinding, onOpenNetworkSettings: { showingNetworkSettings = true })
-        .sheet(isPresented: $showingNetworkSettings) {
-            NavigationStack {
-                TranscriptionSettingsView()
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button(NSLocalizedString("common.done", comment: "Done")) {
-                                showingNetworkSettings = false
+            .quickLookPreview($attachments.previewURL)
+            .errorAlert($attachments.error)
+            .sheet(isPresented: $showingShareSelection) {
+                MeetingShareSelectionView(meeting: meeting, preselectedSummary: selectedSummary) { urls in
+                    shareItem = ShareItem(urls: urls)
+                }
+            }
+            .sheet(isPresented: $showingTemplatePicker) {
+                SummaryTemplatePicker(
+                    templates: settings.summaryTemplates,
+                    selectedID: settings.lastSummaryTemplateID
+                ) { template in
+                    runSummary(with: template)
+                }
+            }
+            .sheet(item: $pendingTranslateSummary) { summary in
+                SummaryTranslateLanguagePicker(
+                    suggestedLanguage: meeting.transcribedLanguage ?? meeting.language
+                ) { language in
+                    runTranslateSummary(summary, to: language)
+                }
+            }
+            .errorAlert(transcriptionErrorBinding, onOpenNetworkSettings: { showingNetworkSettings = true })
+            .sheet(isPresented: $showingNetworkSettings) {
+                NavigationStack {
+                    TranscriptionSettingsView()
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button(NSLocalizedString("common.done", comment: "Done")) {
+                                    showingNetworkSettings = false
+                                }
                             }
                         }
-                    }
+                }
             }
-        }
-        .errorAlert($autoTagError)
-        .errorAlert(Binding(get: { wiki.lastError }, set: { wiki.lastError = $0 }))
-        .errorAlert($actionError)
-        .errorAlert(Binding(get: { summaries?.error }, set: { summaries?.error = $0 }))
-        .errorAlert(Binding(get: { transcription?.error }, set: { transcription?.error = $0 }))
-        .sheet(item: $autoTagSuggestion) { suggestion in
-            AutoTagConfirmView(
-                meeting: meeting,
-                suggestion: suggestion,
-                onApply: { selectedSuggestion in
-                    applyAutoTagSuggestion(selectedSuggestion)
-                }
+            .errorAlert($autoTagError)
+            .errorAlert(Binding(get: { wiki.lastError }, set: { wiki.lastError = $0 }))
+            .errorAlert($actionError)
+            .errorAlert(Binding(get: { summaries?.error }, set: { summaries?.error = $0 }))
+            .errorAlert(Binding(get: { transcription?.error }, set: { transcription?.error = $0 }))
+            .sheet(item: $autoTagSuggestion) { suggestion in
+                AutoTagConfirmView(
+                    meeting: meeting,
+                    suggestion: suggestion,
+                    onApply: { selectedSuggestion in
+                        applyAutoTagSuggestion(selectedSuggestion)
+                    }
+                )
+            }
+            .sheet(item: crossMeetingMatchBinding, content: crossMeetingMatchSheetContent)
+            .detailRetranscribeDialog(pending: $pendingRetranscribe) { retranscribe($0) }
+            .detailDeleteSummaryDialog(pending: $pendingDeleteSummary) { deleteSummary($0) }
+            .detailDeleteMeetingDialog(
+                isPresented: $pendingDeleteMeeting,
+                meetingTitle: meeting.title,
+                onConfirm: deleteMeetingAndDismiss
             )
-        }
-        .sheet(item: crossMeetingMatchBinding, content: crossMeetingMatchSheetContent)
-        .kurnDialog(
-            isPresented: Binding(
-                get: { pendingRetranscribe != nil },
-                set: { if !$0 { pendingRetranscribe = nil } }
-            ),
-            iconSystemName: "arrow.clockwise.circle.fill",
-            iconTint: Theme.destructive,
-            title: NSLocalizedString("detail.retranscribe.confirm.title", comment: "Re-transcribe confirmation"),
-            message: NSLocalizedString("detail.retranscribe.confirm.message", comment: "Re-transcribe message"),
-            primaryTitle: NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"),
-            primaryRole: .destructive,
-            primaryAction: {
-                guard let recording = pendingRetranscribe else { return }
-                retranscribe(recording)
-            },
-            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
-        )
-        .kurnDialog(
-            isPresented: Binding(
-                get: { pendingDeleteSummary != nil },
-                set: { if !$0 { pendingDeleteSummary = nil } }
-            ),
-            iconSystemName: "trash.circle.fill",
-            iconTint: Theme.warning,
-            title: String(
-                format: NSLocalizedString("detail.summary.delete_confirm.title_named", comment: "Delete summary confirmation"),
-                pendingDeleteSummary?.templateName?.isEmpty == false
-                    ? pendingDeleteSummary!.templateName!
-                    : NSLocalizedString("detail.summary.untitled", comment: "Summary")
-            ),
-            message: NSLocalizedString("detail.summary.delete_confirm.message", comment: "Delete summary message"),
-            primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
-            primaryRole: .destructive,
-            primaryAction: {
-                guard let summary = pendingDeleteSummary else { return }
-                deleteSummary(summary)
-            },
-            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
-        )
-        .kurnDialog(
-            isPresented: $pendingDeleteMeeting,
-            iconSystemName: "trash.circle.fill",
-            iconTint: Theme.destructive,
-            title: String(format: NSLocalizedString("meetings.delete.confirm_titled", comment: "Delete meeting confirmation"), meeting.title),
-            message: NSLocalizedString("meetings.delete.message", comment: "Delete meeting message"),
-            primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
-            primaryRole: .destructive,
-            primaryAction: {
-                do throws(AppError) {
-                    try MeetingLibrary(context: modelContext).deleteMeeting(meeting)
-                    dismiss()
-                } catch {
-                    actionError = error
-                }
-            },
-            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
-        )
-        .recordingDeleteDialog(pending: $pendingDeleteRecording) { deleteRecording($0) }
-        .attachmentDeleteDialog(attachments: attachments, modelContext: modelContext)
-        .kurnDialog(
-            isPresented: $pendingRetranscribeAll,
-            iconSystemName: "arrow.triangle.2.circlepath.circle.fill",
-            iconTint: Theme.destructive,
-            title: NSLocalizedString("detail.retranscribe_all.confirm.title", comment: "Re-transcribe all confirmation"),
-            message: NSLocalizedString("detail.retranscribe_all.confirm.message", comment: "Re-transcribe all message"),
-            primaryTitle: NSLocalizedString("detail.retranscribe_all.confirm.action", comment: "Re-transcribe all confirm button"),
-            primaryRole: .destructive,
-            primaryAction: retranscribeAll,
-            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
-        )
+            .recordingDeleteDialog(pending: $pendingDeleteRecording) { deleteRecording($0) }
+            .attachmentDeleteDialog(attachments: attachments, modelContext: modelContext)
+            .detailRetranscribeAllDialog(isPresented: $pendingRetranscribeAll, onConfirm: retranscribeAll)
     }
 
     /// First-open tab choice: the remembered one when this meeting was

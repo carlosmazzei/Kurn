@@ -1,3 +1,4 @@
+import Foundation
 import KurnCore
 import Testing
 @testable import Kurn
@@ -57,5 +58,37 @@ struct TranscriptionPresetTests {
         var choice = TranscriptionPreset.fastCloud.choice(for: .english)
         choice.cloudModel = " Whisper-Large-V3-Turbo "
         #expect(TranscriptionPreset.matching(choice, language: .english) == .fastCloud)
+    }
+
+    /// The settings init must nil out Fluid models whose engine isn't using
+    /// them — a leftover `.parakeetV3`/`.pyannote` pick from an earlier
+    /// configuration must not stop `basic`/`bestQuality` from matching.
+    @MainActor
+    @Test func basicPresetMatchesWithStaleFluidModelsStored() throws {
+        let defaults = try #require(UserDefaults(suiteName: "preset-basic-\(UUID())"))
+        let settings = AppSettings(defaults: defaults)
+        settings.transcriptionEngine = .appleSpeech
+        settings.diarizationEngine = .heuristic
+        settings.preprocessingEngine = .standardDSP
+        settings.vadEngine = .energyThreshold
+        // Stale picks from a previous FluidAudio configuration.
+        settings.fluidAudioASRModel = .parakeetV3
+        settings.fluidAudioDiarizationModel = .pyannote
+        #expect(TranscriptionPreset.current(settings: settings) == .basic)
+    }
+
+    @MainActor
+    @Test func bestQualityPresetMatchesWithStaleFluidModelsStored() throws {
+        let defaults = try #require(UserDefaults(suiteName: "preset-best-\(UUID())"))
+        let settings = AppSettings(defaults: defaults)
+        settings.transcriptionEngine = .whisperAPI
+        settings.transcriptionProviderID = AIProvider.elevenLabs.id
+        settings.setTranscriptionModel("scribe_v2", for: .elevenLabs)
+        settings.diarizationEngine = .transcriptionProviderNative
+        settings.preprocessingEngine = .none
+        settings.vadEngine = .fluidAudio
+        settings.fluidAudioASRModel = .parakeetV3
+        settings.fluidAudioDiarizationModel = .nemotron3
+        #expect(TranscriptionPreset.current(settings: settings) == .bestQuality)
     }
 }

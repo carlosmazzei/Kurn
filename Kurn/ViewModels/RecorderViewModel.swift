@@ -294,10 +294,15 @@ final class RecorderViewModel {
     /// default) and unblock `prepareToRecord()`. Called from the picker UI,
     /// including its cancel/dismiss path. The pick is also stored on the
     /// recorder so a choice made from the mic button (outside `prepareToRecord`)
-    /// applies to the next capture start.
+    /// applies to the next capture start. During a live capture the pick is
+    /// also pushed to the audio session, which reroutes the engine without
+    /// losing the segment.
     func chooseMic(uid: String?) {
         micChoices = []
         recorder.preferredInputUID = uid
+        if recorder.state != .idle {
+            recorder.applyPreferredInput(uid: uid)
+        }
         micChoiceContinuation?.resume(returning: uid)
         micChoiceContinuation = nil
     }

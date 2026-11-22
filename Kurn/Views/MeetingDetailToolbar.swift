@@ -94,7 +94,11 @@ extension MeetingDetailView {
                     .disabled(attachments.isImporting)
                 }
                 Section {
-                    if !settings.knowledgeEnabled {
+                    // The wiki shortcut hides only while the Knowledge tab is
+                    // actually showing the page — knowledge off, still loading,
+                    // or unavailable means the tab cannot reach it, so the
+                    // menu keeps the direct View/Generate entries.
+                    if !wikiLivesInKnowledgeTab {
                         if meeting.wikiArticle != nil {
                             Button { showingWiki = true } label: {
                                 Label(
@@ -153,5 +157,14 @@ extension MeetingDetailView {
             ])
             .accessibilityIdentifier("detail.more")
         }
+    }
+}
+
+extension MeetingDetailView {
+    /// True only while the Knowledge tab itself presents the wiki — the one
+    /// case where a View/Generate menu shortcut would duplicate the tab.
+    var wikiLivesInKnowledgeTab: Bool {
+        settings.knowledgeEnabled
+            && { if case .loaded = meetingKnowledge.presentation(for: meeting.id) { return true }; return false }()
     }
 }

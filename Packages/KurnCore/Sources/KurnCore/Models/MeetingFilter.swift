@@ -148,9 +148,11 @@ public enum MeetingDateFilter: String, CaseIterable, Identifiable, Sendable, Cod
         }
     }
 
-    /// Start-of-day `days` ago or later (and not in the future).
+    /// Calendar days, not rolling 24h windows: "last N days" means today and
+    /// the previous N-1 days counted from `startOfDay(now)` — so 08:00 seven
+    /// days ago is OUT for `last7Days` while start-of-day six days ago is IN.
     private func withinLast(days: Int, date: Date, now: Date, calendar: Calendar) -> Bool {
-        guard let cutoff = calendar.date(byAdding: .day, value: -days, to: calendar.startOfDay(for: now)) else {
+        guard let cutoff = calendar.date(byAdding: .day, value: -(days - 1), to: calendar.startOfDay(for: now)) else {
             return true
         }
         return date >= cutoff && date <= now

@@ -33,7 +33,7 @@ final class RecordingCommandRouter {
     /// than time-based: commands are issued one at a time by hand, so a
     /// small fixed window comfortably covers any realistic retry without
     /// growing unbounded over a long recording.
-    private struct WatchCommandResult {
+    struct WatchCommandResult {
         var handled: Bool
         var phase: WatchAckPhase
         var error: String?
@@ -41,12 +41,6 @@ final class RecordingCommandRouter {
 
     private var recentCommands: [(id: String, result: WatchCommandResult)] = []
     private let recentCommandCapacity = 20
-
-    /// Error attached to the most recent `handleWatchCommand` result — the
-    /// tuple itself stays `(handled, phase)` for the dedup cache, so the one
-    /// new failure kind (`.start` while already recording) reaches the reply
-    /// through here.
-    private(set) var lastCommandError: String?
 
     /// Test seams for the `.start` path: production reads the real app
     /// state and asks `RecordingLauncher` to queue a meeting.
@@ -112,7 +106,6 @@ final class RecordingCommandRouter {
         onStop = nil
         onHighlight = nil
         recentCommands.removeAll()
-        lastCommandError = nil
         // Test seams back to production — a test that swapped them and tore
         // down its session can't leak the fake into the next test.
         isForeground = { UIApplication.shared.applicationState == .active }
@@ -149,19 +142,17 @@ final class RecordingCommandRouter {
     /// `commandID`. Returns whether a recorder session handled it and which
     /// lifecycle phase the phone actually reached.
     @discardableResult
-    func handleWatchCommand(_ command: WatchCommand, commandID: String) -> (handled: Bool, phase: WatchAckPhase) {
+    func handleWatchCommand(_ command: WatchCommand, commandID: String) -> WatchCommandResult {
         if let cached = recentCommands.first(where: { $0.id == commandID }) {
             AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: replaying cached result for duplicate Watch command \(commandID, privacy: .public)")
-            lastCommandError = cached.result.error
-            return (cached.result.handled, cached.result.phase)
+            return cached.result
         }
         let result = performWatchCommand(command)
-        lastCommandError = result.error
         recentCommands.append((commandID, result))
         if recentCommands.count > recentCommandCapacity {
             recentCommands.removeFirst(recentCommands.count - recentCommandCapacity)
         }
-        return (result.handled, result.phase)
+        return result
     }
 
     private func performWatchCommand(_ command: WatchCommand) -> WatchCommandResult {
@@ -171,8 +162,9 @@ final class RecordingCommandRouter {
             // Starting a recording from the wrist goes through the same
             // queue the Control Center intent uses: `RecordingLauncher`
             // creates the meeting and `RecordingSessionPresenter` starts
-            // capture — but only while the app is foreground (or next
-            // becomes it, hence the `.queued` acknowledgement).
+            // capture — but only while the scene is `.active`; while
+            // backgrounded the meeting stays queued and the presenter
+            // consumes it on activation, which is what `.queued` reports.
             guard !hasActiveSession else {
                 return WatchCommandResult(handled: false, phase: .received, error: WatchSessionReplyError.recordingAlreadyActive)
             }

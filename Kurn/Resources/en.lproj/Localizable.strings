@@ -1733,6 +1733,7 @@
 "chat.suggest.email" = "Write a summary email for those who missed it";
 "chat.provider.title" = "Connect an AI provider";
 "chat.provider.subtitle" = "Answers use the transcript and cite the time of each line. Only the sources you choose are sent to the provider.";
+"chat.provider.subtitle.meeting" = "This conversation is scoped to «%1$@» — answers use its transcript and cite the time of each line. Only the sources you choose are sent to the provider.";
 "chat.provider.setup" = "Set up provider";
 "detail.summary.writing" = "writing…";
 "detail.summary.today_at" = "Today %1$@";
@@ -1755,6 +1756,7 @@
 "detail.try_again" = "Try again";
 "detail.recording.not_transcribed" = "not transcribed";
 "detail.recording.queued" = "Queued";
+"detail.recording.try_again" = "Try again";
 "detail.resume_transcription" = "Resume transcription";
 "detail.recording.actions" = "Recording actions";
 "detail.recording.delete" = "Delete recording";

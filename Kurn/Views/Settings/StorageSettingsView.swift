@@ -123,6 +123,10 @@ struct StorageSettingsView: View {
             enhancedAudioBytes = await loadEnhancedAudioBytes()
             quarantineItems = await loadQuarantineItems()
             downloads.refreshInstalledModels()
+            // The chart's segments come from the loaded values — recompute
+            // after the enhanced-audio and model queries land, not on the
+            // numbers captured before them.
+            refreshStorage()
         }
         .errorAlert($quarantineError, offersRecovery: false)
         .sheet(item: $quarantineShareItem) { item in

@@ -349,33 +349,10 @@ struct MeetingsListView: View {
             ).post()
         }
         .task(id: searchText) { await runSemanticSearch() }
-        .kurnDialog(
-            isPresented: Binding(
-                get: { pendingDelete != nil },
-                set: { if !$0 { pendingDelete = nil } }
-            ),
-            iconSystemName: "trash.fill",
-            iconTint: Theme.destructive,
-            title: String(
-                format: NSLocalizedString("meetings.delete.confirm_titled", comment: "Delete confirmation"),
-                pendingDelete?.title ?? ""
-            ),
-            message: NSLocalizedString("meetings.delete.message", comment: "What a meeting delete erases"),
-            primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
-            primaryRole: .destructive,
-            primaryAction: {
-                guard let meeting = pendingDelete else { return }
-                do throws(AppError) {
-                    try MeetingLibrary(context: modelContext).deleteMeeting(meeting)
-                } catch {
-                    saveError = error
-                }
-                pendingDelete = nil
-            },
-            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel"),
-            secondaryAction: {
-                pendingDelete = nil
-            }
+        .meetingDeleteDialog(
+            pending: $pendingDelete,
+            saveError: $saveError,
+            modelContext: modelContext
         )
         .bulkDeleteDialog(
             isPresented: $pendingBulkDelete,

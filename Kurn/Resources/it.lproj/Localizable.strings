@@ -1733,6 +1733,7 @@
 "chat.suggest.email" = "Scrivi un'email di riepilogo per chi non ha partecipato";
 "chat.provider.title" = "Collega un provider IA";
 "chat.provider.subtitle" = "Le risposte usano la trascrizione e citano il tempo di ogni riga. Al provider vengono inviate solo le fonti che scegli.";
+"chat.provider.subtitle.meeting" = "Questa conversazione è limitata a «%1$@»: le risposte usano la sua trascrizione e citano il tempo di ogni riga. Al provider vengono inviate solo le fonti che scegli.";
 "chat.provider.setup" = "Configura provider";
 "detail.summary.writing" = "scrittura…";
 "detail.summary.today_at" = "Oggi %1$@";
@@ -1755,6 +1756,7 @@
 "detail.try_again" = "Riprova";
 "detail.recording.not_transcribed" = "non trascritta";
 "detail.recording.queued" = "In coda";
+"detail.recording.try_again" = "Riprova";
 "detail.resume_transcription" = "Riprendi trascrizione";
 "detail.recording.actions" = "Azioni della registrazione";
 "detail.recording.delete" = "Elimina registrazione";

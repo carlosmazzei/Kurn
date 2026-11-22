@@ -64,6 +64,28 @@ struct MeetingFilterTests {
         #expect(filter.matches(fortyDaysAgo) == false)
     }
 
+    /// "Last N days" counts calendar days — today + the previous N−1 — from
+    /// `startOfDay(now)`: 08:00 seven days ago is OUT for last7Days while
+    /// start-of-day six days ago is IN.
+    @Test func dateRangeLast7DaysCountsCalendarDays() {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date(timeIntervalSince1970: 1_763_500_000) // fixed "now"
+        let startOfToday = calendar.startOfDay(for: now)
+        let day = 24 * 3600.0
+
+        #expect(MeetingDateFilter.last7Days.matches(
+            startOfToday - 6 * day, now: now, calendar: calendar) == true)
+        #expect(MeetingDateFilter.last7Days.matches(
+            startOfToday - 7 * day + 8 * 3600, now: now, calendar: calendar) == false)
+        #expect(MeetingDateFilter.last7Days.matches(
+            startOfToday - 7 * day, now: now, calendar: calendar) == false)
+
+        #expect(MeetingDateFilter.last30Days.matches(
+            startOfToday - 29 * day, now: now, calendar: calendar) == true)
+        #expect(MeetingDateFilter.last30Days.matches(
+            startOfToday - 30 * day + 8 * 3600, now: now, calendar: calendar) == false)
+    }
+
     @Test func tagFilterMatchesMeetingsWithTag() {
         let workTagID = UUID()
         let tagged = attributes(tagIDs: [workTagID])

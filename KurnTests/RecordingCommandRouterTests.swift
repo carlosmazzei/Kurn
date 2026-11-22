@@ -132,7 +132,7 @@ struct RecordingCommandRouterTests {
 
         #expect(!result.handled)
         #expect(result.phase == .received)
-        #expect(router.lastCommandError == WatchSessionReplyError.recordingAlreadyActive)
+        #expect(result.error == WatchSessionReplyError.recordingAlreadyActive)
         #expect(starts == 0)
     }
 
@@ -151,6 +151,8 @@ struct RecordingCommandRouterTests {
         #expect(starts == 1)
     }
 
+    /// `.queued` is true in practice: `RecordingSessionPresenter` consumes
+    /// the queued meeting only once `scenePhase` becomes `.active`.
     @Test func startWhileBackgroundedReportsQueued() {
         let router = RecordingCommandRouter.shared
         router.unregister()
@@ -162,7 +164,7 @@ struct RecordingCommandRouterTests {
 
         #expect(result.handled)
         #expect(result.phase == .queued)
-        #expect(router.lastCommandError == nil)
+        #expect(result.error == nil)
     }
 
     // MARK: - Live Activity buttons

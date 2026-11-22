@@ -45,6 +45,13 @@ struct KnowledgeBrowserView: View {
     }
 
     private var selection: KnowledgeEvidenceSelection? { path.last?.evidenceSelection }
+
+    /// The scope chip's "This week · N meetings" text for states that have
+    /// no loaded read to count from — unavailable and failed routes.
+    private var scopeChipText: String {
+        let count = knowledgeCountText("knowledge.count.meeting", meetingIDs.count)
+        return scopeLabel.isEmpty ? count : scopeLabel + " · " + count
+    }
     private var requestKey: String {
         meetingIDs.map(\.uuidString).sorted().joined(separator: ",") + ":\(path):\(refresh)"
     }
@@ -185,7 +192,7 @@ struct KnowledgeBrowserView: View {
                 ProgressView(NSLocalizedString("detail.knowledge.loading", comment: "Loading"))
                     .accessibilityIdentifier("knowledge.browser.loading")
             case .unavailable:
-                KnowledgeBrowserUnavailable()
+                KnowledgeBrowserUnavailable(scopeText: scopeChipText, onChooseSources: onChooseSources)
             case let .loaded(read):
                 loadedDestination(route, read: read)
             }
@@ -215,29 +222,29 @@ struct KnowledgeBrowserView: View {
                     entityAsk = KnowledgeEntityAskRequest(name: page.entity.name, scope: scope,
                         conversation: conversations?.standaloneConversation() ?? MeetingChatViewModel())
                 }, navigate: { path.append($0) })
-            } else { KnowledgeBrowserUnavailable() }
+            } else { KnowledgeBrowserUnavailable(scopeText: scopeChipText, onChooseSources: onChooseSources) }
         case .timeline:
             KnowledgeTimelineView(read: read)
         case let .compare(id):
             if let page = read.pages.first(where: { $0.entity.id == id }) {
                 KnowledgeCompareView(page: page, pages: read.pages)
-            } else { KnowledgeBrowserUnavailable() }
+            } else { KnowledgeBrowserUnavailable(scopeText: scopeChipText, onChooseSources: onChooseSources) }
         case let .graph(id):
             if read.pages.contains(where: { $0.entity.id == id }) {
                 KnowledgeGraphView(read: read, entityID: id, service: graphService)
-            } else { KnowledgeBrowserUnavailable() }
+            } else { KnowledgeBrowserUnavailable(scopeText: scopeChipText, onChooseSources: onChooseSources) }
         case .evidence:
             if let source = read.selectedEvidence {
                 KnowledgeEvidenceDetailView(source: source, isPlaying: model.isPlaying, isLoadingAudio: model.isLoadingAudio) {
                     if model.isPlaying { model.stopAudio() } else { playRequest += 1 }
                 }
-            } else { KnowledgeBrowserUnavailable() }
+            } else { KnowledgeBrowserUnavailable(scopeText: scopeChipText, onChooseSources: onChooseSources) }
         case .transcript:
             if let source = read.selectedEvidence {
                 KnowledgeSourceTranscriptView(source: source, isPlaying: model.isPlaying, isLoadingAudio: model.isLoadingAudio) {
                     if model.isPlaying { model.stopAudio() } else { playRequest += 1 }
                 }
-            } else { KnowledgeBrowserUnavailable() }
+            } else { KnowledgeBrowserUnavailable(scopeText: scopeChipText, onChooseSources: onChooseSources) }
         }
     }
 
@@ -275,9 +282,35 @@ enum KnowledgeBrowserCopy {
 }
 
 struct KnowledgeBrowserUnavailable: View {
+    var scopeText: String = ""
+    var onChooseSources: (() -> Void)?
+
     var body: some View {
-        ContentUnavailableView(NSLocalizedString("detail.knowledge.unavailable", comment: "Unavailable"), systemImage: "lock.doc",
-            description: Text(NSLocalizedString("detail.knowledge.unavailable_detail", comment: "Access/source changed")))
+        ContentUnavailableView {
+            Label(NSLocalizedString("detail.knowledge.unavailable", comment: "Unavailable"), systemImage: "lock.doc")
+        } description: {
+            Text(NSLocalizedString("detail.knowledge.unavailable_detail", comment: "Access/source changed"))
+        } actions: {
+            if let onChooseSources {
+                // The scope chip stays reachable here so a blocked selection
+                // can always be changed, not only from the loaded home.
+                Button(action: onChooseSources) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "list.bullet").accessibilityHidden(true)
+                        Text(verbatim: scopeText)
+                        Image(systemName: "chevron.down").font(Theme.caption2).accessibilityHidden(true)
+                    }
+                    .font(Theme.footnoteEmphasized)
+                    .foregroundStyle(Theme.ink)
+                    .padding(.horizontal, 14).padding(.vertical, 7)
+                    .background(Theme.fill, in: Capsule())
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("knowledge.chooseSources")
+            }
+        }
     }
 }
 

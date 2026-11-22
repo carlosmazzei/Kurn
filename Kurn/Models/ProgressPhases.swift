@@ -78,6 +78,17 @@ enum TranscriptionPhase: Sendable, Equatable {
         }
     }
 
+    /// The phase's name without its embedded progress percent, for callers
+    /// that show the overall `fractionComplete` percent instead.
+    var baseName: String {
+        switch self {
+        case .transcribing: return TranscriptionPhase.transcribing(progress: nil).displayName
+        case .diarizing: return TranscriptionPhase.diarizing(progress: nil).displayName
+        case .correcting: return TranscriptionPhase.correcting(progress: nil).displayName
+        default: return displayName
+        }
+    }
+
     /// Overall completion in `0...1` for a single, always-determinate progress
     /// bar. Each stage occupies a fixed band so the bar only ever moves forward —
     /// the indeterminate linear bar rendered as a dead, empty line, leaving the

@@ -112,6 +112,7 @@ private struct HostedRecordingMiniBar: ViewModifier {
 
 private struct RecordingSessionPresenter: ViewModifier {
     @Environment(RecordingSessionController.self) private var session
+    @Environment(\.scenePhase) private var scenePhase
     /// Owned here and handed down so a screen can host the bar itself. The
     /// bar steps aside while the keyboard is up, so it never sits between a
     /// text field (the chat composer, search) and the keyboard.
@@ -141,12 +142,17 @@ private struct RecordingSessionPresenter: ViewModifier {
             }
             // `StartRecordingIntent` (Siri/Shortcuts/Control Center/Action
             // Button) queues a meeting instead of calling into a View; start
-            // it exactly like a tap on the record button. `initial: true`
+            // it exactly like a tap on the record button — but only once the
+            // scene is active, so a Watch `.start` answered `.queued` while
+            // backgrounded truly starts on next activation rather than being
+            // consumed by a view that cannot present it. `initial: true`
             // covers an intent that ran (e.g. a cold launch through
             // `openAppWhenRun`) before this view first appeared.
-            .onChange(of: RecordingLauncher.shared.pendingAutoStartMeeting, initial: true) { _, meeting in
-                guard meeting != nil, let next = RecordingLauncher.shared.consumePendingAutoStart() else { return }
-                session.begin(meeting: next)
+            .onChange(of: RecordingLauncher.shared.pendingAutoStartMeeting, initial: true) { _, _ in
+                consumePendingAutoStart()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { consumePendingAutoStart() }
             }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
                 placement.isKeyboardVisible = true
@@ -154,6 +160,14 @@ private struct RecordingSessionPresenter: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
                 placement.isKeyboardVisible = false
             }
+    }
+
+    /// Takes the queued meeting only while the scene is active — a Watch
+    /// `.start` answered `.queued` stays pending until activation.
+    private func consumePendingAutoStart() {
+        guard scenePhase == .active,
+              let next = RecordingLauncher.shared.consumePendingAutoStart() else { return }
+        session.begin(meeting: next)
     }
 
     private var needsAttention: Bool {

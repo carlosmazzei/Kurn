@@ -67,11 +67,12 @@ struct KnowledgeLibraryDestination: View {
             }
         }
         // Meetings resolve asynchronously; re-check when the allowed set or
-        // the enabled flag changes, not only on first appear.
-        .task(id: "\(settings.knowledgeEnabled):\(allowedMeetings.count)") {
-            preselectDefaultScope()
+        // the enabled flag changes, not only on first appear — a scoped
+        // meeting deleted meanwhile gets dropped from the selection here.
+        .task(id: "\(settings.knowledgeEnabled):\(allowedMeetings.map(\.id.uuidString).sorted())") {
+            reconcileScope()
         }
-        .onAppear { preselectDefaultScope() }
+        .onAppear { reconcileScope() }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .sources:
@@ -90,13 +91,16 @@ struct KnowledgeLibraryDestination: View {
         }
     }
 
-    /// A fresh open with nothing selected starts on this week's meetings
-    /// (or the newest when the week is empty), never on a picker screen.
-    private func preselectDefaultScope() {
-        guard settings.knowledgeEnabled, meetingIDs.isEmpty, !allowedMeetings.isEmpty else { return }
-        let ids = WikiDefaultScope.select(
-            candidates: allowedMeetings.map { (id: $0.id, createdAt: $0.createdAt) }, now: Date())
-        if !ids.isEmpty { meetingIDs = Set(ids) }
+    /// Drops scoped meetings that no longer exist or lost their allowance;
+    /// a selection left empty falls back to this week's meetings (or the
+    /// newest when the week is empty), never to a picker screen.
+    private func reconcileScope() {
+        guard settings.knowledgeEnabled else { return }
+        let reconciled = WikiDefaultScope.reconcile(
+            selected: meetingIDs,
+            candidates: allowedMeetings.map { (id: $0.id, createdAt: $0.createdAt) },
+            now: Date())
+        if reconciled != meetingIDs { meetingIDs = reconciled }
     }
 
     private var disabledState: some View {

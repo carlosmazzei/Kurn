@@ -1733,6 +1733,7 @@
 "chat.suggest.email" = "为缺席者撰写一封摘要邮件";
 "chat.provider.title" = "连接 AI 提供商";
 "chat.provider.subtitle" = "回答会使用转录内容并引用每一行的时间。只有您选择的来源才会发送给提供商。";
+"chat.provider.subtitle.meeting" = "此对话仅针对«%1$@»——回答会使用其转录内容并引用每一行的时间。只有您选择的来源才会发送给提供商。";
 "chat.provider.setup" = "设置提供商";
 "detail.summary.writing" = "撰写中…";
 "detail.summary.today_at" = "今天 %1$@";
@@ -1755,6 +1756,7 @@
 "detail.try_again" = "重试";
 "detail.recording.not_transcribed" = "未转写";
 "detail.recording.queued" = "排队中";
+"detail.recording.try_again" = "重试";
 "detail.resume_transcription" = "继续转写";
 "detail.recording.actions" = "录音操作";
 "detail.recording.delete" = "删除录音";

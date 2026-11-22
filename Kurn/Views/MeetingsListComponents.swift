@@ -102,9 +102,23 @@ struct MeetingCard: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(meeting.title)
-                    .font(Theme.body.weight(.semibold))
+                // One step below body so the generated default title
+                // ("Meeting – 2026-11-22 04:27 GMT-3") fits one line on an
+                // iPhone; long custom titles still wrap to a second line.
+                Text(primaryTitle)
+                    .font(Theme.calloutEmphasized)
                     .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(2)
+
+                // The AI title is what tells meetings apart while the person
+                // has not typed one: it leads when the title is still the
+                // generated default, and reads as a second line otherwise.
+                if let secondaryTitle {
+                    Text(secondaryTitle)
+                        .font(Theme.subheadline)
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(2)
+                }
 
                 statusOrMetadata
 
@@ -113,6 +127,25 @@ struct MeetingCard: View {
             Spacer(minLength: 8)
             indicators
         }
+    }
+
+    private var trimmedAITitle: String? {
+        let trimmed = meeting.aiTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// The AI title leads while the meeting still has its generated default
+    /// name; a title the person typed always leads.
+    private var primaryTitle: String {
+        if meeting.isDefaultTitle, let trimmedAITitle { return trimmedAITitle }
+        return meeting.title
+    }
+
+    /// The AI title as a second line under a typed title; nothing when there
+    /// is no AI title or it already leads.
+    private var secondaryTitle: String? {
+        guard let trimmedAITitle, !meeting.isDefaultTitle, trimmedAITitle != meeting.title else { return nil }
+        return trimmedAITitle
     }
 
     /// Line 2: the time/duration line, replaced by status words whenever the
@@ -233,7 +266,8 @@ struct MeetingCard: View {
     /// element lives on the button, not on this inner stack, so the button's
     /// hit point stays tappable in every row.
     var accessibilitySummary: String {
-        var parts = [meeting.title]
+        var parts = [primaryTitle]
+        if let secondaryTitle { parts.append(secondaryTitle) }
         switch meeting.aggregateStatus {
         case .inProgress:
             parts.append(NSLocalizedString("meetings.status.transcribing", comment: "Transcribing"))
