@@ -15,6 +15,9 @@ import SwiftUI
 
 struct ReadAloudBar: View {
     let item: ReadAloudItem
+    /// Line the bar leads with; the summary's "Reading the summary" by default,
+    /// other surfaces pass their own ("Reading the document").
+    var title: String = NSLocalizedString("detail.read_aloud.title", comment: "Reading the summary")
 
     @Environment(AppSettings.self) private var settings
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -26,7 +29,7 @@ struct ReadAloudBar: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(NSLocalizedString("detail.read_aloud.title", comment: "Reading the summary"))
+                    Text(title)
                         .font(Theme.subheadlineEmphasized)
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)

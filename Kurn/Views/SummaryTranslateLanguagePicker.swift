@@ -21,23 +21,37 @@ struct SummaryTranslateLanguagePicker: View {
         MeetingLanguage.allCases.filter { $0 != .autoDetect }
     }
 
+    /// The suggested language plus English when it differs — the two most
+    /// likely targets, offered above the full list.
+    private var suggested: [MeetingLanguage] {
+        var picks: [MeetingLanguage] = []
+        if let suggestedLanguage { picks.append(suggestedLanguage) }
+        if !picks.contains(.english) {
+            picks.append(.english)
+        }
+        return picks
+    }
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 12) {
-                    ForEach(languages) { language in
-                        Button {
-                            onSelect(language)
-                            dismiss()
-                        } label: {
+            List {
+                if !suggested.isEmpty {
+                    Section(NSLocalizedString("detail.summary.translate.section.suggested", comment: "Suggested")) {
+                        ForEach(suggested) { language in
                             row(language)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
-                .padding(20)
+                Section {
+                    ForEach(languages) { language in
+                        row(language)
+                    }
+                } header: {
+                    Text(NSLocalizedString("detail.summary.translate.section.all", comment: "All"))
+                } footer: {
+                    Text(NSLocalizedString("detail.summary.translate.footer", comment: "Translation keeps the original"))
+                }
             }
-            .background(Theme.background.ignoresSafeArea())
             .navigationTitle(NSLocalizedString("detail.summary.choose_language", comment: "Choose translation target language"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -46,28 +60,28 @@ struct SummaryTranslateLanguagePicker: View {
                 }
             }
         }
-        // A fixed 7-language list is a quick pick, not a task that needs the
-        // full screen.
-        .presentationDetents([.medium])
+        // A quick pick, not a task that needs the full screen.
+        .presentationDetents([.medium, .large])
     }
 
     private func row(_ language: MeetingLanguage) -> some View {
-        let isSuggested = language == suggestedLanguage
-        return HStack(spacing: 14) {
-            Text(language.displayName)
-                .font(Theme.calloutEmphasized)
-                .foregroundStyle(Theme.textPrimary)
-            Spacer(minLength: 0)
-            if isSuggested {
-                Text(NSLocalizedString("detail.summary.choose_language.suggested", comment: "Suggested language badge"))
-                    .font(Theme.caption2)
-                    .foregroundStyle(Theme.link)
+        Button {
+            onSelect(language)
+            dismiss()
+        } label: {
+            HStack(spacing: 14) {
+                Text(language.displayName)
+                    .font(Theme.calloutEmphasized)
+                    .foregroundStyle(Theme.textPrimary)
+                Spacer(minLength: 0)
+                if language == suggestedLanguage {
+                    Text(NSLocalizedString("detail.summary.choose_language.suggested", comment: "Suggested language badge"))
+                        .font(Theme.caption2)
+                        .foregroundStyle(Theme.link)
+                }
             }
+            .contentShape(Rectangle())
         }
-        .kurnCard()
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(isSuggested ? Theme.link : .clear, lineWidth: 1.5)
-        )
+        .buttonStyle(.plain)
     }
 }

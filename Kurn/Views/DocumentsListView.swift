@@ -16,9 +16,19 @@ struct DocumentsListView: View {
     private var documents: [GeneratedDocument]
 
     @State private var showingCreate = false
+    @State private var searchText = ""
     @State private var selectedDocument: GeneratedDocument?
     @State private var pendingDelete: GeneratedDocument?
     @State private var saveError: AppError?
+
+    private var filteredDocuments: [GeneratedDocument] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return documents }
+        return documents.filter {
+            $0.title.localizedCaseInsensitiveContains(query)
+                || $0.sourceNames.joined(separator: " ").localizedCaseInsensitiveContains(query)
+        }
+    }
 
     // This screen carried its own copy of the lock branch, with the same
     // teardown problem as `MeetingsListView`. Authentication is now covered by
@@ -30,14 +40,27 @@ struct DocumentsListView: View {
                     ChatArtifactProviderNotice()
                         .clearListRow()
                 }
-                ContentUnavailableView(
-                    NSLocalizedString("documents.empty.title", comment: "No documents"),
-                    systemImage: "doc.badge.plus",
-                    description: Text(NSLocalizedString("documents.empty.subtitle", comment: "Create a document"))
-                )
+                ContentUnavailableView {
+                    Label(
+                        NSLocalizedString("documents.empty.title", comment: "No documents"),
+                        systemImage: "doc.text"
+                    )
+                } description: {
+                    Text(NSLocalizedString("documents.empty.subtitle", comment: "Create a document"))
+                } actions: {
+                    if settings.aiProvider.kind.supportsAgentChat {
+                        Button { showingCreate = true } label: {
+                            Text(NSLocalizedString("documents.new", comment: "New document"))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .tint(Theme.ink)
+                        .accessibilityIdentifier("documents.new")
+                    }
+                }
                 .clearListRow()
             } else {
-                ForEach(documents) { document in
+                ForEach(filteredDocuments) { document in
                     Button { selectedDocument = document } label: {
                         documentRow(document)
                     }
@@ -51,10 +74,15 @@ struct DocumentsListView: View {
                 }
             }
         }
-        .listStyle(.plain)
+        .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Theme.background.ignoresSafeArea())
+        .searchable(
+            text: $searchText,
+            prompt: NSLocalizedString("documents.search", comment: "Search documents")
+        )
         .navigationTitle(NSLocalizedString("documents.title", comment: "Documents"))
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showingCreate = true } label: {
@@ -63,17 +91,30 @@ struct DocumentsListView: View {
                 .accessibilityIdentifier("documents.new")
             }
         }
+        .safeAreaInset(edge: .bottom) {
+            if !documents.isEmpty {
+                Text(NSLocalizedString("documents.footer", comment: "How documents are made"))
+                    .font(Theme.footnote)
+                    .foregroundStyle(Theme.textTertiary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 6)
+            }
+        }
         .navigationDestination(item: $selectedDocument) { document in
             DocumentDetailView(document: document)
         }
         .sheet(isPresented: $showingCreate) {
             NavigationStack {
-                MeetingChatView(meeting: nil)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(NSLocalizedString("common.done", comment: "Done")) { showingCreate = false }
-                        }
+                MeetingChatView(
+                    meeting: nil,
+                    initialScope: ChatSourceScope(kind: .library),
+                    initialDraft: NSLocalizedString("documents.new_draft", comment: "Draft prompt for a new document")
+                )
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(NSLocalizedString("common.done", comment: "Done")) { showingCreate = false }
                     }
+                }
             }
         }
         .kurnDialog(
@@ -84,7 +125,7 @@ struct DocumentsListView: View {
             iconSystemName: "trash.fill",
             iconTint: Theme.destructive,
             title: NSLocalizedString("documents.delete.confirm", comment: "Delete document"),
-            message: pendingDelete?.title ?? "",
+            message: NSLocalizedString("documents.delete.message", comment: "The conversation is kept"),
             primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
             primaryRole: .destructive,
             primaryAction: {
@@ -104,8 +145,8 @@ struct DocumentsListView: View {
     }
 
     private func documentRow(_ document: GeneratedDocument) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: "doc.text.fill")
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: "doc.text")
                 .font(.title3)
                 .foregroundStyle(Theme.textSecondary)
                 .frame(width: 32, height: 32)
@@ -116,20 +157,32 @@ struct DocumentsListView: View {
                     .font(.headline)
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(2)
-                HStack(spacing: 5) {
-                    Image(systemName: document.sourceKind.systemImage)
-                        .accessibilityHidden(true)
-                    Text(document.sourceNames.joined(separator: ", "))
-                        .lineLimit(2)
-                }
-                .font(.caption)
-                .foregroundStyle(Theme.textSecondary)
-                Text(document.createdAt.meetingDisplay)
-                    .font(.caption2)
-                    .foregroundStyle(Theme.textTertiary)
+                Text(documentSubtitle(document))
+                    .font(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(2)
             }
             Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.system(.footnote, weight: .semibold))
+                .foregroundStyle(Theme.textTertiary)
+                .accessibilityHidden(true)
         }
         .padding(.vertical, 6)
+    }
+
+    /// "From: <meeting title or N meetings> · <relative day>".
+    private func documentSubtitle(_ document: GeneratedDocument) -> String {
+        let source = document.sourceNames.count == 1
+            ? document.sourceNames[0]
+            : String(
+                format: NSLocalizedString("documents.sources_count", comment: "N source meetings"),
+                document.sourceNames.count
+            )
+        return String(
+            format: NSLocalizedString("documents.row.subtitle", comment: "From: source · day"),
+            source,
+            document.createdAt.relativeDay
+        )
     }
 }

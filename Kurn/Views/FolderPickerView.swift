@@ -42,10 +42,24 @@ struct FolderPickerView: View {
         meetings.allSatisfy { $0.folder?.persistentModelID == folder?.persistentModelID }
     }
 
+    /// The checkmark shows the row currently picked in this sheet (seeded with
+    /// the shared folder), not wherever a meeting happens to sit.
+    private func selectionMatches(_ folder: Folder?) -> Bool {
+        switch selected {
+        case .some(let picked):
+            return picked?.persistentModelID == folder?.persistentModelID
+        case .none:
+            return isShared(folder)
+        }
+    }
+
     @Query(filter: #Predicate<Folder> { $0.parent == nil }, sort: \Folder.name)
     private var rootFolders: [Folder]
 
     @State private var path: [Folder] = []
+    /// The picked destination; seeded with the shared current folder so the
+    /// Move button can be tapped without re-tapping a row.
+    @State private var selected: Folder??
     /// Set when moving the meeting fails to save, so the failure surfaces and the
     /// sheet stays open.
     @State private var saveError: AppError?
@@ -65,12 +79,12 @@ struct FolderPickerView: View {
     private var rootContent: some View {
         List {
             Section(NSLocalizedString("folder.section.library", comment: "Library")) {
-                Button { move(to: nil) } label: {
+                Button { selected = .some(nil) } label: {
                     row(
                         systemImage: "tray",
                         tint: Theme.textSecondary,
-                        text: NSLocalizedString("folder.inbox", comment: "Inbox"),
-                        isSelected: isShared(nil)
+                        text: NSLocalizedString("folder.none", comment: "No folder"),
+                        isSelected: selectionMatches(nil)
                     )
                 }
                 .buttonStyle(.plain)
@@ -85,9 +99,29 @@ struct FolderPickerView: View {
         }
         .navigationTitle(NSLocalizedString("folder.move_to", comment: "Move to folder"))
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: 10) {
+                Text(NSLocalizedString("folder.picker.footer", comment: "One folder per meeting"))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 4)
+        }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button(NSLocalizedString("common.cancel", comment: "Cancel")) { dismiss() }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button(NSLocalizedString("folder.move", comment: "Move")) {
+                    if let selection = selected { move(to: selection) }
+                }
+                .buttonStyle(.glassProminent)
+                .tint(Theme.ink)
+                // Requires a deliberate pick: with a mixed selection there is
+                // no current folder to default to.
+                .disabled(selected == nil)
             }
         }
     }
@@ -95,12 +129,12 @@ struct FolderPickerView: View {
     private func childrenContent(of parent: Folder) -> some View {
         List {
             Section(NSLocalizedString("folder.section.library", comment: "Library")) {
-                Button { move(to: parent) } label: {
+                Button { selected = parent } label: {
                     row(
                         systemImage: parent.iconName,
                         tint: Color(hex: parent.colorHex),
                         text: NSLocalizedString("folder.select_this", comment: "Select this folder"),
-                        isSelected: isShared(parent)
+                        isSelected: selectionMatches(parent)
                     )
                 }
                 .buttonStyle(.plain)
@@ -123,12 +157,12 @@ struct FolderPickerView: View {
     private func folderRow(_ folder: Folder) -> some View {
         let hasChildren = !folder.children.isEmpty
         return HStack(spacing: 0) {
-            Button { move(to: folder) } label: {
+            Button { selected = folder } label: {
                 row(
                     systemImage: folder.iconName,
                     tint: Color(hex: folder.colorHex),
                     text: folder.name,
-                    isSelected: isShared(folder)
+                    isSelected: selectionMatches(folder)
                 )
             }
             .buttonStyle(.plain)

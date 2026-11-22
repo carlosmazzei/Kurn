@@ -37,40 +37,49 @@ struct AutoTagConfirmView: View {
         NavigationStack {
             List {
                 Section {
-                    if existingTags.isEmpty && suggestion.newTagNames.isEmpty {
+                    Text(NSLocalizedString("tag.auto_suggest.lead", comment: "Suggestion lead"))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+
+                if existingTags.isEmpty && suggestion.newTagNames.isEmpty {
+                    Section {
                         Text(NSLocalizedString("tag.auto_suggest.empty", comment: "No tags suggested"))
                             .foregroundStyle(Theme.textSecondary)
-                    } else {
-                        ForEach(existingTags) { tag in
-                            tagRow(tag)
-                        }
-                        ForEach(suggestion.newTagNames, id: \.self) { name in
-                            Button {
-                                toggleNewTag(name)
-                            } label: {
-                                HStack(spacing: 12) {
-                                    selectionIndicator(selectedNewTagNames.contains(name))
-                                    Image(systemName: "sparkles")
-                                        .foregroundStyle(Theme.textSecondary)
-                                        .accessibilityHidden(true)
-                                    Text(name)
-                                        .foregroundStyle(Theme.textPrimary)
-                                    Spacer()
-                                    Text(NSLocalizedString("tag.suggested_new", comment: "new"))
-                                        .font(.caption2)
-                                        .foregroundStyle(Theme.textTertiary)
-                                }
+                    }
+                } else {
+                    if !existingTags.isEmpty {
+                        Section(NSLocalizedString("tag.auto_suggest.section.existing", comment: "Existing")) {
+                            ForEach(existingTags) { tag in
+                                tagRow(tag)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
-                } header: {
-                    Text(NSLocalizedString("tag.title", comment: "Tags"))
-                } footer: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(NSLocalizedString("tag.auto_suggest.selection_hint", comment: "Selection hint"))
-                        Text(NSLocalizedString("tag.auto_suggest.disclaimer", comment: "Disclaimer"))
+                    if !suggestion.newTagNames.isEmpty {
+                        Section(NSLocalizedString("tag.auto_suggest.section.new", comment: "New")) {
+                            ForEach(suggestion.newTagNames, id: \.self) { name in
+                                Button {
+                                    toggleNewTag(name)
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        selectionIndicator(selectedNewTagNames.contains(name))
+                                        Image(systemName: "sparkles")
+                                            .foregroundStyle(Theme.textSecondary)
+                                            .accessibilityHidden(true)
+                                        Text(name)
+                                            .foregroundStyle(Theme.textPrimary)
+                                        Spacer()
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
                     }
+                }
+
+                Section {
+                    Text(NSLocalizedString("tag.auto_suggest.disclaimer", comment: "Disclaimer"))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.textTertiary)
                 }
             }
             .navigationTitle(NSLocalizedString("tag.auto_suggest", comment: "Suggest tags"))
@@ -80,10 +89,17 @@ struct AutoTagConfirmView: View {
                     Button(NSLocalizedString("common.cancel", comment: "Cancel")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(NSLocalizedString("common.save", comment: "Save")) {
+                    Button(
+                        String(
+                            format: NSLocalizedString("tag.auto_suggest.apply_count", comment: "Apply count"),
+                            selectedTagIDs.count + selectedNewTagNames.count
+                        )
+                    ) {
                         onApply(selectedSuggestion)
                         dismiss()
                     }
+                    .buttonStyle(.glassProminent)
+                    .tint(Theme.ink)
                     .disabled(selectedTagIDs.isEmpty && selectedNewTagNames.isEmpty)
                 }
             }
