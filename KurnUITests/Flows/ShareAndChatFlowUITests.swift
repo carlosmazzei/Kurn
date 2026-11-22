@@ -20,7 +20,7 @@ final class ShareAndChatFlowUITests: FlowUITestCase {
         openShareSheet()
 
         let explanation = app.staticTexts["share.format_explanation"]
-        XCTAssertTrue(explanation.waitForExistence(timeout: 10))
+        XCTAssertTrue(scrollUntilExists(explanation), "Format explanation footer missing")
         let standardExplanation = explanation.label
 
         // The format is now a row of chips in the "Format" section; each chip

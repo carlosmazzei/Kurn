@@ -2,10 +2,13 @@
 //  RecordingSegmentRow.swift
 //  Kurn
 //
-//  One recording in `MeetingDetailView`'s Recordings tab: play/pause,
-//  enhanced playback, transcription start/stop/cancel with its progress bar,
-//  and capture recovery. Split out of `MeetingDetailView.swift`; it reads
-//  everything from its parameters, so it holds no meeting state of its own.
+//  One recording in `MeetingDetailView`'s Audio tab: a play/pause well,
+//  title + "time · duration" subtitle, a trailing transcription status, and
+//  an actions menu (also the row's context menu) holding re-transcribe,
+//  enhanced audio and delete. Playback controls live in the separate player
+//  card under the section once the recording is loaded. Split out of
+//  `MeetingDetailView.swift`; it reads everything from its parameters, so it
+//  holds no meeting state of its own.
 //
 
 import KurnCore
@@ -24,257 +27,316 @@ struct RecordingSegmentRow: View {
     let onStopTranscription: () -> Void
     let onStartTranscription: () -> Void
     let onRetryCaptureRecovery: () -> Void
+    let onRequestDelete: () -> Void
+
+    private var isLoaded: Bool { player.loadedFileName == recording.fileName }
+    private var isTranscribing: Bool { transcription?.isTranscribing(recording) == true }
+    private var isCancelling: Bool { transcription?.isCancelling(recording) == true }
+    private var phase: TranscriptionPhase? { transcription?.phase(for: recording) }
+    private var postTranscriptionPhase: PostTranscriptionPhase? { transcription?.postTranscriptionPhase(for: recording) }
+    private var enhancementProgress: Double? { enhancement.progress(for: recording) }
+    private var isEnhancing: Bool { enhancementProgress != nil }
+    private var isTranscribed: Bool { recording.transcriptionStatus == .done && recording.transcript?.segments.isEmpty == false }
 
     var body: some View {
-        let isLoaded = player.loadedFileName == recording.fileName
-        let isTranscribing = transcription?.isTranscribing(recording) == true
-        let isCancelling = transcription?.isCancelling(recording) == true
-        let phase = transcription?.phase(for: recording)
-        let postTranscriptionPhase = transcription?.postTranscriptionPhase(for: recording)
-        let enhancementProgress = enhancement.progress(for: recording)
-        let isEnhancing = enhancementProgress != nil
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                Button { onTogglePlay() } label: {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Theme.fill)
-                            .frame(width: 34, height: 34)
-                        if recording.isCaptureInProgress {
-                            Image(systemName: "record.circle")
-                                .font(Theme.footnote)
-                                .foregroundStyle(Theme.record)
-                        } else if !recording.isReadyForConsumption {
-                            Image(systemName: "waveform.badge.exclamationmark")
-                                .font(Theme.footnote)
-                                .foregroundStyle(Theme.warning)
-                        } else if isEnhancing {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                                .controlSize(.small)
-                        } else {
-                            Image(systemName: (isLoaded && player.isPlaying) ? "pause.fill" : "play.fill")
-                                .font(Theme.footnote)
-                                .foregroundStyle(Theme.textPrimary)
-                        }
-                    }
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(isEnhancing || !recording.isReadyForConsumption)
-                .accessibilityLabel(
-                    recording.isCaptureInProgress
-                        ? NSLocalizedString("detail.recording_in_progress", comment: "Recording in progress")
-                        : !recording.isReadyForConsumption
-                        ? NSLocalizedString("detail.recording_recovery_needed", comment: "Recording needs recovery")
-                        : (isEnhancing
-                            ? NSLocalizedString("detail.enhancing_audio", comment: "Enhancing audio")
-                            : ((isLoaded && player.isPlaying)
-                                ? NSLocalizedString("detail.pause_recording", comment: "Pause recording")
-                                : NSLocalizedString("detail.play_recording", comment: "Play recording")))
-                )
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(String(format: NSLocalizedString("detail.recording_n", comment: ""), index + 1))
-                        .font(Theme.subheadlineEmphasized)
-                        .foregroundStyle(Theme.textPrimary)
-                    Text("\(recording.recordedAt.meetingDisplay) · \(recording.duration.clockDisplay)")
-                        .font(Theme.caption)
-                        .foregroundStyle(Theme.textTertiary)
-                }
-                Spacer(minLength: 8)
-
-                if recording.isCaptureInProgress {
-                    EmptyView()
-                } else if !recording.isReadyForConsumption {
-                    Button {
-                        onRetryCaptureRecovery()
-                    } label: {
-                        Label(
-                            NSLocalizedString("detail.retry_recovery", comment: "Retry recording recovery"),
-                            systemImage: "arrow.clockwise"
-                        )
-                        .font(Theme.captionEmphasized)
-                    }
-                    .buttonStyle(.bordered)
-                } else if isTranscribing {
-                    HStack(spacing: 8) {
-                        if isCancelling {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                                .scaleEffect(0.7)
-                                .frame(width: 30, height: 30)
-                        } else {
-                            Button {
-                                onCancelTranscription()
-                            } label: {
-                                Image(systemName: "pause.fill")
-                                    .font(Theme.footnoteEmphasized)
-                                    .foregroundStyle(Theme.textSecondary)
-                                    .frame(width: 30, height: 30)
-                                    .background(Theme.fill, in: Circle())
-                                    .frame(minWidth: 44, minHeight: 44)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(NSLocalizedString("detail.cancel_transcription", comment: "Pause transcription"))
-                            Button {
-                                onStopTranscription()
-                            } label: {
-                                Image(systemName: "stop.fill")
-                                    .font(Theme.footnoteEmphasized)
-                                    .foregroundStyle(Theme.ink)
-                                    .frame(width: 30, height: 30)
-                                    .background(Theme.fill, in: Circle())
-                                    .frame(minWidth: 44, minHeight: 44)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(NSLocalizedString("detail.stop_transcription", comment: "Stop transcription"))
-                        }
-                    }
-                } else if recording.transcriptionStatus == .pending {
-                    // Interrupted mid-run with a checkpoint; tapping resumes
-                    // right away instead of waiting for the next foreground pass.
-                    Button {
-                        onStartTranscription()
-                    } label: {
-                        StatusBadge(status: .pending)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                } else if recording.transcriptionStatus == .done {
-                    HStack(spacing: 4) {
-                        StatusBadge(status: .done)
-                        Button {
-                            pendingRetranscribe = recording
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                                .font(Theme.footnoteEmphasized)
-                                .foregroundStyle(Theme.textSecondary)
-                                .frame(width: 30, height: 30)
-                                .background(Theme.fill, in: Circle())
-                                .frame(minWidth: 44, minHeight: 44)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"))
-                    }
-                } else if recording.transcriptionStatus == .failed {
-                    // Show the real "Failed" state (not a mislabeled "Transcribe")
-                    // with a retry that restarts — resuming from the checkpoint if
-                    // the interrupted run left one.
-                    HStack(spacing: 4) {
-                        StatusBadge(status: .failed)
-                        Button {
-                            onStartTranscription()
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                                .font(Theme.footnoteEmphasized)
-                                .foregroundStyle(Theme.textSecondary)
-                                .frame(width: 30, height: 30)
-                                .background(Theme.fill, in: Circle())
-                                .frame(minWidth: 44, minHeight: 44)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"))
-                    }
-                } else if recording.transcriptionStatus == .inProgress {
-                    // Persisted `.inProgress` but not actually running in this
-                    // process (a stale row awaiting the next recovery sweep, which
-                    // moves it to `.pending` to resume or `.failed` to retry).
-                    // Show the honest badge without a dead start button.
-                    StatusBadge(status: .inProgress)
-                } else {
-                    Button {
-                        onStartTranscription()
-                    } label: {
-                        StatusBadge(status: .none)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
+        HStack(spacing: 12) {
+            playWell
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(format: NSLocalizedString("detail.recording_n", comment: ""), index + 1))
+                    .font(Theme.body)
+                    .foregroundStyle(Theme.textPrimary)
+                Text(subtitle)
+                    .font(Theme.footnote)
+                    .foregroundStyle(Theme.textSecondary)
+                statusLine
             }
+            Spacer(minLength: 8)
+            trailingStatus
+            actionsMenu
+        }
+        .padding(.vertical, 4)
+        .contextMenu { menuItems }
+    }
 
-            if recording.isCaptureInProgress {
-                Text(NSLocalizedString("detail.recording_in_progress", comment: "Recording in progress"))
-                    .font(.caption2)
-                    .foregroundStyle(Theme.record)
-            } else if !recording.isReadyForConsumption {
-                Text(NSLocalizedString(
-                    "detail.recording_recovery_message",
-                    comment: "The recording is preserved but unavailable until recovery succeeds"
-                ))
-                .font(.caption2)
-                .foregroundStyle(Theme.warning)
-            } else if isTranscribing {
-                transcriptionProgressBar(phase: phase, isCancelling: isCancelling)
-                if let phase, !isCancelling {
-                    Text(phase.displayName)
-                        .font(.caption2)
-                        .foregroundStyle(Theme.textTertiary)
-                }
-            } else if let postTranscriptionPhase {
-                HStack(spacing: 8) {
+    // MARK: - Leading
+
+    private var playWell: some View {
+        Button { onTogglePlay() } label: {
+            ZStack {
+                Circle().fill(Theme.fill).frame(width: 36, height: 36)
+                if recording.isCaptureInProgress {
+                    Image(systemName: "record.circle")
+                        .foregroundStyle(Theme.record)
+                } else if !recording.isReadyForConsumption {
+                    Image(systemName: "waveform.badge.exclamationmark")
+                        .foregroundStyle(Theme.warning)
+                } else if isEnhancing {
                     ProgressView()
                         .progressViewStyle(.circular)
                         .controlSize(.small)
-                    Text(postTranscriptionPhase.displayName)
-                        .font(.caption2)
-                        .foregroundStyle(Theme.textTertiary)
+                } else {
+                    Image(systemName: (isLoaded && player.isPlaying) ? "pause.fill" : "play.fill")
+                        .foregroundStyle(Theme.ink)
                 }
             }
-            if !isLoaded, let enhancementProgress {
-                EnhancementProgressView(progress: enhancementProgress)
-                    .padding(.leading, 46)
-            }
-            // Show the scrubber whenever this recording is the loaded one — even
-            // while transcription is still running, so playback started mid-
-            // transcription still surfaces the slider and speed control.
-            if isLoaded {
-                SegmentPlaybackScrubber(
-                    currentTime: player.currentTime,
-                    duration: player.duration > 0 ? player.duration : recording.duration,
-                    isPlaying: player.isPlaying,
-                    playbackRate: player.playbackRate,
-                    isEnhanced: player.isPlayingEnhanced,
-                    enhancementProgress: enhancementProgress,
-                    onSeek: { player.seek(to: $0) },
-                    onSkip: { player.skip(by: $0) },
-                    onCycleRate: { player.cycleRate() },
-                    onToggleEnhancement: onToggleEnhancement
-                )
-            }
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
         }
-        .kurnCard(padding: 14, cornerRadius: 16)
+        .buttonStyle(.plain)
+        .disabled(isEnhancing || !recording.isReadyForConsumption)
+        .accessibilityLabel(
+            recording.isCaptureInProgress
+                ? NSLocalizedString("detail.recording_in_progress", comment: "Recording in progress")
+                : !recording.isReadyForConsumption
+                ? NSLocalizedString("detail.recording_recovery_needed", comment: "Recording needs recovery")
+                : (isEnhancing
+                    ? NSLocalizedString("detail.enhancing_audio", comment: "Enhancing audio")
+                    : ((isLoaded && player.isPlaying)
+                        ? NSLocalizedString("detail.pause_recording", comment: "Pause recording")
+                        : NSLocalizedString("detail.play_recording", comment: "Play recording")))
+        )
     }
 
-    /// Thin bar shown beneath the row while a transcription is running.
-    /// Indeterminate while cancelling — the Swift task waits for the concurrent
-    /// diarization child task to finish before the catch block runs, so the last
-    /// known fraction would be stale (stuck at e.g. 88%) for that entire window.
+    /// "<time> · <duration>", plus " · not transcribed" while the recording
+    /// has no transcript.
+    private var subtitle: String {
+        var text = "\(recording.recordedAt.shortTime) · \(recording.duration.clockDisplay)"
+        if recording.transcriptionStatus != .done {
+            text += " · \(NSLocalizedString("detail.recording.not_transcribed", comment: "not transcribed"))"
+        }
+        return text
+    }
+
+    /// The one status line under the subtitle: capture running, recovery
+    /// needed, transcription/post-transcription work, or enhancement progress.
     @ViewBuilder
-    private func transcriptionProgressBar(phase: TranscriptionPhase?, isCancelling: Bool) -> some View {
-        if isCancelling {
+    private var statusLine: some View {
+        if recording.isCaptureInProgress {
+            Text(NSLocalizedString("detail.recording_in_progress", comment: "Recording in progress"))
+                .font(Theme.caption2)
+                .foregroundStyle(Theme.record)
+        } else if !recording.isReadyForConsumption {
+            Text(NSLocalizedString(
+                "detail.recording_recovery_message",
+                comment: "The recording is preserved but unavailable until recovery succeeds"
+            ))
+            .font(Theme.caption2)
+            .foregroundStyle(Theme.warning)
+        } else if isTranscribing, let phase, !isCancelling {
+            Text(phase.displayName)
+                .font(Theme.caption2)
+                .foregroundStyle(Theme.textTertiary)
+        } else if let postTranscriptionPhase {
+            HStack(spacing: 6) {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .controlSize(.mini)
+                Text(postTranscriptionPhase.displayName)
+                    .font(Theme.caption2)
+                    .foregroundStyle(Theme.textTertiary)
+            }
+        } else if !isLoaded, let enhancementProgress {
+            EnhancementProgressView(progress: enhancementProgress)
+        }
+    }
+
+    // MARK: - Trailing status
+
+    @ViewBuilder
+    private var trailingStatus: some View {
+        if recording.isCaptureInProgress {
+            EmptyView()
+        } else if !recording.isReadyForConsumption {
+            Button {
+                onRetryCaptureRecovery()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(Theme.footnoteEmphasized)
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(width: 30, height: 30)
+                    .background(Theme.fill, in: Circle())
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(NSLocalizedString("detail.retry_recovery", comment: "Retry recording recovery"))
+        } else if isTranscribing {
+            HStack(spacing: 8) {
+                transcriptionProgress
+                if isCancelling {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .controlSize(.small)
+                } else {
+                    Button {
+                        onCancelTranscription()
+                    } label: {
+                        Image(systemName: "pause.fill")
+                            .font(Theme.footnoteEmphasized)
+                            .foregroundStyle(Theme.textSecondary)
+                            .frame(width: 30, height: 30)
+                            .background(Theme.fill, in: Circle())
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(NSLocalizedString("detail.cancel_transcription", comment: "Pause transcription"))
+                }
+            }
+        } else if recording.transcriptionStatus == .pending {
+            // Interrupted mid-run with a checkpoint; tapping resumes right
+            // away instead of waiting for the next foreground pass.
+            HStack(spacing: 6) {
+                Text(NSLocalizedString("detail.recording.queued", comment: "Queued"))
+                    .font(Theme.caption2)
+                    .foregroundStyle(Theme.textSecondary)
+                Button {
+                    onStartTranscription()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(Theme.footnoteEmphasized)
+                        .foregroundStyle(Theme.textSecondary)
+                        .frame(width: 30, height: 30)
+                        .background(Theme.fill, in: Circle())
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(NSLocalizedString("detail.resume_transcription", comment: "Resume transcription"))
+            }
+        } else if recording.transcriptionStatus == .done {
+            Image(systemName: "checkmark.circle")
+                .foregroundStyle(Theme.success)
+                .accessibilityLabel(NSLocalizedString("status.done", comment: "Transcribed"))
+        } else if recording.transcriptionStatus == .failed {
+            HStack(spacing: 6) {
+                Text(NSLocalizedString("status.failed", comment: "Failed"))
+                    .font(Theme.caption2)
+                    .foregroundStyle(Theme.destructive)
+                Button {
+                    onStartTranscription()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(Theme.footnoteEmphasized)
+                        .foregroundStyle(Theme.textSecondary)
+                        .frame(width: 30, height: 30)
+                        .background(Theme.fill, in: Circle())
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"))
+            }
+        } else if recording.transcriptionStatus == .inProgress {
+            // Persisted `.inProgress` but not actually running in this
+            // process (a stale row awaiting the next recovery sweep, which
+            // moves it to `.pending` to resume or `.failed` to retry).
+            // Show the honest badge without a dead start button.
+            StatusBadge(status: .inProgress)
+        } else {
+            Button {
+                onStartTranscription()
+            } label: {
+                Text(NSLocalizedString("detail.transcribe", comment: "Transcribe"))
+                    .font(Theme.footnoteEmphasized)
+                    .foregroundStyle(Theme.ink)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 30)
+                    .background(Theme.fill, in: Capsule())
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// Percent-complete text next to a small ring while a transcription runs.
+    @ViewBuilder
+    private var transcriptionProgress: some View {
+        if !isCancelling, case .diarizing(nil) = phase {
             ProgressView()
-                .progressViewStyle(.linear)
-                .tint(Theme.ink.opacity(0.5))
-        } else if case .some(.diarizing(progress: nil)) = phase {
-            // Keep a truthful fallback for diarizers that cannot report a
-            // fraction instead of leaving transcription parked at 100%.
-            ProgressView()
-                .progressViewStyle(.linear)
-                .tint(Theme.ink)
+                .progressViewStyle(.circular)
+                .controlSize(.small)
         } else {
             let fraction = (phase ?? .preparing).fractionComplete
-            ProgressView(value: fraction)
-                .progressViewStyle(.linear)
-                .tint(Theme.ink)
-                .kurnAnimation(.easeInOut(duration: 0.25), value: fraction)
+            HStack(spacing: 4) {
+                ProgressView(value: fraction)
+                    .progressViewStyle(.circular)
+                    .controlSize(.small)
+                    .tint(Theme.ink)
+                Text("\(Int((fraction * 100).rounded()))%")
+                    .font(Theme.caption2)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.textSecondary)
+            }
         }
+    }
+
+    // MARK: - Actions menu / context menu
+
+    private var actionsMenu: some View {
+        Menu {
+            menuItems
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .foregroundStyle(Theme.ink)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel(NSLocalizedString("detail.recording.actions", comment: "Recording actions"))
+        .accessibilityIdentifier("recording.actions")
+    }
+
+    /// Shared by the trailing ⋯ menu and the long-press context menu.
+    @ViewBuilder
+    private var menuItems: some View {
+        if isTranscribed {
+            Button {
+                pendingRetranscribe = recording
+            } label: {
+                Label(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"), systemImage: "arrow.clockwise")
+            }
+        }
+        Toggle(isOn: Binding(
+            get: { isLoaded && player.isPlayingEnhanced },
+            set: { _ in onToggleEnhancement() }
+        )) {
+            Label(NSLocalizedString("detail.playback_enhancement", comment: "Enhanced audio"), systemImage: "wand.and.stars")
+        }
+        .disabled(!recording.isReadyForConsumption || isEnhancing)
+        Divider()
+        Button(role: .destructive) {
+            onRequestDelete()
+        } label: {
+            Label(NSLocalizedString("detail.recording.delete", comment: "Delete recording"), systemImage: "trash")
+        }
+    }
+}
+
+extension View {
+    /// Confirmation dialog before deleting a recording — reached from the
+    /// row's ⋯ menu, its long-press context menu, and the swipe action, so
+    /// all three ask once at the root of `MeetingDetailView`.
+    func recordingDeleteDialog(
+        pending: Binding<Recording?>,
+        onConfirm: @escaping (Recording) -> Void
+    ) -> some View {
+        kurnDialog(
+            isPresented: Binding(
+                get: { pending.wrappedValue != nil },
+                set: { if !$0 { pending.wrappedValue = nil } }
+            ),
+            iconSystemName: "trash.circle.fill",
+            iconTint: Theme.destructive,
+            title: NSLocalizedString("detail.recording.delete_confirm.title", comment: "Delete recording confirmation"),
+            message: NSLocalizedString("detail.recording.delete_confirm.message", comment: "Delete recording message"),
+            primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
+            primaryRole: .destructive,
+            primaryAction: {
+                guard let recording = pending.wrappedValue else { return }
+                onConfirm(recording)
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
     }
 }

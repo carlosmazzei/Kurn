@@ -47,11 +47,11 @@ extension MeetingDetailView {
     /// that failed its integrity check is a more specific, more actionable
     /// diagnosis than any of the states below, which is why it takes
     /// priority even though every one of them would also technically match
-    /// on a corrupted transcript's `segments == []`), "never attempted",
+    /// on a corrupted transcript's `segments == []`), "transcribing now",
     /// "failed" (so a stale or zero-segment transcript from a previous run
-    /// never leaves the tab stuck blank instead of reverting here), and
-    /// "done but no speech detected" (a legitimately silent recording, not
-    /// a failure).
+    /// never leaves the tab stuck blank instead of reverting here), "done
+    /// but no speech detected" (a legitimately silent recording, not a
+    /// failure), and "never attempted".
     @ViewBuilder
     var transcriptEmptyPlaceholder: some View {
         if sortedRecordings.contains(where: { $0.transcript?.isSegmentsDataCorrupted == true }) {
@@ -60,25 +60,111 @@ extension MeetingDetailView {
                 title: NSLocalizedString("detail.transcript.corrupted.title", comment: ""),
                 subtitle: NSLocalizedString("detail.transcript.corrupted.subtitle", comment: "")
             )
-        } else if sortedRecordings.contains(where: { $0.transcriptionStatus == .failed }) {
-            placeholder(
-                icon: "exclamationmark.triangle",
-                title: NSLocalizedString("detail.transcript.failed.title", comment: ""),
-                subtitle: NSLocalizedString("detail.transcript.failed.subtitle", comment: "")
-            )
+        } else if let running = sortedRecordings.first(where: { transcription?.isTranscribing($0) == true }) {
+            transcribingState(running)
+        } else if let failed = sortedRecordings.first(where: { $0.transcriptionStatus == .failed }) {
+            transcriptionFailedState(failed)
         } else if sortedRecordings.contains(where: { $0.transcriptionStatus == .done && $0.transcript?.segments.isEmpty != false }) {
-            placeholder(
-                icon: "waveform.slash",
-                title: NSLocalizedString("detail.transcript.no_speech.title", comment: ""),
-                subtitle: NSLocalizedString("detail.transcript.no_speech.subtitle", comment: "")
-            )
+            ContentUnavailableView {
+                Label(
+                    NSLocalizedString("detail.transcript.no_speech.title", comment: ""),
+                    systemImage: "waveform.slash"
+                )
+            } description: {
+                Text(NSLocalizedString("detail.transcript.no_speech.subtitle", comment: ""))
+            }
+            .padding(.top, 24)
         } else {
-            placeholder(
-                icon: "text.alignleft",
-                title: NSLocalizedString("detail.transcript.empty.title", comment: ""),
-                subtitle: NSLocalizedString("detail.transcript.empty.subtitle", comment: "")
-            )
+            ContentUnavailableView {
+                Label(
+                    NSLocalizedString("detail.transcript.empty.title", comment: ""),
+                    systemImage: "text.alignleft"
+                )
+            } description: {
+                Text(NSLocalizedString("detail.transcript.empty.subtitle", comment: ""))
+            } actions: {
+                if !sortedRecordings.isEmpty {
+                    Button {
+                        tab = .recordings
+                    } label: {
+                        Text(NSLocalizedString("detail.transcript.go_to_audio", comment: "Go to Audio tab"))
+                    }
+                    .buttonStyle(.glassProminent)
+                    .tint(Theme.ink)
+                    .foregroundStyle(Theme.onInk)
+                }
+            }
+            .padding(.top, 24)
         }
+    }
+
+    /// A transcription running right now, with its progress and the same
+    /// pause/stop actions the Audio tab's row offers.
+    private func transcribingState(_ recording: Recording) -> some View {
+        let phase = transcription?.phase(for: recording)
+        let percent = Int(((phase ?? .preparing).fractionComplete * 100).rounded())
+        return ContentUnavailableView {
+            Label {
+                Text(String(
+                    format: NSLocalizedString("detail.transcript.in_progress", comment: "Transcribing with percent"),
+                    percent
+                ))
+            } icon: {
+                ProgressView()
+            }
+        } description: {
+            Text("\(phase?.displayName ?? "")\(phase == nil ? "" : ". ")\(NSLocalizedString("detail.transcript.leave_hint", comment: "You can leave this screen"))")
+        } actions: {
+            HStack(spacing: 12) {
+                Button {
+                    cancelTranscription(recording)
+                } label: {
+                    Text(NSLocalizedString("detail.cancel_transcription", comment: "Pause transcription"))
+                }
+                .buttonStyle(.bordered)
+                Button {
+                    stopTranscription(recording)
+                } label: {
+                    Text(NSLocalizedString("detail.stop_transcription", comment: "Stop transcription"))
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(.top, 24)
+    }
+
+    /// The last run failed: the error itself, a reassurance the audio is
+    /// safe, a retry, and a link straight to the engine settings.
+    private func transcriptionFailedState(_ recording: Recording) -> some View {
+        let errorText = transcription?.transcriptionError(for: recording)?.errorDescription
+            ?? NSLocalizedString("detail.transcript.failed.subtitle", comment: "")
+        return ContentUnavailableView {
+            Label {
+                Text(NSLocalizedString("detail.transcript.failed.title", comment: ""))
+            } icon: {
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(Theme.destructive)
+            }
+        } description: {
+            Text("\(errorText) \(NSLocalizedString("detail.transcript.failed.hint", comment: "Audio is kept"))")
+        } actions: {
+            Button {
+                startTranscription(recording)
+            } label: {
+                Text(NSLocalizedString("detail.try_again", comment: "Try again"))
+            }
+            .buttonStyle(.glassProminent)
+            .tint(Theme.ink)
+            .foregroundStyle(Theme.onInk)
+            Button {
+                showingNetworkSettings = true
+            } label: {
+                Text(NSLocalizedString("detail.transcript.open_settings", comment: "Transcription settings"))
+                    .foregroundStyle(Theme.link)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.top, 24)
     }
 
     /// Shown per recording (like `diarizationWarningBanner` below) rather
@@ -180,7 +266,7 @@ extension MeetingDetailView {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(Theme.fill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 }

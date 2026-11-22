@@ -96,6 +96,8 @@ struct PhotoViewerView: View {
 /// anchor to and so stay empty until transcription finishes).
 struct PhotoThumbnail: View {
     let photo: MeetingPhoto
+    var size: CGFloat = 64
+    var cornerRadius: CGFloat = 10
 
     var body: some View {
         Group {
@@ -110,8 +112,8 @@ struct PhotoThumbnail: View {
                     .overlay(Image(systemName: "photo").foregroundStyle(Theme.textTertiary))
             }
         }
-        .frame(width: 64, height: 64)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .accessibilityLabel(NSLocalizedString("photo.captured_image", comment: "Photo captured during recording"))
         .accessibilityAddTraits(.isButton)
     }

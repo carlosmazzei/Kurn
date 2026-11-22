@@ -101,7 +101,9 @@ struct MeetingDetailView: View {
     @State var showingWiki = false
     /// Opened from a transcription failure the large-transfer policy caused,
     /// so the cellular / Low Data Mode switches are one tap from the error.
-    @State private var showingNetworkSettings = false
+    /// Also the Transcript tab's "Transcription settings" link, so it is not
+    /// `private` (`MeetingDetailTranscript.swift` sets it).
+    @State var showingNetworkSettings = false
     @State var showingTemplatePicker = false
     @State var shareItem: ShareItem?
     @State var showingShareSelection = false
@@ -117,6 +119,9 @@ struct MeetingDetailView: View {
     /// Set when the user taps redo on a transcribed recording; drives the
     /// per-segment re-transcription confirmation dialog.
     @State var pendingRetranscribe: Recording?
+    /// Set from a recording row's actions menu, context menu or swipe action;
+    /// drives the delete-recording confirmation dialog.
+    @State var pendingDeleteRecording: Recording?
     /// Set when the user picks "Re-transcribe all" from the menu. Not
     /// `private` — `MeetingDetailToolbar.swift` needs it.
     @State var pendingRetranscribeAll = false
@@ -160,7 +165,13 @@ struct MeetingDetailView: View {
         .navigationTitle(meeting.title)
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
-            MeetingAskBar { showingAsk = true }
+            // While the summary is being read aloud, the floating read-aloud
+            // bar takes over the Ask bar's spot.
+            if let item = readAloudItem, ReadAloudController.shared.phase(for: item.id) != .idle {
+                ReadAloudBar(item: item)
+            } else {
+                MeetingAskBar { showingAsk = true }
+            }
         }
         .sheet(isPresented: $showingAsk) {
             MeetingAskSheet(meeting: meeting) { time in
@@ -174,7 +185,11 @@ struct MeetingDetailView: View {
             FolderPickerView(meeting: meeting)
         }
         .sheet(isPresented: $showingCompare) {
-            SummaryCompareView(summaries: meeting.summaries.sorted { $0.createdAt > $1.createdAt }, meeting: meeting)
+            SummaryCompareView(
+                summaries: meeting.summaries.sorted { $0.createdAt > $1.createdAt },
+                currentID: selectedSummary?.id,
+                meeting: meeting
+            )
         }
         .onAppear(perform: applyInitialTab)
         .onChange(of: tab) { _, newTab in
@@ -320,6 +335,7 @@ struct MeetingDetailView: View {
             },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
         )
+        .recordingDeleteDialog(pending: $pendingDeleteRecording) { deleteRecording($0) }
         .attachmentDeleteDialog(attachments: attachments, modelContext: modelContext)
         .kurnDialog(
             isPresented: $pendingRetranscribeAll,
@@ -419,68 +435,92 @@ struct MeetingDetailView: View {
         }
     }
 
-    // MARK: - Recordings tab (List, so swipe-to-delete works)
+    // MARK: - Audio tab (grouped list on the app background)
 
     private var recordingsList: some View {
         List {
-            sectionLabel(NSLocalizedString("detail.recordings", comment: "Recordings"))
-                .clearListRow(insets: EdgeInsets(top: 16, leading: 20, bottom: 4, trailing: 20))
-            ForEach(Array(sortedRecordings.enumerated()), id: \.element.id) { index, recording in
-                RecordingSegmentRow(
-                    recording: recording,
-                    index: index,
-                    player: player,
-                    transcription: transcription,
-                    enhancement: enhancement,
-                    pendingRetranscribe: $pendingRetranscribe,
-                    onTogglePlay: { togglePlay(recording) },
-                    onToggleEnhancement: { toggleEnhancement(recording) },
-                    onCancelTranscription: { cancelTranscription(recording) },
-                    onStopTranscription: { stopTranscription(recording) },
-                    onStartTranscription: { startTranscription(recording) },
-                    onRetryCaptureRecovery: { retryCaptureRecovery(recording) }
-                )
-                .clearListRow(insets: EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
-                .swipeActions(edge: .trailing) {
-                    Button(role: .destructive) { deleteRecording(recording) } label: {
-                        Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
+            Section {
+                ForEach(Array(sortedRecordings.enumerated()), id: \.element.id) { index, recording in
+                    RecordingSegmentRow(
+                        recording: recording,
+                        index: index,
+                        player: player,
+                        transcription: transcription,
+                        enhancement: enhancement,
+                        pendingRetranscribe: $pendingRetranscribe,
+                        onTogglePlay: { togglePlay(recording) },
+                        onToggleEnhancement: { toggleEnhancement(recording) },
+                        onCancelTranscription: { cancelTranscription(recording) },
+                        onStopTranscription: { stopTranscription(recording) },
+                        onStartTranscription: { startTranscription(recording) },
+                        onRetryCaptureRecovery: { retryCaptureRecovery(recording) },
+                        onRequestDelete: { pendingDeleteRecording = recording }
+                    )
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) { pendingDeleteRecording = recording } label: {
+                            Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
+                        }
                     }
                 }
+                addRecordingRow
+            } header: {
+                Text(NSLocalizedString("detail.recordings", comment: "Recordings"))
             }
-            addSegmentButton
-                .clearListRow(insets: EdgeInsets(top: 8, leading: 20, bottom: 24, trailing: 20))
-            photosStrip
+
+            if let loaded = loadedRecording {
+                Section {
+                    playerCard(loaded)
+                }
+            }
+
+            photosSection
             attachmentsSection
         }
-        .listStyle(.plain)
+        .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .listRowBackground(Theme.surface)
     }
 
-    /// Starts a new segment, or — while a recording runs minimized — says so
-    /// and re-opens it, since a second capture cannot start alongside it.
-    private var addSegmentButton: some View {
+    /// The recording currently loaded into `player`, if any — drives the
+    /// grouped player card under the Recordings section.
+    private var loadedRecording: Recording? {
+        guard let fileName = player.loadedFileName else { return nil }
+        return sortedRecordings.first { $0.fileName == fileName }
+    }
+
+    /// Elapsed/remaining, the scrub slider and the transport row for the
+    /// recording being played — playback logic stays in `player`.
+    private func playerCard(_ recording: Recording) -> some View {
+        SegmentPlaybackScrubber(
+            currentTime: player.currentTime,
+            duration: player.duration > 0 ? player.duration : recording.duration,
+            isPlaying: player.isPlaying,
+            playbackRate: player.playbackRate,
+            isEnhanced: player.isPlayingEnhanced,
+            enhancementProgress: enhancement.progress(for: recording),
+            onSeek: { player.seek(to: $0) },
+            onSkip: { player.skip(by: $0) },
+            onTogglePlay: { togglePlay(recording) },
+            onCycleRate: { player.cycleRate() },
+            onToggleEnhancement: { toggleEnhancement(recording) }
+        )
+    }
+
+    /// Last row of the Recordings group: starts a new segment, or — while a
+    /// recording runs minimized — says so and re-opens it, since a second
+    /// capture cannot start alongside it.
+    private var addRecordingRow: some View {
         Button { recordingSession.begin(meeting: meeting) } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle().fill(Theme.fill).frame(width: 34, height: 34)
-                    Image(systemName: recordingSession.isActive ? "waveform" : "plus")
-                        .font(.system(.footnote, design: .default, weight: .bold)).foregroundStyle(Theme.ink)
-                        .accessibilityHidden(true)
-                }
+            HStack(spacing: 8) {
+                Image(systemName: recordingSession.isActive ? "waveform" : "plus")
+                    .foregroundStyle(recordingSession.isActive ? Theme.record : Theme.link)
+                    .accessibilityHidden(true)
                 Text(addSegmentTitle)
-                    .font(Theme.subheadline)
-                    .foregroundStyle(recordingSession.isActive ? Theme.record : Theme.textSecondary)
+                    .font(Theme.body)
+                    .foregroundStyle(recordingSession.isActive ? Theme.record : Theme.link)
                 Spacer()
             }
-            .padding(14)
-            .frame(maxWidth: .infinity)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
-                    .foregroundStyle(Theme.textTertiary.opacity(0.4))
-            )
         }
-        .buttonStyle(.plain)
         .accessibilityHint(recordingSession.isActive
             ? NSLocalizedString("recorder.mini.hint", comment: "Opens the full recorder")
             : "")
@@ -493,7 +533,7 @@ struct MeetingDetailView: View {
         if recordingSession.isActive {
             return NSLocalizedString("detail.open_active_recording", comment: "Another meeting is being recorded; opens it")
         }
-        return NSLocalizedString("detail.add_segment", comment: "Add segment")
+        return NSLocalizedString("detail.recording.add", comment: "Add recording")
     }
 
     // MARK: - Section picker
@@ -515,16 +555,6 @@ struct MeetingDetailView: View {
     }
 
     // MARK: - Shared bits
-
-    /// Not `private` — `MeetingDetailPhotos.swift` needs it.
-    func sectionLabel(_ text: String) -> some View {
-        Text(text.uppercased())
-            .font(Theme.caption2Emphasized)
-            .tracking(0.8)
-            .foregroundStyle(Theme.textTertiary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, 2)
-    }
 
     func placeholder(icon: String, title: String, subtitle: String) -> some View {
         VStack(spacing: 10) {
