@@ -21,23 +21,20 @@ struct CaptureJournalFailureReporterTests {
         }
     }
 
-    @Test(.timeLimit(.minutes(1))) func signalReportsWithoutAManualFlush() async {
-        let (delivered, continuation) = AsyncStream<Void>.makeStream()
+    // Synchronous on purpose: waiting through the cooperative executor made this test time out
+    // whenever a loaded CI runner starved that pool, although the utility thread had delivered.
+    @Test func signalReportsWithoutAManualFlush() {
+        let delivered = DispatchSemaphore(value: 0)
         let count = Mutex(0)
         let reporter = CaptureJournalFailureReporter {
             count.withLock { $0 += 1 }
-            continuation.yield(())
-            continuation.finish()
+            delivered.signal()
         }
-        defer {
-            reporter.stop()
-            continuation.finish()
-        }
+        defer { reporter.stop() }
 
         reporter.signal()
-        // Yield the cooperative executor while the real utility thread delivers the signal.
-        // A missing callback still fails via the test deadline or the delivery-count assertion.
-        for await _ in delivered { break }
+        // A missing callback fails on this deadline or on the delivery-count assertion.
+        #expect(delivered.wait(timeout: .now() + 30) == .success)
         #expect(count.withLock { $0 } == 1)
     }
 
