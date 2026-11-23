@@ -217,10 +217,19 @@ extension MeetingDetailView {
     /// the coordinator's progress/result/failure state driving the tab's rows.
     func updateKnowledge() {
         Task {
-            _ = await knowledgeCompilation.compile(meetingID: meeting.id, trigger: .explicit, force: true)
+            let outcome = await knowledgeCompilation.compile(meetingID: meeting.id, trigger: .explicit, force: true)
             meetingKnowledge.invalidate()
             knowledgeRefresh += 1
+            presentKnowledgeFailure(after: outcome)
         }
+    }
+
+    /// The menu action can run from any tab, where the Wiki tab's inline
+    /// failure row is not on screen: say why nothing was updated.
+    private func presentKnowledgeFailure(after outcome: KnowledgeJobQueue.Outcome) {
+        guard outcome != .completed,
+              let failure = knowledgeCompilation.lastExplicitFailure, failure.meetingID == meeting.id else { return }
+        actionError = .wikiGenerationDeferred(reason: failure.code)
     }
 
     /// Regenerate rebuilds the extracted facts first, then rewrites the
@@ -228,9 +237,10 @@ extension MeetingDetailView {
     /// Generate runs, so a stale compilation can't back a "new" page.
     func regenerateWiki() {
         Task {
-            _ = await knowledgeCompilation.compile(meetingID: meeting.id, trigger: .explicit, force: true)
+            let outcome = await knowledgeCompilation.compile(meetingID: meeting.id, trigger: .explicit, force: true)
             meetingKnowledge.invalidate()
             knowledgeRefresh += 1
+            presentKnowledgeFailure(after: outcome)
             if settings.wikiGenerationProvider.kind == .appleOnDevice {
                 _ = await knowledgeCompilation.generateLocalMeetingNotes(meeting, wiki: wiki)
             } else {

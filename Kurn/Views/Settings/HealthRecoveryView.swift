@@ -103,6 +103,9 @@ struct HealthRecoveryView: View {
             downloads.refreshInstalledModels()
             await refresh()
         }
+        .onReceive(NotificationCenter.default.publisher(for: ProviderCircuitBreaker.didChange)) { _ in
+            Task { await refresh() }
+        }
         .navigationDestination(item: $selectedMeeting) { meeting in
             MeetingDetailView(meeting: meeting)
         }

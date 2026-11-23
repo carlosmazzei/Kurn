@@ -146,13 +146,16 @@ actor ProviderCircuitBreaker {
         records[providerID]
     }
 
-    /// Providers currently blocked pending an explicit retry, for the Health
-    /// & Recovery surface. Deliberately excludes a plain time-based
-    /// `.transient` backoff — that clears itself and isn't something a user
-    /// needs to act on — so only the kind of block that would otherwise sit
-    /// silently forever shows up here.
+    /// Providers whose circuit is open, for the Health & Recovery surface:
+    /// a block awaiting an explicit retry and a time-based backoff still
+    /// running. The backoff clears itself, but it can last up to a day, and
+    /// until it does an automatic run is refused with no other visible sign
+    /// — so the person gets the reset option for it too.
     func blockedProviderIDs() -> [String] {
-        records.filter(\.value.requiresExplicitRetry).keys.sorted()
+        let current = now()
+        return records.filter { _, record in
+            record.requiresExplicitRetry || (record.blockedUntil.map { $0 > current } ?? false)
+        }.keys.sorted()
     }
 
     /// Clears any open circuit for `providerID`. A `.configuration` (or
@@ -170,7 +173,12 @@ actor ProviderCircuitBreaker {
         persist()
     }
 
+    /// Posted after every change to the circuit records, so a screen showing
+    /// them (Health & Recovery) can reload instead of reading once on appear.
+    nonisolated static let didChange = Notification.Name("ai.kurn.providerCircuit.didChange")
+
     private func persist() {
+        defer { NotificationCenter.default.post(name: Self.didChange, object: nil) }
         do {
             try store.save(records)
             storageHealthy = true

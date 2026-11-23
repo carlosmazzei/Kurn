@@ -30,6 +30,25 @@ struct ProviderCircuitBreakerTests {
         ))
     }
 
+    @Test func openCircuitsAreListedForRecoveryUntilTheyExpireOrReset() async {
+        let clock = MutableDateClock()
+        let breaker = ProviderCircuitBreaker(store: InMemoryProviderCircuitStore(), now: { clock.now })
+        let changes = NotificationCenter.default.notifications(named: ProviderCircuitBreaker.didChange)
+
+        await breaker.recordFailure(providerID: "openai", failure: .transient)
+        await breaker.recordFailure(providerID: "anthropic", failure: .configuration)
+        #expect(await breaker.blockedProviderIDs() == ["anthropic", "openai"])
+        var iterator = changes.makeAsyncIterator()
+        #expect(await iterator.next() != nil)
+
+        await breaker.reset(providerID: "openai")
+        #expect(await breaker.blockedProviderIDs() == ["anthropic"])
+
+        await breaker.recordFailure(providerID: "groq", failure: .transient)
+        clock.advance(by: ProviderCircuitBreaker.transientDelays[0] + 1)
+        #expect(await breaker.blockedProviderIDs() == ["anthropic"])
+    }
+
     @Test func configurationFailureRequiresExplicitSuccessfulRetry() async {
         let clock = MutableDateClock()
         let breaker = ProviderCircuitBreaker(
