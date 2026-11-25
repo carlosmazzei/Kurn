@@ -199,10 +199,14 @@ rebuilt; nothing derived is evidence.
 - Derivatives inherit the strictest policy and classification of their sources, store
   their source set, and are readable only while every source stays authorized, checked
   live like pages (spec §20.5). A scope string is never an ACL.
-- Incremental by construction: an outbox revision marks the touched entities, the dirty
-  set is those plus their neighbours at distance two, and only dirty edges, communities
-  and narratives are recomputed, as another producer on `KnowledgeJobQueue` under a
-  `ResourceWorkKind` reservation. A full rebuild must produce the same result.
+- Incremental by construction: an outbox revision marks the touched entities, and only
+  what they affect is recomputed, as another producer on `KnowledgeJobQueue` under a
+  `ResourceWorkKind` reservation. Derived edges (K7.4) are local to the touched
+  entities and their neighbours at distance two. Communities are not: one new claim can
+  join two communities and change the membership of nodes many hops away, so a
+  community that contains or touches a changed node is recomputed whole, and K7.5 may
+  use a local-update algorithm only with an explicit guarantee that it matches a full
+  rebuild. A full rebuild must always produce the same result.
 - No new egress path. Narratives use the existing `.pageNarrative` operation and the
   provider's automatic grant; the `knowledge-network` static rule covers the new code.
 - No auto-merge before the K0.4 holdout meets its precision target; people stay manual.
@@ -214,7 +218,7 @@ rebuilt; nothing derived is evidence.
 | **K7.2 · Written events** | Write `KnowledgeEvent` rows from the reducer, lifecycle transitions and late arrivals in the same transaction as projection publication, with a timeline marker for late claims; `trace_influence` and `compare_state` read them | Events equal a fresh recomputation on every fixture; a retraction removes its events; no schema migration |
 | **K7.3 · Context pack and brief** | `get_context_pack` returns neighbourhood, state at a date, recent changes and evidence IDs in one call; a `knowledge_brief` system section (top entities, open actions, recent changes, coverage) changes only with the canonical revision, so prompt caching holds, and is carried by `systemPatch` | Median tool calls per question fall on the K7.0 set with no loss of accuracy; the brief stays within its token budget |
 | **K7.4 · Derived edges** | KurnCore `KnowledgeInference`: transitive `blocks`/`dependsOn`, `supersedes` chains, owner → action → due, and virtual `same_as` candidate edges from the resolver score, shown as inferred (dotted) and off by default. Stored as a versioned, checksummed projection like the wiki pages, not as canonical rows | Every edge lists resolvable premises; precision measured on fixtures; invalidation on premise retraction verified; nothing is merged |
-| **K7.5 · Incremental communities** | Deterministic community detection (weighted components or label propagation first, Leiden only if quality asks) with a stability measure; a cited page per community through the existing narrative contract; dirty-set recomputation by member hash; `search_communities` and `get_community` | A property test shows incremental equals full rebuild; community churn stays under a stated bound per added meeting; cost scales with the change, not the library |
+| **K7.5 · Incremental communities** | Deterministic community detection (weighted components or label propagation first, Leiden only if quality asks) with a stability measure; a cited page per community through the existing narrative contract; recomputation of every affected community whole (a merge of two communities can reassign distant nodes), regenerating narratives only where the member hash changed; `search_communities` and `get_community` | A property test shows incremental equals full rebuild; community churn stays under a stated bound per added meeting; cost scales with the change, not the library |
 | **K7.6 · Routing and low-risk linking** | `knowledge_policy` routes local, temporal and global questions to the right tools; automatic reversible redirects for non-person kinds with an exact normalized name, enabled only after the auto-merge precision target is met on the holdout | Measured gain on the K7.0 set over K5; every automatic link undoable from the review history |
 
 **Library-wide questions and the 16-meeting bound.** Do not raise the number. Global
