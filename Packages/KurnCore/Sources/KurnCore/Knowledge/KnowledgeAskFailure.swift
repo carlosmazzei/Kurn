@@ -65,12 +65,17 @@ public enum KnowledgeAskFailureClassifier {
     /// Failures counted per class, the dominant class first (ties in declaration order), with the
     /// classes that never failed left out.
     public static func ranked(_ failures: [KnowledgeAskFailureClass]) -> [(failure: KnowledgeAskFailureClass, count: Int)] {
-        KnowledgeAskFailureClass.allCases.enumerated()
-            .map { entry in
-                (order: entry.offset, failure: entry.element, count: failures.filter { $0 == entry.element }.count)
-            }
-            .filter { $0.count > 0 }
-            .sorted { $0.count != $1.count ? $0.count > $1.count : $0.order < $1.order }
-            .map { (failure: $0.failure, count: $0.count) }
+        var counts: [KnowledgeAskFailureClass: Int] = [:]
+        for failure in failures { counts[failure, default: 0] += 1 }
+        var result: [(failure: KnowledgeAskFailureClass, count: Int)] = []
+        for failure in KnowledgeAskFailureClass.allCases {
+            if let count = counts[failure] { result.append((failure: failure, count: count)) }
+        }
+        // `sorted` is not documented as stable, so ties are broken by declaration order explicitly.
+        let order = KnowledgeAskFailureClass.allCases
+        return result.sorted { left, right in
+            if left.count != right.count { return left.count > right.count }
+            return (order.firstIndex(of: left.failure) ?? 0) < (order.firstIndex(of: right.failure) ?? 0)
+        }
     }
 }
