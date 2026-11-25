@@ -3472,7 +3472,11 @@ per code per process; an unknown scope or pipeline is refused, never dropped.
   it may cite. KurnCore's `KnowledgeAnswerScorer` scores an answer for precision, recall, tempting
   claims stated, refusal honoured and resolvable citations, and summarizes a run so Ask variants
   can be compared. `KnowledgeQuestionFixtureTests` checks every reference against its fixture, that
-  an oracle answer scores perfectly and that declining everything does not. Running variants A–F
+  an oracle answer scores perfectly and that declining everything does not. K7.0 adds temporal multi-hop questions (`traits`
+  such as `multiHop`, `asOf`, `lateArrival`, `deadlineMoved`, plus `hops`) over the `en-moved-deadline` fixture and
+  the existing ones, and `KnowledgeAskFailureClassifier` (KurnCore) sorts a failed answer into
+  `KnowledgeAskFailureClass` — `extraction`, `island`, `lostHop` or `temporal`, tried from the cause furthest
+  upstream — so the K7 steps are ordered by measured failures, not guessed ones. Running variants A–F
   on a device to produce observations is still to do.
 - **Meeting/source:** every assertion, event and evidence row of that meeting,
   their relations and all its extraction jobs (provenance included). Entities

@@ -25,6 +25,10 @@ struct KnowledgeQuestionSet: Decodable {
         let forbidden: [Int]
         let mustRefuse: Bool
         let citable: [String]
+        /// K7.0: what makes a temporal question hard (`KnowledgeQuestionFixtureTests.traits`).
+        let traits: [String]?
+        /// K7.0: how many separate lookups a correct answer chains.
+        let hops: Int?
 
         var expectation: KnowledgeAnswerScorer.Expectation { expectation(in: nil) }
 
@@ -46,6 +50,9 @@ struct KnowledgeQuestionSet: Decodable {
 
 struct KnowledgeQuestionFixtureTests {
     private static let kinds: Set = ["fact", "temporal", "absence", "injection", "correction"]
+    private static let traits: Set = [
+        "multiHop", "asOf", "lateArrival", "reopened", "supersession", "deadlineMoved", "commitmentBeforeChange"
+    ]
 
     private static func questions() throws -> KnowledgeQuestionSet {
         let url = try #require(Bundle.module.url(forResource: "questions", withExtension: "json",
@@ -87,6 +94,30 @@ struct KnowledgeQuestionFixtureTests {
                 .flatMap { item in item.segmentIDs.map { "\(item.source)/\($0)" } }
             #expect(Set(evidence).isSubset(of: Set(question.citable)), "\(question.id)")
             #expect(question.mustRefuse || !question.expected.isEmpty, "\(question.id)")
+        }
+    }
+
+    /// K7.0: the temporal multi-hop questions that order the K7 steps. A deadline that moved, a
+    /// commitment made before a change, a reopened item and a late-arriving blocker must each be
+    /// asked, and a question that claims to chain facts must need more than one meeting.
+    @Test func theTemporalMultiHopSetCoversTheNamedCasesInBothLanguages() throws {
+        let questions = try Self.questions().questions
+        let tagged = questions.filter { !($0.traits ?? []).isEmpty }
+        #expect(tagged.allSatisfy { Set($0.traits ?? []).isSubset(of: Self.traits) && $0.kind == "temporal" })
+        for named in ["deadlineMoved", "commitmentBeforeChange", "reopened", "lateArrival", "asOf", "supersession"] {
+            #expect(tagged.contains { ($0.traits ?? []).contains(named) }, "no question asks \(named)")
+        }
+        for language in KnowledgeFixtureVocabulary.languages {
+            #expect(tagged.contains { $0.language == language && ($0.traits ?? []).contains("multiHop") }, "\(language)")
+        }
+        for question in tagged {
+            let hops = question.hops ?? 0
+            #expect(hops >= 1 && hops <= question.expected.count + 1, "\(question.id): hops")
+            if (question.traits ?? []).contains("multiHop") {
+                let sources = Set(question.citable.compactMap { $0.split(separator: "/").first })
+                #expect(hops >= 2 && question.expected.count >= 2 && sources.count >= 2,
+                        "\(question.id): a multi-hop question joins facts of more than one meeting")
+            }
         }
     }
 

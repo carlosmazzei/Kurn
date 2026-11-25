@@ -1,0 +1,70 @@
+{
+  "format": "kurn.knowledge-fixture",
+  "version": 1,
+  "id": "en-moved-deadline",
+  "language": "en",
+  "summary": "Synthetic. A deadline is committed to, moves twice and changes hands; the blocker that explains the first move is imported weeks after its meeting.",
+  "covers": ["relativeDate", "lateArrival"],
+  "caseSegments": {"relativeDate": ["s1"], "lateArrival": ["s3"]},
+  "sources": [
+    {
+      "id": "m1", "context": "internalMeeting", "organization": null,
+      "recordedAt": "2026-10-05T14:00:00Z", "ingestedAt": "2026-10-05T15:00:00Z", "timezone": "America/New_York",
+      "segments": [
+        {"id": "s1", "speaker": "Speaker 1", "startMs": 0, "endMs": 7000, "text": "Maria Santos will finish the contract review by this Friday."}
+      ]
+    },
+    {
+      "id": "m2", "context": "internalMeeting", "organization": null,
+      "recordedAt": "2026-10-08T14:00:00Z", "ingestedAt": "2026-10-08T15:00:00Z", "timezone": "America/New_York",
+      "segments": [
+        {"id": "s2", "speaker": "Speaker 2", "startMs": 0, "endMs": 6000, "text": "The contract review slipped, so the new date is October 16."}
+      ]
+    },
+    {
+      "id": "m3", "context": "internalMeeting", "organization": null,
+      "recordedAt": "2026-10-14T14:00:00Z", "ingestedAt": "2026-11-20T10:00:00Z", "timezone": "America/New_York",
+      "segments": [
+        {"id": "s3", "speaker": "Speaker 3", "startMs": 0, "endMs": 7000, "text": "The legal team has not signed off yet, so the contract review is blocked."}
+      ]
+    },
+    {
+      "id": "m4", "context": "internalMeeting", "organization": null,
+      "recordedAt": "2026-10-20T14:00:00Z", "ingestedAt": "2026-10-20T15:00:00Z", "timezone": "America/New_York",
+      "segments": [
+        {"id": "s4", "speaker": "Speaker 1", "startMs": 0, "endMs": 7000, "text": "We moved the contract review again, it is now due on November 6."},
+        {"id": "s5", "speaker": "Speaker 2", "startMs": 7500, "endMs": 12000, "text": "Maria Santos handed the contract review to Lee Park."}
+      ]
+    }
+  ],
+  "expected": {
+    "entities": [
+      {"ref": "e1", "kind": "actionItem", "name": "Contract review", "aliases": []},
+      {"ref": "e2", "kind": "person", "name": "Maria Santos", "aliases": ["Maria"]},
+      {"ref": "e3", "kind": "team", "name": "Legal team", "aliases": []},
+      {"ref": "e4", "kind": "person", "name": "Lee Park", "aliases": ["Lee"]}
+    ],
+    "assertions": [
+      {"ref": "a1", "subject": "e1", "predicate": "assignedTo", "object": "e2",
+       "modality": "agreed", "polarity": "positive", "claimKind": "commitment", "validFrom": "2026-10-05", "precision": "day",
+       "evidence": [{"source": "m1", "segmentIDs": ["s1"], "quote": "Maria Santos will finish the contract review"}]},
+      {"ref": "a2", "subject": "e1", "predicate": "dueOn", "value": {"type": "date", "value": "2026-10-09", "precision": "day"},
+       "modality": "agreed", "polarity": "positive", "claimKind": "commitment", "validFrom": "2026-10-05", "precision": "day",
+       "evidence": [{"source": "m1", "segmentIDs": ["s1"], "quote": "by this Friday"}]},
+      {"ref": "a3", "subject": "e1", "predicate": "dueOn", "value": {"type": "date", "value": "2026-10-16", "precision": "day"},
+       "modality": "agreed", "polarity": "positive", "claimKind": "commitment", "validFrom": "2026-10-08", "precision": "day",
+       "evidence": [{"source": "m2", "segmentIDs": ["s2"], "quote": "the new date is October 16"}]},
+      {"ref": "a4", "subject": "e3", "predicate": "blocks", "object": "e1",
+       "modality": "reported", "polarity": "positive", "claimKind": "internalStatusReport", "validFrom": "2026-10-14", "precision": "day",
+       "evidence": [{"source": "m3", "segmentIDs": ["s3"], "quote": "has not signed off yet, so the contract review is blocked"}]},
+      {"ref": "a5", "subject": "e1", "predicate": "dueOn", "value": {"type": "date", "value": "2026-11-06", "precision": "day"},
+       "modality": "agreed", "polarity": "positive", "claimKind": "commitment", "validFrom": "2026-10-20", "precision": "day",
+       "evidence": [{"source": "m4", "segmentIDs": ["s4"], "quote": "it is now due on November 6"}]},
+      {"ref": "a6", "subject": "e1", "predicate": "assignedTo", "object": "e4",
+       "modality": "agreed", "polarity": "positive", "claimKind": "commitment", "validFrom": "2026-10-20", "precision": "day",
+       "evidence": [{"source": "m4", "segmentIDs": ["s5"], "quote": "Maria Santos handed the contract review to Lee Park"}]}
+    ],
+    "mustNotAssert": [],
+    "mustNotMerge": []
+  }
+}
