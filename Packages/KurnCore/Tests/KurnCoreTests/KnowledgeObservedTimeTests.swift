@@ -58,14 +58,33 @@ struct KnowledgeObservedTimeTests {
         #expect(!ids.contains(try #require(line.assertions["a4"])))
     }
 
-    @Test func pagesCarrySourceTimeAndTheTimelineShowsItBesideRecordedTime() throws {
+    @Test func theTimelineKeepsSourceTimeAndRecordedTimeApartPerClaim() throws {
         let line = try KnowledgeFixtureTimeline.load("pt-provisioning-timeline")
-        let facts = line.snapshot.facts
-        #expect(facts.allSatisfy { $0.source.observedAt != nil })
-        let pages = try KnowledgeWikiProjector.project(line.snapshot)
-        let timeline = KnowledgeTimeline.build(pages: pages)
+        // The helper's snapshot dates both clocks with the meeting; give each fact its claim's own transaction time
+        // (the meeting's import), so a swap of the two fields cannot pass.
+        let recordedByFact = Dictionary(uniqueKeysWithValues: line.claims.map { ($0.id, $0.recordedAt) })
+        let observedByFact = Dictionary(uniqueKeysWithValues: line.claims.map { ($0.id, $0.observedAt) })
+        let facts = try line.snapshot.facts.map { fact in
+            KnowledgeWikiSnapshot.Fact(
+                id: fact.id, subjectID: fact.subjectID, predicate: fact.predicate, objectID: fact.objectID, value: fact.value,
+                qualifiers: fact.qualifiers,
+                source: .init(meetingID: fact.source.meetingID, recordedAt: try #require(recordedByFact[fact.id]),
+                              observedAt: fact.source.observedAt, evidence: fact.source.evidence))
+        }
+        let snapshot = KnowledgeWikiSnapshot(revision: line.snapshot.revision, entities: line.snapshot.entities, facts: facts)
+        let timeline = KnowledgeTimeline.build(pages: try KnowledgeWikiProjector.project(snapshot))
         let entries = timeline.periods.flatMap(\.entries) + timeline.undated
-        #expect(!entries.isEmpty && entries.allSatisfy { $0.observedAt != nil })
+        #expect(entries.count == facts.count)
+        for entry in entries {
+            #expect(entry.recordedAt == recordedByFact[entry.factID])
+            #expect(entry.observedAt == observedByFact[entry.factID] ?? nil)
+        }
+        // The late import: said 2026-10-20, recorded 2026-11-14.
+        let blocker = try #require(line.assertions["a6"])
+        let late = try #require(entries.first { $0.factID == blocker })
+        #expect(late.observedAt == KnowledgeFixtureTimeline.date("2026-10-20T13:00:00Z"))
+        #expect(late.recordedAt == KnowledgeFixtureTimeline.date("2026-11-14T10:00:00Z"))
+        #expect(entries.contains { $0.observedAt != $0.recordedAt })
     }
 
     @Test func aSnapshotStoredBeforeSourceTimeExistedStillDecodes() throws {
