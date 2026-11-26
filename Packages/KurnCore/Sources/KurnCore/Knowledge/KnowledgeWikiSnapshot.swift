@@ -78,12 +78,17 @@ public struct KnowledgeWikiSnapshot: Codable, Equatable, Sendable {
 
     public struct Source: Codable, Equatable, Sendable {
         public let meetingID: UUID
+        /// Transaction time: when the store learned the claim (its meeting was compiled into knowledge).
         public let recordedAt: Date
+        /// Source time (K7.1): the date of the recording the claim's evidence quotes, i.e. when it was said.
+        /// Nil when the recording is not known; a stored snapshot from before it existed decodes with nil.
+        public let observedAt: Date?
         public let evidence: [Evidence]
 
-        public init(meetingID: UUID, recordedAt: Date, evidence: [Evidence]) {
+        public init(meetingID: UUID, recordedAt: Date, observedAt: Date? = nil, evidence: [Evidence]) {
             self.meetingID = meetingID
             self.recordedAt = recordedAt
+            self.observedAt = observedAt
             self.evidence = evidence
         }
     }

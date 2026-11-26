@@ -47,7 +47,8 @@ struct KnowledgeFixtureTimeline {
             let claim = KnowledgeTemporalClaim(
                 id: UUID(), subjectID: subject, predicate: row.predicate, objectID: row.object.flatMap { entities[$0] },
                 value: row.value, polarity: row.polarity, modality: row.modality,
-                validFrom: KnowledgeTemporalValue(text: row.validFrom, precision: row.precision), recordedAt: recordedAt)
+                validFrom: KnowledgeTemporalValue(text: row.validFrom, precision: row.precision), recordedAt: recordedAt,
+                observedAt: recorded[source])
             ids[row.ref] = claim.id
             claims.append(claim)
             let evidence = row.evidence.enumerated().map { index, cited in
@@ -59,7 +60,7 @@ struct KnowledgeFixtureTimeline {
                 id: claim.id, subjectID: subject, predicate: row.predicate, objectID: claim.objectID, value: row.value,
                 qualifiers: .init(modality: row.modality, polarity: row.polarity, claimKind: row.claimKind, authority: .attributed,
                                   confidence: .medium, review: .machineExtracted, validFrom: claim.validFrom),
-                source: .init(meetingID: meetingID, recordedAt: meetingDate, evidence: evidence)))
+                source: .init(meetingID: meetingID, recordedAt: meetingDate, observedAt: meetingDate, evidence: evidence)))
         }
         let snapshotEntities = try fixture.expected.entities.map { entity in
             KnowledgeWikiSnapshot.Entity(id: try #require(entities[entity.ref]), kind: entity.kind, name: entity.name)

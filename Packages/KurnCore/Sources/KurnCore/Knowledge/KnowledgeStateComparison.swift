@@ -126,7 +126,7 @@ public struct KnowledgeStateComparison: Equatable, Sendable {
                 objectID: fact.objectID.map { item.object?.id ?? $0 }, value: fact.value,
                 polarity: fact.qualifiers.polarity, modality: fact.qualifiers.modality,
                 validFrom: fact.qualifiers.validFrom, validTo: fact.qualifiers.validTo,
-                recordedAt: fact.source.recordedAt))
+                recordedAt: fact.source.recordedAt, observedAt: fact.source.observedAt))
         }
         return claims.sorted { $0.id.uuidString < $1.id.uuidString }
     }

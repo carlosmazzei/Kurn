@@ -33,6 +33,8 @@ public struct KnowledgeTimeline: Equatable, Sendable {
         /// The stated valid-time start, at its precision; nil in the undated list.
         public let stated: KnowledgeTemporalValue?
         public let recordedAt: Date
+        /// When the claim was said (the meeting's date), shown beside `recordedAt`; nil when unknown.
+        public let observedAt: Date?
         /// A proposal, hypothesis or disputed claim: shown, never a change of state.
         public let isTentative: Bool
         /// Lifecycle findings (K3.2) about this claim's place in its entity's history.
@@ -105,7 +107,7 @@ public struct KnowledgeTimeline: Equatable, Sendable {
         let anomalies = lifecycleAnomalies(items: Array(items.values), kinds: kinds)
         let entries = items.values.map { item in
             Entry(item: item, kind: kind(of: item.fact), stated: item.fact.qualifiers.validFrom.flatMap { $0.bounds == nil ? nil : $0 },
-                  recordedAt: item.fact.source.recordedAt,
+                  recordedAt: item.fact.source.recordedAt, observedAt: item.fact.source.observedAt,
                   isTentative: KnowledgeTemporalReducer.tentative.contains(item.fact.qualifiers.modality),
                   lifecycleAnomalies: anomalies[item.fact.id].map { Array($0).sorted { $0.rawValue < $1.rawValue } } ?? [])
         }.filter(filter.keeps)

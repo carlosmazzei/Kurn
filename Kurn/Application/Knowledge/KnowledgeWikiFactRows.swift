@@ -18,7 +18,8 @@ enum KnowledgeWikiFactRows {
             qualifiers: .init(modality: modality, polarity: polarity, claimKind: kind, authority: authority, confidence: confidence, review: review,
                 validFrom: try temporal(row.validFromText, precision: row.validFromPrecisionRaw),
                 validTo: try temporal(row.validToText, precision: row.validToPrecisionRaw)),
-            source: .init(meetingID: row.sourceMeetingID, recordedAt: row.recordedAt, evidence: evidence))
+            source: .init(meetingID: row.sourceMeetingID, recordedAt: row.recordedAt,
+                          observedAt: source.recordings.first { $0.id == origin.recordingID }?.recordedAt, evidence: evidence))
     }
 
     private static func temporal(_ text: String?, precision: String?) throws -> KnowledgeTemporalValue? {
