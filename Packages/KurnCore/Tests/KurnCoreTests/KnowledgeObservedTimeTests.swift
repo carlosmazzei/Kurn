@@ -87,18 +87,42 @@ struct KnowledgeObservedTimeTests {
         #expect(entries.contains { $0.observedAt != $0.recordedAt })
     }
 
-    @Test func endOfDayIsTheLastSecondOfAStatedUTCDayAndOnlyForDays() throws {
+    @Test func dayEndIsTheMidnightThatStartsTheNextUTCDayAndOnlyForDays() throws {
         let day = try #require(KnowledgeTemporalValue(text: "2026-10-20", precision: .day))
-        #expect(KnowledgeObservedTime.endOfDay(day) == KnowledgeFixtureTimeline.date("2026-10-20T23:59:59Z"))
+        #expect(KnowledgeObservedTime.dayEnd(day) == KnowledgeFixtureTimeline.date("2026-10-21T00:00:00Z"))
         let month = try #require(KnowledgeTemporalValue(text: "2026-10", precision: .month))
-        #expect(KnowledgeObservedTime.endOfDay(month) == nil)
+        #expect(KnowledgeObservedTime.dayEnd(month) == nil)
+    }
+
+    @Test func aMeetingInTheLastFractionOfADayIsInThatDayAndMidnightIsTheNext() throws {
+        let line = try KnowledgeFixtureTimeline.load("pt-provisioning-timeline")
+        let late = try #require(line.assertions["a1"]), midnight = try #require(line.assertions["a2"])
+        let dayEnd = try #require(KnowledgeObservedTime.dayEnd(try #require(KnowledgeTemporalValue(text: "2026-08-17", precision: .day))))
+        let overrides: [UUID: Date] = [late: dayEnd.addingTimeInterval(-0.5), midnight: dayEnd]
+        var facts: [KnowledgeWikiSnapshot.Fact] = []
+        for fact in line.snapshot.facts {
+            guard let observed = overrides[fact.id] else {
+                facts.append(fact)
+                continue
+            }
+            let source = KnowledgeWikiSnapshot.Source(meetingID: fact.source.meetingID, recordedAt: fact.source.recordedAt,
+                                                      observedAt: observed, evidence: fact.source.evidence)
+            facts.append(KnowledgeWikiSnapshot.Fact(
+                id: fact.id, subjectID: fact.subjectID, predicate: fact.predicate, objectID: fact.objectID, value: fact.value,
+                qualifiers: fact.qualifiers, source: source))
+        }
+        let snapshot = KnowledgeWikiSnapshot(revision: 1, entities: line.snapshot.entities, facts: facts)
+        let restriction = KnowledgeObservedTime.restricting(try KnowledgeWikiProjector.project(snapshot), saidBefore: dayEnd)
+        let kept = Set(restriction.pages.flatMap { $0.sections.flatMap(\.entries) }.map(\.fact.id))
+        #expect(kept == [late])
+        #expect(restriction.shown == 1 && restriction.hiddenLater == 8)
     }
 
     @Test func restrictingKeepsOnlyClaimsSaidByTheDayAndCountsEachClaimOnce() throws {
         let line = try KnowledgeFixtureTimeline.load("pt-provisioning-timeline")
         let pages = try KnowledgeWikiProjector.project(line.snapshot)
-        let cutoff = try #require(KnowledgeObservedTime.endOfDay(try #require(KnowledgeTemporalValue(text: "2026-10-20", precision: .day))))
-        let restriction = KnowledgeObservedTime.restricting(pages, saidBy: cutoff)
+        let upper = try #require(KnowledgeObservedTime.dayEnd(try #require(KnowledgeTemporalValue(text: "2026-10-20", precision: .day))))
+        let restriction = KnowledgeObservedTime.restricting(pages, saidBefore: upper)
         // m1 to m4 (a1 to a6) were said by then; m5 (a7) and m6 (a8, a9) later. A claim on two pages counts once.
         #expect(restriction.shown == 6 && restriction.hiddenLater == 3 && restriction.hiddenUnplaced == 0)
         let kept = Set(restriction.pages.flatMap { $0.sections.flatMap(\.entries) }.map(\.fact.id))
@@ -106,7 +130,7 @@ struct KnowledgeObservedTimeTests {
         #expect(kept == expected)
         #expect(restriction.pages.allSatisfy { page in page.sections.allSatisfy { !$0.entries.isEmpty } })
         // Before anything was said no page is left, and the same counts say why.
-        let none = KnowledgeObservedTime.restricting(pages, saidBy: KnowledgeFixtureTimeline.date("2026-09-01"))
+        let none = KnowledgeObservedTime.restricting(pages, saidBefore: KnowledgeFixtureTimeline.date("2026-09-01"))
         #expect(none.pages.isEmpty && none.shown == 0 && none.hiddenLater == 9)
     }
 
@@ -131,7 +155,7 @@ struct KnowledgeObservedTimeTests {
             .init(text: "The environment provisioning project.", assertionIDs: [first])])
         let pages = try KnowledgeWikiProjector.project(snapshot, narratives: [narrative])
         #expect(pages.first { $0.entity.id == project }?.narrative != nil)
-        let restriction = KnowledgeObservedTime.restricting(pages, saidBy: .distantFuture)
+        let restriction = KnowledgeObservedTime.restricting(pages, saidBefore: .distantFuture)
         #expect(restriction.hiddenUnplaced == 1 && restriction.hiddenLater == 0 && restriction.shown == 8)
         #expect(restriction.pages.allSatisfy { $0.narrative == nil })
         #expect(!restriction.pages.flatMap { $0.sections.flatMap(\.entries) }.contains { $0.fact.id == first })

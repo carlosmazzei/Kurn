@@ -130,7 +130,7 @@ enum ChatKnowledgeTools {
     private static func asOfScope(_ params: Parameters, pages: [KnowledgeWikiPage])
         throws -> (restriction: KnowledgeObservedTime.Restriction, note: String)? {
         guard let asOf = try params.asOf() else { return nil }
-        let restriction = KnowledgeObservedTime.restricting(pages, saidBy: asOf.cutoff)
+        let restriction = KnowledgeObservedTime.restricting(pages, saidBefore: asOf.before)
         return (restriction, "\n" + ChatKnowledgeToolText.asOfNote(day: asOf.day, restriction))
     }
 
@@ -153,7 +153,8 @@ enum ChatKnowledgeTools {
         case "get_entity":
             let id = try params.uuid("entityID")
             guard let page = read.pages.first(where: { $0.entity.id == id }) else { throw Invalid("Unknown entityID.") }
-            let scoped = try asOfScope(params, pages: read.pages)
+            // The counts are the entity's own: a page of another entity says nothing of what this one lost.
+            let scoped = try asOfScope(params, pages: [page])
             // As of a day the page is the one restricted to what had been said by then (none left when nothing had).
             var visible: KnowledgeWikiPage? = page
             if let scoped { visible = scoped.restriction.pages.first { $0.entity.id == id } }
@@ -247,7 +248,8 @@ enum ChatKnowledgeTools {
         "type": .string("string"),
         "description": .string("Calendar day yyyy-MM-dd. Read only claims said in meetings held by the end of that day (UTC), "
             + "as they were then: later claims, claims whose meeting date is unknown and generated narratives are left out and "
-            + "counted. It is when a claim was said, not when it is stated to hold or when it was compiled.")
+            + "counted. It is when a claim was said, not when it is stated to hold or when it was compiled. Names, aliases and "
+            + "merged identities are today's: the day limits the claims, not the names used to find them.")
     ])
 
     struct Invalid: LocalizedError {
@@ -292,12 +294,12 @@ enum ChatKnowledgeTools {
 
         func uuid(_ key: String) throws -> UUID { try Self.uuid(values[key], key: key) }
 
-        /// The optional `as_of` day and the inclusive cutoff it means: the last second of that UTC day.
-        func asOf() throws -> (day: String, cutoff: Date)? {
+        /// The optional `as_of` day and the exclusive instant it ends at: midnight starting the next UTC day.
+        func asOf() throws -> (day: String, before: Date)? {
             guard let value = values["as_of"] else { return nil }
             guard case .string(let text) = value, let day = KnowledgeTemporalValue(text: text, precision: .day),
-                  let cutoff = KnowledgeObservedTime.endOfDay(day) else { throw Invalid("Invalid as_of; expected yyyy-MM-dd.") }
-            return (day.text, cutoff)
+                  let before = KnowledgeObservedTime.dayEnd(day) else { throw Invalid("Invalid as_of; expected yyyy-MM-dd.") }
+            return (day.text, before)
         }
 
         func optionalUUID(_ key: String) throws -> UUID? {

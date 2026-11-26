@@ -100,6 +100,44 @@ struct ChatKnowledgeToolsTests {
         #expect(all.content.contains("NOT Example portal hasStatus open") && !all.content.contains("as of "))
     }
 
+    /// An entity page reports what it lost itself, not what the other selected entities lost.
+    @Test func asOfCountsOnlyTheRequestedEntitysClaims() async throws {
+        let first = UUID(), second = UUID(), firstFact = UUID(), secondFact = UUID()
+        func fact(_ id: UUID, subject: UUID, said: Date) -> KnowledgeWikiSnapshot.Fact {
+            .init(id: id, subjectID: subject, predicate: .hasStatus, value: .enumeration("open"),
+                  qualifiers: .init(modality: .reported, polarity: .positive, claimKind: .internalStatusReport,
+                                    authority: .attributed, confidence: .medium, review: .machineExtracted),
+                  source: .init(meetingID: Self.meeting, recordedAt: Date(timeIntervalSince1970: 1_790_000_000), observedAt: said,
+                                evidence: [.init(id: UUID(), recordingID: Self.recording, segmentIDs: ["s1"], quote: "q",
+                                                 startMs: 1_000, endMs: 2_000, attributedSpeaker: "Speaker 1")]))
+        }
+        // The first entity's only claim was said on 2026-08-17; the second entity's was said in May, so a count over
+        // every page would report one claim shown for the first.
+        let wiki = KnowledgeWikiSnapshot(
+            revision: 3,
+            entities: [.init(id: first, kind: .project, name: "Example alpha"), .init(id: second, kind: .project, name: "Example beta")],
+            facts: [fact(firstFact, subject: first, said: Date(timeIntervalSince1970: 1_787_000_000)),
+                    fact(secondFact, subject: second, said: Date(timeIntervalSince1970: 1_780_000_000))])
+        let read = try KnowledgeBrowserRead(meetingIDs: [Self.meeting], wiki: wiki, meetingTitles: [Self.meeting: "Weekly review"],
+                                            selectedEvidence: nil, policyRevisionKey: "p1",
+                                            meetingContexts: [Self.meeting: .init(id: UUID(), kind: .vendorDiscussion, name: "Sync",
+                                                                                  classification: .internal)])
+        let source = ChatKnowledgeSource(read: { _, _ in read }, authorization: Self.source().authorization, remoteConsent: { _ in true })
+        let output = try await run("get_entity", ["entityID": .string(first.uuidString), "as_of": .string("2026-08-16")], source: source)
+        #expect(!output.isError)
+        #expect(output.content.contains("0 claims shown; left out: 1 said later, 0 with no known meeting date"))
+        #expect(!output.content.contains("1 claims shown"))
+        // Search spans every selected page, so it reports the whole selection: one shown (beta), one said later (alpha).
+        let search = try await run("search_knowledge", ["query": .string("Example"), "as_of": .string("2026-08-16")], source: source)
+        #expect(search.content.contains("1 claims shown; left out: 1 said later, 0 with no known meeting date"))
+    }
+
+    @Test func asOfSaysItLimitsClaimsNotTheNamesUsedToFindThem() throws {
+        let tools = ChatKnowledgeTools.make(source: Self.source(), meetings: [Self.meeting], provider: .openAI)
+        let schema = String(describing: try #require(tools.first { $0.spec.name == "get_entity" }).spec.inputSchema)
+        #expect(schema.contains("today's") && schema.contains("not the names"))
+    }
+
     @Test func asOfRestrictsSearchWithoutLeakingALaterClaimThroughAPageHit() async throws {
         let early = try await run("search_knowledge", ["query": .string("portal"), "as_of": .string("2026-08-16")])
         #expect(!early.isError)

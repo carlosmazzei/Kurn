@@ -30,15 +30,17 @@ extension KnowledgeObservedTime {
         public let hiddenUnplaced: Int
     }
 
-    /// The last second of a stated UTC day: the inclusive cutoff `saidBy` uses for an `as_of` day.
-    public static func endOfDay(_ day: KnowledgeTemporalValue) -> Date? {
-        guard day.precision == .day, let upper = day.bounds?.upper else { return nil }
-        return upper.addingTimeInterval(-1)
+    /// The exclusive end of a stated UTC day: midnight starting the next one. A recording keeps fractions of a second,
+    /// so a day is "everything before this instant", never "up to its last whole second".
+    public static func dayEnd(_ day: KnowledgeTemporalValue) -> Date? {
+        guard day.precision == .day else { return nil }
+        return day.bounds?.upper
     }
 
-    /// Restricts `pages` to the claims whose meeting was held at or before `cutoff`. A claim shown on two pages
-    /// (as subject and as object) is counted once; a claim with an unknown source time is left out and counted.
-    public static func restricting(_ pages: [KnowledgeWikiPage], saidBy cutoff: Date) -> Restriction {
+    /// Restricts `pages` to the claims whose meeting was held before `upper` (exclusive, as `dayEnd` gives it). A claim
+    /// shown on two pages (as subject and as object) is counted once; a claim with an unknown source time is left out
+    /// and counted.
+    public static func restricting(_ pages: [KnowledgeWikiPage], saidBefore upper: Date) -> Restriction {
         var kept = Set<UUID>(), later = Set<UUID>(), unplaced = Set<UUID>()
         var result: [KnowledgeWikiPage] = []
         for page in pages {
@@ -51,7 +53,7 @@ extension KnowledgeObservedTime {
                         unplaced.insert(id)
                         continue
                     }
-                    if observed <= cutoff {
+                    if observed < upper {
                         kept.insert(id)
                         entries.append(entry)
                     } else {
