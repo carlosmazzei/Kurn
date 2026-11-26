@@ -53,8 +53,11 @@ struct KnowledgeTimelinePresentationTests {
         #expect(titled.source == String(format: KnowledgeTimelinePresentation.text("said_in"), "Example review", "Oct 20, 2026", "Nov 14, 2026"))
         let untitled = KnowledgeTimelinePresentation.row(lateEntry, meetingTitles: [:], locale: Self.english, timeZone: Self.utc)
         #expect(untitled.source == String(format: KnowledgeTimelinePresentation.text("said"), "Oct 20, 2026", "Nov 14, 2026"))
-        // Said and recorded on one day: the date is printed once, as before.
-        let (sameDay, _) = try Self.entry(status: "blocked", stated: stated, recordedAt: recorded, observedAt: recorded, meetingID: meetingID)
+        // Said and recorded on one day, at different times: the date is printed once, as before (the days are compared,
+        // not the instants).
+        let earlierThatDay = try #require(formatter.date(from: "2026-11-14T08:30:00Z"))
+        let (sameDay, _) = try Self.entry(status: "blocked", stated: stated, recordedAt: recorded, observedAt: earlierThatDay,
+                                          meetingID: meetingID)
         let sameEntry = try #require(sameDay.periods.first?.entries.first)
         let same = KnowledgeTimelinePresentation.row(sameEntry, meetingTitles: [:], locale: Self.english, timeZone: Self.utc)
         #expect(same.source == String(format: KnowledgeTimelinePresentation.text("recorded"), "Nov 14, 2026"))
