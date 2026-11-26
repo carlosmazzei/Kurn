@@ -45,8 +45,13 @@ enum KnowledgeTimelinePresentation {
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
         let date = formatter.string(from: entry.recordedAt)
-        guard let title = meetingTitles[entry.item.fact.source.meetingID] else { return String(format: text("recorded"), date) }
-        return String(format: text("recorded_in"), title, date)
+        // The day it was said is added only when it differs from the day it was recorded into knowledge (a meeting
+        // imported late); otherwise one date would be printed twice.
+        let said = entry.observedAt.map { formatter.string(from: $0) }.flatMap { $0 == date ? nil : $0 }
+        guard let title = meetingTitles[entry.item.fact.source.meetingID] else {
+            return said.map { String(format: text("said"), $0, date) } ?? String(format: text("recorded"), date)
+        }
+        return said.map { String(format: text("said_in"), title, $0, date) } ?? String(format: text("recorded_in"), title, date)
     }
 
     /// Tentative, planned-ahead and lifecycle findings, in that order.

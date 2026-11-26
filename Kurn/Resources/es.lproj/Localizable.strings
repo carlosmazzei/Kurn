@@ -1480,6 +1480,8 @@
 "knowledge.timeline.stated" = "Declarado para %@";
 "knowledge.timeline.recorded" = "Registrado el %@";
 "knowledge.timeline.recorded_in" = "De %1$@ · registrado el %2$@";
+"knowledge.timeline.said" = "Dicho el %1$@ · registrado el %2$@";
+"knowledge.timeline.said_in" = "De %1$@ · dicho el %2$@ · registrado el %3$@";
 "knowledge.timeline.tentative" = "Provisional";
 "knowledge.timeline.ahead" = "Planificado a futuro";
 "knowledge.timeline.anomaly.invalid_transition" = "Cambio de estado inesperado";

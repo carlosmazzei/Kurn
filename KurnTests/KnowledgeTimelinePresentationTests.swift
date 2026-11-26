@@ -8,13 +8,13 @@ struct KnowledgeTimelinePresentationTests {
     private static let utc = TimeZone(identifier: "UTC")!
 
     private static func entry(status: String, modality: KnowledgeModality = .reported, stated: KnowledgeTemporalValue?,
-                              recordedAt: Date, meetingID: UUID, entityKind: KnowledgeEntityKind = .actionItem,
+                              recordedAt: Date, observedAt: Date? = nil, meetingID: UUID, entityKind: KnowledgeEntityKind = .actionItem,
                               extra: [KnowledgeWikiSnapshot.Fact] = []) throws -> (KnowledgeTimeline, KnowledgeWikiSnapshot.Fact) {
         let entityID = UUID()
         let fact = KnowledgeWikiSnapshot.Fact(id: UUID(), subjectID: entityID, predicate: .hasStatus, value: .enumeration(status),
             qualifiers: .init(modality: modality, polarity: .positive, claimKind: .internalStatusReport, authority: .attributed,
                               confidence: .medium, review: .machineExtracted, validFrom: stated),
-            source: .init(meetingID: meetingID, recordedAt: recordedAt, evidence: [
+            source: .init(meetingID: meetingID, recordedAt: recordedAt, observedAt: observedAt, evidence: [
                 .init(id: UUID(), recordingID: UUID(), segmentIDs: ["s1"], quote: "quoted", startMs: 0, endMs: 500,
                       attributedSpeaker: "Speaker 1"),
             ]))
@@ -38,6 +38,27 @@ struct KnowledgeTimelinePresentationTests {
         #expect(row.claim == MeetingKnowledgeClaimPresentation.text(entry.item))
         let month = try #require(timeline.periods.first).month
         #expect(KnowledgeTimelinePresentation.monthTitle(month, locale: Self.english) == "November 2026")
+    }
+
+    @Test func aRowSaysWhenItWasSaidOnlyWhenThatDiffersFromWhenItWasRecorded() throws {
+        let meetingID = UUID()
+        let formatter = ISO8601DateFormatter()
+        let recorded = try #require(formatter.date(from: "2026-11-14T10:00:00Z"))
+        let said = try #require(formatter.date(from: "2026-10-20T13:00:00Z"))
+        let stated = try #require(KnowledgeTemporalValue(text: "2026-10", precision: .month))
+        let (late, _) = try Self.entry(status: "blocked", stated: stated, recordedAt: recorded, observedAt: said, meetingID: meetingID)
+        let lateEntry = try #require(late.periods.first?.entries.first)
+        let titled = KnowledgeTimelinePresentation.row(lateEntry, meetingTitles: [meetingID: "Example review"], locale: Self.english,
+                                                       timeZone: Self.utc)
+        #expect(titled.source == String(format: KnowledgeTimelinePresentation.text("said_in"), "Example review", "Oct 20, 2026", "Nov 14, 2026"))
+        let untitled = KnowledgeTimelinePresentation.row(lateEntry, meetingTitles: [:], locale: Self.english, timeZone: Self.utc)
+        #expect(untitled.source == String(format: KnowledgeTimelinePresentation.text("said"), "Oct 20, 2026", "Nov 14, 2026"))
+        // Said and recorded on one day: the date is printed once, as before.
+        let (sameDay, _) = try Self.entry(status: "blocked", stated: stated, recordedAt: recorded, observedAt: recorded, meetingID: meetingID)
+        let sameEntry = try #require(sameDay.periods.first?.entries.first)
+        let same = KnowledgeTimelinePresentation.row(sameEntry, meetingTitles: [:], locale: Self.english, timeZone: Self.utc)
+        #expect(same.source == String(format: KnowledgeTimelinePresentation.text("recorded"), "Nov 14, 2026"))
+        for key in ["said", "said_in"] { #expect(KnowledgeTimelinePresentation.text(key) != "knowledge.timeline." + key) }
     }
 
     @Test func undatedTentativeRowsSayWhatTheyAre() throws {

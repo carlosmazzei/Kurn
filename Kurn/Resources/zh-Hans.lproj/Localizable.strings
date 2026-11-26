@@ -1480,6 +1480,8 @@
 "knowledge.timeline.stated" = "所述日期：%@";
 "knowledge.timeline.recorded" = "记录于 %@";
 "knowledge.timeline.recorded_in" = "来自 %1$@ · 记录于 %2$@";
+"knowledge.timeline.said" = "说于 %1$@ · 记录于 %2$@";
+"knowledge.timeline.said_in" = "来自 %1$@ · 说于 %2$@ · 记录于 %3$@";
 "knowledge.timeline.tentative" = "暂定";
 "knowledge.timeline.ahead" = "提前计划";
 "knowledge.timeline.anomaly.invalid_transition" = "意外的状态变化";
