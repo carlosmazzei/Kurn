@@ -3649,6 +3649,20 @@ picks, from the same authorized pages the reader shows, offline.
   show what a change replaced, and open the first cited passage through the
   ID-only evidence route.
 
+### Knowledge source time (K7.1)
+
+A claim has three clocks that are never mixed: stated valid time (`validFrom`/`validTo`), transaction time
+(`recordedAt`, when its meeting was compiled into knowledge) and source time (`observedAt`, when it was said).
+`KnowledgeWikiSnapshot.Source.observedAt` is the date of the recording its evidence quotes
+(`KnowledgeWikiFactRows` reads it from the origin recording; no schema change), optional so a stored snapshot from
+before it existed decodes with nil. It rides on `KnowledgeTemporalClaim`, which the reducer ignores, and on
+`KnowledgeTimeline.Entry`; the timeline and `get_entity`/`get_timeline` tool text show it as `said <date>` beside
+`recorded`, only when known. KurnCore's `KnowledgeObservedTime.saidBy(_:in:)` answers "what had been said by then"
+(inclusive, claims with an unknown source time left out) so a meeting imported long after it happened is known late
+but said early; `KnowledgeObservedTimeTests` checks it on the late-import fixtures. A cached projection stored
+before this change no longer equals a fresh snapshot, so its read returns nil until "Rebuild pages" republishes it.
+Not yet: an `as_of` argument on `search_knowledge`/`get_entity`, and comparison "as known after meeting X".
+
 ### Knowledge late arrivals (K3.5)
 
 An entity page's overview ends with "Revised later" when knowledge recorded after

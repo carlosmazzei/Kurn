@@ -10,14 +10,17 @@ struct ChatKnowledgeToolsTests {
     private nonisolated static let meeting = UUID(), project = UUID(), team = UUID()
     private nonisolated static let blocker = UUID(), status = UUID(), evidenceID = UUID(), recording = UUID()
 
+    /// K7.1: the blocker was said a month before it was recorded into knowledge; the other claim has no source time.
+    private nonisolated static let said = Date(timeIntervalSince1970: 1_787_000_000)
+
     private nonisolated static let entities: [KnowledgeWikiSnapshot.Entity] = [
         .init(id: project, kind: .project, name: "Example portal", aliases: ["Portal"]),
         .init(id: team, kind: .team, name: "Platform team"),
     ]
 
     private nonisolated static func wiki() -> KnowledgeWikiSnapshot {
-        func source(_ quote: String, evidence: UUID = UUID()) -> KnowledgeWikiSnapshot.Source {
-            .init(meetingID: meeting, recordedAt: Date(timeIntervalSince1970: 1_790_000_000), evidence: [
+        func source(_ quote: String, evidence: UUID = UUID(), observedAt: Date? = nil) -> KnowledgeWikiSnapshot.Source {
+            .init(meetingID: meeting, recordedAt: Date(timeIntervalSince1970: 1_790_000_000), observedAt: observedAt, evidence: [
                 .init(id: evidence, recordingID: recording, segmentIDs: ["s1"], quote: quote, startMs: 65_000, endMs: 70_000,
                       attributedSpeaker: "Speaker 2"),
             ])
@@ -28,7 +31,7 @@ struct ChatKnowledgeToolsTests {
                                     confidence: .medium, review: .machineExtracted,
                                     validFrom: KnowledgeTemporalValue(text: "2026-10", precision: .month),
                                     validTo: KnowledgeTemporalValue(text: "2026-11", precision: .month)),
-                  source: source("The platform team is blocking the portal.", evidence: evidenceID)),
+                  source: source("The platform team is blocking the portal.", evidence: evidenceID, observedAt: said)),
             .init(id: status, subjectID: project, predicate: .hasStatus, value: .enumeration("open"),
                   qualifiers: .init(modality: .proposed, polarity: .negative, claimKind: .internalStatusReport, authority: .attributed,
                                     confidence: .medium, review: .machineExtracted),
@@ -115,6 +118,7 @@ struct ChatKnowledgeToolsTests {
         #expect(output.content.contains("NOT Example portal hasStatus open | modality: proposed"))
         #expect(output.content.contains("Platform team blocks Example portal | modality: reported"))
         #expect(output.content.contains("valid from: 2026-10"))
+        #expect(output.content.contains("| said \(ChatSourceToolText.date(Self.said))"))
         #expect(output.content.contains("evidence \(Self.evidenceID.uuidString) [1:05] Speaker 2: \"The platform team is blocking the portal.\""))
         #expect(output.content.contains("page: items 1–2 of 2; end"))
         let paged = try await run("get_entity", ["entityID": .string(Self.project.uuidString), "limit": .number(1)])
@@ -134,6 +138,10 @@ struct ChatKnowledgeToolsTests {
         let undated = try #require(lines.firstIndex { $0.hasPrefix("- undated | NOT Example portal hasStatus open") })
         #expect(dated < undated)
         #expect(lines[undated].hasSuffix("| tentative") && lines[undated].contains("modality: proposed"))
+        // Source time (K7.1) rides beside recorded time, and only when the claim's meeting date is known.
+        #expect(lines[dated].contains("| recorded \(ChatSourceToolText.date(Date(timeIntervalSince1970: 1_790_000_000))) | said "
+            + "\(ChatSourceToolText.date(Self.said))"))
+        #expect(!lines[undated].contains("| said "))
         // Both ends of a stated validity reach the model.
         #expect(lines[dated].contains("modality: reported; kind: internalStatusReport; review: machineExtracted; "
             + "valid from: 2026-10; valid to: 2026-11"))

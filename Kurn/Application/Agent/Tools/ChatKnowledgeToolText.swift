@@ -62,6 +62,7 @@ enum ChatKnowledgeToolText {
         let text = ChatSourceToolText.renderedField(claimText(entry), limit: 400)
         var line = "- \(entry.fact.id.uuidString) | \(text.text) | \(qualifiers(entry.fact.qualifiers))"
             + " | meeting \(entry.fact.source.meetingID.uuidString)"
+        if let said = entry.fact.source.observedAt { line += " | said \(ChatSourceToolText.date(said))" }
         var omitted = text.omittedScalars
         if let evidence = entry.fact.source.evidence.first {
             let quote = ChatSourceToolText.renderedField(evidence.quote, limit: 300)
@@ -76,6 +77,7 @@ enum ChatKnowledgeToolText {
         let text = ChatSourceToolText.renderedField(claimText(entry.item), limit: 400)
         var line = "- \(entry.stated?.text ?? "undated") | \(text.text) | \(qualifiers(entry.item.fact.qualifiers))"
             + " | assertion \(entry.factID.uuidString) | recorded \(ChatSourceToolText.date(entry.recordedAt))"
+        if let said = entry.observedAt { line += " | said \(ChatSourceToolText.date(said))" }
         if entry.isTentative { line += " | tentative" }
         if !entry.lifecycleAnomalies.isEmpty {
             line += " | anomalies: " + entry.lifecycleAnomalies.map(\.rawValue).joined(separator: ", ")

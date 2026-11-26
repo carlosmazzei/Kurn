@@ -46,12 +46,15 @@ public struct KnowledgeTemporalClaim: Codable, Equatable, Sendable {
     /// it stopped holding it.
     public let recordedAt: Date
     public let retractedAt: Date?
+    /// Source time (K7.1): when the claim was said, from the meeting its evidence quotes. A third clock, never
+    /// mixed with valid or transaction time; the reducer ignores it and `KnowledgeObservedTime` filters on it.
+    public let observedAt: Date?
 
     // swiftlint:disable:next function_parameter_count
     public init(id: UUID, subjectID: UUID, predicate: KnowledgePredicate, objectID: UUID? = nil,
                 value: KnowledgeTypedValue? = nil, polarity: KnowledgePolarity = .positive,
                 modality: KnowledgeModality, validFrom: KnowledgeTemporalValue?, validTo: KnowledgeTemporalValue? = nil,
-                recordedAt: Date, retractedAt: Date? = nil) {
+                recordedAt: Date, retractedAt: Date? = nil, observedAt: Date? = nil) {
         self.id = id
         self.subjectID = subjectID
         self.predicate = predicate
@@ -63,6 +66,7 @@ public struct KnowledgeTemporalClaim: Codable, Equatable, Sendable {
         self.validTo = validTo
         self.recordedAt = recordedAt
         self.retractedAt = retractedAt
+        self.observedAt = observedAt
     }
 }
 
