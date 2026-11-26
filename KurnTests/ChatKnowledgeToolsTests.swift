@@ -134,8 +134,14 @@ struct ChatKnowledgeToolsTests {
 
     @Test func asOfSaysItLimitsClaimsNotTheNamesUsedToFindThem() throws {
         let tools = ChatKnowledgeTools.make(source: Self.source(), meetings: [Self.meeting], provider: .openAI)
-        let schema = String(describing: try #require(tools.first { $0.spec.name == "get_entity" }).spec.inputSchema)
-        #expect(schema.contains("today's") && schema.contains("not the names"))
+        let schema = try #require(tools.first { $0.spec.name == "get_entity" }).spec.inputSchema
+        guard case .object(let root) = schema, case .object(let properties)? = root["properties"],
+              case .object(let asOf)? = properties["as_of"], case .string(let text)? = asOf["description"] else {
+            Issue.record("get_entity declares no as_of description")
+            return
+        }
+        #expect(text.contains("are today's"))
+        #expect(text.contains("not the names"))
     }
 
     @Test func asOfRestrictsSearchWithoutLeakingALaterClaimThroughAPageHit() async throws {
