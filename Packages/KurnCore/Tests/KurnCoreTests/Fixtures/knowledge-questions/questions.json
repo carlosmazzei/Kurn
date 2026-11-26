@@ -290,6 +290,269 @@
       "citable": [
         "m6/s10"
       ]
+    },
+    {
+      "id": "en-deadline-moved",
+      "fixture": "en-moved-deadline",
+      "language": "en",
+      "kind": "temporal",
+      "question": "When is the contract review due now, and when was it first due?",
+      "expected": [
+        "a2",
+        "a3",
+        "a5"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m1/s1",
+        "m2/s2",
+        "m4/s4"
+      ],
+      "traits": [
+        "multiHop",
+        "deadlineMoved"
+      ],
+      "hops": 3
+    },
+    {
+      "id": "en-commit-before-move",
+      "fixture": "en-moved-deadline",
+      "language": "en",
+      "kind": "temporal",
+      "question": "Who committed to the contract review before its date first changed?",
+      "expected": [
+        "a1",
+        "a3"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m1/s1",
+        "m2/s2"
+      ],
+      "traits": [
+        "multiHop",
+        "commitmentBeforeChange"
+      ],
+      "hops": 2
+    },
+    {
+      "id": "en-owner-handover",
+      "fixture": "en-moved-deadline",
+      "language": "en",
+      "kind": "temporal",
+      "question": "Who owns the contract review now, and who had it before?",
+      "expected": [
+        "a1",
+        "a6"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m1/s1",
+        "m4/s5"
+      ],
+      "traits": [
+        "multiHop"
+      ],
+      "hops": 2
+    },
+    {
+      "id": "en-late-blocker",
+      "fixture": "en-moved-deadline",
+      "language": "en",
+      "kind": "temporal",
+      "question": "What blocked the contract review in mid-October?",
+      "expected": [
+        "a4"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m3/s3"
+      ],
+      "traits": [
+        "lateArrival"
+      ],
+      "hops": 1
+    },
+    {
+      "id": "en-blocked-at-second-move",
+      "fixture": "en-moved-deadline",
+      "language": "en",
+      "kind": "temporal",
+      "question": "Was the contract review blocked when its date moved the second time?",
+      "expected": [
+        "a4",
+        "a5"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m3/s3",
+        "m4/s4"
+      ],
+      "traits": [
+        "multiHop",
+        "lateArrival"
+      ],
+      "hops": 2
+    },
+    {
+      "id": "en-asof-oct-10",
+      "fixture": "en-moved-deadline",
+      "language": "en",
+      "kind": "temporal",
+      "question": "As of October 10, when was the contract review due?",
+      "expected": [
+        "a3"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m2/s2"
+      ],
+      "traits": [
+        "asOf"
+      ],
+      "hops": 1
+    },
+    {
+      "id": "en-runbook-owner-reopened",
+      "fixture": "en-platform-review",
+      "language": "en",
+      "kind": "temporal",
+      "question": "Who owns the runbook item that was reopened?",
+      "expected": [
+        "a4",
+        "a8"
+      ],
+      "forbidden": [
+        3
+      ],
+      "mustRefuse": false,
+      "citable": [
+        "m1/s4",
+        "m2/s8"
+      ],
+      "traits": [
+        "multiHop",
+        "reopened"
+      ],
+      "hops": 2
+    },
+    {
+      "id": "pt-late-blocker-meeting",
+      "fixture": "pt-provisioning-timeline",
+      "language": "pt-BR",
+      "kind": "temporal",
+      "question": "Qual equipe bloqueou o provisionamento e em qual reunião isso foi dito?",
+      "expected": [
+        "a6"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m4/s7"
+      ],
+      "traits": [
+        "lateArrival"
+      ],
+      "hops": 1
+    },
+    {
+      "id": "pt-blocker-then-revision",
+      "fixture": "pt-provisioning-timeline",
+      "language": "pt-BR",
+      "kind": "temporal",
+      "question": "O plano foi revisado depois que a equipe de segurança bloqueou o provisionamento?",
+      "expected": [
+        "a6",
+        "a7"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m4/s7",
+        "m5/s8"
+      ],
+      "traits": [
+        "multiHop",
+        "lateArrival"
+      ],
+      "hops": 2
+    },
+    {
+      "id": "pt-due-before-supersede",
+      "fixture": "pt-provisioning-timeline",
+      "language": "pt-BR",
+      "kind": "temporal",
+      "question": "A entrega prevista para outubro ainda valia quando a decisão foi substituída, e o que a bloqueava?",
+      "expected": [
+        "a4",
+        "a6",
+        "a8"
+      ],
+      "forbidden": [
+        1
+      ],
+      "mustRefuse": false,
+      "citable": [
+        "m2/s5",
+        "m4/s7",
+        "m6/s9"
+      ],
+      "traits": [
+        "multiHop",
+        "supersession"
+      ],
+      "hops": 3
+    },
+    {
+      "id": "pt-asof-oct-20",
+      "fixture": "pt-provisioning-timeline",
+      "language": "pt-BR",
+      "kind": "temporal",
+      "question": "Em 20 de outubro, a automação do provisionamento já estava aprovada?",
+      "expected": [
+        "a3"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m2/s4"
+      ],
+      "traits": [
+        "asOf"
+      ],
+      "hops": 1
+    },
+    {
+      "id": "pt-decision-chain",
+      "fixture": "pt-provisioning-timeline",
+      "language": "pt-BR",
+      "kind": "temporal",
+      "question": "Como a decisão de automatizar evoluiu, da proposta à substituição?",
+      "expected": [
+        "a2",
+        "a3",
+        "a7",
+        "a8"
+      ],
+      "forbidden": [],
+      "mustRefuse": false,
+      "citable": [
+        "m1/s2",
+        "m2/s4",
+        "m5/s8",
+        "m6/s9"
+      ],
+      "traits": [
+        "multiHop",
+        "supersession"
+      ],
+      "hops": 4
     }
   ]
 }

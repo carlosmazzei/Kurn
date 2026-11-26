@@ -115,7 +115,7 @@ struct KnowledgeFixture: Decodable {
 
 enum KnowledgeFixtureVocabulary {
     static let files = [
-        "en-platform-review", "en-three-contexts", "pt-corrected-transcript", "pt-provisioning-timeline"
+        "en-moved-deadline", "en-platform-review", "en-three-contexts", "pt-corrected-transcript", "pt-provisioning-timeline"
     ]
     static let languages: Set = ["en", "pt-BR"]
     static let hardCases: Set = [
