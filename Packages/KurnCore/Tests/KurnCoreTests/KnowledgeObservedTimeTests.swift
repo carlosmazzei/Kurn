@@ -97,7 +97,8 @@ struct KnowledgeObservedTimeTests {
     @Test func aMeetingInTheLastFractionOfADayIsInThatDayAndMidnightIsTheNext() throws {
         let line = try KnowledgeFixtureTimeline.load("pt-provisioning-timeline")
         let late = try #require(line.assertions["a1"]), midnight = try #require(line.assertions["a2"])
-        let dayEnd = try #require(KnowledgeObservedTime.dayEnd(try #require(KnowledgeTemporalValue(text: "2026-08-17", precision: .day))))
+        let day = try #require(KnowledgeTemporalValue(text: "2026-08-17", precision: .day))
+        let dayEnd = try #require(KnowledgeObservedTime.dayEnd(day))
         let overrides: [UUID: Date] = [late: dayEnd.addingTimeInterval(-0.5), midnight: dayEnd]
         var facts: [KnowledgeWikiSnapshot.Fact] = []
         for fact in line.snapshot.facts {
@@ -121,7 +122,8 @@ struct KnowledgeObservedTimeTests {
     @Test func restrictingKeepsOnlyClaimsSaidByTheDayAndCountsEachClaimOnce() throws {
         let line = try KnowledgeFixtureTimeline.load("pt-provisioning-timeline")
         let pages = try KnowledgeWikiProjector.project(line.snapshot)
-        let upper = try #require(KnowledgeObservedTime.dayEnd(try #require(KnowledgeTemporalValue(text: "2026-10-20", precision: .day))))
+        let day = try #require(KnowledgeTemporalValue(text: "2026-10-20", precision: .day))
+        let upper = try #require(KnowledgeObservedTime.dayEnd(day))
         let restriction = KnowledgeObservedTime.restricting(pages, saidBefore: upper)
         // m1 to m4 (a1 to a6) were said by then; m5 (a7) and m6 (a8, a9) later. A claim on two pages counts once.
         #expect(restriction.shown == 6 && restriction.hiddenLater == 3 && restriction.hiddenUnplaced == 0)
