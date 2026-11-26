@@ -34,6 +34,12 @@ enum ChatKnowledgeToolText {
         return AgentToolOutput(content: content(), summary: "Read \(count) knowledge items", metrics: metrics)
     }
 
+    /// What an `as_of` read kept and left out, so a missing claim is never mistaken for one never said.
+    static func asOfNote(day: String, _ restriction: KnowledgeObservedTime.Restriction) -> String {
+        "as of \(day) (by meeting date): \(restriction.shown) claims shown; left out: \(restriction.hiddenLater) said later, "
+            + "\(restriction.hiddenUnplaced) with no known meeting date; generated narratives omitted"
+    }
+
     static func hit(_ document: KnowledgeSearchDocument, query: String) -> Rendered {
         let title = ChatSourceToolText.renderedField(document.title, limit: 200)
         let snippet = ChatSourceToolText.renderedField(document.snippet(query: query), limit: 300)

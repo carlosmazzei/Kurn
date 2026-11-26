@@ -80,6 +80,54 @@ struct ChatKnowledgeToolsTests {
         return try await #require(tools.first { $0.spec.name == name }).execute(.object(arguments))
     }
 
+    /// K7.1: `as_of` reads only what had been said in meetings held by the end of that UTC day. The blocker was said on
+    /// 2026-08-17; the other claim has no known meeting date.
+    @Test func asOfReadsOnlyWhatHadBeenSaidByThatDayAndCountsWhatItLeavesOut() async throws {
+        let project = JSONValue.string(Self.project.uuidString)
+        let before = try await run("get_entity", ["entityID": project, "as_of": .string("2026-08-16")])
+        #expect(!before.isError)
+        #expect(before.content.contains("as of 2026-08-16 (by meeting date): 0 claims shown; left out: 1 said later, "
+            + "1 with no known meeting date; generated narratives omitted"))
+        #expect(!before.content.contains("Platform team blocks Example portal"))
+        // The page itself is still there: nothing had been said, which is not the same as an unknown entity.
+        #expect(before.content.contains("entity \(Self.project.uuidString)"))
+        let sameDay = try await run("get_entity", ["entityID": project, "as_of": .string("2026-08-17")])
+        #expect(sameDay.content.contains("1 claims shown; left out: 0 said later, 1 with no known meeting date"))
+        #expect(sameDay.content.contains("Platform team blocks Example portal"))
+        #expect(!sameDay.content.contains("NOT Example portal hasStatus open"))
+        // Without as_of nothing is restricted and nothing is announced.
+        let all = try await run("get_entity", ["entityID": project])
+        #expect(all.content.contains("NOT Example portal hasStatus open") && !all.content.contains("as of "))
+    }
+
+    @Test func asOfRestrictsSearchWithoutLeakingALaterClaimThroughAPageHit() async throws {
+        let early = try await run("search_knowledge", ["query": .string("portal"), "as_of": .string("2026-08-16")])
+        #expect(!early.isError)
+        #expect(early.content.contains("as of 2026-08-16 (by meeting date)"))
+        #expect(!early.content.contains("assertion \(Self.blocker.uuidString)"))
+        // Page and alias hits are built from the claims they summarize, so none survives when no claim does.
+        #expect(!early.content.contains("entity \(Self.project.uuidString)"))
+        let late = try await run("search_knowledge", ["query": .string("portal"), "as_of": .string("2026-08-17")])
+        #expect(late.content.contains("assertion \(Self.blocker.uuidString)"))
+        #expect(!late.content.contains("assertion \(Self.status.uuidString)"))
+    }
+
+    @Test func asOfMustBeACalendarDayAndIsOnlyOfferedToTheToolsThatHonourIt() async throws {
+        let project = JSONValue.string(Self.project.uuidString)
+        for bad in ["tomorrow", "2026-13-40", "2026-08", "2026-08-17T10:00:00Z"] {
+            #expect(try await run("get_entity", ["entityID": project, "as_of": .string(bad)]).isError, "\(bad)")
+        }
+        #expect(try await run("get_entity", ["entityID": project, "as_of": .number(1)]).isError)
+        // Tools that do not read it refuse it rather than ignoring it.
+        #expect(try await run("get_timeline", ["as_of": .string("2026-08-17")]).isError)
+        let tools = ChatKnowledgeTools.make(source: Self.source(), meetings: [Self.meeting], provider: .openAI)
+        for name in ["search_knowledge", "get_entity"] {
+            let spec = try #require(tools.first { $0.spec.name == name }).spec
+            #expect(String(describing: spec.inputSchema).contains("as_of"), "\(name)")
+        }
+        #expect(!String(describing: try #require(tools.first { $0.spec.name == "get_timeline" }).spec.inputSchema).contains("as_of"))
+    }
+
     @Test func theGateOffersKnowledgeOnlyWhenPolicyAndConsentAllowIt() {
         let ids: Set<UUID> = [Self.meeting]
         #expect(ChatKnowledgeGate.meetings(ids, source: Self.source(), provider: .openAI) == ids)

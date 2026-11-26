@@ -126,16 +126,25 @@ enum ChatKnowledgeTools {
         return read
     }
 
+    /// The pages restricted to an `as_of` day and the line saying what that left out; nil without `as_of`.
+    private static func asOfScope(_ params: Parameters, pages: [KnowledgeWikiPage])
+        throws -> (restriction: KnowledgeObservedTime.Restriction, note: String)? {
+        guard let asOf = try params.asOf() else { return nil }
+        let restriction = KnowledgeObservedTime.restricting(pages, saidBy: asOf.cutoff)
+        return (restriction, "\n" + ChatKnowledgeToolText.asOfNote(day: asOf.day, restriction))
+    }
+
     private static func execute(_ name: String, params: Parameters, read: KnowledgeBrowserRead, now: Date) throws -> AgentToolOutput {
         switch name {
         case "search_knowledge":
             let query = try params.string("query", limit: KnowledgeSearchIndex.queryLimit)
             // Pages a ranked top-`searchWindow` window, like the transcript search; a full window
             // says so instead of passing its size off as the number of matches.
-            let hits = try KnowledgeSearchIndex(pages: read.pages, meetingIDs: read.meetingIDs)
+            let scoped = try asOfScope(params, pages: read.pages)
+            let hits = try KnowledgeSearchIndex(pages: scoped?.restriction.pages ?? read.pages, meetingIDs: read.meetingIDs)
                 .search(query: query, limit: searchWindow)
             let window = hits.count >= searchWindow ? "top \(searchWindow) shown; refine the query for more" : "all matches"
-            let output = ChatKnowledgeToolText.output(header: "knowledge search results (best first; \(window)):",
+            let output = ChatKnowledgeToolText.output(header: "knowledge search results (best first; \(window)):" + (scoped?.note ?? ""),
                                                       lines: hits.map { ChatKnowledgeToolText.hit($0, query: query) },
                                                       offset: params.offset, limit: params.limit, read: read)
             let metrics = output.metrics.merging([.searchResultLimit: searchWindow,
@@ -144,8 +153,12 @@ enum ChatKnowledgeTools {
         case "get_entity":
             let id = try params.uuid("entityID")
             guard let page = read.pages.first(where: { $0.entity.id == id }) else { throw Invalid("Unknown entityID.") }
-            let entries = page.sections.flatMap(\.entries)
-            return ChatKnowledgeToolText.output(header: ChatKnowledgeToolText.entityHeader(page),
+            let scoped = try asOfScope(params, pages: read.pages)
+            // As of a day the page is the one restricted to what had been said by then (none left when nothing had).
+            var visible: KnowledgeWikiPage? = page
+            if let scoped { visible = scoped.restriction.pages.first { $0.entity.id == id } }
+            let entries = (visible?.sections ?? []).flatMap(\.entries)
+            return ChatKnowledgeToolText.output(header: ChatKnowledgeToolText.entityHeader(page) + (scoped?.note ?? ""),
                                                 lines: entries.map { ChatKnowledgeToolText.claim($0) },
                                                 offset: params.offset, limit: params.limit, read: read)
         case "get_wiki_page":
@@ -189,10 +202,12 @@ enum ChatKnowledgeTools {
         case "search_knowledge":
             properties["query"] = .object(["type": .string("string"), "minLength": .number(1),
                                            "maxLength": .number(Double(KnowledgeSearchIndex.queryLimit))])
+            properties["as_of"] = asOfProperty
             required = [.string("query")]
             description = "Search the canonical knowledge (entities, aliases, evidence-backed claims) of the selected meetings."
         case "get_entity":
             properties["entityID"] = uuid
+            properties["as_of"] = asOfProperty
             required = [.string("entityID")]
             description = "Read one entity's page: its attributed claims with modality, polarity, stated dates and evidence IDs."
         case "get_wiki_page":
@@ -227,6 +242,14 @@ enum ChatKnowledgeTools {
                                   "required": .array(required), "additionalProperties": .bool(false)]))
     }
 
+    /// `as_of` (K7.1): a calendar day; only claims said in meetings held by its end (UTC) are read.
+    private static let asOfProperty: JSONValue = .object([
+        "type": .string("string"),
+        "description": .string("Calendar day yyyy-MM-dd. Read only claims said in meetings held by the end of that day (UTC), "
+            + "as they were then: later claims, claims whose meeting date is unknown and generated narratives are left out and "
+            + "counted. It is when a claim was said, not when it is stated to hold or when it was compiled.")
+    ])
+
     struct Invalid: LocalizedError {
         let errorDescription: String?
         init(_ message: String) { errorDescription = message }
@@ -241,8 +264,9 @@ enum ChatKnowledgeTools {
         init(_ arguments: JSONValue, name: String) throws {
             guard case .object(let values) = arguments else { throw Invalid("Expected an object.") }
             let permitted: Set<String> = switch name {
-            case "search_knowledge": ["query", "offset", "limit"]
-            case "get_entity", "get_timeline", "get_wiki_page": ["entityID", "offset", "limit"]
+            case "search_knowledge": ["query", "as_of", "offset", "limit"]
+            case "get_entity": ["entityID", "as_of", "offset", "limit"]
+            case "get_timeline", "get_wiki_page": ["entityID", "offset", "limit"]
             case "get_evidence": ["assertionID", "evidenceID"]
             case "get_coverage": ["meetingID", "offset", "limit"]
             default: ChatKnowledgeTools.structureArguments[name] ?? []
@@ -267,6 +291,14 @@ enum ChatKnowledgeTools {
         }
 
         func uuid(_ key: String) throws -> UUID { try Self.uuid(values[key], key: key) }
+
+        /// The optional `as_of` day and the inclusive cutoff it means: the last second of that UTC day.
+        func asOf() throws -> (day: String, cutoff: Date)? {
+            guard let value = values["as_of"] else { return nil }
+            guard case .string(let text) = value, let day = KnowledgeTemporalValue(text: text, precision: .day),
+                  let cutoff = KnowledgeObservedTime.endOfDay(day) else { throw Invalid("Invalid as_of; expected yyyy-MM-dd.") }
+            return (day.text, cutoff)
+        }
 
         func optionalUUID(_ key: String) throws -> UUID? {
             values[key] == nil ? nil : try uuid(key)
