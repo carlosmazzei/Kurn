@@ -19,7 +19,7 @@ struct KnowledgeFixtureTimeline {
 
     private struct Fixture: Decodable {
         struct Source: Decodable { let id: String; let recordedAt: String; let ingestedAt: String }
-        struct Entity: Decodable { let ref: String; let kind: KnowledgeEntityKind; let name: String }
+        struct Entity: Decodable { let ref: String; let kind: KnowledgeEntityKind; let name: String; let aliases: [String]? }
         struct Evidence: Decodable { let source: String; let segmentIDs: [String]; let quote: String }
         struct Assertion: Decodable {
             let ref: String, subject: String, predicate: KnowledgePredicate, object: String?
@@ -63,7 +63,8 @@ struct KnowledgeFixtureTimeline {
                 source: .init(meetingID: meetingID, recordedAt: meetingDate, observedAt: meetingDate, evidence: evidence)))
         }
         let snapshotEntities = try fixture.expected.entities.map { entity in
-            KnowledgeWikiSnapshot.Entity(id: try #require(entities[entity.ref]), kind: entity.kind, name: entity.name)
+            KnowledgeWikiSnapshot.Entity(id: try #require(entities[entity.ref]), kind: entity.kind, name: entity.name,
+                                         aliases: entity.aliases ?? [])
         }
         return KnowledgeFixtureTimeline(claims: claims, entities: entities, assertions: ids,
                                         snapshot: KnowledgeWikiSnapshot(revision: 1, entities: snapshotEntities, facts: facts))
