@@ -110,18 +110,21 @@ struct KnowledgeInferenceSameAsTests {
         #expect(result.candidates.isEmpty)
     }
 
-    @Test func theScanStopsAtTheLimitAndSaysSoWithoutLosingTheBestOfWhatItSaw() throws {
-        // 60 groups of 30 identities, each sharing one name: 60 × 435 = 26,100 eligible pairs, past the
-        // 25,600 the scan will look at. Every pair scores the same, so the best 400 are the lowest IDs.
+    @Test func theScanStopsAtTheLimitEvenWhenAStrongerPairComesAfterIt() throws {
+        // 60 groups of 30 identities sharing one name: 60 × 435 = 26,100 eligible pairs, past the 25,600
+        // the scan looks at. A pair that also shares an alias scores higher (1.0 against 0.85) but has the
+        // highest IDs, so it is scanned last. Without the limit it would sort first; with it, it is left out.
         var entities: [KnowledgeWikiSnapshot.Entity] = []
         for group in 0..<60 {
             for member in 0..<30 { entities.append(Self.entity(group * 100 + member + 1, "Team\(group) Roadmap Plan")) }
         }
+        entities.append(Self.entity(9001, "Zeta Omega Prime", aliases: ["Zeta Shared"]))
+        entities.append(Self.entity(9002, "Zeta Omega Prime", aliases: ["Zeta Shared"]))
         let result = try Self.derive(entities)
         #expect(result.isTruncated)
         #expect(result.candidates.count == KnowledgeInference.maximumEdges)
-        let ids = result.candidates.map { $0.firstID.uuidString }
-        #expect(ids == ids.sorted())
+        let late = [Self.id(9001), Self.id(9002)]
+        #expect(!result.candidates.contains { late.contains($0.firstID) || late.contains($0.secondID) })
         #expect(try Self.derive(Array(entities.reversed())) == result)
     }
 }
