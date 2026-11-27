@@ -82,6 +82,17 @@ public enum KnowledgeEntityResolver {
 
     public static func rank(_ query: KnowledgeEntityResolutionValue, candidates: [KnowledgeEntityResolutionValue],
                             profile: KnowledgeEntityResolutionProfile) throws -> [KnowledgeEntityResolutionMatch] {
+        let matches = try eligibleMatches(query, candidates: candidates, profile: profile)
+        return Array(matches.sorted { lhs, rhs in
+            lhs.score == rhs.score ? lhs.entityID.uuidString < rhs.entityID.uuidString : lhs.score > rhs.score
+        }.prefix(profile.maximumCandidates))
+    }
+
+    /// Every candidate that clears the profile's rules and floor, unsorted and not cut to
+    /// `maximumCandidates`: `rank` limits one identity's review list, while a caller selecting among
+    /// many identities needs the whole eligible set to know whether it cut anything.
+    static func eligibleMatches(_ query: KnowledgeEntityResolutionValue, candidates: [KnowledgeEntityResolutionValue],
+                                profile: KnowledgeEntityResolutionProfile) throws -> [KnowledgeEntityResolutionMatch] {
         try profile.validate() // Synthesized Codable must not bypass validation.
         guard Set(candidates.map(\.id)).count == candidates.count else { throw KnowledgeEntityResolutionError.duplicateEntity }
         let name = normalizedName(query.name)
@@ -106,9 +117,7 @@ public enum KnowledgeEntityResolver {
             return KnowledgeEntityResolutionMatch(entityID: candidate.id, score: score, exactName: exact,
                 aliasMatch: alias, tokenSimilarity: similarity)
         }
-        return Array(matches.sorted { lhs, rhs in
-            lhs.score == rhs.score ? lhs.entityID.uuidString < rhs.entityID.uuidString : lhs.score > rhs.score
-        }.prefix(profile.maximumCandidates))
+        return matches
     }
 
     private static func tokens(_ name: String) -> Set<String> {
