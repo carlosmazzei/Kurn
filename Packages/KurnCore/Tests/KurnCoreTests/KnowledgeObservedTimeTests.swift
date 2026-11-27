@@ -87,6 +87,82 @@ struct KnowledgeObservedTimeTests {
         #expect(entries.contains { $0.observedAt != $0.recordedAt })
     }
 
+    @Test func dayEndIsTheMidnightThatStartsTheNextUTCDayAndOnlyForDays() throws {
+        let day = try #require(KnowledgeTemporalValue(text: "2026-10-20", precision: .day))
+        #expect(KnowledgeObservedTime.dayEnd(day) == KnowledgeFixtureTimeline.date("2026-10-21T00:00:00Z"))
+        let month = try #require(KnowledgeTemporalValue(text: "2026-10", precision: .month))
+        #expect(KnowledgeObservedTime.dayEnd(month) == nil)
+    }
+
+    @Test func aMeetingInTheLastFractionOfADayIsInThatDayAndMidnightIsTheNext() throws {
+        let line = try KnowledgeFixtureTimeline.load("pt-provisioning-timeline")
+        let late = try #require(line.assertions["a1"]), midnight = try #require(line.assertions["a2"])
+        let day = try #require(KnowledgeTemporalValue(text: "2026-08-17", precision: .day))
+        let dayEnd = try #require(KnowledgeObservedTime.dayEnd(day))
+        let overrides: [UUID: Date] = [late: dayEnd.addingTimeInterval(-0.5), midnight: dayEnd]
+        var facts: [KnowledgeWikiSnapshot.Fact] = []
+        for fact in line.snapshot.facts {
+            guard let observed = overrides[fact.id] else {
+                facts.append(fact)
+                continue
+            }
+            let source = KnowledgeWikiSnapshot.Source(meetingID: fact.source.meetingID, recordedAt: fact.source.recordedAt,
+                                                      observedAt: observed, evidence: fact.source.evidence)
+            facts.append(KnowledgeWikiSnapshot.Fact(
+                id: fact.id, subjectID: fact.subjectID, predicate: fact.predicate, objectID: fact.objectID, value: fact.value,
+                qualifiers: fact.qualifiers, source: source))
+        }
+        let snapshot = KnowledgeWikiSnapshot(revision: 1, entities: line.snapshot.entities, facts: facts)
+        let restriction = KnowledgeObservedTime.restricting(try KnowledgeWikiProjector.project(snapshot), saidBefore: dayEnd)
+        let kept = Set(restriction.pages.flatMap { $0.sections.flatMap(\.entries) }.map(\.fact.id))
+        #expect(kept == [late])
+        #expect(restriction.shown == 1 && restriction.hiddenLater == 8)
+    }
+
+    @Test func restrictingKeepsOnlyClaimsSaidByTheDayAndCountsEachClaimOnce() throws {
+        let line = try KnowledgeFixtureTimeline.load("pt-provisioning-timeline")
+        let pages = try KnowledgeWikiProjector.project(line.snapshot)
+        let day = try #require(KnowledgeTemporalValue(text: "2026-10-20", precision: .day))
+        let upper = try #require(KnowledgeObservedTime.dayEnd(day))
+        let restriction = KnowledgeObservedTime.restricting(pages, saidBefore: upper)
+        // m1 to m4 (a1 to a6) were said by then; m5 (a7) and m6 (a8, a9) later. A claim on two pages counts once.
+        #expect(restriction.shown == 6 && restriction.hiddenLater == 3 && restriction.hiddenUnplaced == 0)
+        let kept = Set(restriction.pages.flatMap { $0.sections.flatMap(\.entries) }.map(\.fact.id))
+        let expected = Set(try ["a1", "a2", "a3", "a4", "a5", "a6"].map { try #require(line.assertions[$0]) })
+        #expect(kept == expected)
+        #expect(restriction.pages.allSatisfy { page in page.sections.allSatisfy { !$0.entries.isEmpty } })
+        // Before anything was said no page is left, and the same counts say why.
+        let none = KnowledgeObservedTime.restricting(pages, saidBefore: KnowledgeFixtureTimeline.date("2026-09-01"))
+        #expect(none.pages.isEmpty && none.shown == 0 && none.hiddenLater == 9)
+    }
+
+    @Test func restrictingDropsGeneratedNarrativesAndLeavesUnknownSourceTimesOut() throws {
+        let line = try KnowledgeFixtureTimeline.load("pt-provisioning-timeline")
+        let project = try #require(line.entities["e1"]), first = try #require(line.assertions["a1"])
+        // a1's meeting date is unknown; every other claim keeps its own.
+        var facts: [KnowledgeWikiSnapshot.Fact] = []
+        for fact in line.snapshot.facts {
+            guard fact.id == first else {
+                facts.append(fact)
+                continue
+            }
+            let source = KnowledgeWikiSnapshot.Source(meetingID: fact.source.meetingID, recordedAt: fact.source.recordedAt,
+                                                      evidence: fact.source.evidence)
+            facts.append(KnowledgeWikiSnapshot.Fact(
+                id: fact.id, subjectID: fact.subjectID, predicate: fact.predicate, objectID: fact.objectID, value: fact.value,
+                qualifiers: fact.qualifiers, source: source))
+        }
+        let snapshot = KnowledgeWikiSnapshot(revision: 1, entities: line.snapshot.entities, facts: facts)
+        let narrative = KnowledgeWikiNarrative(entityID: project, paragraphs: [
+            .init(text: "The environment provisioning project.", assertionIDs: [first])])
+        let pages = try KnowledgeWikiProjector.project(snapshot, narratives: [narrative])
+        #expect(pages.first { $0.entity.id == project }?.narrative != nil)
+        let restriction = KnowledgeObservedTime.restricting(pages, saidBefore: .distantFuture)
+        #expect(restriction.hiddenUnplaced == 1 && restriction.hiddenLater == 0 && restriction.shown == 8)
+        #expect(restriction.pages.allSatisfy { $0.narrative == nil })
+        #expect(!restriction.pages.flatMap { $0.sections.flatMap(\.entries) }.contains { $0.fact.id == first })
+    }
+
     @Test func aSnapshotStoredBeforeSourceTimeExistedStillDecodes() throws {
         let source = KnowledgeWikiSnapshot.Source(meetingID: UUID(), recordedAt: Date(timeIntervalSince1970: 10), evidence: [])
         #expect(source.observedAt == nil)

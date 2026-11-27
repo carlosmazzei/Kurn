@@ -80,6 +80,98 @@ struct ChatKnowledgeToolsTests {
         return try await #require(tools.first { $0.spec.name == name }).execute(.object(arguments))
     }
 
+    /// K7.1: `as_of` reads only what had been said in meetings held by the end of that UTC day. The blocker was said on
+    /// 2026-08-17; the other claim has no known meeting date.
+    @Test func asOfReadsOnlyWhatHadBeenSaidByThatDayAndCountsWhatItLeavesOut() async throws {
+        let project = JSONValue.string(Self.project.uuidString)
+        let before = try await run("get_entity", ["entityID": project, "as_of": .string("2026-08-16")])
+        #expect(!before.isError)
+        #expect(before.content.contains("as of 2026-08-16 (by meeting date): 0 claims shown; left out: 1 said later, "
+            + "1 with no known meeting date; generated narratives omitted"))
+        #expect(!before.content.contains("Platform team blocks Example portal"))
+        // The page itself is still there: nothing had been said, which is not the same as an unknown entity.
+        #expect(before.content.contains("entity \(Self.project.uuidString)"))
+        let sameDay = try await run("get_entity", ["entityID": project, "as_of": .string("2026-08-17")])
+        #expect(sameDay.content.contains("1 claims shown; left out: 0 said later, 1 with no known meeting date"))
+        #expect(sameDay.content.contains("Platform team blocks Example portal"))
+        #expect(!sameDay.content.contains("NOT Example portal hasStatus open"))
+        // Without as_of nothing is restricted and nothing is announced.
+        let all = try await run("get_entity", ["entityID": project])
+        #expect(all.content.contains("NOT Example portal hasStatus open") && !all.content.contains("as of "))
+    }
+
+    /// An entity page reports what it lost itself, not what the other selected entities lost.
+    @Test func asOfCountsOnlyTheRequestedEntitysClaims() async throws {
+        let first = UUID(), second = UUID(), firstFact = UUID(), secondFact = UUID()
+        func fact(_ id: UUID, subject: UUID, said: Date) -> KnowledgeWikiSnapshot.Fact {
+            .init(id: id, subjectID: subject, predicate: .hasStatus, value: .enumeration("open"),
+                  qualifiers: .init(modality: .reported, polarity: .positive, claimKind: .internalStatusReport,
+                                    authority: .attributed, confidence: .medium, review: .machineExtracted),
+                  source: .init(meetingID: Self.meeting, recordedAt: Date(timeIntervalSince1970: 1_790_000_000), observedAt: said,
+                                evidence: [.init(id: UUID(), recordingID: Self.recording, segmentIDs: ["s1"], quote: "q",
+                                                 startMs: 1_000, endMs: 2_000, attributedSpeaker: "Speaker 1")]))
+        }
+        // The first entity's only claim was said on 2026-08-17; the second entity's was said in May, so a count over
+        // every page would report one claim shown for the first.
+        let wiki = KnowledgeWikiSnapshot(
+            revision: 3,
+            entities: [.init(id: first, kind: .project, name: "Example alpha"), .init(id: second, kind: .project, name: "Example beta")],
+            facts: [fact(firstFact, subject: first, said: Date(timeIntervalSince1970: 1_787_000_000)),
+                    fact(secondFact, subject: second, said: Date(timeIntervalSince1970: 1_780_000_000))])
+        let read = try KnowledgeBrowserRead(meetingIDs: [Self.meeting], wiki: wiki, meetingTitles: [Self.meeting: "Weekly review"],
+                                            selectedEvidence: nil, policyRevisionKey: "p1",
+                                            meetingContexts: [Self.meeting: .init(id: UUID(), kind: .vendorDiscussion, name: "Sync",
+                                                                                  classification: .internal)])
+        let source = ChatKnowledgeSource(read: { _, _ in read }, authorization: Self.source().authorization, remoteConsent: { _ in true })
+        let output = try await run("get_entity", ["entityID": .string(first.uuidString), "as_of": .string("2026-08-16")], source: source)
+        #expect(!output.isError)
+        #expect(output.content.contains("0 claims shown; left out: 1 said later, 0 with no known meeting date"))
+        #expect(!output.content.contains("1 claims shown"))
+        // Search spans every selected page, so it reports the whole selection: one shown (beta), one said later (alpha).
+        let search = try await run("search_knowledge", ["query": .string("Example"), "as_of": .string("2026-08-16")], source: source)
+        #expect(search.content.contains("1 claims shown; left out: 1 said later, 0 with no known meeting date"))
+    }
+
+    @Test func asOfSaysItLimitsClaimsNotTheNamesUsedToFindThem() throws {
+        let tools = ChatKnowledgeTools.make(source: Self.source(), meetings: [Self.meeting], provider: .openAI)
+        let schema = try #require(tools.first { $0.spec.name == "get_entity" }).spec.inputSchema
+        guard case .object(let root) = schema, case .object(let properties)? = root["properties"],
+              case .object(let asOf)? = properties["as_of"], case .string(let text)? = asOf["description"] else {
+            Issue.record("get_entity declares no as_of description")
+            return
+        }
+        #expect(text.contains("are today's"))
+        #expect(text.contains("not the names"))
+    }
+
+    @Test func asOfRestrictsSearchWithoutLeakingALaterClaimThroughAPageHit() async throws {
+        let early = try await run("search_knowledge", ["query": .string("portal"), "as_of": .string("2026-08-16")])
+        #expect(!early.isError)
+        #expect(early.content.contains("as of 2026-08-16 (by meeting date)"))
+        #expect(!early.content.contains("assertion \(Self.blocker.uuidString)"))
+        // Page and alias hits are built from the claims they summarize, so none survives when no claim does.
+        #expect(!early.content.contains("entity \(Self.project.uuidString)"))
+        let late = try await run("search_knowledge", ["query": .string("portal"), "as_of": .string("2026-08-17")])
+        #expect(late.content.contains("assertion \(Self.blocker.uuidString)"))
+        #expect(!late.content.contains("assertion \(Self.status.uuidString)"))
+    }
+
+    @Test func asOfMustBeACalendarDayAndIsOnlyOfferedToTheToolsThatHonourIt() async throws {
+        let project = JSONValue.string(Self.project.uuidString)
+        for bad in ["tomorrow", "2026-13-40", "2026-08", "2026-08-17T10:00:00Z"] {
+            #expect(try await run("get_entity", ["entityID": project, "as_of": .string(bad)]).isError, "\(bad)")
+        }
+        #expect(try await run("get_entity", ["entityID": project, "as_of": .number(1)]).isError)
+        // Tools that do not read it refuse it rather than ignoring it.
+        #expect(try await run("get_timeline", ["as_of": .string("2026-08-17")]).isError)
+        let tools = ChatKnowledgeTools.make(source: Self.source(), meetings: [Self.meeting], provider: .openAI)
+        for name in ["search_knowledge", "get_entity"] {
+            let spec = try #require(tools.first { $0.spec.name == name }).spec
+            #expect(String(describing: spec.inputSchema).contains("as_of"), "\(name)")
+        }
+        #expect(!String(describing: try #require(tools.first { $0.spec.name == "get_timeline" }).spec.inputSchema).contains("as_of"))
+    }
+
     @Test func theGateOffersKnowledgeOnlyWhenPolicyAndConsentAllowIt() {
         let ids: Set<UUID> = [Self.meeting]
         #expect(ChatKnowledgeGate.meetings(ids, source: Self.source(), provider: .openAI) == ids)

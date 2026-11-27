@@ -3665,7 +3665,16 @@ time left out) so a meeting imported long after it happened is known late but sa
 A projection published before this change no longer equals a fresh snapshot, so the generated narratives it cached are
 not shown until "Rebuild pages" regenerates them (which needs a provider; without one the page publishes without
 narratives). The claims themselves are unaffected: the reader builds them from the canonical rows.
-Not yet: an `as_of` argument on `search_knowledge`/`get_entity`, and comparison "as known after meeting X".
+`search_knowledge` and `get_entity` take an optional `as_of` (`yyyy-MM-dd`, UTC): `KnowledgeObservedTime.restricting`
+keeps only the claims whose meeting was held before the midnight that ends that UTC day (an exclusive bound, since a
+recording keeps fractions of a second), drops every generated narrative (it summarizes
+all meetings) and counts what it left out (`said later`, `no known meeting date`), and the tool says so in its header.
+It restricts the pages before the search index is built, so a page or alias hit cannot carry a later claim; an entity
+with nothing said by then still answers (an empty page), never "unknown", and counts only its own page's claims;
+`search_knowledge` counts the whole selection. Names, aliases and merged identities are today's: the day limits the
+claims, not the names used to find them. It is source time only: it does not read
+the stated validity or what the store had compiled by then (`compare_state`'s `asKnownThen` does). Not yet:
+comparison "as known after meeting X" in the app (a meeting picker).
 
 ### Knowledge late arrivals (K3.5)
 
