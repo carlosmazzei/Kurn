@@ -23,11 +23,14 @@ struct KnowledgeInferenceSameAsTests {
         #expect(pair?.exactName == true && pair?.modality == .inferred && pair?.requiresHumanReview == true)
     }
 
-    @Test func anAliasOrTwoSharedWordsIsEnoughButOneGenericWordIsNot() throws {
+    @Test func anAliasOrManySharedWordsIsEnoughButOneGenericWordIsNot() throws {
         let alias = try Self.derive([Self.entity(1, "Portal", aliases: ["Client Portal"]), Self.entity(2, "Client Portal")])
         #expect(alias.candidates.first?.aliasMatch == true)
-        let words = try Self.derive([Self.entity(1, "Client Portal Redesign"), Self.entity(2, "Client Portal Launch")])
+        // Words alone need a similarity of at least 0.6 under the experimental profile (0.25 weight, 0.15 floor).
+        let words = try Self.derive([Self.entity(1, "Client Portal Redesign Plan"), Self.entity(2, "Client Portal Redesign Plan v2")])
         #expect(words.candidates.count == 1)
+        let fewWords = try Self.derive([Self.entity(1, "Client Portal Redesign"), Self.entity(2, "Client Portal Launch")])
+        #expect(fewWords.candidates.isEmpty)
         let generic = try Self.derive([Self.entity(1, "Budget Review"), Self.entity(2, "Hiring Review")])
         #expect(generic.candidates.isEmpty)
     }

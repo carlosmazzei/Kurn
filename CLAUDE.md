@@ -3706,7 +3706,7 @@ checksummed projection like the wiki pages and shows it dotted and off by defaul
 - **`same_as` candidates** (`deriveSameAsCandidates(from:profile:)`, over the page entities): identities of one
   kind whose names or aliases look alike, scored by the K1.7 review-only resolver (so the score is the
   experimental one, not a calibrated probability). A candidate is an undirected pair (lower ID first),
-  `.inferred`, listing its features (exact name, alias, token similarity) and always `requiresHumanReview`,
+  `.inferred`, listing its features (exact name, alias, token similarity; words alone need a similarity of at least 0.6 under the experimental profile) and always `requiresHumanReview`,
   people included; nothing is merged or stored. Merged identities (redirects) and duplicate IDs are skipped,
   different kinds never match, at most 2,048 identities are compared and the list is capped at 400 pairs, best
   score first, with `isTruncated` set. A profile decoded with bad values throws rather than bypass validation.
