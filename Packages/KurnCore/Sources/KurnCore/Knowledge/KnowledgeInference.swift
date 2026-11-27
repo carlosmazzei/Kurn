@@ -49,8 +49,10 @@ public enum KnowledgeInference {
         public let cyclic: [Rule: [UUID]]
     }
 
-    /// Derives edges from `edges`' established, positive, stated claims. A pair
-    /// already joined by a stated claim of the same predicate gets none.
+    /// Derives edges from `edges`' established, positive, stated claims. A pair some input claim
+    /// already speaks to for the rule (stated, negated, tentative or itself inferred) gets none: any
+    /// input claim about the pair suppresses a derived edge, but only established stated claims are
+    /// ever premises.
     public static func derive(from edges: [KnowledgeGraph.Edge], hops: Int = maximumHops) -> Result {
         let limit = min(max(hops, 2), maximumHops)
         var derived: [DerivedEdge] = []
