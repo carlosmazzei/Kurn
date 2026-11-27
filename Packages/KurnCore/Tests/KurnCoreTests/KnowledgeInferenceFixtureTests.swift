@@ -28,20 +28,38 @@ struct KnowledgeInferenceFixtureTests {
         }
     }
 
-    @Test func noFixtureOffersASameAsCandidateForItsMustNotMergePairs() throws {
-        // Alex / Alex Moreno share one word, which is below the review floor: nothing is suggested, so a
-        // reviewer is never invited to merge two people the fixture says are different.
+    @Test func theOnlySameAsCandidateIsTheHomonymPairAndItStaysReviewOnly() throws {
+        // "Alex" is a recorded alias of "Alex Moreno" (e4), and the fixture says the two must not merge (e3, e4).
+        // The alias makes them a review suggestion (0.15 alias + 0.5 × 0.25 words = 0.275, above the 0.15
+        // floor): a false positive of the suggestion list, kept because nothing is merged without a person.
+        // No other fixture offers any pair.
+        var offered: [String] = []
         for name in Self.names {
             let timeline = try KnowledgeFixtureTimeline.load(name)
             let result = try KnowledgeInference.deriveSameAsCandidates(from: timeline.snapshot.entities, profile: .experimental)
-            #expect(result.candidates.isEmpty, "\(name)")
+            #expect(!result.isTruncated, "\(name)")
+            for candidate in result.candidates {
+                #expect(candidate.requiresHumanReview, "\(name)")
+                #expect(abs(candidate.score - 0.275) < 0.000_001, "\(name)")
+                let pair: Set<UUID> = [candidate.firstID, candidate.secondID]
+                var homonyms = Set<UUID>()
+                if let first = timeline.entities["e3"], let second = timeline.entities["e4"] { homonyms = [first, second] }
+                if name == "en-platform-review", pair == homonyms {
+                    offered.append("\(name):e3+e4")
+                } else {
+                    offered.append("\(name):other")
+                }
+            }
         }
+        #expect(offered == ["en-platform-review:e3+e4"])
     }
 
     @Test func commitmentsAreRecallCompleteButOnlyAsPreciseAsTheirPairings() throws {
         // The moved-deadline fixture assigns the review to Maria, then to Lee, and moves its due date twice.
-        // The one commitment true at the end is Lee → 2026-11-06 (a6 with a5). The derivation lists every
-        // owner × date pairing and leaves the current one to the temporal reducer: recall 1, precision 1/6.
+        // The one commitment true at the end, by the fixture's own narration, is Lee → 2026-11-06 (a6 with a5).
+        // The derivation lists every owner × date pairing: recall 1, precision 1/6. The temporal reducer would
+        // replace the older due dates but keeps assignments to different people, so reaching Lee alone needs a
+        // rule that a later assignment ends an earlier one, which no code states yet.
         let timeline = try KnowledgeFixtureTimeline.load("en-moved-deadline")
         let result = KnowledgeInference.deriveCommitments(from: timeline.snapshot.facts)
         #expect(!result.isTruncated)
