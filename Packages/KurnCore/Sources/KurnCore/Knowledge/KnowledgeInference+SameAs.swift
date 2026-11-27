@@ -29,12 +29,15 @@ extension KnowledgeInference {
 
     public struct SameAsResult: Equatable, Sendable {
         public let candidates: [SameAsCandidate]
-        /// More identities than `maximumEntities`, or more pairs than `maximumEdges`, were cut.
+        /// More identities than `maximumEntities`, or more eligible pairs than `maximumEdges`, were cut.
         public let isTruncated: Bool
     }
 
     /// The most identities compared (the wiki projection's own bound); the comparison is pairwise.
     public static let maximumEntities = 2_048
+    /// Eligible pairs kept before choosing the best `maximumEdges`; past it the scan stops and the result
+    /// is marked truncated (the best pairs among those seen are returned).
+    public static let maximumPairsConsidered = maximumEdges * 64
 
     /// Candidate pairs among `entities`, best score first. A merged identity (a redirect to
     /// another) is skipped: its target stands for it. Pairs of different kinds never match.
@@ -43,7 +46,12 @@ extension KnowledgeInference {
         profile: KnowledgeEntityResolutionProfile
     ) throws -> SameAsResult {
         try profile.validate()
-        let live = entities.filter { $0.targetID == nil }.sorted { $0.id.uuidString < $1.id.uuidString }
+        // A repeated ID with different data keeps the entry that sorts first by name and aliases, so the
+        // input order never decides which one is compared.
+        let live = entities.filter { $0.targetID == nil }.sorted { lhs, rhs in
+            [lhs.id.uuidString, lhs.name, lhs.aliases.joined(separator: "\u{1}")]
+                .lexicographicallyPrecedes([rhs.id.uuidString, rhs.name, rhs.aliases.joined(separator: "\u{1}")])
+        }
         var unique: [KnowledgeWikiSnapshot.Entity] = []
         var seen = Set<UUID>()
         for entity in live where seen.insert(entity.id).inserted { unique.append(entity) }
@@ -53,8 +61,9 @@ extension KnowledgeInference {
             KnowledgeEntityResolutionValue(id: $0.id, kind: $0.kind, name: $0.name, aliases: $0.aliases)
         }
         var pairs: [String: SameAsCandidate] = [:]
-        for query in values {
-            for match in try KnowledgeEntityResolver.rank(query, candidates: values, profile: profile) {
+        scan: for query in values {
+            for match in try KnowledgeEntityResolver.eligibleMatches(query, candidates: values, profile: profile) {
+                if pairs.count >= maximumPairsConsidered { truncated = true; break scan }
                 let ordered = [query.id, match.entityID].sorted { $0.uuidString < $1.uuidString }
                 let key = ordered[0].uuidString + ordered[1].uuidString
                 if pairs[key] == nil {

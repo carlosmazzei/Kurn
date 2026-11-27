@@ -3709,7 +3709,9 @@ checksummed projection like the wiki pages and shows it dotted and off by defaul
   `.inferred`, listing its features (exact name, alias, token similarity; words alone need a similarity of at least 0.6 under the experimental profile) and always `requiresHumanReview`,
   people included; nothing is merged or stored. Merged identities (redirects) and duplicate IDs are skipped,
   different kinds never match, at most 2,048 identities are compared and the list is capped at 400 pairs, best
-  score first, with `isTruncated` set. A profile decoded with bad values throws rather than bypass validation.
+  score first, with `isTruncated` set. The scan takes every eligible pair (`eligibleMatches`), not each identity's
+  five-name review list, so it knows when it cut; past 25,600 pairs seen it stops and says so. A repeated ID with
+  different data keeps the entry that sorts first by name and aliases, never the first in input order. A profile decoded with bad values throws rather than bypass validation.
 - Not yet: the Graph Explorer showing commitments and `same_as` candidates, premise-retraction
   invalidation (it follows from recomputing over the current read), the stored
   projection, the Graph Explorer and `get_graph` showing them, and precision measured

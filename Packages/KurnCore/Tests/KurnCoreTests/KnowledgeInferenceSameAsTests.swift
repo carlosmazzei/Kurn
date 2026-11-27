@@ -81,4 +81,22 @@ struct KnowledgeInferenceSameAsTests {
             try KnowledgeInference.deriveSameAsCandidates(from: [], profile: bad)
         }
     }
+
+    @Test func pairsTheReviewListCutsAreStillCountedAsTruncation() throws {
+        // 15 groups of 8 identities with one name each: 15 × 28 = 420 eligible pairs, while a review list
+        // keeps only five per identity. The derivation sees all 420, returns the best 400 and says it cut.
+        var entities: [KnowledgeWikiSnapshot.Entity] = []
+        for group in 0..<15 {
+            for member in 0..<8 { entities.append(Self.entity(group * 10 + member + 1, "Team\(group) Roadmap Plan")) }
+        }
+        let result = try Self.derive(entities)
+        #expect(result.isTruncated)
+        #expect(result.candidates.count == KnowledgeInference.maximumEdges)
+    }
+
+    @Test func aRepeatedIdentityWithDifferentDataIsChosenByTheDataNotTheOrder() throws {
+        let first = [Self.entity(1, "Alpha Beta"), Self.entity(1, "Client Portal"), Self.entity(2, "Client Portal")]
+        let second = [Self.entity(2, "Client Portal"), Self.entity(1, "Client Portal"), Self.entity(1, "Alpha Beta")]
+        #expect(try Self.derive(first) == Self.derive(second))
+    }
 }
