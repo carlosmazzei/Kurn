@@ -55,24 +55,20 @@ public enum KnowledgeInference {
         let limit = min(max(hops, 2), maximumHops)
         var derived: [DerivedEdge] = []
         var cyclic: [Rule: [UUID]] = [:]
-        for rule in Rule.allCases {
-            let steps = links(for: rule, in: edges)
-            let stated = Set(steps.map { Pair(source: $0.from, target: $0.to) })
-            let found = chains(steps, limit: limit)
+        var truncated = false
+        // Rules in the order the output is sorted, so stopping at the bound keeps the first edges of that order.
+        for rule in Rule.allCases.sorted(by: { $0.rawValue < $1.rawValue }) {
+            let suppressed = statedPairs(for: rule, in: edges)
+            let found = chains(links(for: rule, in: edges), limit: limit, suppressed: suppressed,
+                               room: maximumEdges - derived.count)
             cyclic[rule] = found.cyclic.sorted { $0.uuidString < $1.uuidString }
-            for item in found.paths where !stated.contains(Pair(source: item.from, target: item.to)) {
+            for item in found.paths {
                 derived.append(DerivedEdge(rule: rule, sourceID: item.from, targetID: item.to,
                                            premiseFactIDs: item.premises))
             }
+            if found.isTruncated { truncated = true; break }
         }
-        derived.sort { lhs, rhs in
-            let left = [lhs.rule.rawValue, lhs.sourceID.uuidString, lhs.targetID.uuidString]
-            let right = [rhs.rule.rawValue, rhs.sourceID.uuidString, rhs.targetID.uuidString]
-            return left.lexicographicallyPrecedes(right)
-        }
-        let truncated = derived.count > maximumEdges
-        return Result(edges: Array(derived.prefix(maximumEdges)), isTruncated: truncated,
-                      cyclic: cyclic.filter { !$0.value.isEmpty })
+        return Result(edges: derived, isTruncated: truncated, cyclic: cyclic.filter { !$0.value.isEmpty })
     }
 
     // MARK: - Steps
@@ -80,6 +76,23 @@ public enum KnowledgeInference {
     private struct Pair: Hashable { let source: UUID; let target: UUID }
     private struct Step { let from: UUID; let to: UUID; let factID: UUID }
     private struct Path { let from: UUID; let to: UUID; let premises: [UUID] }
+
+    /// Every pair some input claim already speaks to for the rule, whatever its polarity or modality: a
+    /// negated or tentative claim is no premise, but it still keeps a derived edge from contradicting it.
+    private static func statedPairs(for rule: Rule, in edges: [KnowledgeGraph.Edge]) -> Set<Pair> {
+        var pairs = Set<Pair>()
+        for edge in edges where edge.sourceID != edge.targetID {
+            switch (rule, edge.predicate) {
+            case (.transitiveBlocks, .blocks), (.supersessionChain, .supersedes):
+                pairs.insert(Pair(source: edge.sourceID, target: edge.targetID))
+            case (.transitiveBlocks, .dependsOn):
+                pairs.insert(Pair(source: edge.targetID, target: edge.sourceID))
+            default:
+                break
+            }
+        }
+        return pairs
+    }
 
     /// One directed step per established, positive, stated claim of the rule.
     private static func links(for rule: Rule, in edges: [KnowledgeGraph.Edge]) -> [Step] {
@@ -96,14 +109,15 @@ public enum KnowledgeInference {
             }
         }
         return steps.sorted { lhs, rhs in
-            [lhs.from.uuidString, lhs.to.uuidString, lhs.factID.uuidString]
-                .lexicographicallyPrecedes([rhs.from.uuidString, rhs.to.uuidString, rhs.factID.uuidString])
+            [lhs.from.uuidString, lhs.factID.uuidString, lhs.to.uuidString]
+                .lexicographicallyPrecedes([rhs.from.uuidString, rhs.factID.uuidString, rhs.to.uuidString])
         }
     }
 
     /// Shortest chain of two or more steps from every identity, ties broken by
     /// step order; identities on a cycle neither start nor pass a chain.
-    private static func chains(_ steps: [Step], limit: Int) -> (paths: [Path], cyclic: Set<UUID>) {
+    private static func chains(_ steps: [Step], limit: Int, suppressed: Set<Pair>,
+                               room: Int) -> (paths: [Path], cyclic: Set<UUID>, isTruncated: Bool) {
         var next: [UUID: [Step]] = [:]
         for step in steps { next[step.from, default: []].append(step) }
         let cyclic = cycleMembers(next)
@@ -123,11 +137,13 @@ public enum KnowledgeInference {
                 }
                 frontier = following
             }
-            for (target, trail) in best.sorted(by: { $0.key.uuidString < $1.key.uuidString }) where trail.count >= 2 {
+            for (target, trail) in best.sorted(by: { $0.key.uuidString < $1.key.uuidString })
+            where trail.count >= 2 && !suppressed.contains(Pair(source: start, target: target)) {
+                if paths.count >= room { return (paths, cyclic, true) }
                 paths.append(Path(from: start, to: target, premises: trail.map(\.factID)))
             }
         }
-        return (paths, cyclic)
+        return (paths, cyclic, false)
     }
 
     /// Identities that can reach themselves.

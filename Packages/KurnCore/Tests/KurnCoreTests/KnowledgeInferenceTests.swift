@@ -77,7 +77,7 @@ struct KnowledgeInferenceTests {
     }
 
     @Test func aDenseGraphIsMarkedTruncatedNotSilentlyCut() {
-        // 900 two-step pairs, more than the output bound.
+        // 27,000 two-step pairs, far more than the output bound; the walk stops at the bound.
         var edges: [KnowledgeGraph.Edge] = []
         var fact = 1
         for a in 0..<30 {
@@ -89,5 +89,26 @@ struct KnowledgeInferenceTests {
         let result = KnowledgeInference.derive(from: edges)
         #expect(result.isTruncated)
         #expect(result.edges.count == KnowledgeInference.maximumEdges)
+    }
+
+    @Test func aDirectDenialOrProposalKeepsTheChainFromContradictingIt() {
+        let chain = [Self.edge(101, 1, .blocks, 2), Self.edge(102, 2, .blocks, 3)]
+        let direct: [KnowledgeGraph.Edge] = [
+            Self.edge(103, 1, .blocks, 3, polarity: .negative),
+            Self.edge(103, 1, .blocks, 3, modality: .proposed),
+            // `3 dependsOn 1` is `1 blocks 3` read the other way.
+            Self.edge(103, 3, .dependsOn, 1, polarity: .negative)
+        ]
+        for edge in direct { #expect(KnowledgeInference.derive(from: chain + [edge]).edges.isEmpty) }
+    }
+
+    @Test func equalChainsTakeThePremisesWithTheLowerClaimIDs() {
+        // 1→2→4 uses claims 200 and 201, 1→3→4 uses 100 and 101; entity 2 sorts before 3.
+        let result = KnowledgeInference.derive(from: [
+            Self.edge(200, 1, .blocks, 2), Self.edge(201, 2, .blocks, 4),
+            Self.edge(100, 1, .blocks, 3), Self.edge(101, 3, .blocks, 4)
+        ])
+        let derived = result.edges.first { $0.sourceID == Self.id(1) && $0.targetID == Self.id(4) }
+        #expect(derived?.premiseFactIDs == [Self.id(100), Self.id(101)])
     }
 }

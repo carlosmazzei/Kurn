@@ -3688,10 +3688,13 @@ checksummed projection like the wiki pages and shows it dotted and off by defaul
   `premiseFactIDs` in chain order (at least two); it is never evidence.
 - **Only strong premises.** Positive, non-tentative, non-inferred claims between two
   different identities. A negated, proposed, hypothetical, disputed or already inferred
-  claim derives nothing, and a pair already joined by a stated claim of the same
-  predicate gets no derived edge.
+  claim derives nothing. A pair some input claim already speaks to for the rule
+  (stated, negated or tentative, either direction of `dependsOn`) gets no derived
+  edge, so a chain never contradicts a denial.
 - **Bounded and honest.** Chains run at most 4 steps (the shortest chain wins, ties by
-  claim ID order) and the list is capped at 400 edges with `isTruncated` set. An
+  the claim IDs of the premises in order) and the list is capped at 400 edges, in the
+  output order, with `isTruncated` set; the walk stops at the bound rather than
+  materializing every candidate. An
   identity on a cycle of a rule's premises starts and passes no chain and is reported
   in `cyclic`, never ordered through. Output is identical for any input order.
 - Not yet: owner → action → due and `same_as` candidates, premise-retraction
