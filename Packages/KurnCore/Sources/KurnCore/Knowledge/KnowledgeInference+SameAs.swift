@@ -46,12 +46,12 @@ extension KnowledgeInference {
         profile: KnowledgeEntityResolutionProfile
     ) throws -> SameAsResult {
         try profile.validate()
-        // A repeated ID with different data keeps the entry that sorts first by name and aliases, so the
-        // input order never decides which one is compared.
-        let live = entities.filter { $0.targetID == nil }.sorted { lhs, rhs in
-            [lhs.id.uuidString, lhs.name, lhs.aliases.joined(separator: "\u{1}")]
-                .lexicographicallyPrecedes([rhs.id.uuidString, rhs.name, rhs.aliases.joined(separator: "\u{1}")])
+        // A repeated ID with different data keeps the entry that sorts first by kind, name and aliases, so
+        // the input order never decides which one is compared.
+        func key(_ entity: KnowledgeWikiSnapshot.Entity) -> [String] {
+            [entity.id.uuidString, entity.kind.rawValue, entity.name, entity.aliases.joined(separator: "\u{1}")]
         }
+        let live = entities.filter { $0.targetID == nil }.sorted { key($0).lexicographicallyPrecedes(key($1)) }
         var unique: [KnowledgeWikiSnapshot.Entity] = []
         var seen = Set<UUID>()
         for entity in live where seen.insert(entity.id).inserted { unique.append(entity) }

@@ -99,4 +99,29 @@ struct KnowledgeInferenceSameAsTests {
         let second = [Self.entity(2, "Client Portal"), Self.entity(1, "Client Portal"), Self.entity(1, "Alpha Beta")]
         #expect(try Self.derive(first) == Self.derive(second))
     }
+
+    @Test func aRepeatedIdentityWithAnotherKindIsChosenByTheKindNotTheOrder() throws {
+        let first = [Self.entity(1, "Alpha Beta", kind: .project), Self.entity(1, "Alpha Beta", kind: .person),
+                     Self.entity(2, "Alpha Beta", kind: .project)]
+        let second = [first[2], first[1], first[0]]
+        let result = try Self.derive(first)
+        #expect(result == (try Self.derive(second)))
+        // "person" sorts before "project", so identity 1 is the person and no same-kind pair remains.
+        #expect(result.candidates.isEmpty)
+    }
+
+    @Test func theScanStopsAtTheLimitAndSaysSoWithoutLosingTheBestOfWhatItSaw() throws {
+        // 60 groups of 30 identities, each sharing one name: 60 × 435 = 26,100 eligible pairs, past the
+        // 25,600 the scan will look at. Every pair scores the same, so the best 400 are the lowest IDs.
+        var entities: [KnowledgeWikiSnapshot.Entity] = []
+        for group in 0..<60 {
+            for member in 0..<30 { entities.append(Self.entity(group * 100 + member + 1, "Team\(group) Roadmap Plan")) }
+        }
+        let result = try Self.derive(entities)
+        #expect(result.isTruncated)
+        #expect(result.candidates.count == KnowledgeInference.maximumEdges)
+        let ids = result.candidates.map { $0.firstID.uuidString }
+        #expect(ids == ids.sorted())
+        #expect(try Self.derive(Array(entities.reversed())) == result)
+    }
 }
