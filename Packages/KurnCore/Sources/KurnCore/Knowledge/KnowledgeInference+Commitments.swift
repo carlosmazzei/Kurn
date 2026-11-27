@@ -32,11 +32,14 @@ extension KnowledgeInference {
     /// An owner is the object of `assignedTo` (action → person) or the subject of `owns`
     /// (person → action). Several owners or several due dates give every pairing: choosing
     /// the current one is the temporal reducer's job, never this one's. Only positive,
-    /// non-tentative, non-inferred claims are premises.
+    /// non-tentative, non-inferred claims are premises. A page repeats a relation on both
+    /// entities' pages, so a claim seen twice counts once (by its ID); identities must already
+    /// be resolved by the caller, as `KnowledgeStateComparison.claims(from:)` does.
     public static func deriveCommitments(from facts: [KnowledgeWikiSnapshot.Fact]) -> CommitmentResult {
         var owners: [UUID: [(owner: UUID, fact: UUID)]] = [:]
         var dues: [UUID: [(due: KnowledgeTemporalValue, fact: UUID)]] = [:]
-        for fact in facts where isPremise(fact) {
+        var seen = Set<UUID>()
+        for fact in facts where isPremise(fact) && seen.insert(fact.id).inserted {
             switch fact.predicate {
             case .assignedTo:
                 if let owner = fact.objectID, owner != fact.subjectID {

@@ -78,4 +78,20 @@ struct KnowledgeInferenceCommitmentsTests {
         #expect(result.isTruncated)
         #expect(result.commitments.count == KnowledgeInference.maximumEdges)
     }
+
+    @Test func aClaimRepeatedOnTwoPagesCountsOnce() {
+        let owner = Self.fact(101, 1, .assignedTo, object: 2)
+        let due = Self.fact(102, 1, .dueOn, due: "2026-12-01")
+        let result = KnowledgeInference.deriveCommitments(from: [owner, due, owner, due])
+        #expect(result.commitments.count == 1)
+    }
+
+    @Test func selfOwnershipAndNonDateDueValuesDeriveNothing() {
+        let selfOwned = [Self.fact(101, 1, .assignedTo, object: 1), Self.fact(103, 1, .owns, object: 1),
+                         Self.fact(102, 1, .dueOn, due: "2026-12-01")]
+        #expect(KnowledgeInference.deriveCommitments(from: selfOwned).commitments.isEmpty)
+        // A due claim without a date value is not a date.
+        let noDate = [Self.fact(101, 1, .assignedTo, object: 2), Self.fact(102, 1, .dueOn)]
+        #expect(KnowledgeInference.deriveCommitments(from: noDate).commitments.isEmpty)
+    }
 }
