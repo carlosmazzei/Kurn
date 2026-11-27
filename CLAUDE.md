@@ -3703,7 +3703,14 @@ checksummed projection like the wiki pages and shows it dotted and off by defaul
   `DerivedCommitment` listing both premises (ownership first). Several owners or several dates give
   every pairing: which date is current is the temporal reducer's decision, never this one's. Same
   premise filter and the same 400 bound as the edges.
-- Not yet: `same_as` candidates, the Graph Explorer showing commitments, premise-retraction
+- **`same_as` candidates** (`deriveSameAsCandidates(from:profile:)`, over the page entities): identities of one
+  kind whose names or aliases look alike, scored by the K1.7 review-only resolver (so the score is the
+  experimental one, not a calibrated probability). A candidate is an undirected pair (lower ID first),
+  `.inferred`, listing its features (exact name, alias, token similarity) and always `requiresHumanReview`,
+  people included; nothing is merged or stored. Merged identities (redirects) and duplicate IDs are skipped,
+  different kinds never match, at most 2,048 identities are compared and the list is capped at 400 pairs, best
+  score first, with `isTruncated` set. A profile decoded with bad values throws rather than bypass validation.
+- Not yet: the Graph Explorer showing commitments and `same_as` candidates, premise-retraction
   invalidation (it follows from recomputing over the current read), the stored
   projection, the Graph Explorer and `get_graph` showing them, and precision measured
   on fixtures.
