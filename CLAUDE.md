@@ -3712,10 +3712,16 @@ checksummed projection like the wiki pages and shows it dotted and off by defaul
   score first, with `isTruncated` set. The scan takes every eligible pair (`eligibleMatches`), not each identity's
   five-name review list, so it knows when it cut; past 25,600 pairs seen it stops and says so. A repeated ID with
   different data keeps the entry that sorts first by name and aliases, never the first in input order. A profile decoded with bad values throws rather than bypass validation.
+- **Measured on the golden fixtures** (`KnowledgeInferenceFixtureTests`, recorded, not tuned): no fixture
+  chains two blocks/supersedes claims, so no edge is derived from them (and no cycle reported); no
+  `same_as` candidate is offered for any fixture (Alex / Alex Moreno share one word, below the floor, so the
+  `mustNotMerge` pair is never suggested); commitments have recall 1 but precision 1/6 on
+  `en-moved-deadline` (six owner × date pairings, one of them true at the end: Lee → 2026-11-06) and none
+  elsewhere. The 1/6 is the reason pairings are not shown as current commitments: narrowing them by the
+  temporal reducer is the next step. Multi-hop precision has no real-meeting evidence yet.
 - Not yet: the Graph Explorer showing commitments and `same_as` candidates, premise-retraction
   invalidation (it follows from recomputing over the current read), the stored
-  projection, the Graph Explorer and `get_graph` showing them, and precision measured
-  on fixtures.
+  projection, the Graph Explorer and `get_graph` showing them, and a current-commitment filter.
 
 ### Knowledge late arrivals (K3.5)
 
