@@ -3676,6 +3676,32 @@ claims, not the names used to find them. It is source time only: it does not rea
 the stated validity or what the store had compiled by then (`compare_state`'s `asKnownThen` does). Not yet:
 comparison "as known after meeting X" in the app (a meeting picker).
 
+### Knowledge derived edges (K7.4)
+
+KurnCore's `KnowledgeInference.derive(from:hops:)` derives relations the graph never
+stated, from the graph's own edges and nothing else. Pure, deterministic and not yet
+wired to a store, reader or tool: the next step stores the result as a versioned,
+checksummed projection like the wiki pages and shows it dotted and off by default.
+
+- **Two rules.** `transitive_blocks` (`a blocks b`, or `b dependsOn a`, chained) and
+  `supersession_chain`. A derived edge is `.inferred`, names its predicate and lists
+  `premiseFactIDs` in chain order (at least two); it is never evidence.
+- **Only strong premises.** Positive, non-tentative, non-inferred claims between two
+  different identities. A negated, proposed, hypothetical, disputed or already inferred
+  claim derives nothing. A pair some input claim already speaks to for the rule
+  (stated, negated or tentative, either direction of `dependsOn`) gets no derived
+  edge, so a chain never contradicts a denial.
+- **Bounded and honest.** Chains run at most 4 steps (the shortest chain wins, ties by
+  the claim IDs of the premises in order) and the list is capped at 400 edges, in the
+  output order, with `isTruncated` set; the walk stops at the bound rather than
+  materializing every candidate. An
+  identity on a cycle of a rule's premises starts and passes no chain and is reported
+  in `cyclic`, never ordered through. Output is identical for any input order.
+- Not yet: owner → action → due and `same_as` candidates, premise-retraction
+  invalidation (it follows from recomputing over the current read), the stored
+  projection, the Graph Explorer and `get_graph` showing them, and precision measured
+  on fixtures.
+
 ### Knowledge late arrivals (K3.5)
 
 An entity page's overview ends with "Revised later" when knowledge recorded after
