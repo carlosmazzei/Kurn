@@ -57,9 +57,8 @@ struct KnowledgeInferenceFixtureTests {
     @Test func commitmentsAreRecallCompleteButOnlyAsPreciseAsTheirPairings() throws {
         // The moved-deadline fixture assigns the review to Maria, then to Lee, and moves its due date twice.
         // The one commitment true at the end, by the fixture's own narration, is Lee → 2026-11-06 (a6 with a5).
-        // The derivation lists every owner × date pairing: recall 1, precision 1/6. The temporal reducer would
-        // replace the older due dates but keeps assignments to different people, so reaching Lee alone needs a
-        // rule that a later assignment ends an earlier one, which no code states yet.
+        // The derivation lists every owner × date pairing: recall 1, precision 1/6. `deriveCurrentCommitments`
+        // narrows them by stated start, with the reducer's rule extended to the owner.
         let timeline = try KnowledgeFixtureTimeline.load("en-moved-deadline")
         let result = KnowledgeInference.deriveCommitments(from: timeline.snapshot.facts)
         #expect(!result.isTruncated)
@@ -69,6 +68,10 @@ struct KnowledgeInferenceFixtureTests {
         #expect(matching.count == 1)
         #expect(matching.first?.ownerID == timeline.entities["e4"])
         #expect(matching.first?.due == Self.dayValue("2026-11-06"))
+        // Narrowed by stated start (a later assignment or date replaces an earlier one), the same facts give
+        // exactly that commitment: recall 1, precision 1.
+        let narrowed = KnowledgeInference.deriveCurrentCommitments(from: timeline.snapshot.facts)
+        #expect(narrowed.commitments.map(\.premiseFactIDs) == [current])
         // A commitment needs both halves: no other fixture states an owner and a date for one action.
         for name in Self.names where name != "en-moved-deadline" {
             let other = try KnowledgeFixtureTimeline.load(name)

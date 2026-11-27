@@ -7,11 +7,12 @@ struct KnowledgeInferenceCommitmentsTests {
     private static func id(_ n: Int) -> UUID { UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", n))! }
 
     private static func fact(_ number: Int, _ subject: Int, _ predicate: KnowledgePredicate, object: Int? = nil,
-                             due: String? = nil, polarity: KnowledgePolarity = .positive,
+                             due: String? = nil, from start: String? = nil, polarity: KnowledgePolarity = .positive,
                              modality: KnowledgeModality = .agreed) -> KnowledgeWikiSnapshot.Fact {
         let qualifiers = KnowledgeWikiSnapshot.Qualifiers(
             modality: modality, polarity: polarity, claimKind: .commitment, authority: .attributed,
-            confidence: .high, review: .machineExtracted)
+            confidence: .high, review: .machineExtracted,
+            validFrom: start.flatMap { KnowledgeTemporalValue(text: $0, precision: .day) })
         let value = due.flatMap { KnowledgeTemporalValue(text: $0, precision: .day) }.map(KnowledgeTypedValue.date)
         return KnowledgeWikiSnapshot.Fact(
             id: id(number), subjectID: id(subject), predicate: predicate, objectID: object.map(id), value: value,
@@ -93,5 +94,52 @@ struct KnowledgeInferenceCommitmentsTests {
         // A due claim without a date value is not a date.
         let noDate = [Self.fact(101, 1, .assignedTo, object: 2), Self.fact(102, 1, .dueOn)]
         #expect(KnowledgeInference.deriveCommitments(from: noDate).commitments.isEmpty)
+    }
+
+    @Test func aLaterAssignmentAndALaterDateReplaceTheEarlierOnes() {
+        let facts = [
+            Self.fact(101, 1, .assignedTo, object: 2, from: "2026-10-05"),
+            Self.fact(102, 1, .assignedTo, object: 3, from: "2026-10-20"),
+            Self.fact(103, 1, .dueOn, due: "2026-10-09", from: "2026-10-05"),
+            Self.fact(104, 1, .dueOn, due: "2026-11-06", from: "2026-10-20")
+        ]
+        #expect(KnowledgeInference.deriveCommitments(from: facts).commitments.count == 4)
+        let current = KnowledgeInference.deriveCurrentCommitments(from: facts)
+        #expect(current.commitments.count == 1)
+        #expect(current.commitments.first?.ownerID == Self.id(3))
+        #expect(current.commitments.first?.due.text == "2026-11-06")
+        #expect(current.commitments.first?.premiseFactIDs == [Self.id(102), Self.id(104)])
+    }
+
+    @Test func undatedClaimsAreNeverNarrowedAway() {
+        let facts = [
+            Self.fact(101, 1, .assignedTo, object: 2), Self.fact(102, 1, .assignedTo, object: 3, from: "2026-10-20"),
+            Self.fact(103, 1, .dueOn, due: "2026-11-06", from: "2026-10-20")
+        ]
+        let current = KnowledgeInference.deriveCurrentCommitments(from: facts)
+        #expect(current.commitments.map(\.ownerID) == [Self.id(2), Self.id(3)])
+    }
+
+    @Test func theSameOwnerStatedTwiceOrAtTheSameStartIsNotReplaced() {
+        // assignedTo and owns name one person; two different people from the same day stay side by side.
+        let same = [
+            Self.fact(101, 1, .assignedTo, object: 2, from: "2026-10-05"), Self.fact(102, 2, .owns, object: 1, from: "2026-10-20"),
+            Self.fact(103, 1, .dueOn, due: "2026-11-06")
+        ]
+        #expect(KnowledgeInference.deriveCurrentCommitments(from: same).commitments.count == 2)
+        let together = [
+            Self.fact(101, 1, .assignedTo, object: 2, from: "2026-10-05"), Self.fact(102, 1, .assignedTo, object: 3, from: "2026-10-05"),
+            Self.fact(103, 1, .dueOn, due: "2026-11-06")
+        ]
+        #expect(KnowledgeInference.deriveCurrentCommitments(from: together).commitments.count == 2)
+    }
+
+    @Test func theInputOrderDecidesNothing() {
+        let facts = [
+            Self.fact(101, 1, .assignedTo, object: 2, from: "2026-10-05"), Self.fact(102, 1, .assignedTo, object: 3, from: "2026-10-20"),
+            Self.fact(103, 1, .dueOn, due: "2026-11-06", from: "2026-10-20")
+        ]
+        #expect(KnowledgeInference.deriveCurrentCommitments(from: facts)
+            == KnowledgeInference.deriveCurrentCommitments(from: Array(facts.reversed())))
     }
 }
