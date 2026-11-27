@@ -7,12 +7,13 @@ struct KnowledgeInferenceCommitmentsTests {
     private static func id(_ n: Int) -> UUID { UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", n))! }
 
     private static func fact(_ number: Int, _ subject: Int, _ predicate: KnowledgePredicate, object: Int? = nil,
-                             due: String? = nil, from start: String? = nil, polarity: KnowledgePolarity = .positive,
+                             due: String? = nil, from start: String? = nil, until end: String? = nil, polarity: KnowledgePolarity = .positive,
                              modality: KnowledgeModality = .agreed) -> KnowledgeWikiSnapshot.Fact {
         let qualifiers = KnowledgeWikiSnapshot.Qualifiers(
             modality: modality, polarity: polarity, claimKind: .commitment, authority: .attributed,
             confidence: .high, review: .machineExtracted,
-            validFrom: start.flatMap { KnowledgeTemporalValue(text: $0, precision: .day) })
+            validFrom: start.flatMap { KnowledgeTemporalValue(text: $0, precision: .day) },
+            validTo: end.flatMap { KnowledgeTemporalValue(text: $0, precision: .day) })
         let value = due.flatMap { KnowledgeTemporalValue(text: $0, precision: .day) }.map(KnowledgeTypedValue.date)
         return KnowledgeWikiSnapshot.Fact(
             id: id(number), subjectID: id(subject), predicate: predicate, objectID: object.map(id), value: value,
@@ -141,5 +142,26 @@ struct KnowledgeInferenceCommitmentsTests {
         ]
         #expect(KnowledgeInference.deriveCurrentCommitments(from: facts)
             == KnowledgeInference.deriveCurrentCommitments(from: Array(facts.reversed())))
+    }
+
+    @Test func aClaimWithAStatedEndReplacesNothing() {
+        // Person 3 covers for a week; the derivation reads no date, so person 2 stays an owner too.
+        let facts = [
+            Self.fact(101, 1, .assignedTo, object: 2, from: "2026-10-05"),
+            Self.fact(102, 1, .assignedTo, object: 3, from: "2026-10-20", until: "2026-10-27"),
+            Self.fact(103, 1, .dueOn, due: "2026-11-06")
+        ]
+        let current = KnowledgeInference.deriveCurrentCommitments(from: facts)
+        #expect(current.commitments.map(\.ownerID) == [Self.id(2), Self.id(3)])
+    }
+
+    @Test func aClaimWithAStatedEndCanStillBeReplacedByAnOpenOne() {
+        let facts = [
+            Self.fact(101, 1, .assignedTo, object: 2, from: "2026-10-05", until: "2026-10-12"),
+            Self.fact(102, 1, .assignedTo, object: 3, from: "2026-10-20"),
+            Self.fact(103, 1, .dueOn, due: "2026-11-06")
+        ]
+        let current = KnowledgeInference.deriveCurrentCommitments(from: facts)
+        #expect(current.commitments.map(\.ownerID) == [Self.id(3)])
     }
 }

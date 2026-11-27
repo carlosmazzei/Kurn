@@ -3723,8 +3723,9 @@ checksummed projection like the wiki pages and shows it dotted and off by defaul
   owner claim is replaced by a claim naming another owner whose start is wholly after its own (a later assignment
   ends an earlier one: a decision made here, since the temporal reducer keeps assignments to different people side
   by side), a due date by a different date likewise (the reducer's rule for `dueOn`). Claims with no stated start
-  neither replace nor are replaced, `assignedTo` and `owns` naming one person do not replace each other, and
-  recording order decides nothing. On `en-moved-deadline` it yields exactly Lee → 2026-11-06 (precision 1). It is
+  neither replace nor are replaced, a claim with a stated end replaces nothing (the derivation reads no date, so it
+  cannot tell whether a week's cover is over; an open later claim still replaces it), `assignedTo` and `owns` naming
+  one person do not replace each other, and recording order decides nothing. On `en-moved-deadline` it yields exactly Lee → 2026-11-06 (precision 1). It is
   still a derived suggestion with the same two premises; the explorer and tools do not show it yet.
 - Not yet: the Graph Explorer showing commitments and `same_as` candidates, premise-retraction
   invalidation (it follows from recomputing over the current read), the stored

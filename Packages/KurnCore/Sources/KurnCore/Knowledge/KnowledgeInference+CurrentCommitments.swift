@@ -17,22 +17,27 @@ extension KnowledgeInference {
     /// date. This is the temporal reducer's rule for single-valued predicates, applied to the
     /// owner as well: assignments to different people are otherwise kept side by side. A claim
     /// with no stated start neither replaces nor is replaced, so an undated pairing is never
-    /// narrowed away, and `recordedAt` and input order decide nothing. A pairing that survives is
+    /// narrowed away, and `recordedAt` and input order decide nothing. A claim with a stated end
+    /// (a week's cover) replaces nothing: this reads no date, so it cannot tell whether the cover
+    /// has ended, and both owners stay. A pairing that survives is
     /// still a derived, review-only suggestion: it lists the same two premises.
     public static func deriveCurrentCommitments(from facts: [KnowledgeWikiSnapshot.Fact]) -> CommitmentResult {
         let premises = commitmentPremises(from: facts)
         var starts: [UUID: (lower: Date, upper: Date)] = [:]
+        var ended = Set<UUID>()
         for fact in facts {
             if let bounds = fact.qualifiers.validFrom?.bounds { starts[fact.id] = bounds }
+            // A claim with a stated end replaces nothing: it may already be over.
+            if fact.qualifiers.validTo != nil { ended.insert(fact.id) }
         }
         var owners: [UUID: [(owner: UUID, fact: UUID)]] = [:]
         for (action, items) in premises.owners {
-            let replaced = replacedClaims(items.map { (statement: $0.owner.uuidString, fact: $0.fact) }, starts: starts)
+            let replaced = replacedClaims(items.map { (statement: $0.owner.uuidString, fact: $0.fact) }, starts: starts, ended: ended)
             owners[action] = items.filter { !replaced.contains($0.fact) }
         }
         var dues: [UUID: [(due: KnowledgeTemporalValue, fact: UUID)]] = [:]
         for (action, items) in premises.dues {
-            let replaced = replacedClaims(items.map { (statement: $0.due.text, fact: $0.fact) }, starts: starts)
+            let replaced = replacedClaims(items.map { (statement: $0.due.text, fact: $0.fact) }, starts: starts, ended: ended)
             dues[action] = items.filter { !replaced.contains($0.fact) }
         }
         return join(owners: owners, dues: dues)
@@ -41,11 +46,11 @@ extension KnowledgeInference {
     /// The claims some other statement replaced: one with a different statement whose stated
     /// start is wholly after this claim's own.
     private static func replacedClaims(_ items: [(statement: String, fact: UUID)],
-                                       starts: [UUID: (lower: Date, upper: Date)]) -> Set<UUID> {
+                                       starts: [UUID: (lower: Date, upper: Date)], ended: Set<UUID>) -> Set<UUID> {
         var replaced = Set<UUID>()
         for item in items {
             guard let mine = starts[item.fact] else { continue }
-            for other in items where other.statement != item.statement {
+            for other in items where other.statement != item.statement && !ended.contains(other.fact) {
                 guard let theirs = starts[other.fact] else { continue }
                 if theirs.lower >= mine.upper {
                     replaced.insert(item.fact)
