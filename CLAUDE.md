@@ -3697,7 +3697,13 @@ checksummed projection like the wiki pages and shows it dotted and off by defaul
   materializing every candidate. An
   identity on a cycle of a rule's premises starts and passes no chain and is reported
   in `cyclic`, never ordered through. Output is identical for any input order.
-- Not yet: owner → action → due and `same_as` candidates, premise-retraction
+- **Owner → action → due** (`deriveCommitments(from:)`, over the page facts because a due date is a
+  value claim the graph's edges do not carry): an owner is the object of `assignedTo` (action → person)
+  or the subject of `owns` (person → action); joined with each `dueOn` date of the action it gives a
+  `DerivedCommitment` listing both premises (ownership first). Several owners or several dates give
+  every pairing: which date is current is the temporal reducer's decision, never this one's. Same
+  premise filter and the same 400 bound as the edges.
+- Not yet: `same_as` candidates, the Graph Explorer showing commitments, premise-retraction
   invalidation (it follows from recomputing over the current read), the stored
   projection, the Graph Explorer and `get_graph` showing them, and precision measured
   on fixtures.
