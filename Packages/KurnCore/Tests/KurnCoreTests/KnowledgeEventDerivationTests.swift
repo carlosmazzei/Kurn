@@ -130,4 +130,46 @@ struct KnowledgeEventDerivationTests {
         let events = KnowledgeEventDerivation.derive(entityID: project, lifecycle: nil, knownAt: Self.later, claims: line.claims)
         #expect(Self.rows(events) == [Row(kind: .dueDateChanged, detail: "2026-10", previous: nil)])
     }
+
+    @Test func lifecycleOrderSurvivesAMonthStatedCompletionAfterADayStatedCommitment() throws {
+        let item = UUID(), recorded = Self.date("2026-01-01")
+        func status(_ raw: String, _ stated: KnowledgeTemporalValue) -> KnowledgeTemporalClaim {
+            KnowledgeTemporalClaim(id: UUID(), subjectID: item, predicate: .hasStatus, value: .enumeration(raw),
+                                   modality: .agreed, validFrom: stated, recordedAt: recorded)
+        }
+        let november = try #require(KnowledgeTemporalValue(text: "2026-11", precision: .month))
+        let claims = [status("completed", november), status("committed", Self.day("2026-11-03"))]
+        let events = KnowledgeEventDerivation.derive(entityID: item, lifecycle: .action, knownAt: Self.later, claims: claims)
+        #expect(Self.rows(events) == [Row(kind: .statusChanged, detail: "committed", previous: nil),
+                                      Row(kind: .statusChanged, detail: "completed", previous: "committed")])
+    }
+
+    @Test func aLaterConfirmationDoesNotMakeTheOriginalChangeLate() {
+        let action = UUID(), due = Self.day("2026-10-09")
+        func claim(recorded: String) -> KnowledgeTemporalClaim {
+            KnowledgeTemporalClaim(id: UUID(), subjectID: action, predicate: .dueOn, value: .date(due), modality: .agreed,
+                                   validFrom: Self.day("2026-10-01"), recordedAt: Self.date(recorded))
+        }
+        let events = KnowledgeEventDerivation.derive(
+            entityID: action, lifecycle: .action, knownAt: Self.later,
+            claims: [claim(recorded: "2026-10-01T10:00:00Z"), claim(recorded: "2026-10-02T10:00:00Z")])
+        #expect(events.count == 1)
+        #expect(events.first?.recordedAt == Self.date("2026-10-01T10:00:00Z"))
+        #expect(events.first?.isLate == false)
+    }
+
+    @Test func ownersStatedForTheSameDayAreNotAHandoverAndACoverStatesNoChange() {
+        let action = UUID(), first = UUID(), second = UUID(), cover = UUID(), recorded = Self.date("2026-01-01")
+        func assigned(_ owner: UUID, from: String, until: String? = nil) -> KnowledgeTemporalClaim {
+            KnowledgeTemporalClaim(id: UUID(), subjectID: action, predicate: .assignedTo, objectID: owner, modality: .agreed,
+                                   validFrom: Self.day(from), validTo: until.map(Self.day), recordedAt: recorded)
+        }
+        let events = KnowledgeEventDerivation.derive(
+            entityID: action, lifecycle: .action, knownAt: Self.later,
+            claims: [assigned(first, from: "2026-02-01"), assigned(second, from: "2026-02-01"),
+                     assigned(cover, from: "2026-03-01", until: "2026-03-08")])
+        #expect(events.count == 2)
+        #expect(Set(events.map(\.detail)) == [first.uuidString, second.uuidString])
+        #expect(events.allSatisfy { $0.previous == nil })
+    }
 }

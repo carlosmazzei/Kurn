@@ -27,7 +27,8 @@ public enum KnowledgeEventDerivation {
         public let detail: String
         /// What it replaced, when something did.
         public let previous: String?
-        /// Transaction time of the latest claim among `claimIDs`.
+        /// Transaction time at which the change was first known: the earliest claim among `claimIDs`, so a later
+        /// confirmation of the same change never makes it look late.
         public let recordedAt: Date
         /// True when the change starts before the UTC day it was recorded on:
         /// knowledge that arrived after the days it concerns (K3.5).
@@ -43,27 +44,37 @@ public enum KnowledgeEventDerivation {
                               claims: [KnowledgeTemporalClaim]) -> [Event] {
         let known = claims.filter { $0.recordedAt <= knownAt && ($0.retractedAt.map { knownAt < $0 } ?? true) }
         let recorded = Dictionary(known.map { ($0.id, $0.recordedAt) }, uniquingKeysWith: max)
-        var events = statusEvents(entityID: entityID, lifecycle: lifecycle, knownAt: knownAt, claims: known, recorded: recorded)
-        events += dueDateEvents(entityID: entityID, claims: known)
-        events += assignmentEvents(entityID: entityID, claims: known)
-        return events.sorted(by: ordered)
+        var entries = statusEvents(entityID: entityID, lifecycle: lifecycle, knownAt: knownAt, claims: known, recorded: recorded)
+        entries += dueDateEvents(entityID: entityID, claims: known, recorded: recorded)
+        entries += assignmentEvents(entityID: entityID, claims: known, recorded: recorded)
+        return entries.sorted(by: ordered).map(\.event)
     }
 
-    private static func ordered(_ lhs: Event, _ rhs: Event) -> Bool {
-        let left = lhs.occurredAt?.bounds?.lower, right = rhs.occurredAt?.bounds?.lower
-        if left != right {
-            guard let left else { return false }
-            guard let right else { return true }
+    /// An event with where it sorts. A lifecycle transition keeps the machine's order even where the machine
+    /// placed a month-stated completion after a day-stated commitment, so its sort date never moves backwards.
+    private struct Entry {
+        let event: Event
+        let sortDate: Date?
+        let group: Int
+        let sequence: Int
+    }
+
+    private static func ordered(_ lhs: Entry, _ rhs: Entry) -> Bool {
+        if lhs.sortDate != rhs.sortDate {
+            guard let left = lhs.sortDate else { return false }
+            guard let right = rhs.sortDate else { return true }
             return left < right
         }
-        return (lhs.kind.rawValue, lhs.key) < (rhs.kind.rawValue, rhs.key)
+        if lhs.group != rhs.group { return lhs.group < rhs.group }
+        if lhs.sequence != rhs.sequence { return lhs.sequence < rhs.sequence }
+        return (lhs.event.kind.rawValue, lhs.event.key) < (rhs.event.kind.rawValue, rhs.event.key)
     }
 
     // swiftlint:disable:next function_parameter_count
     private static func make(_ kind: KnowledgeEventKind, entityID: UUID, stated: KnowledgeTemporalValue?, claimIDs: [UUID],
                              detail: String, previous: String?, recorded: [UUID: Date]) -> Event {
         let ids = claimIDs.sorted { $0.uuidString < $1.uuidString }
-        let recordedAt = ids.compactMap { recorded[$0] }.max() ?? .distantPast
+        let recordedAt = ids.compactMap { recorded[$0] }.min() ?? .distantPast
         var utc = Calendar(identifier: .gregorian)
         utc.timeZone = TimeZone(identifier: "UTC") ?? .gmt
         let late = stated?.bounds.map { $0.lower < utc.startOfDay(for: recordedAt) } ?? false
@@ -72,33 +83,32 @@ public enum KnowledgeEventDerivation {
     }
 
     private static func statusEvents(entityID: UUID, lifecycle: KnowledgeLifecycle?, knownAt: Date,
-                                     claims: [KnowledgeTemporalClaim], recorded: [UUID: Date]) -> [Event] {
+                                     claims: [KnowledgeTemporalClaim], recorded: [UUID: Date]) -> [Entry] {
         guard let lifecycle else { return [] }
-        return lifecycle.project(entityID: entityID, knownAt: knownAt, claims: claims).transitions.map { transition in
+        var latest: Date?
+        return lifecycle.project(entityID: entityID, knownAt: knownAt, claims: claims).transitions.enumerated().map { index, transition in
             let kind: KnowledgeEventKind = switch transition.status {
             case .reopened: .reopened
             case .superseded: .superseded
             default: .statusChanged
             }
-            return make(kind, entityID: entityID, stated: transition.stated, claimIDs: transition.claimIDs,
-                        detail: transition.status.rawValue, previous: transition.from?.rawValue, recorded: recorded)
+            let event = make(kind, entityID: entityID, stated: transition.stated, claimIDs: transition.claimIDs,
+                             detail: transition.status.rawValue, previous: transition.from?.rawValue, recorded: recorded)
+            if let lower = transition.stated.bounds?.lower { latest = max(latest ?? lower, lower) }
+            return Entry(event: event, sortDate: latest, group: 0, sequence: index)
         }
     }
 
-    /// An established, positive, dated claim: what a change can be built on.
+    /// An established, positive, dated claim with no stated end: what a change can be built on. A claim with a
+    /// stated end (a week's cover) is a temporary holding, not a handover or a new date, so it states no change.
     private static func firm(_ claim: KnowledgeTemporalClaim) -> Bool {
         claim.polarity == .positive && !KnowledgeTemporalReducer.tentative.contains(claim.modality)
-            && claim.validFrom?.bounds != nil
+            && claim.validFrom?.bounds != nil && claim.validTo == nil
     }
 
-    /// Consecutive statements of the same value are one change; the earliest stated start names it.
-    private struct Change {
-        let stated: KnowledgeTemporalValue
-        let detail: String
-        var claimIDs: [UUID]
-        let previous: String?
-    }
-
+    /// Consecutive statements of the same value are one change; the earliest stated start names it. A change
+    /// names what it replaced only when its stated start is wholly after the previous change's: starts that
+    /// overlap are a conflict the temporal reducer reports, not an order this derivation may invent.
     private static func changes(_ steps: [(stated: KnowledgeTemporalValue, detail: String, claimID: UUID)]) -> [Change] {
         let sorted = steps.sorted {
             let (left, right) = ($0.stated.bounds?.lower ?? .distantPast, $1.stated.bounds?.lower ?? .distantPast)
@@ -106,29 +116,34 @@ public enum KnowledgeEventDerivation {
         }
         var result: [Change] = []
         for step in sorted {
+            let bounds = step.stated.bounds
             if let last = result.last, last.detail == step.detail {
                 result[result.count - 1].claimIDs.append(step.claimID)
-            } else {
-                result.append(Change(stated: step.stated, detail: step.detail, claimIDs: [step.claimID], previous: result.last?.detail))
+                continue
             }
+            let replaced = result.last.flatMap { last in
+                (last.stated.bounds?.upper ?? .distantFuture) <= (bounds?.lower ?? .distantPast) ? last.detail : nil
+            }
+            result.append(Change(stated: step.stated, detail: step.detail, claimIDs: [step.claimID], previous: replaced))
         }
         return result
     }
 
-    private static func dueDateEvents(entityID: UUID, claims: [KnowledgeTemporalClaim]) -> [Event] {
+    private static func dueDateEvents(entityID: UUID, claims: [KnowledgeTemporalClaim], recorded: [UUID: Date]) -> [Entry] {
         let steps = claims.compactMap { claim -> (stated: KnowledgeTemporalValue, detail: String, claimID: UUID)? in
             guard claim.subjectID == entityID, claim.predicate == .dueOn, firm(claim),
                   case let .date(due) = claim.value, let stated = claim.validFrom else { return nil }
             return (stated, due.text, claim.id)
         }
-        return changes(steps).map { change in
-            make(.dueDateChanged, entityID: entityID, stated: change.stated, claimIDs: change.claimIDs,
-                 detail: change.detail, previous: change.previous, recorded: recordedDates(claims))
+        return changes(steps).enumerated().map { index, change in
+            let event = make(.dueDateChanged, entityID: entityID, stated: change.stated, claimIDs: change.claimIDs,
+                             detail: change.detail, previous: change.previous, recorded: recorded)
+            return Entry(event: event, sortDate: change.stated.bounds?.lower, group: 2, sequence: index)
         }
     }
 
     /// Owners from `assignedTo` (action → person) and `owns` (person → action) fold into one sequence.
-    private static func assignmentEvents(entityID: UUID, claims: [KnowledgeTemporalClaim]) -> [Event] {
+    private static func assignmentEvents(entityID: UUID, claims: [KnowledgeTemporalClaim], recorded: [UUID: Date]) -> [Entry] {
         let steps = claims.compactMap { claim -> (stated: KnowledgeTemporalValue, detail: String, claimID: UUID)? in
             guard firm(claim), let stated = claim.validFrom else { return nil }
             if claim.predicate == .assignedTo, claim.subjectID == entityID, let owner = claim.objectID {
@@ -139,13 +154,10 @@ public enum KnowledgeEventDerivation {
             }
             return nil
         }
-        return changes(steps).map { change in
-            make(.assigned, entityID: entityID, stated: change.stated, claimIDs: change.claimIDs,
-                 detail: change.detail, previous: change.previous, recorded: recordedDates(claims))
+        return changes(steps).enumerated().map { index, change in
+            let event = make(.assigned, entityID: entityID, stated: change.stated, claimIDs: change.claimIDs,
+                             detail: change.detail, previous: change.previous, recorded: recorded)
+            return Entry(event: event, sortDate: change.stated.bounds?.lower, group: 1, sequence: index)
         }
-    }
-
-    private static func recordedDates(_ claims: [KnowledgeTemporalClaim]) -> [UUID: Date] {
-        Dictionary(claims.map { ($0.id, $0.recordedAt) }, uniquingKeysWith: max)
     }
 }
