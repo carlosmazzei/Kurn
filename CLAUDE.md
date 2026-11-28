@@ -767,7 +767,10 @@ between runs, like the pipeline evaluation.
 prompt, no tools) and `knowledge` (the K5.1 tools over a read built from the fixture's golden assertions, under
 `HarnessChatService.knowledgePolicy`, no transcripts). A second, tool-less call judges the answer against the
 expected assertions and the tempting `mustNotAssert` ones; `KnowledgeAnswerScorer` scores the verdict. The citations
-are what the judge reads in the answer, not a parsed link. `[ask-eval]` lines carry the question ID, kind, scores, tool
+are the ones the judge reads the answer naming (a meeting and a time turned into its segment), not a parsed link, and
+the scorer needs one of each stated claim's own evidence segments. An unreadable verdict is a failure, never an
+empty answer, and `[ask-eval]` summaries report what was attempted plus a `common` group over the questions every
+variant scored; an unknown variant or a non-positive `limit` is refused before any paid call. `[ask-eval]` lines carry the question ID, kind, scores, tool
 calls and tokens, never a prompt, an answer or a key, and there is no pass/fail threshold: runs are compared with each
 other. Inputs are `limit` (default 3, so a first run shows the cost), `variants` and the two model names. The offline
 tests in that suite (fixture to read, prompts, verdict parsing, report lines) run in every CI; the K5.4 variants A and B

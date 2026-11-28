@@ -117,6 +117,35 @@ struct KnowledgeAskEvalTests {
         #expect(summary.contains("summary variant=knowledge group=all questions=1"))
     }
 
+    @Test func workflowInputsAreReadStrictlyAndBlankMeansAll() throws {
+        #expect(try KnowledgeAskEvalRunner.variants(from: "") == KnowledgeAskEvalRunner.Variant.allCases)
+        #expect(try KnowledgeAskEvalRunner.variants(from: " knowledge , closed_book ") == [.knowledge, .closedBook])
+        #expect(throws: KnowledgeAskEvalRunner.EvalError.invalidInput("variants")) {
+            try KnowledgeAskEvalRunner.variants(from: "knowledge,knowlege")
+        }
+        #expect(try KnowledgeAskEvalRunner.limit(from: "  ") == nil)
+        #expect(try KnowledgeAskEvalRunner.limit(from: "3") == 3)
+        for bad in ["0", "-2", "three", "2.5"] {
+            #expect(throws: KnowledgeAskEvalRunner.EvalError.invalidInput("limit")) { try KnowledgeAskEvalRunner.limit(from: bad) }
+        }
+    }
+
+    @Test func coverageIsAvailableAndEveryClaimNeedsOneOfItsOwnSegments() async throws {
+        let fixture = try KnowledgeAskEvalFiles.fixture("en-moved-deadline")
+        let coverage = try #require(KnowledgeAskEvalRunner.tools(for: .knowledge, fixture: fixture).first { $0.spec.name == "get_coverage" })
+        let output = try await coverage.execute(.object([:]))
+        #expect(!output.isError && output.content.contains("complete: yes"))
+        let question = try #require(try KnowledgeAskEvalFiles.questions().first { $0.fixture == fixture.id && $0.expected.count > 1 })
+        let evidence = fixture.evidenceSegments(for: question.expected)
+        #expect(Set(evidence.keys) == Set(question.expected) && evidence.values.allSatisfy { !$0.isEmpty })
+    }
+
+    @Test func theTranscriptGivesEachSegmentItsTimeSoACitedMomentResolves() throws {
+        let fixture = try KnowledgeAskEvalFiles.fixture("en-moved-deadline")
+        #expect(fixture.transcriptText.contains("[m1/s1 at 0:00]"))
+        #expect(KnowledgeAskEvalFixture.clock(125_000) == "2:05")
+    }
+
     // MARK: Live
 
     /// Every golden question, each variant. `KURN_ASK_EVAL_LIMIT` caps the questions (a small first run
@@ -135,12 +164,14 @@ struct KnowledgeAskEvalTests {
         let model = named("KURN_ASK_EVAL_MODEL"), judgeModel = named("KURN_ASK_EVAL_JUDGE_MODEL")
         let runner = KnowledgeAskEvalRunner(model: LiveProviderSmokeTests.client(target, key: key, model: model),
                                             judge: LiveProviderSmokeTests.client(target, key: key, model: judgeModel))
-        let wanted = (Self.environment["KURN_ASK_EVAL_VARIANTS"] ?? "").split(separator: ",")
-            .compactMap { KnowledgeAskEvalRunner.Variant(rawValue: $0.trimmingCharacters(in: .whitespaces)) }
-        let variants = wanted.isEmpty ? KnowledgeAskEvalRunner.Variant.allCases : wanted
+        // Invalid inputs are refused here, before the first paid call.
+        let variants = try KnowledgeAskEvalRunner.variants(from: Self.environment["KURN_ASK_EVAL_VARIANTS"] ?? "")
         var questions = try KnowledgeAskEvalFiles.questions()
-        if let limit = Self.environment["KURN_ASK_EVAL_LIMIT"].flatMap(Int.init), limit > 0 { questions = Array(questions.prefix(limit)) }
+        if let limit = try KnowledgeAskEvalRunner.limit(from: Self.environment["KURN_ASK_EVAL_LIMIT"] ?? "") {
+            questions = Array(questions.prefix(limit))
+        }
         print("[ask-eval] model=\(model) judge=\(judgeModel) questions=\(questions.count) variants=\(variants.map(\.rawValue).joined(separator: ","))")
+        var scored: [KnowledgeAskEvalRunner.Variant: [KnowledgeAskEvalRunner.Observation]] = [:]
         for variant in variants {
             var observations: [KnowledgeAskEvalRunner.Observation] = []
             for question in questions {
@@ -149,14 +180,23 @@ struct KnowledgeAskEvalTests {
                     let observation = try await runner.run(question, variant: variant, fixture: fixture)
                     observations.append(observation)
                     print(KnowledgeAskEvalRunner.line(observation))
+                } catch KnowledgeAskEvalRunner.EvalError.unreadableVerdict {
+                    print("[ask-eval] variant=\(variant.rawValue) question=\(question.id) failed=judge_unreadable")
                 } catch {
                     print("[ask-eval] variant=\(variant.rawValue) question=\(question.id) failed=\(error.publicLogCode)")
                 }
             }
-            print(KnowledgeAskEvalRunner.summaryLine(variant, label: "all", observations))
+            scored[variant] = observations
+            print(KnowledgeAskEvalRunner.summaryLine(variant, label: "all", attempted: questions.count, observations))
             for kind in Set(observations.map(\.kind)).sorted() {
                 print(KnowledgeAskEvalRunner.summaryLine(variant, label: kind, observations.filter { $0.kind == kind }))
             }
+        }
+        // A failure leaves a question out of one variant's average: compare variants on what every one of them scored.
+        let common = variants.map { Set(scored[$0, default: []].map(\.questionID)) }.reduce(Set(questions.map(\.id))) { $0.intersection($1) }
+        for variant in variants {
+            print(KnowledgeAskEvalRunner.summaryLine(variant, label: "common", attempted: questions.count,
+                                                     scored[variant, default: []].filter { common.contains($0.questionID) }))
         }
     }
 }

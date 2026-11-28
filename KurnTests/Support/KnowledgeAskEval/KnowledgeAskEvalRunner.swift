@@ -37,7 +37,13 @@ struct KnowledgeAskEvalRunner {
         let cited: [String]
     }
 
-    enum EvalError: Error { case noOutcome }
+    enum EvalError: Error, Equatable {
+        case noOutcome
+        /// The judge's reply held no readable verdict: the answer is not scored, never scored as empty.
+        case unreadableVerdict
+        /// A workflow input that is not a known variant or a positive count: refused before any paid call.
+        case invalidInput(String)
+    }
 
     let model: any AgentModel
     let judge: any AgentModel
@@ -74,7 +80,8 @@ struct KnowledgeAskEvalRunner {
                     KnowledgeProcessingPolicy(allowedRemoteProviderIDs: [AIProvider.openAI.id], maxRemoteClassification: .internal),
                 ], sourceClassifications: [.internal])
             },
-            remoteConsent: { _ in true })
+            remoteConsent: { _ in true },
+            coverage: { _ in fixture.coverage() })
         let today = fixture.today
         return ChatKnowledgeTools.make(source: source, meetings: fixture.meetingIDs, provider: .openAI, now: { today })
     }
@@ -116,7 +123,9 @@ struct KnowledgeAskEvalRunner {
         unconfirmed does not count as asserted unless the claim itself says so). \
         "unsupported": how many other factual claims the answer makes that the transcripts do not support. \
         "declined": true when the answer says the meetings do not tell, or refuses to answer. \
-        "cited": the transcript segments, written meeting/segment like m1/s2, that the answer names or clearly relies on.
+        "cited": ONLY the transcript segments the answer itself names, written meeting/segment like m1/s2. A meeting \
+        and a time the answer names (a meeting title or ID with m:ss) may be turned into the segment that starts \
+        there, using the transcripts. An answer that names no source gets []; never add segments it merely agrees with.
         """
 
     static func judgePrompt(_ question: KnowledgeAskEvalFiles.Question, answer: String, fixture: KnowledgeAskEvalFixture) -> String {
@@ -150,8 +159,7 @@ struct KnowledgeAskEvalRunner {
             if case .runFinished(let finished) = event { outcome = finished }
         }
         guard let finished = outcome else { throw EvalError.noOutcome }
-        // An unreadable verdict scores as an answer that stated nothing and declined nothing: visible as a miss.
-        let verdict = Self.verdict(from: finished.finalText) ?? Verdict(stated: [], unsupported: 0, declined: false, cited: [])
+        guard let verdict = Self.verdict(from: finished.finalText) else { throw EvalError.unreadableVerdict }
         return (verdict, finished.totalUsage)
     }
 
@@ -167,7 +175,8 @@ struct KnowledgeAskEvalRunner {
         let graded = try await grade(question, answer: given.text, fixture: fixture)
         let expectation = KnowledgeAnswerScorer.Expectation(
             expected: Set(question.expected), forbidden: Set(question.forbidden.map { "!\($0)" }),
-            mustRefuse: question.mustRefuse, citable: Set(question.citable), evidence: [:])
+            mustRefuse: question.mustRefuse, citable: Set(question.citable),
+            evidence: fixture.evidenceSegments(for: question.expected))
         let score = KnowledgeAnswerScorer.score(Self.observation(graded.verdict), against: expectation,
                                                 resolvable: fixture.segmentKeys)
         return Observation(variant: variant, questionID: question.id, kind: question.kind, score: score,
@@ -188,10 +197,29 @@ struct KnowledgeAskEvalRunner {
             + " judge_input_tokens=\(observation.judgeTokens.inputTokens) judge_output_tokens=\(observation.judgeTokens.outputTokens)"
     }
 
-    static func summaryLine(_ variant: Variant, label: String, _ observations: [Observation]) -> String {
+    /// The variants named in a workflow input; blank means all. A name that is not one is refused, never skipped.
+    static func variants(from input: String) throws -> [Variant] {
+        let names = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        guard !names.isEmpty else { return Variant.allCases }
+        return try names.map { name in
+            guard let variant = Variant(rawValue: name) else { throw EvalError.invalidInput("variants") }
+            return variant
+        }
+    }
+
+    /// The question limit in a workflow input; blank means all. Anything but a positive integer is refused.
+    static func limit(from input: String) throws -> Int? {
+        let text = input.trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty else { return nil }
+        guard let count = Int(text), count > 0 else { throw EvalError.invalidInput("limit") }
+        return count
+    }
+
+    static func summaryLine(_ variant: Variant, label: String, attempted: Int? = nil, _ observations: [Observation]) -> String {
         let summary = KnowledgeAnswerScorer.summary(observations.map(\.score))
         func number(_ value: Double) -> String { String(format: "%.2f", value) }
         return "[ask-eval] summary variant=\(variant.rawValue) group=\(label) questions=\(summary.questions)"
+            + (attempted.map { " attempted=\($0)" } ?? "")
             + " precision=\(number(summary.precision)) recall=\(number(summary.recall)) forbidden=\(summary.forbiddenStated)"
             + " refusals_honoured=\(number(summary.refusalsHonoured)) cites_resolvable=\(number(summary.citationsResolvable))"
             + " cites_grounded=\(number(summary.citationsGrounded))"

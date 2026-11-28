@@ -202,8 +202,35 @@ struct KnowledgeAskEvalFixture {
         sources.map { source in
             "Meeting \(source.id), held \(source.recordedAt.prefix(10))"
                 + (source.organization.map { " (\($0))" } ?? "") + ":\n"
-                + source.segments.map { "[\(source.id)/\($0.id)] \($0.speaker ?? "Speaker"): \($0.text)" }.joined(separator: "\n")
+                + source.segments.map {
+                "[\(source.id)/\($0.id) at \(Self.clock($0.startMs))] \($0.speaker ?? "Speaker"): \($0.text)"
+            }.joined(separator: "\n")
         }.joined(separator: "\n\n")
+    }
+
+    /// `m:ss`, the form the tools and the transcript give a moment in.
+    static func clock(_ milliseconds: Int) -> String {
+        let seconds = milliseconds / 1_000
+        return "\(seconds / 60):" + String(format: "%02d", seconds % 60)
+    }
+
+    /// The compilation's coverage, as `get_coverage` reads it: every segment examined, every recording current.
+    func coverage() -> KnowledgeCoverageRead {
+        .init(revision: 1, isComplete: true, meetings: sources.compactMap { source in
+            sourceIDs[source.id].map { meeting in
+                .init(meetingID: meeting, recordings: [
+                    .init(recordingID: meeting, totalSegments: source.segments.count, examinedSegments: source.segments.count,
+                          state: .current),
+                ], classification: .internal)
+            }
+        })
+    }
+
+    /// Each expected assertion's evidence segments (`source/segment`): a grounded answer cites one for every claim it states.
+    func evidenceSegments(for refs: [String]) -> [String: Set<String>] {
+        Dictionary(uniqueKeysWithValues: expected.assertions.filter { refs.contains($0.ref) }.map { assertion in
+            (assertion.ref, Set(assertion.evidence.flatMap { item in item.segmentIDs.map { "\(item.source)/\($0)" } }))
+        })
     }
 
     private func name(_ reference: String?) -> String {
