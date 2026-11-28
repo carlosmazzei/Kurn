@@ -3727,9 +3727,15 @@ checksummed projection like the wiki pages and shows it dotted and off by defaul
   cannot tell whether a week's cover is over; an open later claim still replaces it), `assignedTo` and `owns` naming
   one person do not replace each other, and recording order decides nothing. On `en-moved-deadline` it yields exactly Lee → 2026-11-06 (precision 1). It is
   still a derived suggestion with the same two premises; the explorer and tools do not show it yet.
-- Not yet: the Graph Explorer showing commitments and `same_as` candidates, premise-retraction
-  invalidation (it follows from recomputing over the current read), the stored
-  projection and the Graph Explorer and `get_graph` showing them.
+- **Shown in Ask, computed on read.** `KnowledgeInference.suggestions(from:touching:)` runs the three
+  derivations over the pages of one authorized read (identities as the pages resolve them) and keeps what
+  touches the given identities. `get_graph` with `includeInferred` appends, after the stated nodes and
+  edges, `derived` edges, `derived commitment` (current owner and due date) and `possible same_as` lines, each
+  labelled `modality: inferred` with its premise claim IDs (a candidate says it needs human review and that
+  its score is experimental, with the signals behind it). The tool passes its clock, so a claim whose stated period is
+  not running then (an assignment that ended, one not begun) is neither an owner nor a replacement. Nothing is stored, so a retracted premise drops its line on the next read
+  (premise-retraction invalidation follows from recomputing). Without the flag the output is unchanged.
+- Not yet: the Graph Explorer showing commitments and `same_as` candidates, and the stored projection.
 
 ### Knowledge late arrivals (K3.5)
 

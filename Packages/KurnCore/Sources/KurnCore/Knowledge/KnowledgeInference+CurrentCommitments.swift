@@ -21,7 +21,14 @@ extension KnowledgeInference {
     /// (a week's cover) replaces nothing: this reads no date, so it cannot tell whether the cover
     /// has ended, and both owners stay. A pairing that survives is
     /// still a derived, review-only suggestion: it lists the same two premises.
-    public static func deriveCurrentCommitments(from facts: [KnowledgeWikiSnapshot.Fact]) -> CommitmentResult {
+    ///
+    /// With `now`, a claim whose stated period is not running then is left out before any of that: one
+    /// that ended (an owner who stepped down) or has not begun (a later assignment) is neither a premise
+    /// nor a replacement. A claim whose stated start is still within its own period at `now` stays a
+    /// premise but replaces nothing until that period is over.
+    public static func deriveCurrentCommitments(from allFacts: [KnowledgeWikiSnapshot.Fact],
+                                                at now: Date? = nil) -> CommitmentResult {
+        let facts = now.map { now in allFacts.filter { isRunning($0, at: now) } } ?? allFacts
         let premises = commitmentPremises(from: facts)
         var starts: [UUID: (lower: Date, upper: Date)] = [:]
         var ended = Set<UUID>()
@@ -29,6 +36,9 @@ extension KnowledgeInference {
             if let bounds = fact.qualifiers.validFrom?.bounds { starts[fact.id] = bounds }
             // A claim with a stated end replaces nothing: it may already be over.
             if fact.qualifiers.validTo != nil { ended.insert(fact.id) }
+            // With a clock, a start whose stated period is still running ("sometime in November") may not
+            // have happened yet: the claim stays a possible premise but replaces nothing until it is over.
+            if let now, let bounds = starts[fact.id], bounds.upper > now { ended.insert(fact.id) }
         }
         var owners: [UUID: [(owner: UUID, fact: UUID)]] = [:]
         for (action, items) in premises.owners {
@@ -59,5 +69,12 @@ extension KnowledgeInference {
             }
         }
         return replaced
+    }
+
+    /// A stated period that contains `now`: begun (or undated) and not yet over (or open).
+    private static func isRunning(_ fact: KnowledgeWikiSnapshot.Fact, at now: Date) -> Bool {
+        if let begin = fact.qualifiers.validFrom?.bounds, begin.lower > now { return false }
+        if let end = fact.qualifiers.validTo?.bounds, end.upper <= now { return false }
+        return true
     }
 }

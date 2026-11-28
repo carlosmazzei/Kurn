@@ -71,9 +71,57 @@ struct ChatKnowledgeStructureToolsTests {
     }
 
     private func run(_ name: String, _ arguments: [String: JSONValue]) async throws -> AgentToolOutput {
-        let tools = ChatKnowledgeTools.make(source: Self.source(), meetings: [Self.review, Self.planning], provider: .openAI,
+        try await run(name, arguments, source: Self.source())
+    }
+
+    private func run(_ name: String, _ arguments: [String: JSONValue], source: ChatKnowledgeSource) async throws -> AgentToolOutput {
+        let tools = ChatKnowledgeTools.make(source: source, meetings: [Self.review, Self.planning], provider: .openAI,
                                             now: { Self.now })
         return try await #require(tools.first { $0.spec.name == name }).execute(.object(arguments))
+    }
+
+    /// A chain `Alpha blocks Beta blocks Gamma` and two people one of whom is the other's alias.
+    private nonisolated static func derivedRead(alpha: UUID, sam: UUID) throws -> KnowledgeBrowserRead {
+        let beta = UUID(), gamma = UUID(), samAlias = UUID()
+        let entities: [KnowledgeWikiSnapshot.Entity] = [
+            .init(id: alpha, kind: .project, name: "Alpha"), .init(id: beta, kind: .project, name: "Beta"),
+            .init(id: gamma, kind: .project, name: "Gamma"),
+            .init(id: sam, kind: .person, name: "Sam Rivera", aliases: ["Sam R"]),
+            .init(id: samAlias, kind: .person, name: "Sam R"),
+        ]
+        let facts = [
+            fact(alpha, .blocks, object: beta), fact(beta, .blocks, object: gamma),
+            fact(sam, .relatesTo, object: alpha), fact(samAlias, .relatesTo, object: alpha),
+        ]
+        return try KnowledgeBrowserRead(meetingIDs: [review, planning], wiki: .init(revision: 5, entities: entities, facts: facts),
+                                        meetingTitles: [review: "Weekly review", planning: "Planning"])
+    }
+
+    private static func derivedSource(alpha: UUID, sam: UUID) -> ChatKnowledgeSource {
+        ChatKnowledgeSource(
+            read: { _, _ in try derivedRead(alpha: alpha, sam: sam) },
+            authorization: { ids in
+                KnowledgeSourceAuthorization(featureEnabled: true, meetingIDs: ids, policies: [
+                    KnowledgeProcessingPolicy(allowedRemoteProviderIDs: [AIProvider.openAI.id], maxRemoteClassification: .internal),
+                ], sourceClassifications: [.internal])
+            },
+            remoteConsent: { _ in true })
+    }
+
+    @Test func includeInferredListsAChainedEdgeAndAnAliasOnlyIdentityForReview() async throws {
+        let alpha = UUID(), sam = UUID()
+        let source = Self.derivedSource(alpha: alpha, sam: sam)
+        let chain = try await run("get_graph", ["entityID": .string(alpha.uuidString), "includeInferred": .bool(true)], source: source)
+        #expect(chain.content.contains("- derived transitive_blocks | Alpha blocks Gamma | modality: inferred"))
+        #expect(chain.content.contains("| premises "))
+        let people = try await run("get_graph", ["entityID": .string(sam.uuidString), "includeInferred": .bool(true)], source: source)
+        // The pair is ordered by ID, which is random here, so either order names it.
+        let pair = ["Sam Rivera / Sam R", "Sam R / Sam Rivera"]
+        #expect(pair.contains { people.content.contains("- possible same_as | \($0) | modality: inferred | needs human review") })
+        #expect(people.content.contains("because: alias match"))
+        #expect(!people.content.contains("because: same name"))
+        let plain = try await run("get_graph", ["entityID": .string(alpha.uuidString)], source: source)
+        #expect(!plain.content.contains("- derived ") && !plain.content.contains("possible same_as"))
     }
 
     @Test func resolveEntityRanksExactNamesThenAliasesPrefixesAndWords() async throws {
@@ -100,6 +148,15 @@ struct ChatKnowledgeStructureToolsTests {
         #expect(!graph.content.contains("Avery Example"))
         let inferred = try await run("get_graph", ["entityID": .string(Self.team.uuidString), "includeInferred": .bool(true)])
         #expect(inferred.content.contains("Platform team relatesTo Avery Example | modality: inferred"))
+        // Derived suggestions are computed only when inferred relations are asked for.
+        #expect(inferred.content.contains("then derived lines (inferred suggestions for review, never evidence"))
+        #expect(!graph.content.contains("derived lines") && !graph.content.contains("- derived "))
+        // A current owner and due date become one derived commitment with its two premises; the owner whose
+        // assignment ended on 2026-10-01 and the tentative proposal are not offered.
+        let commitment = try await run("get_graph", ["entityID": .string(Self.migrate.uuidString), "includeInferred": .bool(true)])
+        #expect(commitment.content.contains("- derived commitment | Avery Example owns Migrate billing | due: 2026-12-01 | modality: inferred"))
+        #expect(commitment.content.contains("| premises "))
+        #expect(!commitment.content.contains("Former owner owns") && !commitment.content.contains("Riley Example owns"))
         #expect(try await run("get_graph", ["entityID": .string(UUID().uuidString)]).isError)
         #expect(try await run("get_graph", ["entityID": .string(Self.team.uuidString), "depth": .number(3)]).isError)
         #expect(try await run("get_graph", ["entityID": .string(Self.team.uuidString), "includeNegated": .string("yes")]).isError)
