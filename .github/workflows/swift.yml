@@ -115,6 +115,9 @@ jobs:
       - name: Validate native harness contracts
         run: python3 Tools/check_native_harness_contracts.py
 
+      - name: Check workflow secrets and triggers
+        run: python3 Tools/check_workflow_security.py
+
       - name: Test the coverage tools
         run: python3 -m unittest discover -s Tools/tests -t .
 

@@ -31,6 +31,10 @@ jobs:
   smoke:
     runs-on: macos-26
     timeout-minutes: 60
+    # The provider keys live in the `paid-evals` GitHub Environment, which releases them only after its
+    # reviewer approves and only to runs of `main`; a workflow that names them without declaring it is
+    # refused by Tools/check_workflow_security.py (CLAUDE.md "CI supply chain").
+    environment: paid-evals
 
     env:
       XCODE_PROJECT: Kurn.xcodeproj

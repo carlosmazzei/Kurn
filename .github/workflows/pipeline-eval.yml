@@ -78,6 +78,10 @@ jobs:
     # not a partial result -- `writeCSV` runs only after every item, so a job
     # killed at the limit produces no CSV and no aggregate table at all.
     timeout-minutes: 360
+    # The provider keys live in the `paid-evals` GitHub Environment, which releases them only after its
+    # reviewer approves and only to runs of `main`; a workflow that names them without declaring it is
+    # refused by Tools/check_workflow_security.py (CLAUDE.md "CI supply chain").
+    environment: paid-evals
 
     env:
       XCODE_PROJECT: Kurn.xcodeproj

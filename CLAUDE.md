@@ -745,7 +745,7 @@ To verify a change through CI:
 
 ### Live provider qualification
 
-`.github/workflows/live-provider-smoke.yml` (`workflow_dispatch` only, since it spends API credit) runs
+`.github/workflows/live-provider-smoke.yml` (`workflow_dispatch` only, since it spends API credit, and gated by the `paid-evals` environment) runs
 `LiveProviderSmokeTests` with `KURN_LIVE_SMOKE=1` and the `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/`GEMINI_API_KEY`
 secrets: one agent run per vendor whose key is set, through the app's own clients and `NativeHarness`, with a
 tool whose answer carries an offset the model cannot guess, so a pass proves the tool round trip. Models come
@@ -760,7 +760,7 @@ between runs, like the pipeline evaluation.
 
 ### Ask evaluation (K7.0)
 
-`.github/workflows/knowledge-ask-eval.yml` (`workflow_dispatch` only, since it spends API credit; secret
+`.github/workflows/knowledge-ask-eval.yml` (`workflow_dispatch` only, since it spends API credit, gated by the `paid-evals` environment; secret
 `OPENAI_API_KEY`) runs `KnowledgeAskEvalTests` with `KURN_ASK_EVAL=1`: every question of
 `Fixtures/knowledge-questions` (synthetic) under each variant, through the app's own OpenAI client and
 `NativeHarness`. Variants: `closed_book` (no sources), `full_transcript` (the fixture's transcripts in the system
@@ -4544,6 +4544,24 @@ enforced by lint and by a CI audit test, not just convention:
   SHA with the version in a trailing comment (Dependabot keeps both current),
   checkouts set `persist-credentials: false`, and workflow inputs reach `run:`
   scripts through `env:`, never `${{ }}` interpolation.
+  Secrets that can spend money or ship the app live in protected GitHub
+  environments, never at repository level: `paid-evals` (the OpenAI, Anthropic,
+  Gemini, Groq, ElevenLabs and Hugging Face keys, read only by the on-demand
+  `live-provider-smoke`, `pipeline-eval` and `knowledge-ask-eval` workflows) and
+  `release` (App Store Connect and fastlane match). An environment releases its
+  secrets only to a job that declares it, after its reviewer approves and only
+  from the branches it allows (`main`), so a branch with an edited workflow gets
+  none. `Tools/check_workflow_security.py` (in `static-policy`, tested in
+  `Tools/tests/test_workflow_security.py`) fails CI when a job reads a paid or
+  release secret without its environment, when a secret is not classified there,
+  when a paid workflow is anything but `workflow_dispatch`, when a workflow uses
+  `pull_request_target`, `workflow_run`, comment/issue/review/discussion triggers,
+  `secrets: inherit` (one documented exception: `swift.yml`'s `store-assets`) or
+  `secrets[...]`, or when `.github/CODEOWNERS` loses its owner for `.github/`.
+  The check reads the workflow text; that the environments exist with reviewers,
+  that the ruleset asks for code-owner review and that provider keys have spend
+  limits are repository and provider settings it cannot see. A new secret is
+  classified in that script in the same change that uses it.
 - **Do not commit directly to `main`:** create a feature branch for every change,
   push it, and open a pull request. Only merge through the GitHub PR workflow so
   CI runs before the change lands on `main`. The only exceptions are fastlane

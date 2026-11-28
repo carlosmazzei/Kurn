@@ -1,0 +1,21 @@
+# Code owners. With the repository ruleset asking for code-owner review, a pull request that touches one
+# of these paths needs its owner's approval before it can merge.
+#
+# These are the places where a change runs with a secret, ships to users or decides what CI trusts: the
+# workflows and the actions they use, release automation, the CI checks themselves, the remote model
+# catalog every install reads, the threat model, the dependency pins, and the tests the paid evaluation
+# workflows execute with provider keys.
+
+/.github/                                                                  @carlosmazzei
+/fastlane/                                                                 @carlosmazzei
+/scripts/                                                                  @carlosmazzei
+/Tools/                                                                    @carlosmazzei
+/catalog/                                                                  @carlosmazzei
+/SECURITY_MODEL.md                                                         @carlosmazzei
+/Packages/*/Package.swift                                                  @carlosmazzei
+/Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved  @carlosmazzei
+/KurnTests/LiveProviderSmokeTests.swift                                    @carlosmazzei
+/KurnTests/KnowledgeAskEvalTests.swift                                     @carlosmazzei
+/KurnTests/Support/KnowledgeAskEval/                                       @carlosmazzei
+/KurnTests/PublicDatasetEvaluationHarnessTests.swift                       @carlosmazzei
+/KurnTests/PipelineEvaluationMatrixTests.swift                             @carlosmazzei
