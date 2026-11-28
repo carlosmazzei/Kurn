@@ -1535,6 +1535,12 @@
 "knowledge.graph.show_negated" = "Afficher les relations niées";
 "knowledge.graph.show_inferred" = "Afficher les relations déduites";
 "knowledge.graph.inferred" = "Déduite, non énoncée";
+"knowledge.graph.suggestions.title" = "Suggestions";
+"knowledge.graph.suggestions.footer" = "Déduites d’affirmations énoncées, non énoncées elles-mêmes. À vérifier ; jamais une preuve.";
+"knowledge.graph.suggestion.derived" = "Déduit de %d affirmations énoncées";
+"knowledge.graph.suggestion.commitment" = "%1$@ est responsable de « %2$@ », échéance %3$@";
+"knowledge.graph.suggestion.same_as" = "« %1$@ » et « %2$@ » peuvent être la même entité";
+"knowledge.graph.suggestion.same_as_detail" = "À vérifier · similarité de nom %.2f (expérimental)";
 "knowledge.graph.mode" = "Mode";
 "knowledge.graph.mode.relationships" = "Toutes";
 "knowledge.graph.mode.evolution" = "Un jour donné";
