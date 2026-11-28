@@ -75,7 +75,7 @@ struct KnowledgeAskEvalTests {
         #expect(!KnowledgeAskEvalRunner.tools(for: .knowledge, fixture: fixture).isEmpty)
     }
 
-    @Test func theJudgeSeesTheExpectedAndTheTemptingClaimsButTheModelNeverDoes() throws {
+    @Test func theJudgeSeesTheTemptingClaimsButTheModelNeverDoes() throws {
         let fixture = try KnowledgeAskEvalFiles.fixture("en-three-contexts")
         let question = try #require(try KnowledgeAskEvalFiles.questions().first { $0.fixture == fixture.id && !$0.forbidden.isEmpty })
         let table = fixture.judgeTable(expected: question.expected, forbidden: question.forbidden)
@@ -95,7 +95,7 @@ struct KnowledgeAskEvalTests {
         #expect(KnowledgeAskEvalRunner.verdict(from: "{not json}") == nil)
     }
 
-    @Test func aPerfectVerdictScoresPerfectlyAndAForbiddenOneIsCounted() {
+    @Test func aPerfectVerdictScoresPerfectAndAForbiddenOneCounts() {
         let expectation = KnowledgeAnswerScorer.Expectation(expected: ["a1"], forbidden: ["!0"], mustRefuse: false, citable: ["m1/s1"])
         let good = KnowledgeAskEvalRunner.observation(.init(stated: ["a1"], unsupported: 0, declined: false, cited: ["m1/s1"]))
         #expect(KnowledgeAnswerScorer.score(good, against: expectation, resolvable: ["m1/s1"]).recall == 1)
