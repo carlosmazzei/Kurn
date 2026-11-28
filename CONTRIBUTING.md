@@ -163,6 +163,12 @@ the app's real pipeline over public benchmark corpora, once per configuration in
 `PipelineEvaluationMatrix`, and scores WER and DER against each. Nobody needs
 Xcode locally for it.
 
+Only maintainers can dispatch workflows. A run that sends nothing to a provider
+(`cloud_providers: none`, `correction: off`, open corpora) runs on any branch, so
+a pipeline change is measured on its own branch; cloud providers, the LLM
+correction pass and corpora that need `HF_TOKEN` wait for the maintainer's
+approval and run only from `main`.
+
 If the numbers moved, record the run in
 [`docs/pipeline-evaluation.md`](docs/pipeline-evaluation.md) — the workflow's
 job summary hands you the Markdown to paste — and mention the before/after in

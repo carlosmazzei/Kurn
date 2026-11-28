@@ -78,6 +78,13 @@ jobs:
     # not a partial result -- `writeCSV` runs only after every item, so a job
     # killed at the limit produces no CSV and no aggregate table at all.
     timeout-minutes: 360
+    # A run that sends nothing to a provider (`cloud_providers: none`, `correction: off`) uses the
+    # `evals-open` environment, which holds no secrets and allows any branch, so a pipeline change can be
+    # measured on its own branch. Every other run (a cloud provider, the LLM correction pass, or a corpus that
+    # needs `HF_TOKEN`) uses `paid-evals`, which holds the keys, waits for its reviewer and releases them only
+    # to runs of `main`. Both names are checked by Tools/check_workflow_security.py (CLAUDE.md "CI supply
+    # chain"); the keyless run sees no key only while no paid key is left at repository level.
+    environment: ${{ inputs.cloud_providers == 'none' && inputs.correction == 'off' && 'evals-open' || 'paid-evals' }}
 
     env:
       XCODE_PROJECT: Kurn.xcodeproj

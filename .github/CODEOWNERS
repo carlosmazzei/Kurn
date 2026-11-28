@@ -1,0 +1,26 @@
+# Code owners. With the repository ruleset asking for code-owner review, a pull request that touches one
+# of these paths needs its owner's approval before it can merge. GitHub does not let an author approve their
+# own pull request, so the owner merges their own through the ruleset's bypass list.
+#
+# The owner owns everything: the paid evaluation workflows build and run the whole app and its tests from
+# `main` with provider keys, so any merged change can reach them. The lines after it are the places where a
+# change runs with a secret, ships to users or decides what CI trusts, kept so they stay visible and so the
+# `.github/` entry that Tools/check_workflow_security.py requires has a reason to exist.
+
+*                                                                          @carlosmazzei
+
+/.github/                                                                  @carlosmazzei
+/fastlane/                                                                 @carlosmazzei
+/scripts/                                                                  @carlosmazzei
+/Tools/                                                                    @carlosmazzei
+/catalog/                                                                  @carlosmazzei
+/SECURITY_MODEL.md                                                         @carlosmazzei
+/Packages/*/Package.swift                                                  @carlosmazzei
+/Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved  @carlosmazzei
+/KurnTests/LiveProviderSmokeTests.swift                                    @carlosmazzei
+/KurnTests/KnowledgeAskEvalTests.swift                                     @carlosmazzei
+/KurnTests/Support/KnowledgeAskEval/                                       @carlosmazzei
+/KurnTests/PublicDatasetEvaluationHarnessTests.swift                       @carlosmazzei
+/KurnTests/PipelineEvaluationMatrixTests.swift                             @carlosmazzei
+/KurnTests/ChatSessionScaleTests.swift                                     @carlosmazzei
+/KurnTests/Support/Evaluation/                                              @carlosmazzei
