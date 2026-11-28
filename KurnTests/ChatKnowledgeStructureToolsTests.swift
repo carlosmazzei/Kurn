@@ -115,7 +115,9 @@ struct ChatKnowledgeStructureToolsTests {
         #expect(chain.content.contains("- derived transitive_blocks | Alpha blocks Gamma | modality: inferred"))
         #expect(chain.content.contains("| premises "))
         let people = try await run("get_graph", ["entityID": .string(sam.uuidString), "includeInferred": .bool(true)], source: source)
-        #expect(people.content.contains("- possible same_as | Sam Rivera / Sam R | modality: inferred | needs human review"))
+        // The pair is ordered by ID, which is random here, so either order names it.
+        let pair = ["Sam Rivera / Sam R", "Sam R / Sam Rivera"]
+        #expect(pair.contains { people.content.contains("- possible same_as | \($0) | modality: inferred | needs human review") })
         #expect(people.content.contains("because: alias match"))
         #expect(!people.content.contains("because: same name"))
         let plain = try await run("get_graph", ["entityID": .string(alpha.uuidString)], source: source)
