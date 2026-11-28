@@ -25,7 +25,7 @@ extension ChatKnowledgeTools {
                                  now: Date) throws -> AgentToolOutput {
         switch name {
         case "resolve_entity": return try resolveEntity(params, read: read)
-        case "get_graph": return try graph(params, read: read)
+        case "get_graph": return try graph(params, read: read, now: now)
         case "compare_state": return try compareState(params, read: read, now: now)
         case "list_open_actions": return try openActions(params, read: read, now: now)
         case "list_contexts": return contexts(params, read: read)
@@ -76,7 +76,7 @@ extension ChatKnowledgeTools {
 
     // MARK: - get_graph
 
-    private static func graph(_ params: Parameters, read: KnowledgeBrowserRead) throws -> AgentToolOutput {
+    private static func graph(_ params: Parameters, read: KnowledgeBrowserRead, now: Date) throws -> AgentToolOutput {
         let id = try params.uuid("entityID")
         // Inferred relations stay hidden unless asked for, as in the Graph Explorer (K4.3).
         let depth = try params.integer("depth", fallback: 1, range: 0...KnowledgeGraph.Query.maximumDepth)
@@ -90,7 +90,7 @@ extension ChatKnowledgeTools {
         var header = ChatKnowledgeToolText.graphHeader(graph, names: names)
         if query.includesInferred {
             // Computed on this read, never stored; every line says it is inferred and names its premises.
-            let suggestions = try KnowledgeInference.suggestions(from: read.pages, touching: Set(graph.nodes.map(\.id)))
+            let suggestions = try KnowledgeInference.suggestions(from: read.pages, touching: Set(graph.nodes.map(\.id)), at: now)
             let all = ChatKnowledgeToolText.names(read.pages)
             lines += suggestions.edges.map { ChatKnowledgeToolText.derivedEdge($0, names: all) }
                 + suggestions.commitments.map { ChatKnowledgeToolText.derivedCommitment($0, names: all) }

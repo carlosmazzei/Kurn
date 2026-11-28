@@ -3732,7 +3732,8 @@ checksummed projection like the wiki pages and shows it dotted and off by defaul
   touches the given identities. `get_graph` with `includeInferred` appends, after the stated nodes and
   edges, `derived` edges, `derived commitment` (current owner and due date) and `possible same_as` lines, each
   labelled `modality: inferred` with its premise claim IDs (a candidate says it needs human review and that
-  its score is experimental). Nothing is stored, so a retracted premise drops its line on the next read
+  its score is experimental, with the signals behind it). The tool passes its clock, so a claim whose stated period is
+  not running then (an assignment that ended, one not begun) is neither an owner nor a replacement. Nothing is stored, so a retracted premise drops its line on the next read
   (premise-retraction invalidation follows from recomputing). Without the flag the output is unchanged.
 - Not yet: the Graph Explorer showing commitments and `same_as` candidates, and the stored projection.
 

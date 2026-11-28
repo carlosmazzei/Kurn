@@ -21,7 +21,13 @@ extension KnowledgeInference {
     /// (a week's cover) replaces nothing: this reads no date, so it cannot tell whether the cover
     /// has ended, and both owners stay. A pairing that survives is
     /// still a derived, review-only suggestion: it lists the same two premises.
-    public static func deriveCurrentCommitments(from facts: [KnowledgeWikiSnapshot.Fact]) -> CommitmentResult {
+    ///
+    /// With `now`, a claim whose stated period is not running then is left out before any of that: one
+    /// that ended (an owner who stepped down) or has not begun (a later assignment) is neither a premise
+    /// nor a replacement.
+    public static func deriveCurrentCommitments(from allFacts: [KnowledgeWikiSnapshot.Fact],
+                                                at now: Date? = nil) -> CommitmentResult {
+        let facts = now.map { now in allFacts.filter { isRunning($0, at: now) } } ?? allFacts
         let premises = commitmentPremises(from: facts)
         var starts: [UUID: (lower: Date, upper: Date)] = [:]
         var ended = Set<UUID>()
@@ -59,5 +65,12 @@ extension KnowledgeInference {
             }
         }
         return replaced
+    }
+
+    /// A stated period that contains `now`: begun (or undated) and not yet over (or open).
+    private static func isRunning(_ fact: KnowledgeWikiSnapshot.Fact, at now: Date) -> Bool {
+        if let begin = fact.qualifiers.validFrom?.bounds, begin.lower > now { return false }
+        if let end = fact.qualifiers.validTo?.bounds, end.upper <= now { return false }
+        return true
     }
 }

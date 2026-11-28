@@ -20,8 +20,9 @@ extension KnowledgeInference {
 
     /// Runs the three derivations over `pages` and keeps what touches `ids` (an edge, a commitment's owner
     /// or action, a candidate's either side). Identities are the ones the pages show, so a merged identity
-    /// counts as the one it was merged into. Deterministic for any page order.
-    public static func suggestions(from pages: [KnowledgeWikiPage], touching ids: Set<UUID>) throws -> Suggestions {
+    /// counts as the one it was merged into. With `now`, commitments read only claims whose stated period is running
+    /// then. Deterministic for any page order.
+    public static func suggestions(from pages: [KnowledgeWikiPage], touching ids: Set<UUID>, at now: Date? = nil) throws -> Suggestions {
         var entities: [UUID: KnowledgeWikiSnapshot.Entity] = [:]
         var edges: [UUID: KnowledgeGraph.Edge] = [:]
         var facts: [UUID: KnowledgeWikiSnapshot.Fact] = [:]
@@ -44,7 +45,7 @@ extension KnowledgeInference {
         let sorted = edges.values.sorted { $0.factID.uuidString < $1.factID.uuidString }
         let derived = derive(from: sorted.filter { $0.sourceID != $0.targetID })
         let ordered = facts.values.sorted { $0.id.uuidString < $1.id.uuidString }
-        let commitments = deriveCurrentCommitments(from: ordered)
+        let commitments = deriveCurrentCommitments(from: ordered, at: now)
         let sameAs = try deriveSameAsCandidates(
             from: entities.values.sorted { $0.id.uuidString < $1.id.uuidString }, profile: .experimental)
         return Suggestions(

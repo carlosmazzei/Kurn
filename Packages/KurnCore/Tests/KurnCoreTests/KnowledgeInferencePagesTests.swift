@@ -15,17 +15,22 @@ struct KnowledgeInferencePagesTests {
         }
 
         @discardableResult
-        mutating func fact(_ subject: UUID, _ predicate: KnowledgePredicate, _ object: UUID) -> UUID {
+        mutating func fact(_ subject: UUID, _ predicate: KnowledgePredicate, _ object: UUID? = nil,
+                           value: KnowledgeTypedValue? = nil, to: KnowledgeTemporalValue? = nil) -> UUID {
             let id = UUID()
             facts.append(.init(
-                id: id, subjectID: subject, predicate: predicate, objectID: object,
+                id: id, subjectID: subject, predicate: predicate, objectID: object, value: value,
                 qualifiers: .init(modality: .reported, polarity: .positive, claimKind: .internalStatusReport,
-                                  authority: .attributed, confidence: .medium, review: .machineExtracted),
+                                  authority: .attributed, confidence: .medium, review: .machineExtracted, validTo: to),
                 source: .init(meetingID: UUID(), recordedAt: Date(timeIntervalSince1970: 1_800_000_000), evidence: [
                     .init(id: UUID(), recordingID: UUID(), segmentIDs: ["s1"], quote: "quoted", startMs: 0, endMs: 500,
                           attributedSpeaker: "Speaker 1"),
                 ])))
             return id
+        }
+
+        mutating func due(_ action: UUID, _ day: String) {
+            fact(action, .dueOn, value: KnowledgeTemporalValue(text: day, precision: .day).map { .date($0) })
         }
 
         func pages() throws -> [KnowledgeWikiPage] {
@@ -63,5 +68,20 @@ struct KnowledgeInferencePagesTests {
         #expect(Set([result.sameAs[0].firstID, result.sameAs[0].secondID]) == [first, second])
         #expect(result.sameAs[0].requiresHumanReview)
         #expect(try KnowledgeInference.suggestions(from: Array(pages.reversed()), touching: [first]) == result)
+    }
+
+    @Test func anOwnerWhoseAssignmentEndedIsNotOfferedForTheDueDate() throws {
+        var graph = Builder()
+        let action = graph.entity("Migrate billing", kind: .actionItem)
+        let current = graph.entity("Avery", kind: .person), former = graph.entity("Former", kind: .person)
+        graph.fact(action, .assignedTo, current)
+        graph.fact(action, .assignedTo, former, to: KnowledgeTemporalValue(text: "2026-10-01", precision: .day))
+        graph.due(action, "2026-12-01")
+        let pages = try graph.pages()
+        let now = Date(timeIntervalSince1970: 1_795_000_000)  // late November 2026
+        let owners = try KnowledgeInference.suggestions(from: pages, touching: [action], at: now).commitments.map(\.ownerID)
+        #expect(owners == [current])
+        let all = try KnowledgeInference.suggestions(from: pages, touching: [action]).commitments.map(\.ownerID)
+        #expect(Set(all) == [current, former])
     }
 }

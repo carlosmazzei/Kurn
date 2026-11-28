@@ -103,6 +103,12 @@ struct ChatKnowledgeStructureToolsTests {
         // Derived suggestions are computed only when inferred relations are asked for.
         #expect(inferred.content.contains("then derived lines (inferred suggestions for review, never evidence"))
         #expect(!graph.content.contains("derived lines") && !graph.content.contains("- derived "))
+        // A current owner and due date become one derived commitment with its two premises; the owner whose
+        // assignment ended on 2026-10-01 and the tentative proposal are not offered.
+        let commitment = try await run("get_graph", ["entityID": .string(Self.migrate.uuidString), "includeInferred": .bool(true)])
+        #expect(commitment.content.contains("- derived commitment | Avery Example owns Migrate billing | due: 2026-12-01 | modality: inferred"))
+        #expect(commitment.content.contains("| premises "))
+        #expect(!commitment.content.contains("Former owner owns") && !commitment.content.contains("Riley Example owns"))
         #expect(try await run("get_graph", ["entityID": .string(UUID().uuidString)]).isError)
         #expect(try await run("get_graph", ["entityID": .string(Self.team.uuidString), "depth": .number(3)]).isError)
         #expect(try await run("get_graph", ["entityID": .string(Self.team.uuidString), "includeNegated": .string("yes")]).isError)

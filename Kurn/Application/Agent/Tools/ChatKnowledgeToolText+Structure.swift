@@ -69,8 +69,12 @@ extension ChatKnowledgeToolText {
         let first = ChatSourceToolText.renderedField(names[candidate.firstID] ?? "", limit: 200)
         let second = ChatSourceToolText.renderedField(names[candidate.secondID] ?? "", limit: 200)
         let score = String(format: "%.2f", candidate.score)
+        var signals: [String] = []
+        if candidate.exactName { signals.append("same name") }
+        if candidate.aliasMatch { signals.append("alias match") }
+        if candidate.tokenSimilarity > 0 { signals.append("shared words \(String(format: "%.2f", candidate.tokenSimilarity))") }
         return Rendered(text: "- possible same_as | \(first.text) / \(second.text) | modality: inferred | needs human review"
-                        + " | score: \(score) (experimental, not a probability) | \(candidate.firstID.uuidString)"
+                        + " | because: \(signals.joined(separator: ", ")) | score: \(score) (experimental, not a probability) | \(candidate.firstID.uuidString)"
                         + " and \(candidate.secondID.uuidString)",
                         omittedScalars: first.omittedScalars + second.omittedScalars)
     }
