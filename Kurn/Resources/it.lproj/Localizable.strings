@@ -1535,6 +1535,13 @@
 "knowledge.graph.show_negated" = "Mostra relazioni negate";
 "knowledge.graph.show_inferred" = "Mostra relazioni dedotte";
 "knowledge.graph.inferred" = "Dedotta, non dichiarata";
+"knowledge.graph.suggestions.title" = "Suggerimenti";
+"knowledge.graph.suggestions.footer" = "Dedotti da affermazioni dichiarate, non dichiarati di per sé. Da verificare; mai una prova.";
+"knowledge.graph.suggestions.truncated" = "Alcuni suggerimenti potrebbero mancare: è stato raggiunto un limite durante la deduzione.";
+"knowledge.graph.suggestion.derived" = "Dedotto da %d affermazioni dichiarate";
+"knowledge.graph.suggestion.commitment" = "%1$@ è responsabile di “%2$@”, scadenza %3$@";
+"knowledge.graph.suggestion.same_as" = "“%1$@” e “%2$@” potrebbero essere lo stesso";
+"knowledge.graph.suggestion.same_as_detail" = "Richiede la tua verifica · somiglianza del nome %.2f (sperimentale)";
 "knowledge.graph.mode" = "Modalità";
 "knowledge.graph.mode.relationships" = "Tutte";
 "knowledge.graph.mode.evolution" = "In un giorno";

@@ -3735,7 +3735,16 @@ checksummed projection like the wiki pages and shows it dotted and off by defaul
   its score is experimental, with the signals behind it). The tool passes its clock, so a claim whose stated period is
   not running then (an assignment that ended, one not begun) is neither an owner nor a replacement. Nothing is stored, so a retracted premise drops its line on the next read
   (premise-retraction invalidation follows from recomputing). Without the flag the output is unchanged.
-- Not yet: the Graph Explorer showing commitments and `same_as` candidates, and the stored projection.
+- **Listed in the Graph Explorer.** With "Show inferred relationships" on, the Explorer adds a Suggestions card
+  (`KnowledgeGraphPresentation.suggestions`, tested) under the summary: derived relations, current owners with their due
+  date and identities that may be one, for the shown nodes. Each row says how it was reached (inferred from N stated
+  claims, or a name match with its experimental score, for the reader's review), and a row that follows from claims
+  opens the first one's cited passage through the ID-only evidence route (for a commitment that is the ownership claim; the
+  due date's passage is not linked yet). The card is offered only in All and Contexts: the derivations read every claim of
+  the read, so a chosen day's known-then cut-offs cannot apply and the day and compare modes show none. A derivation bound
+  is announced ("some suggestions may be missing"). They are computed on read, never drawn on the
+  canvas, never stored and never merged. Seven languages cover the card.
+- Not yet: drawing derived relations dotted on the canvas, and the stored projection.
 
 ### Knowledge late arrivals (K3.5)
 

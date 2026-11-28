@@ -66,6 +66,7 @@ struct KnowledgeGraphView: View {
                         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 summary(scene)
+                suggestionsCard(scene)
                 if isList {
                     ForEach(KnowledgeGraphPresentation.listSections(scene)) { item in
                         nodeCard(item.node, edges: item.edges)
@@ -164,6 +165,48 @@ struct KnowledgeGraphView: View {
             }
         }
         .knowledgeCard()
+    }
+
+    /// What the stated claims suggest, only while inferred relationships are asked for.
+    @ViewBuilder
+    private func suggestionsCard(_ scene: KnowledgeGraphPresentation.Scene) -> some View {
+        let suggestions = KnowledgeGraphPresentation.offersSuggestions(exploration)
+            ? KnowledgeGraphPresentation.suggestions(pages: read.pages, touching: Set(scene.nodes.map(\.id)), now: Date()) : .none
+        if !suggestions.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                KnowledgeSectionLabel(KnowledgeGraphPresentation.copy("suggestions.title"))
+                footnote(KnowledgeGraphPresentation.copy("suggestions.footer"))
+                if suggestions.isTruncated { footnote(KnowledgeGraphPresentation.copy("suggestions.truncated")) }
+                ForEach(suggestions.items) { suggestion in
+                    Divider().overlay(Theme.separator).accessibilityHidden(true)
+                    suggestionRow(suggestion)
+                }
+            }
+            .knowledgeCard()
+            .accessibilityIdentifier("knowledge.graph.suggestions")
+        }
+    }
+
+    @ViewBuilder
+    private func suggestionRow(_ suggestion: KnowledgeGraphPresentation.Suggestion) -> some View {
+        let content = VStack(alignment: .leading, spacing: 4) {
+            Text(verbatim: suggestion.text).font(Theme.subheadlineEmphasized).foregroundStyle(Theme.textPrimary)
+            Text(verbatim: suggestion.detail).font(Theme.caption2Emphasized).foregroundStyle(Theme.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        if let route = suggestion.evidence {
+            NavigationLink(value: route) {
+                HStack(spacing: 12) {
+                    content
+                    KnowledgeChevron()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("knowledge.graph.suggestion")
+        } else {
+            content.accessibilityIdentifier("knowledge.graph.suggestion")
+        }
     }
 
     @ViewBuilder

@@ -1535,6 +1535,13 @@
 "knowledge.graph.show_negated" = "显示被否定的关系";
 "knowledge.graph.show_inferred" = "显示推断的关系";
 "knowledge.graph.inferred" = "推断，未明确陈述";
+"knowledge.graph.suggestions.title" = "建议";
+"knowledge.graph.suggestions.footer" = "由已陈述的内容推断，本身并未被陈述。仅供您审阅，绝非证据。";
+"knowledge.graph.suggestions.truncated" = "部分建议可能缺失：推断时达到了上限。";
+"knowledge.graph.suggestion.derived" = "由 %d 条已陈述的内容推断";
+"knowledge.graph.suggestion.commitment" = "%1$@ 负责“%2$@”，截止 %3$@";
+"knowledge.graph.suggestion.same_as" = "“%1$@”和“%2$@”可能是同一个";
+"knowledge.graph.suggestion.same_as_detail" = "需要您审阅 · 名称相似度 %.2f（实验性）";
 "knowledge.graph.mode" = "模式";
 "knowledge.graph.mode.relationships" = "全部";
 "knowledge.graph.mode.evolution" = "某一天";

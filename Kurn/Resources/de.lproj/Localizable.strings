@@ -1535,6 +1535,13 @@
 "knowledge.graph.show_negated" = "Verneinte Beziehungen zeigen";
 "knowledge.graph.show_inferred" = "Abgeleitete Beziehungen zeigen";
 "knowledge.graph.inferred" = "Abgeleitet, nicht ausgesagt";
+"knowledge.graph.suggestions.title" = "Vorschläge";
+"knowledge.graph.suggestions.footer" = "Aus ausgesprochenen Aussagen abgeleitet, nicht selbst ausgesprochen. Zur Prüfung; nie ein Beleg.";
+"knowledge.graph.suggestions.truncated" = "Einige Vorschläge fehlen möglicherweise: Beim Ableiten wurde eine Grenze erreicht.";
+"knowledge.graph.suggestion.derived" = "Aus %d ausgesprochenen Aussagen abgeleitet";
+"knowledge.graph.suggestion.commitment" = "%1$@ ist zuständig für „%2$@“, fällig %3$@";
+"knowledge.graph.suggestion.same_as" = "„%1$@“ und „%2$@“ könnten dasselbe sein";
+"knowledge.graph.suggestion.same_as_detail" = "Zu prüfen · Namensähnlichkeit %.2f (experimentell)";
 "knowledge.graph.mode" = "Modus";
 "knowledge.graph.mode.relationships" = "Alle";
 "knowledge.graph.mode.evolution" = "An einem Tag";
