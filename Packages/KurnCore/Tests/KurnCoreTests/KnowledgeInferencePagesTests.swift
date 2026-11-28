@@ -16,12 +16,13 @@ struct KnowledgeInferencePagesTests {
 
         @discardableResult
         mutating func fact(_ subject: UUID, _ predicate: KnowledgePredicate, _ object: UUID? = nil,
-                           value: KnowledgeTypedValue? = nil, to: KnowledgeTemporalValue? = nil) -> UUID {
+                           value: KnowledgeTypedValue? = nil, from: KnowledgeTemporalValue? = nil,
+                           to: KnowledgeTemporalValue? = nil) -> UUID {
             let id = UUID()
             facts.append(.init(
                 id: id, subjectID: subject, predicate: predicate, objectID: object, value: value,
                 qualifiers: .init(modality: .reported, polarity: .positive, claimKind: .internalStatusReport,
-                                  authority: .attributed, confidence: .medium, review: .machineExtracted, validTo: to),
+                                  authority: .attributed, confidence: .medium, review: .machineExtracted, validFrom: from, validTo: to),
                 source: .init(meetingID: UUID(), recordedAt: Date(timeIntervalSince1970: 1_800_000_000), evidence: [
                     .init(id: UUID(), recordingID: UUID(), segmentIDs: ["s1"], quote: "quoted", startMs: 0, endMs: 500,
                           attributedSpeaker: "Speaker 1"),
@@ -83,5 +84,22 @@ struct KnowledgeInferencePagesTests {
         #expect(owners == [current])
         let all = try KnowledgeInference.suggestions(from: pages, touching: [action]).commitments.map(\.ownerID)
         #expect(Set(all) == [current, former])
+    }
+
+    @Test func aReplacementStartingSometimeThisMonthDoesNotEndTheEarlierOwnerYet() throws {
+        var graph = Builder()
+        let action = graph.entity("Migrate billing", kind: .actionItem)
+        let first = graph.entity("Avery", kind: .person), second = graph.entity("Riley", kind: .person)
+        graph.fact(action, .assignedTo, first, from: KnowledgeTemporalValue(text: "2026-09-01", precision: .day))
+        graph.fact(action, .assignedTo, second, from: KnowledgeTemporalValue(text: "2026-11", precision: .month))
+        graph.due(action, "2026-12-01")
+        let pages = try graph.pages()
+        func owners(_ time: TimeInterval) throws -> Set<UUID> {
+            Set(try KnowledgeInference.suggestions(from: pages, touching: [action], at: Date(timeIntervalSince1970: time))
+                .commitments.map(\.ownerID))
+        }
+        #expect(try owners(1_790_000_000) == [first])           // 2026-09-21: November has not begun
+        #expect(try owners(1_795_000_000) == [first, second])   // 2026-11-18: inside the window, either may hold
+        #expect(try owners(1_797_000_000) == [second])          // 2026-12-11: the window is over
     }
 }
