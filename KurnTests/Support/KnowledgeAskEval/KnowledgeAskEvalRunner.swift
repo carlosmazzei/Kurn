@@ -81,8 +81,15 @@ struct KnowledgeAskEvalRunner {
 
     // MARK: Answer
 
+    struct Answer {
+        let text: String
+        let toolCalls: Int
+        let stop: String
+        let usage: AgentUsage
+    }
+
     func answer(_ question: KnowledgeAskEvalFiles.Question, variant: Variant, fixture: KnowledgeAskEvalFixture)
-        async throws -> (text: String, toolCalls: Int, stop: String, usage: AgentUsage) {
+        async throws -> Answer {
         let harness = NativeHarness(model: model, limits: AgentLimits(maxTurns: 14, maxToolCalls: 28))
         var outcome: AgentRunOutcome?
         var toolCalls = 0
@@ -96,7 +103,7 @@ struct KnowledgeAskEvalRunner {
             }
         }
         guard let finished = outcome else { throw EvalError.noOutcome }
-        return (finished.finalText, toolCalls, finished.stopReason.rawValue, finished.totalUsage)
+        return Answer(text: finished.finalText, toolCalls: toolCalls, stop: finished.stopReason.rawValue, usage: finished.totalUsage)
     }
 
     // MARK: Judge
