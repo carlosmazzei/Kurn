@@ -208,10 +208,10 @@ struct KnowledgeAskEvalFixture {
         }.joined(separator: "\n\n")
     }
 
-    /// `m:ss`, the form the tools and the transcript give a moment in.
+    /// The moment as the knowledge tools show it (`ChatSourceToolText.duration`, rounded to the nearest second), so a
+    /// time the model copies from a tool result finds its segment in the transcript the judge reads.
     static func clock(_ milliseconds: Int) -> String {
-        let seconds = milliseconds / 1_000
-        return "\(seconds / 60):" + String(format: "%02d", seconds % 60)
+        ChatSourceToolText.duration(Double(milliseconds) / 1_000)
     }
 
     /// The compilation's coverage, as `get_coverage` reads it: every segment examined, every recording current.

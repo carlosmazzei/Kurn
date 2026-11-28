@@ -40,7 +40,8 @@ struct KnowledgeAskEvalRunner {
     enum EvalError: Error, Equatable {
         case noOutcome
         /// The judge's reply held no readable verdict: the answer is not scored, never scored as empty.
-        case unreadableVerdict
+        /// Carries what the paid calls cost, which a failed score does not undo.
+        case unreadableVerdict(answer: AgentUsage?, judge: AgentUsage)
         /// A workflow input that is not a known variant or a positive count: refused before any paid call.
         case invalidInput(String)
     }
@@ -159,7 +160,9 @@ struct KnowledgeAskEvalRunner {
             if case .runFinished(let finished) = event { outcome = finished }
         }
         guard let finished = outcome else { throw EvalError.noOutcome }
-        guard let verdict = Self.verdict(from: finished.finalText) else { throw EvalError.unreadableVerdict }
+        guard let verdict = Self.verdict(from: finished.finalText) else {
+            throw EvalError.unreadableVerdict(answer: nil, judge: finished.totalUsage)
+        }
         return (verdict, finished.totalUsage)
     }
 
@@ -172,7 +175,12 @@ struct KnowledgeAskEvalRunner {
 
     func run(_ question: KnowledgeAskEvalFiles.Question, variant: Variant, fixture: KnowledgeAskEvalFixture) async throws -> Observation {
         let given = try await answer(question, variant: variant, fixture: fixture)
-        let graded = try await grade(question, answer: given.text, fixture: fixture)
+        let graded: (verdict: Verdict, usage: AgentUsage)
+        do {
+            graded = try await grade(question, answer: given.text, fixture: fixture)
+        } catch EvalError.unreadableVerdict(_, let judge) {
+            throw EvalError.unreadableVerdict(answer: given.usage, judge: judge)
+        }
         let expectation = KnowledgeAnswerScorer.Expectation(
             expected: Set(question.expected), forbidden: Set(question.forbidden.map { "!\($0)" }),
             mustRefuse: question.mustRefuse, citable: Set(question.citable),

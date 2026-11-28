@@ -144,6 +144,8 @@ struct KnowledgeAskEvalTests {
         let fixture = try KnowledgeAskEvalFiles.fixture("en-moved-deadline")
         #expect(fixture.transcriptText.contains("[m1/s1 at 0:00]"))
         #expect(KnowledgeAskEvalFixture.clock(125_000) == "2:05")
+        // A segment starting between seconds reads as the tools round it, so a copied time matches the transcript.
+        #expect(KnowledgeAskEvalFixture.clock(16_500) == "0:17" && KnowledgeAskEvalFixture.clock(16_499) == "0:16")
     }
 
     // MARK: Live
@@ -180,8 +182,11 @@ struct KnowledgeAskEvalTests {
                     let observation = try await runner.run(question, variant: variant, fixture: fixture)
                     observations.append(observation)
                     print(KnowledgeAskEvalRunner.line(observation))
-                } catch KnowledgeAskEvalRunner.EvalError.unreadableVerdict {
-                    print("[ask-eval] variant=\(variant.rawValue) question=\(question.id) failed=judge_unreadable")
+                } catch KnowledgeAskEvalRunner.EvalError.unreadableVerdict(let answer, let judge) {
+                    // The paid calls happened: keep their tokens in the line the cost estimate is read from.
+                    print("[ask-eval] variant=\(variant.rawValue) question=\(question.id) failed=judge_unreadable"
+                          + " input_tokens=\(answer?.inputTokens ?? 0) output_tokens=\(answer?.outputTokens ?? 0)"
+                          + " judge_input_tokens=\(judge.inputTokens) judge_output_tokens=\(judge.outputTokens)")
                 } catch {
                     print("[ask-eval] variant=\(variant.rawValue) question=\(question.id) failed=\(error.publicLogCode)")
                 }
