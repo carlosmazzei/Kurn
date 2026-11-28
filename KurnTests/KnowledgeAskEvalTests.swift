@@ -104,15 +104,16 @@ struct KnowledgeAskEvalTests {
     }
 
     @Test func reportLinesCarryScoresAndTokensButNoContent() {
-        let expectation = KnowledgeAnswerScorer.Expectation(expected: ["a1", "a2"], forbidden: [], mustRefuse: false, citable: ["m1/s1"])
+        // The citation exists in the fixture but is not one the question accepts: resolvable, not grounded.
+        let expectation = KnowledgeAnswerScorer.Expectation(expected: ["a1", "a2"], forbidden: [], mustRefuse: false, citable: ["m2/s2"])
         let score = KnowledgeAnswerScorer.score(.init(stated: ["a1"], refused: false, cited: ["m1/s1"]), against: expectation,
-                                                resolvable: ["m1/s1"])
+                                                resolvable: ["m1/s1", "m2/s2"])
         let usage = AgentUsage(inputTokens: 10, outputTokens: 5)
         let observation = KnowledgeAskEvalRunner.Observation(variant: .knowledge, questionID: "q1", kind: "fact", score: score,
                                                              toolCalls: 3, stop: "completed", answerTokens: usage, judgeTokens: usage)
         let line = KnowledgeAskEvalRunner.line(observation)
         #expect(line.hasPrefix("[ask-eval] variant=knowledge question=q1 kind=fact precision=1.00 recall=0.50"))
-        #expect(line.contains("tool_calls=3") && line.contains("input_tokens=10") && line.contains("cites_grounded=false"))
+        #expect(line.contains("tool_calls=3") && line.contains("input_tokens=10") && line.contains("cites_resolvable=true") && line.contains("cites_grounded=false"))
         let summary = KnowledgeAskEvalRunner.summaryLine(.knowledge, label: "all", [observation])
         #expect(summary.contains("summary variant=knowledge group=all questions=1"))
     }
