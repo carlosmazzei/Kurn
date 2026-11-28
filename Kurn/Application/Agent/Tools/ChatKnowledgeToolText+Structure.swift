@@ -45,6 +45,38 @@ extension ChatKnowledgeToolText {
         return Rendered(text: line, omittedScalars: text.omittedScalars)
     }
 
+    /// A derived relation: inferred, review-only, never evidence, with the stated claims it follows from.
+    static func derivedEdge(_ edge: KnowledgeInference.DerivedEdge, names: [UUID: String]) -> Rendered {
+        let claim = [names[edge.sourceID] ?? "", edge.predicate.rawValue, names[edge.targetID] ?? ""].joined(separator: " ")
+        let text = ChatSourceToolText.renderedField(claim, limit: 400)
+        return Rendered(text: "- derived \(edge.rule.rawValue) | \(text.text) | modality: inferred | from \(edge.sourceID.uuidString)"
+                        + " to \(edge.targetID.uuidString) | premises \(premiseList(edge.premiseFactIDs))",
+                        omittedScalars: text.omittedScalars)
+    }
+
+    /// An owner and a due date that still stand by stated start; a suggestion, not a statement.
+    static func derivedCommitment(_ commitment: KnowledgeInference.DerivedCommitment, names: [UUID: String]) -> Rendered {
+        let owner = ChatSourceToolText.renderedField(names[commitment.ownerID] ?? "", limit: 200)
+        let action = ChatSourceToolText.renderedField(names[commitment.actionID] ?? "", limit: 200)
+        return Rendered(text: "- derived commitment | \(owner.text) owns \(action.text) | due: \(commitment.due.text)"
+                        + " | modality: inferred | owner \(commitment.ownerID.uuidString) | action \(commitment.actionID.uuidString)"
+                        + " | premises \(premiseList(commitment.premiseFactIDs))",
+                        omittedScalars: owner.omittedScalars + action.omittedScalars)
+    }
+
+    /// Two identities that may be one; a person for review, never merged by the tool.
+    static func sameAsCandidate(_ candidate: KnowledgeInference.SameAsCandidate, names: [UUID: String]) -> Rendered {
+        let first = ChatSourceToolText.renderedField(names[candidate.firstID] ?? "", limit: 200)
+        let second = ChatSourceToolText.renderedField(names[candidate.secondID] ?? "", limit: 200)
+        let score = String(format: "%.2f", candidate.score)
+        return Rendered(text: "- possible same_as | \(first.text) / \(second.text) | modality: inferred | needs human review"
+                        + " | score: \(score) (experimental, not a probability) | \(candidate.firstID.uuidString)"
+                        + " and \(candidate.secondID.uuidString)",
+                        omittedScalars: first.omittedScalars + second.omittedScalars)
+    }
+
+    private static func premiseList(_ ids: [UUID]) -> String { ids.map(\.uuidString).joined(separator: ", ") }
+
     /// Every identity the pages name, by ID.
     static func names(_ pages: [KnowledgeWikiPage]) -> [UUID: String] {
         Dictionary(pages.flatMap { page in

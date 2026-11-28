@@ -100,6 +100,9 @@ struct ChatKnowledgeStructureToolsTests {
         #expect(!graph.content.contains("Avery Example"))
         let inferred = try await run("get_graph", ["entityID": .string(Self.team.uuidString), "includeInferred": .bool(true)])
         #expect(inferred.content.contains("Platform team relatesTo Avery Example | modality: inferred"))
+        // Derived suggestions are computed only when inferred relations are asked for.
+        #expect(inferred.content.contains("then derived lines (inferred suggestions for review, never evidence"))
+        #expect(!graph.content.contains("derived lines") && !graph.content.contains("- derived "))
         #expect(try await run("get_graph", ["entityID": .string(UUID().uuidString)]).isError)
         #expect(try await run("get_graph", ["entityID": .string(Self.team.uuidString), "depth": .number(3)]).isError)
         #expect(try await run("get_graph", ["entityID": .string(Self.team.uuidString), "includeNegated": .string("yes")]).isError)

@@ -86,8 +86,19 @@ extension ChatKnowledgeTools {
                                              includesInferred: params.bool("includeInferred", fallback: false))
         guard let graph = KnowledgeGraphIndex(pages: read.pages).query(query) else { throw Invalid("Unknown entityID.") }
         let names = Dictionary(graph.nodes.map { ($0.id, $0.entity.name) }, uniquingKeysWith: { first, _ in first })
-        let lines = graph.nodes.map(ChatKnowledgeToolText.node) + graph.edges.map { ChatKnowledgeToolText.edge($0, names: names) }
-        return ChatKnowledgeToolText.output(header: ChatKnowledgeToolText.graphHeader(graph, names: names), lines: lines,
+        var lines = graph.nodes.map(ChatKnowledgeToolText.node) + graph.edges.map { ChatKnowledgeToolText.edge($0, names: names) }
+        var header = ChatKnowledgeToolText.graphHeader(graph, names: names)
+        if query.includesInferred {
+            // Computed on this read, never stored; every line says it is inferred and names its premises.
+            let suggestions = try KnowledgeInference.suggestions(from: read.pages, touching: Set(graph.nodes.map(\.id)))
+            let all = ChatKnowledgeToolText.names(read.pages)
+            lines += suggestions.edges.map { ChatKnowledgeToolText.derivedEdge($0, names: all) }
+                + suggestions.commitments.map { ChatKnowledgeToolText.derivedCommitment($0, names: all) }
+                + suggestions.sameAs.map { ChatKnowledgeToolText.sameAsCandidate($0, names: all) }
+            header += "\nthen derived lines (inferred suggestions for review, never evidence: derived | commitment | possible same_as)"
+            if suggestions.isTruncated { header += " | truncated: a derivation bound was reached" }
+        }
+        return ChatKnowledgeToolText.output(header: header, lines: lines,
                                             offset: params.offset, limit: params.limit, read: read)
     }
 
@@ -225,7 +236,10 @@ extension ChatKnowledgeTools {
                      "includeTentative": flag, "includeNegated": flag, "includeInferred": flag],
                     ["entityID"],
                     "Read the relationships around one entity (default depth 1, inferred relations hidden unless asked for): "
-                        + "nodes, then edges, each edge one claim in its stated direction with its evidence ID.")
+                        + "nodes, then edges, each edge one claim in its stated direction with its evidence ID. With "
+                        + "includeInferred, derived lines follow (chained blocks/supersedes, current owner and due date, "
+                        + "possible same identities), each labelled inferred with the claims it follows from: suggestions "
+                        + "for review, never evidence.")
         case "compare_state":
             return (["entityID": uuid, "from": day, "to": day, "asKnownThen": flag],
                     ["entityID", "from", "to"],
