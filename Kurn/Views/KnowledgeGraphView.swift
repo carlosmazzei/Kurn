@@ -170,13 +170,14 @@ struct KnowledgeGraphView: View {
     /// What the stated claims suggest, only while inferred relationships are asked for.
     @ViewBuilder
     private func suggestionsCard(_ scene: KnowledgeGraphPresentation.Scene) -> some View {
-        let suggestions = exploration.options.includesInferred
-            ? KnowledgeGraphPresentation.suggestions(pages: read.pages, touching: Set(scene.nodes.map(\.id)), now: Date()) : []
+        let suggestions = KnowledgeGraphPresentation.offersSuggestions(exploration)
+            ? KnowledgeGraphPresentation.suggestions(pages: read.pages, touching: Set(scene.nodes.map(\.id)), now: Date()) : .none
         if !suggestions.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 KnowledgeSectionLabel(KnowledgeGraphPresentation.copy("suggestions.title"))
                 footnote(KnowledgeGraphPresentation.copy("suggestions.footer"))
-                ForEach(suggestions) { suggestion in
+                if suggestions.isTruncated { footnote(KnowledgeGraphPresentation.copy("suggestions.truncated")) }
+                ForEach(suggestions.items) { suggestion in
                     Divider().overlay(Theme.separator).accessibilityHidden(true)
                     suggestionRow(suggestion)
                 }

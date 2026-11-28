@@ -1537,6 +1537,7 @@
 "knowledge.graph.inferred" = "Abgeleitet, nicht ausgesagt";
 "knowledge.graph.suggestions.title" = "Vorschläge";
 "knowledge.graph.suggestions.footer" = "Aus ausgesprochenen Aussagen abgeleitet, nicht selbst ausgesprochen. Zur Prüfung; nie ein Beleg.";
+"knowledge.graph.suggestions.truncated" = "Einige Vorschläge fehlen möglicherweise: Beim Ableiten wurde eine Grenze erreicht.";
 "knowledge.graph.suggestion.derived" = "Aus %d ausgesprochenen Aussagen abgeleitet";
 "knowledge.graph.suggestion.commitment" = "%1$@ ist zuständig für „%2$@“, fällig %3$@";
 "knowledge.graph.suggestion.same_as" = "„%1$@“ und „%2$@“ könnten dasselbe sein";

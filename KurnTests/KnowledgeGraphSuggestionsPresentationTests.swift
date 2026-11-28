@@ -38,7 +38,9 @@ struct KnowledgeGraphSuggestionsPresentationTests {
 
     @Test func eachKindIsListedWithItsReasonAndAPassageWhenItFollowsFromClaims() throws {
         let all: Set = [Self.alpha, Self.beta, Self.gamma, Self.sam, Self.samAlias, Self.action, Self.owner]
-        let list = KnowledgeGraphPresentation.suggestions(pages: try Self.pages(), touching: all, now: Self.now)
+        let result = KnowledgeGraphPresentation.suggestions(pages: try Self.pages(), touching: all, now: Self.now)
+        let list = result.items
+        #expect(!result.isTruncated)
         let edge = try #require(list.first { $0.kind == .derivedEdge })
         #expect(edge.text.contains("Alpha") && edge.text.contains("Gamma") && edge.evidence != nil)
         #expect(edge.detail == String(format: KnowledgeGraphPresentation.copy("suggestion.derived"), 2))
@@ -55,6 +57,20 @@ struct KnowledgeGraphSuggestionsPresentationTests {
         let pages = try Self.pages()
         #expect(KnowledgeGraphPresentation.suggestions(pages: pages, touching: [UUID()], now: Self.now).isEmpty)
         let onlyAction = KnowledgeGraphPresentation.suggestions(pages: pages, touching: [Self.action], now: Self.now)
-        #expect(onlyAction.map(\.kind) == [.commitment])
+        #expect(onlyAction.items.map(\.kind) == [.commitment])
+    }
+
+    @Test func theCardIsOfferedOnlyWhereTheDerivationsCanHonourTheView() {
+        var exploration = KnowledgeGraphPresentation.Exploration(root: Self.alpha)
+        #expect(!KnowledgeGraphPresentation.offersSuggestions(exploration))  // inferred relationships are off
+        exploration.options.includesInferred = true
+        #expect(KnowledgeGraphPresentation.offersSuggestions(exploration))
+        exploration.mode = .lanes
+        #expect(KnowledgeGraphPresentation.offersSuggestions(exploration))
+        // A day or a comparison cuts claims by what was known then, which the derivations do not read.
+        exploration.mode = .evolution
+        #expect(!KnowledgeGraphPresentation.offersSuggestions(exploration))
+        exploration.mode = .compare
+        #expect(!KnowledgeGraphPresentation.offersSuggestions(exploration))
     }
 }

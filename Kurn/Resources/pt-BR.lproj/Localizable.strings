@@ -1537,6 +1537,7 @@
 "knowledge.graph.inferred" = "Inferida, não declarada";
 "knowledge.graph.suggestions.title" = "Sugestões";
 "knowledge.graph.suggestions.footer" = "Inferidas a partir de afirmações declaradas, não declaradas por si. Para sua revisão; nunca são evidência.";
+"knowledge.graph.suggestions.truncated" = "Algumas sugestões podem estar faltando: um limite foi atingido ao derivá-las.";
 "knowledge.graph.suggestion.derived" = "Inferido de %d afirmações declaradas";
 "knowledge.graph.suggestion.commitment" = "%1$@ é responsável por “%2$@”, prazo %3$@";
 "knowledge.graph.suggestion.same_as" = "“%1$@” e “%2$@” podem ser o mesmo";

@@ -1537,6 +1537,7 @@
 "knowledge.graph.inferred" = "Inferred, not stated";
 "knowledge.graph.suggestions.title" = "Suggestions";
 "knowledge.graph.suggestions.footer" = "Inferred from stated claims, not stated themselves. For your review; never evidence.";
+"knowledge.graph.suggestions.truncated" = "Some suggestions may be missing: a limit was reached while deriving them.";
 "knowledge.graph.suggestion.derived" = "Inferred from %d stated claims";
 "knowledge.graph.suggestion.commitment" = "%1$@ owns “%2$@”, due %3$@";
 "knowledge.graph.suggestion.same_as" = "“%1$@” and “%2$@” may be the same";

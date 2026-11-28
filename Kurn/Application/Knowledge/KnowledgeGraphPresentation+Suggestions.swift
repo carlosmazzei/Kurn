@@ -19,11 +19,26 @@ extension KnowledgeGraphPresentation {
         let evidence: KnowledgeBrowserRoute?
     }
 
+    /// The suggestions for the shown nodes, and whether a derivation bound may have left some out.
+    struct Suggestions: Equatable {
+        let items: [Suggestion]
+        let isTruncated: Bool
+
+        static let none = Suggestions(items: [], isTruncated: false)
+        var isEmpty: Bool { items.isEmpty && !isTruncated }
+    }
+
+    /// Whether the card is offered. The derivations read every claim of the read, so they cannot
+    /// honour the cut-offs of a chosen day: the historical modes (a day, a comparison) show none.
+    static func offersSuggestions(_ exploration: Exploration) -> Bool {
+        exploration.options.includesInferred && (exploration.mode == .relationships || exploration.mode == .lanes)
+    }
+
     /// The suggestions that touch the shown nodes, in the order the derivations return them. Only
     /// computed when the reader asked for inferred relationships; a derivation that cannot run
     /// shows none rather than failing the drawing.
-    static func suggestions(pages: [KnowledgeWikiPage], touching nodeIDs: Set<UUID>, now: Date) -> [Suggestion] {
-        guard let found = try? KnowledgeInference.suggestions(from: pages, touching: nodeIDs, at: now) else { return [] }
+    static func suggestions(pages: [KnowledgeWikiPage], touching nodeIDs: Set<UUID>, now: Date) -> Suggestions {
+        guard let found = try? KnowledgeInference.suggestions(from: pages, touching: nodeIDs, at: now) else { return .none }
         let names = Dictionary(
             pages.flatMap { page in
                 [(page.entity.id, page.entity.name)] + page.sections.flatMap(\.entries).flatMap { entry in
@@ -55,7 +70,7 @@ extension KnowledgeGraphPresentation {
                 text: String(format: copy("suggestion.same_as"), name(candidate.firstID), name(candidate.secondID)),
                 detail: String(format: copy("suggestion.same_as_detail"), candidate.score), evidence: nil)
         }
-        return edges + commitments + sameAs
+        return Suggestions(items: edges + commitments + sameAs, isTruncated: found.isTruncated)
     }
 
     /// Each stated claim's first cited passage, by claim ID.
