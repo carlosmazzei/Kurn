@@ -1,0 +1,98 @@
+name: Knowledge Ask evaluation
+
+# K7.0 on demand only: it spends API credit, so it never runs on a push or a pull request. It asks the
+# real model (OPENAI_API_KEY) every question of `Fixtures/knowledge-questions` (synthetic, English and
+# Portuguese) under each variant — closed book, full transcript, and the compiled-knowledge tools of K5.1
+# — through the app's own client and the agent harness, then has a second call judge the answer against
+# the assertions the question expects and the tempting ones it must not state. `KnowledgeAnswerScorer`
+# scores it. The job prints `[ask-eval]` lines (scores, tool calls, tokens) and no prompt, answer or key.
+# There is no pass/fail threshold: the runs are compared with each other, like the pipeline evaluation.
+# Start with a small `limit` to see what a full run costs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Questions to ask (blank = all 30)"
+        type: string
+        default: "3"
+      variants:
+        description: "Comma-separated: closed_book, full_transcript, knowledge (blank = all)"
+        type: string
+        default: ""
+      model:
+        description: "Answering model (blank = the app's OpenAI default)"
+        type: string
+        default: ""
+      judge_model:
+        description: "Judge model (blank = the app's OpenAI default)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  ask-eval:
+    runs-on: macos-26
+    timeout-minutes: 150
+
+    env:
+      XCODE_PROJECT: Kurn.xcodeproj
+      XCODE_SCHEME: Kurn
+      IOS_DESTINATION: platform=iOS Simulator,name=iPhone 17
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - uses: ./.github/actions/prepare-simulator
+
+      - uses: ./.github/actions/cache-spm-packages
+
+      - name: Build for testing
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "$IOS_DESTINATION" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            build-for-testing \
+            | tee "$RUNNER_TEMP/build.log"
+
+      - name: Run the evaluation
+        env:
+          # xcodebuild forwards environment variables to the test runner only with the
+          # TEST_RUNNER_ prefix, which it strips.
+          TEST_RUNNER_KURN_ASK_EVAL: "1"
+          TEST_RUNNER_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TEST_RUNNER_KURN_ASK_EVAL_LIMIT: ${{ inputs.limit }}
+          TEST_RUNNER_KURN_ASK_EVAL_VARIANTS: ${{ inputs.variants }}
+          TEST_RUNNER_KURN_ASK_EVAL_MODEL: ${{ inputs.model }}
+          TEST_RUNNER_KURN_ASK_EVAL_JUDGE_MODEL: ${{ inputs.judge_model }}
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "$IOS_DESTINATION" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            test-without-building \
+            -only-testing:KurnTests/KnowledgeAskEvalTests \
+            | tee "$RUNNER_TEMP/ask-eval.log"
+
+      - name: Publish measurements
+        if: always()
+        run: |
+          {
+            echo "## Knowledge Ask evaluation"
+            echo '```'
+            grep -hE '\[ask-eval\]' "$RUNNER_TEMP/ask-eval.log" 2>/dev/null | sed -E 's/^.*(\[ask-eval\])/\1/' || echo "no measurements"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
