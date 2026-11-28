@@ -4550,14 +4550,20 @@ enforced by lint and by a CI audit test, not just convention:
   `live-provider-smoke`, `pipeline-eval` and `knowledge-ask-eval` workflows) and
   `release` (App Store Connect and fastlane match). An environment releases its
   secrets only to a job that declares it, after its reviewer approves and only
-  from the branches it allows (`main`), so a branch with an edited workflow gets
-  none. `Tools/check_workflow_security.py` (in `static-policy`, tested in
+  from the refs it allows (`paid-evals`: `main`; `release`: the `v*` release
+  tags the App Store workflows run on), so a branch with an edited workflow gets
+  none. `pipeline-eval` picks its environment by expression: a run that sends
+  nothing to a provider (`cloud_providers: none`, `correction: off`) uses
+  `evals-open`, which holds no secrets and allows any branch, so a pipeline
+  change can be measured on its own branch; anything else uses `paid-evals`.
+  That only holds while no paid key is left at repository level, because the
+  repository's own secrets reach every environment. `Tools/check_workflow_security.py` (in `static-policy`, tested in
   `Tools/tests/test_workflow_security.py`) fails CI when a job reads a paid or
   release secret without its environment, when a secret is not classified there,
   when a paid workflow is anything but `workflow_dispatch`, when a workflow uses
   `pull_request_target`, `workflow_run`, comment/issue/review/discussion triggers,
   `secrets: inherit` (one documented exception: `swift.yml`'s `store-assets`) or
-  `secrets[...]`, or when `.github/CODEOWNERS` loses its owner for `.github/`.
+  `secrets[...]`, or when `.github/CODEOWNERS` loses its owner for `.github/` (the owner owns the whole tree: the paid workflows build and run all of it).
   The check reads the workflow text; that the environments exist with reviewers,
   that the ruleset asks for code-owner review and that provider keys have spend
   limits are repository and provider settings it cannot see. A new secret is

@@ -64,6 +64,14 @@ class WorkflowSecurityTests(unittest.TestCase):
             findings = security.check(repository({"eval.yml": text}))
             self.assertTrue(any("`workflow_dispatch` only" in finding for finding in findings), trigger)
 
+    def test_an_expression_may_pair_the_paid_environment_with_a_secretless_one(self):
+        keyless = "environment: ${{ inputs.cloud == 'none' && 'evals-open' || 'paid-evals' }}"
+        self.assertEqual(security.check(repository({"eval.yml": PAID_JOB.format(environment=keyless)})), [])
+        for expression in ("${{ inputs.x && 'release' || 'paid-evals' }}", "${{ inputs.x && 'evals-open' || 'other' }}",
+                           "${{ inputs.x }}"):
+            findings = security.check(repository({"eval.yml": PAID_JOB.format(environment=f"environment: {expression}")}))
+            self.assertEqual(len(findings), 1, expression)
+
     def test_release_secrets_need_the_release_environment(self):
         text = """\
             name: ship

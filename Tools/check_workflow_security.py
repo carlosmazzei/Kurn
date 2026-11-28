@@ -14,7 +14,8 @@
 # This check makes the workflows say so, so a new workflow or a new secret cannot quietly bypass it:
 #
 # - every secret a job reads is classified here (paid, release or free), and a job that reads a paid or
-#   release secret declares that secret's environment;
+#   release secret declares that secret's environment (or, in an expression, that one and a listed
+#   secretless environment);
 # - a workflow with a paid secret is `workflow_dispatch` only: no push, pull request or schedule spends
 #   money unattended;
 # - no workflow uses a trigger that runs with secrets on content an outsider controls
@@ -38,6 +39,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 PAID_ENVIRONMENT = "paid-evals"
 RELEASE_ENVIRONMENT = "release"
+# Environments that hold no secrets and no restriction. A job that needs a paid secret may name one of these
+# beside the paid environment in an expression, for a run that sends nothing to a provider (pipeline-eval's
+# keyless on-device run). It is only safe while no paid secret is left at repository level: the repository's
+# own secrets reach every environment.
+SECRETLESS_ENVIRONMENTS = {"evals-open"}
 
 PAID_SECRETS = {
     "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GROQ_API_KEY", "ELEVENLABS_API_KEY", "HF_TOKEN",
@@ -72,8 +78,20 @@ class Job:
     lines: list[str] = field(default_factory=list)
 
     @property
+    def environments(self) -> set[str]:
+        """Every environment the job can run in: its name, or each quoted result of an `${{ }}` expression."""
+        value = self.environment
+        if value is None:
+            return set()
+        if "${{" in value:
+            # The quoted results of the expression, not the values it compares an input with.
+            results = re.sub(r"(==|!=)\s*'[^']*'", "", value)
+            return set(re.findall(r"'([A-Za-z0-9_.-]+)'", results))
+        return {value}
+
+    @property
     def environment(self) -> str | None:
-        """The job's own `environment:`, as a name or as a `name:` mapping."""
+        """The job's own `environment:` text, as a name, an expression or a `name:` mapping."""
         for index, line in enumerate(self.lines):
             match = re.match(r"^    environment:\s*(.*?)\s*$", line)
             if not match:
@@ -150,7 +168,7 @@ def check_workflow(path: Path, relative: str) -> list[str]:
         findings.append(f"{relative}: `secrets[...]` is read dynamically, so it cannot be classified")
     has_paid = False
     for job in jobs(lines):
-        environment = job.environment
+        environments = job.environments
         if any(re.search(r"secrets:\s*inherit", line) for line in job.lines) \
                 and (path.name, job.name) not in INHERIT_EXCEPTIONS:
             findings.append(f"{relative}: job `{job.name}` uses `secrets: inherit`, which hands the called workflow "
@@ -167,9 +185,10 @@ def check_workflow(path: Path, relative: str) -> list[str]:
                 findings.append(f"{relative}: job `{job.name}` reads `{secret}`, which Tools/check_workflow_security.py "
                                 "does not classify (paid, release or free)")
                 continue
-            if environment != needed:
+            others = environments - {needed}
+            if needed not in environments or (others and not others <= SECRETLESS_ENVIRONMENTS):
                 findings.append(f"{relative}: job `{job.name}` reads `{secret}` and must declare `environment: {needed}`"
-                                f" (it declares {environment or 'none'})")
+                                f" (it declares {', '.join(sorted(environments)) or 'none'})")
     if has_paid and events != {"workflow_dispatch"}:
         findings.append(f"{relative}: a workflow with a paid secret must be `workflow_dispatch` only (it has "
                         f"{', '.join(sorted(events)) or 'no triggers'})")
