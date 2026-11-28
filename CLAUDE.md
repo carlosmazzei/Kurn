@@ -758,6 +758,24 @@ packages build in the Swift 6 language mode, where a visible data race is an err
 prompt, an answer, a key or tool arguments, and no threshold is invented for the times: they are compared
 between runs, like the pipeline evaluation.
 
+### Ask evaluation (K7.0)
+
+`.github/workflows/knowledge-ask-eval.yml` (`workflow_dispatch` only, since it spends API credit; secret
+`OPENAI_API_KEY`) runs `KnowledgeAskEvalTests` with `KURN_ASK_EVAL=1`: every question of
+`Fixtures/knowledge-questions` (synthetic) under each variant, through the app's own OpenAI client and
+`NativeHarness`. Variants: `closed_book` (no sources), `full_transcript` (the fixture's transcripts in the system
+prompt, no tools) and `knowledge` (the K5.1 tools over a read built from the fixture's golden assertions, under
+`HarnessChatService.knowledgePolicy`, no transcripts). A second, tool-less call judges the answer against the
+expected assertions and the tempting `mustNotAssert` ones; `KnowledgeAnswerScorer` scores the verdict. The citations
+are the ones the judge reads the answer naming (a meeting and a time turned into its segment), not a parsed link, and
+the scorer needs one of each stated claim's own evidence segments. An unreadable verdict is a failure, never an
+empty answer, and `[ask-eval]` summaries report what was attempted plus a `common` group over the questions every
+variant scored; an unknown variant or a non-positive `limit` is refused before any paid call. `[ask-eval]` lines carry the question ID, kind, scores, tool
+calls and tokens, never a prompt, an answer or a key, and there is no pass/fail threshold: runs are compared with each
+other. Inputs are `limit` (default 3, so a first run shows the cost), `variants` and the two model names. The offline
+tests in that suite (fixture to read, prompts, verdict parsing, report lines) run in every CI; the K5.4 variants A and B
+(hybrid transcript search, a plain Markdown wiki) and C–F are not built.
+
 ### Measuring accuracy (WER / DER)
 
 `KurnTests/Support/Evaluation/` implements the two standard metrics, so an
