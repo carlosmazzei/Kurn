@@ -36,25 +36,40 @@ extension KnowledgeInference {
     /// entities' pages, so a claim seen twice counts once (by its ID); identities must already
     /// be resolved by the caller, as `KnowledgeStateComparison.claims(from:)` does.
     public static func deriveCommitments(from facts: [KnowledgeWikiSnapshot.Fact]) -> CommitmentResult {
+        let premises = commitmentPremises(from: facts)
+        return join(owners: premises.owners, dues: premises.dues)
+    }
+
+    /// The owner and due-date premises per action, each with the claim it came from.
+    struct CommitmentPremises {
         var owners: [UUID: [(owner: UUID, fact: UUID)]] = [:]
         var dues: [UUID: [(due: KnowledgeTemporalValue, fact: UUID)]] = [:]
+    }
+
+    static func commitmentPremises(from facts: [KnowledgeWikiSnapshot.Fact]) -> CommitmentPremises {
+        var result = CommitmentPremises()
         var seen = Set<UUID>()
         for fact in facts where isPremise(fact) && seen.insert(fact.id).inserted {
             switch fact.predicate {
             case .assignedTo:
                 if let owner = fact.objectID, owner != fact.subjectID {
-                    owners[fact.subjectID, default: []].append((owner, fact.id))
+                    result.owners[fact.subjectID, default: []].append((owner, fact.id))
                 }
             case .owns:
                 if let action = fact.objectID, action != fact.subjectID {
-                    owners[action, default: []].append((fact.subjectID, fact.id))
+                    result.owners[action, default: []].append((fact.subjectID, fact.id))
                 }
             case .dueOn:
-                if case let .date(value)? = fact.value { dues[fact.subjectID, default: []].append((value, fact.id)) }
+                if case let .date(value)? = fact.value { result.dues[fact.subjectID, default: []].append((value, fact.id)) }
             default:
                 break
             }
         }
+        return result
+    }
+
+    static func join(owners: [UUID: [(owner: UUID, fact: UUID)]],
+                     dues: [UUID: [(due: KnowledgeTemporalValue, fact: UUID)]]) -> CommitmentResult {
         var found: [DerivedCommitment] = []
         for action in owners.keys.sorted(by: { $0.uuidString < $1.uuidString }) {
             guard let due = dues[action] else { continue }
@@ -72,7 +87,7 @@ extension KnowledgeInference {
         return CommitmentResult(commitments: found, isTruncated: false)
     }
 
-    private static func isPremise(_ fact: KnowledgeWikiSnapshot.Fact) -> Bool {
+    static func isPremise(_ fact: KnowledgeWikiSnapshot.Fact) -> Bool {
         let qualifiers = fact.qualifiers
         return qualifiers.polarity == .positive && qualifiers.modality != .inferred
             && !KnowledgeTemporalReducer.tentative.contains(qualifiers.modality)
