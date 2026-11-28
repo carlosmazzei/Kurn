@@ -27,8 +27,8 @@ public enum KnowledgeEventDerivation {
         public let detail: String
         /// What it replaced, when something did.
         public let previous: String?
-        /// Transaction time at which the change was first known: the earliest claim among `claimIDs`, so a later
-        /// confirmation of the same change never makes it look late.
+        /// Transaction time at which the change was first known: the earliest claim that states its start, so a later
+        /// confirmation never makes it look late and an earlier start learned later still does.
         public let recordedAt: Date
         /// True when the change starts before the UTC day it was recorded on:
         /// knowledge that arrived after the days it concerns (K3.5).
@@ -72,9 +72,10 @@ public enum KnowledgeEventDerivation {
 
     // swiftlint:disable:next function_parameter_count
     private static func make(_ kind: KnowledgeEventKind, entityID: UUID, stated: KnowledgeTemporalValue?, claimIDs: [UUID],
-                             detail: String, previous: String?, recorded: [UUID: Date]) -> Event {
+                             detail: String, previous: String?, recorded: [UUID: Date],
+                             anchorIDs: [UUID]? = nil) -> Event {
         let ids = claimIDs.sorted { $0.uuidString < $1.uuidString }
-        let recordedAt = ids.compactMap { recorded[$0] }.min() ?? .distantPast
+        let recordedAt = (anchorIDs ?? ids).compactMap { recorded[$0] }.min() ?? .distantPast
         var utc = Calendar(identifier: .gregorian)
         utc.timeZone = TimeZone(identifier: "UTC") ?? .gmt
         let late = stated?.bounds.map { $0.lower < utc.startOfDay(for: recordedAt) } ?? false
@@ -106,6 +107,15 @@ public enum KnowledgeEventDerivation {
             && claim.validFrom?.bounds != nil && claim.validTo == nil
     }
 
+    private struct Change {
+        let stated: KnowledgeTemporalValue
+        let detail: String
+        var claimIDs: [UUID]
+        /// The claims that state the chosen start: the change was first known when the earliest of them was recorded.
+        var anchorIDs: [UUID]
+        let previous: String?
+    }
+
     /// Consecutive statements of the same value are one change; the earliest stated start names it. A change
     /// names what it replaced only when its stated start is wholly after the previous change's: starts that
     /// overlap are a conflict the temporal reducer reports, not an order this derivation may invent.
@@ -119,12 +129,14 @@ public enum KnowledgeEventDerivation {
             let bounds = step.stated.bounds
             if let last = result.last, last.detail == step.detail {
                 result[result.count - 1].claimIDs.append(step.claimID)
+                if step.stated == last.stated { result[result.count - 1].anchorIDs.append(step.claimID) }
                 continue
             }
             let replaced = result.last.flatMap { last in
                 (last.stated.bounds?.upper ?? .distantFuture) <= (bounds?.lower ?? .distantPast) ? last.detail : nil
             }
-            result.append(Change(stated: step.stated, detail: step.detail, claimIDs: [step.claimID], previous: replaced))
+            result.append(Change(stated: step.stated, detail: step.detail, claimIDs: [step.claimID], anchorIDs: [step.claimID],
+                                 previous: replaced))
         }
         return result
     }
@@ -137,7 +149,8 @@ public enum KnowledgeEventDerivation {
         }
         return changes(steps).enumerated().map { index, change in
             let event = make(.dueDateChanged, entityID: entityID, stated: change.stated, claimIDs: change.claimIDs,
-                             detail: change.detail, previous: change.previous, recorded: recorded)
+                             detail: change.detail, previous: change.previous, recorded: recorded,
+                             anchorIDs: change.anchorIDs)
             return Entry(event: event, sortDate: change.stated.bounds?.lower, group: 2, sequence: index)
         }
     }
@@ -156,7 +169,8 @@ public enum KnowledgeEventDerivation {
         }
         return changes(steps).enumerated().map { index, change in
             let event = make(.assigned, entityID: entityID, stated: change.stated, claimIDs: change.claimIDs,
-                             detail: change.detail, previous: change.previous, recorded: recorded)
+                             detail: change.detail, previous: change.previous, recorded: recorded,
+                             anchorIDs: change.anchorIDs)
             return Entry(event: event, sortDate: change.stated.bounds?.lower, group: 1, sequence: index)
         }
     }

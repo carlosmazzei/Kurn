@@ -172,4 +172,20 @@ struct KnowledgeEventDerivationTests {
         #expect(Set(events.map(\.detail)) == [first.uuidString, second.uuidString])
         #expect(events.allSatisfy { $0.previous == nil })
     }
+
+    @Test func anEarlierStartLearnedLaterMakesTheChangeLate() {
+        let action = UUID(), due = Self.day("2026-10-09")
+        func claim(from: String, recorded: String) -> KnowledgeTemporalClaim {
+            KnowledgeTemporalClaim(id: UUID(), subjectID: action, predicate: .dueOn, value: .date(due), modality: .agreed,
+                                   validFrom: Self.day(from), recordedAt: Self.date(recorded))
+        }
+        let events = KnowledgeEventDerivation.derive(
+            entityID: action, lifecycle: .action, knownAt: Self.later,
+            claims: [claim(from: "2026-10-05", recorded: "2026-09-28T10:00:00Z"),
+                     claim(from: "2026-10-01", recorded: "2026-10-03T10:00:00Z")])
+        #expect(events.count == 1)
+        #expect(events.first?.occurredAt == Self.day("2026-10-01"))
+        #expect(events.first?.recordedAt == Self.date("2026-10-03T10:00:00Z"))
+        #expect(events.first?.isLate == true)
+    }
 }
